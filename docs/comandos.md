@@ -118,14 +118,27 @@ Quem chama quem, a partir dos `calls` do dump: arestas únicas
 argumento, filtra para chamadores+chamados da função. Mesmas cegueiras
 documentadas do `calls` (Eval/sends de método).
 
+### `rename-static <hbp> <arquivo> <velho> <novo> [--func]` — ✅
+Rename de variável `STATIC`, de função ou **file-wide** (a declaração
+file-wide vive na pseudo-função `fileDecl` do dump; as ocorrências carregam
+`filewide: true`). Território **S**: statics são invisíveis ao macro e seus
+nomes não existem no pcode — verificação **byte-idêntica** em todos os
+módulos, como na Fase 0. Recusa conservadora: nome novo já declarado em
+qualquer escopo do módulo. Fato aprendido no fixture: `STATIC` file-wide
+precisa vir antes de qualquer código executável do módulo (E0004).
+
+### `find-dynamic-calls <hbp>` — ✅
+Auditoria dos pontos cegos: strings cujo conteúdo é identificador **e**
+coincide com função do projeto (possível `Do()`/dispatch por nome, com o
+módulo onde a função vive) + funções que usam macro `&` (nomes dinâmicos
+possíveis). É o mapa de onde os renames de função merecem revisão humana.
+
 ## Candidatos (aceitos em princípio, sem fase definida)
 
 | Comando | Base já existente | Risco |
 |---|---|---|
-| `rename-static-var` | dump já traz `scope: static` + filewide | S |
 | `rename-define` (símbolo de `#define`/`#command`) | replay com biblioteca do pp | H |
 | `inline-local` (substituir var de uso único pela expressão) | `used` no dump | S/H |
-| `find-dynamic-calls` (relatório de `Do("...")`/macros para auditoria) | varredura de strings + `usesMacro` | leitura |
 
 ## Integração VSCode — ✅ ([vscode/](../vscode/))
 

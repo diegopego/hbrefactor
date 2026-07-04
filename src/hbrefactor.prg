@@ -31,6 +31,10 @@ PROCEDURE Main()
       nExit := ExtractFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-static"
+      nExit := RenameStatic( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "find-dynamic-calls"
+      nExit := FindDynamicCalls( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "unused-locals"
       nExit := UnusedLocals( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "call-graph"
@@ -54,6 +58,8 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor reorder-params <project.hbp> <function> <name1,name2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <project.hbp> <file.prg> <first>-<last> <newname> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project.hbp> <name> [--func <function>]" + hb_eol() )
+   OutStd( "  hbrefactor rename-static <project.hbp> <file.prg> <old> <new> [--func <function>] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor find-dynamic-calls <project.hbp>" + hb_eol() )
    OutStd( "  hbrefactor unused-locals <project.hbp>" + hb_eol() )
    OutStd( "  hbrefactor call-graph <project.hbp> [<function>]" + hb_eol() )
 
@@ -1510,6 +1516,221 @@ STATIC FUNCTION LocationsJson( aLoc )
    RETURN hb_jsonEncode( aOut, .T. )
 
 // ---------------------------------------------------------------------------
+// rename-static: STATIC variable, either function-level or file-wide.
+// Static names never reach the pcode (without -b), so the verification is
+// the strongest one: every module's -gh -l .hrb must stay byte-identical.
+// Statics are invisible to runtime macros, so this is S territory.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION RenameStatic( aArgs )
+
+   LOCAL cHbp, cFile, cOld, cNew, cFuncFilter := "", lDryRun := .F.
+   LOCAL hProj, cTmp, cSrcPath, hDump, hFunc, hDecl, hOcc
+   LOCAL aDecls := {}, hDeclFunc, lFileWide, aLines := {}
+   LOCAL hScan, hPpo, nLine, cClean, cPpoLine, aHits, hHit, aEdits := {}
+   LOCAL cText, cTextNew, nI, cPath
+
+   IF Len( aArgs ) < 5
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cHbp := aArgs[ 2 ]
+   cFile := aArgs[ 3 ]
+   cOld := aArgs[ 4 ]
+   cNew := aArgs[ 5 ]
+   FOR nI := 6 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--func" .AND. nI < Len( aArgs )
+         cFuncFilter := Upper( aArgs[ ++nI ] )
+      CASE Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      ENDCASE
+   NEXT
+
+   IF ! IsValidIdent( cNew )
+      RETURN Refuse( "new name '" + cNew + "' is not a valid identifier" )
+   ENDIF
+   IF IsReserved( cNew )
+      RETURN Refuse( "new name '" + cNew + "' is a reserved word" )
+   ENDIF
+   IF Upper( cOld ) == Upper( cNew )
+      RETURN Refuse( "old and new names are identical" )
+   ENDIF
+
+   hProj := LoadProject( cHbp )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + cHbp + "'" )
+   ENDIF
+   cSrcPath := ProjectMember( hProj, cFile )
+   IF cSrcPath == ""
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cHbp + "'" )
+   ENDIF
+   IF DefineCollision( hProj, cSrcPath, cNew )
+      RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule" )
+   ENDIF
+
+   cTmp := WorkDir()
+   IF ! CompileAll( hProj, cSrcPath, cTmp, "before" )
+      RETURN Refuse( "project does not compile - fix build errors first" )
+   ENDIF
+   hDump := ReadDump( cTmp + hb_ps() + FNameBase( cSrcPath ) + ".occ.json" )
+   IF hDump == NIL
+      RETURN Refuse( "occurrence dump not found/invalid (compiler with -x support required)" )
+   ENDIF
+
+   // locate the STATIC declaration (file-wide lives in the fileDecl pseudo
+   // function) and refuse the new name if it is declared anywhere in the
+   // module (conservative: any capture/shadow risk is a no)
+   FOR EACH hFunc IN hDump[ "functions" ]
+      FOR EACH hDecl IN hFunc[ "declarations" ]
+         IF Upper( hDecl[ "sym" ] ) == Upper( cNew )
+            RETURN Refuse( "new name '" + cNew + "' is already declared in this module (" + ;
+                           hFunc[ "name" ] + ", scope " + hDecl[ "scope" ] + ")" )
+         ENDIF
+         IF Upper( hDecl[ "sym" ] ) == Upper( cOld ) .AND. hDecl[ "scope" ] == "static"
+            IF Empty( cFuncFilter ) .OR. ;
+               ( ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cFuncFilter )
+               AAdd( aDecls, { hFunc, hDecl } )
+            ENDIF
+         ENDIF
+      NEXT
+   NEXT
+   IF Empty( aDecls )
+      RETURN Refuse( "'" + cOld + "' is not a STATIC variable of '" + cFile + "'" )
+   ENDIF
+   IF Len( aDecls ) > 1
+      RETURN Refuse( "'" + cOld + "' is STATIC in more than one function - use --func" )
+   ENDIF
+   hDeclFunc := aDecls[ 1 ][ 1 ]
+   lFileWide := hDeclFunc[ "fileDecl" ]
+   AddLine( aLines, aDecls[ 1 ][ 2 ][ "declLine" ] )
+
+   FOR EACH hFunc IN hDump[ "functions" ]
+      FOR EACH hOcc IN hFunc[ "occurrences" ]
+         IF Upper( hOcc[ "sym" ] ) == Upper( cOld ) .AND. hOcc[ "scope" ] == "static"
+            DO CASE
+            CASE lFileWide .AND. ( hb_HGetDef( hOcc, "filewide", .F. ) .OR. hFunc[ "fileDecl" ] )
+               AddLine( aLines, hOcc[ "line" ] )
+            CASE ! lFileWide .AND. ! hb_HGetDef( hOcc, "filewide", .F. ) .AND. ;
+                 Upper( hFunc[ "name" ] ) == Upper( hDeclFunc[ "name" ] )
+               AddLine( aLines, hOcc[ "line" ] )
+            ENDCASE
+         ENDIF
+      NEXT
+   NEXT
+
+   cText := hb_MemoRead( cSrcPath )
+   hScan := TokenScan( cText, cOld )
+   hPpo := PpoMap( cTmp + hb_ps() + FNameBase( cSrcPath ) + ".ppo" )
+   FOR EACH nLine IN ASort( aLines )
+      cClean := Squeeze( hb_HGetDef( hScan[ "clean" ], nLine, "" ) )
+      cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
+      IF !( cClean == cPpoLine ) .AND. ;
+         CountIdent( cPpoLine, cOld ) != Len( hb_HGetDef( hScan[ "hits" ], nLine, {} ) )
+         RETURN Refuse( "line " + hb_ntos( nLine ) + " is rewritten by the preprocessor - refusing" )
+      ENDIF
+      aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
+      IF Empty( aHits )
+         RETURN Refuse( "line " + hb_ntos( nLine ) + ": oracle reports an occurrence but no matching token found" )
+      ENDIF
+      FOR EACH hHit IN aHits
+         AAdd( aEdits, { nLine, hHit[ 1 ], hHit[ 2 ], cNew } )
+      NEXT
+   NEXT
+   IF Empty( aEdits )
+      RETURN Refuse( "nothing to rename" )
+   ENDIF
+
+   OutStd( "rename-static: " + cOld + " -> " + cNew + ;
+           iif( lFileWide, " (file-wide, " + cFile + ")", " (in " + hDeclFunc[ "name" ] + ")" ) + hb_eol() )
+   FOR EACH hHit IN aEdits
+      OutStd( "  " + cFile + ":" + hb_ntos( hHit[ 1 ] ) + ":" + hb_ntos( hHit[ 2 ] ) + hb_eol() )
+   NEXT
+   IF lDryRun
+      OutStd( "dry run - no changes written" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   cTextNew := ApplyEdits( cText, aEdits )
+   hb_MemoWrit( cSrcPath, cTextNew )
+
+   IF ! CompileAll( hProj, cSrcPath, cTmp, "after" )
+      hb_MemoWrit( cSrcPath, cText )
+      RETURN Refuse( "project stopped compiling after rename - rolled back" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      IF !( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ) == ;
+            hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ) )
+         hb_MemoWrit( cSrcPath, cText )
+         RETURN Refuse( "verification FAILED: " + hb_FNameNameExt( cPath ) + ".hrb changed - rolled back" )
+      ENDIF
+   NEXT
+   OutStd( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + " module(s) byte-identical (-gh -l)" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// find-dynamic-calls: audit report of the blind spots - string literals that
+// name a project function (possible Do()/dispatch-by-name) and functions
+// using & macros (dynamic names may be built there)
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION FindDynamicCalls( aArgs )
+
+   LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
+   LOCAL hDefined := { => }, nFound := 0, cModFile, hScan, aSrc
+
+   IF Len( aArgs ) < 2
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   hProj := LoadProject( aArgs[ 2 ] )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + aArgs[ 2 ] + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! CompileAll( hProj, "", cTmp, "before", .T. )
+      RETURN Refuse( "project does not compile - fix build errors first" )
+   ENDIF
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      IF hDump == NIL
+         RETURN Refuse( "missing occurrence dump for '" + cPath + "'" )
+      ENDIF
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF ! hFunc[ "fileDecl" ]
+            hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
+         ENDIF
+      NEXT
+   NEXT
+
+   FOR EACH cPath IN hProj[ "files" ]
+      cModFile := hb_FNameNameExt( cPath )
+      hScan := TokenScan( hb_MemoRead( cPath ), "hbrf_dummy" )
+      aSrc := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
+      FOR EACH hItem IN hScan[ "strids" ]
+         IF Upper( hItem[ 2 ] ) $ hDefined
+            nFound++
+            OutStd( cModFile + ":" + hb_ntos( hItem[ 1 ] ) + ": string '" + hItem[ 2 ] + ;
+               "' names a project function [" + hDefined[ Upper( hItem[ 2 ] ) ] + "]" + ;
+               SrcLine( aSrc, hItem[ 1 ] ) + hb_eol() )
+         ENDIF
+      NEXT
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "usesMacro" ]
+            nFound++
+            OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": function " + hFunc[ "name" ] + ;
+               " uses & macros (dynamic names possible)" + hb_eol() )
+         ENDIF
+      NEXT
+   NEXT
+   OutStd( hb_ntos( nFound ) + " finding(s)" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
 // unused-locals: delegate to the compiler's own analysis (-w3 warnings
 // W0003 "declared but not used" and W0032 "assigned but not used").
 // The -x dump cannot see never-used locals: the optimizer removes them
@@ -1858,7 +2079,7 @@ STATIC PROCEDURE AddLine( aLines, nLine )
 
 STATIC FUNCTION TokenScan( cText, cName )
 
-   LOCAL hHits := { => }, hClean := { => }, aStrHits := {}, aStrExact := {}
+   LOCAL hHits := { => }, hClean := { => }, aStrHits := {}, aStrExact := {}, aStrIds := {}
    LOCAL cUp := Upper( cName )
    LOCAL nLen := hb_BLen( cText )
    LOCAL nAt := 1, nLine := 1, nCol := 1
@@ -1914,6 +2135,9 @@ STATIC FUNCTION TokenScan( cText, cName )
                AAdd( aStrExact, { nLine, nStrCol, Len( cStrBuf ) } )
             ELSEIF cUp $ Upper( cStrBuf )
                AddLine( aStrHits, nLine )
+            ENDIF
+            IF IsValidIdent( cStrBuf )
+               AAdd( aStrIds, { nLine, cStrBuf } )
             ENDIF
             cStrBuf := ""
             cState := "code"
@@ -1980,7 +2204,8 @@ STATIC FUNCTION TokenScan( cText, cName )
    ENDDO
    hClean[ nLine ] := cLineBuf
 
-   RETURN { "hits" => hHits, "clean" => hClean, "strhits" => aStrHits, "strexact" => aStrExact }
+   RETURN { "hits" => hHits, "clean" => hClean, "strhits" => aStrHits, ;
+            "strexact" => aStrExact, "strids" => aStrIds }
 
 // count identifier tokens equal to cName in a single (comment-free) line,
 // with the same string and ->/: context rules used by TokenScan

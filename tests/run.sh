@@ -91,7 +91,7 @@ D=$(fresh case8)
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "b.prg:3: definition (function)" "$D/out.log"
+grep -q "b.prg:5: definition (function)" "$D/out.log"
 check "definition found in b.prg"  $?
 grep -q "a.prg:10: call in MAIN" "$D/out.log"
 check "call found in a.prg (Main)" $?
@@ -228,7 +228,7 @@ python3 - "$D/locs.json" <<'PYEOF'
 import json, sys
 locs = json.load(open(sys.argv[1]))
 assert isinstance(locs, list) and len(locs) >= 2, "few locations"
-assert any(l["uri"].endswith("b.prg") and l["range"]["start"]["line"] == 2 for l in locs), "definition loc"
+assert any(l["uri"].endswith("b.prg") and l["range"]["start"]["line"] == 4 for l in locs), "definition loc"
 assert any(l["uri"].endswith("a.prg") for l in locs), "call loc"
 PYEOF
 check "Location[] valid with def+call" $?
@@ -258,6 +258,31 @@ check "external callee tagged"     $?
 ( cd "$D" && "$BIN" call-graph fix01.hbp Dupla > filt.log 2>&1 )
 grep -q "MAIN -> DUPLA" "$D/filt.log" && ! grep -q "QOUT" "$D/filt.log"
 check "filter by function works"   $?
+
+echo "case 21: rename-static (file-wide) with byte-identical verification"
+D=$(fresh case21)
+( cd "$D" && "$BIN" rename-static fix01.hbp b.prg s_nContador s_nSeq > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "STATIC s_nSeq := 0" "$D/b.prg"
+check "file-wide declaration renamed" $?
+grep -q "RETURN s_nSeq" "$D/b.prg"
+check "use inside function renamed" $?
+grep -q "verified: all 2 module" "$D/out.log"
+check "byte-identical verification" $?
+cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
+check "a.prg untouched"            $?
+
+echo "case 22: find-dynamic-calls audits strings and macro zones"
+D=$(fresh case22)
+printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n\nFUNCTION Dinamica( cVar )\n\n   RETURN &cVar\n' >> "$D/a.prg"
+( cd "$D" && "$BIN" find-dynamic-calls fix01.hbp > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "string 'Dupla' names a project function \[b.prg\]" "$D/out.log"
+check "string naming function reported" $?
+grep -q "function DINAMICA uses & macros" "$D/out.log"
+check "macro zone reported"        $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"
