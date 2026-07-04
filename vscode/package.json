@@ -1,0 +1,41 @@
+{
+  "name": "hbrefactor",
+  "displayName": "hbrefactor - Harbour refactoring",
+  "description": "Refatoração verificada para Harbour: rename, reorder, extract e usages via CLI hbrefactor (oráculo do compilador -x).",
+  "version": "0.1.0",
+  "publisher": "diegopego",
+  "license": "MIT",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": [ "Other" ],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "hbrefactor.usages", "title": "hbrefactor: Usages (all references)" },
+      { "command": "hbrefactor.renameLocal", "title": "hbrefactor: Rename local/param under cursor" },
+      { "command": "hbrefactor.renameFunction", "title": "hbrefactor: Rename function under cursor" },
+      { "command": "hbrefactor.reorderParams", "title": "hbrefactor: Reorder parameters of function under cursor" },
+      { "command": "hbrefactor.extractFunction", "title": "hbrefactor: Extract selection to new function" }
+    ],
+    "configuration": {
+      "title": "hbrefactor",
+      "properties": {
+        "hbrefactor.binPath": {
+          "type": "string",
+          "default": "hbrefactor",
+          "description": "Caminho do executável hbrefactor."
+        },
+        "hbrefactor.hbBin": {
+          "type": "string",
+          "default": "",
+          "description": "Diretório dos binários do Harbour com suporte a -x (vira HB_BIN). Ex.: ~/devel/harbour-core/harbour/bin/linux/gcc"
+        },
+        "hbrefactor.project": {
+          "type": "string",
+          "default": "",
+          "description": "Caminho do .hbp do projeto. Vazio: procura *.hbp no workspace (pergunta se houver mais de um)."
+        }
+      }
+    }
+  }
+}

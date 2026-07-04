@@ -219,6 +219,20 @@ check "RETURN in range refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+echo "case 18: usages --json emits LSP Location[]"
+D=$(fresh case18)
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+python3 - "$D/locs.json" <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+assert isinstance(locs, list) and len(locs) >= 2, "few locations"
+assert any(l["uri"].endswith("b.prg") and l["range"]["start"]["line"] == 2 for l in locs), "definition loc"
+assert any(l["uri"].endswith("a.prg") for l in locs), "call loc"
+PYEOF
+check "Location[] valid with def+call" $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

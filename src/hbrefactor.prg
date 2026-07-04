@@ -1381,9 +1381,10 @@ STATIC FUNCTION HrbExtractCheck( cBefore, cAfter, cUpNew, cWhy )
 
 STATIC FUNCTION Usages( aArgs )
 
-   LOCAL cHbp, cName, cFuncFilter := ""
+   LOCAL cHbp, cName, cFuncFilter := "", cJsonOut := ""
    LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
    LOCAL nHits := 0, nI, cModFile, aSrc, cCtx, cSrcText, hStrScan
+   LOCAL aLoc := {}
 
    IF Len( aArgs ) < 3
       Usage()
@@ -1393,9 +1394,12 @@ STATIC FUNCTION Usages( aArgs )
    cHbp  := aArgs[ 2 ]
    cName := aArgs[ 3 ]
    FOR nI := 4 TO Len( aArgs )
-      IF Lower( aArgs[ nI ] ) == "--func" .AND. nI < Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--func" .AND. nI < Len( aArgs )
          cFuncFilter := Upper( aArgs[ ++nI ] )
-      ENDIF
+      CASE Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
+         cJsonOut := aArgs[ ++nI ]
+      ENDCASE
    NEXT
 
    hProj := LoadProject( cHbp )
@@ -1421,6 +1425,7 @@ STATIC FUNCTION Usages( aArgs )
       hStrScan := TokenScan( cSrcText, cName )
       FOR EACH hItem IN hStrScan[ "strexact" ]
          nHits++
+         AAdd( aLoc, { cPath, hItem[ 1 ] } )
          OutStd( cModFile + ":" + hb_ntos( hItem[ 1 ] ) + ": possible reference in string" + ;
                  SrcLine( aSrc, hItem[ 1 ] ) + hb_eol() )
       NEXT
@@ -1435,6 +1440,7 @@ STATIC FUNCTION Usages( aArgs )
 
          IF Upper( hFunc[ "name" ] ) == Upper( cName )
             nHits++
+            AAdd( aLoc, { cPath, hFunc[ "line" ] } )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
          ENDIF
@@ -1442,6 +1448,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
+               AAdd( aLoc, { cPath, hItem[ "declLine" ] } )
                cCtx := SrcLine( aSrc, hItem[ "declLine" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "declLine" ] ) + ": declaration (" + ;
                   hItem[ "scope" ] + iif( hItem[ "param" ], ", parameter", "" ) + ") in " + ;
@@ -1452,6 +1459,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "occurrences" ]
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
+               AAdd( aLoc, { cPath, hItem[ "line" ] } )
                cCtx := SrcLine( aSrc, hItem[ "line" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + hItem[ "access" ] + ;
                   " (" + hItem[ "scope" ] + iif( hItem[ "block" ], ", codeblock", "" ) + ") in " + ;
@@ -1462,6 +1470,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "calls" ]
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
+               AAdd( aLoc, { cPath, hItem[ "line" ] } )
                cCtx := SrcLine( aSrc, hItem[ "line" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": call" + ;
                   iif( hItem[ "block" ], " (codeblock)", "" ) + " in " + ;
@@ -1473,7 +1482,26 @@ STATIC FUNCTION Usages( aArgs )
 
    OutStd( hb_ntos( nHits ) + " result(s) for '" + cName + "'" + hb_eol() )
 
+   IF ! Empty( cJsonOut )
+      hb_MemoWrit( cJsonOut, LocationsJson( aLoc ) )
+   ENDIF
+
    RETURN iif( nHits > 0, EXIT_OK, EXIT_REFUSED )
+
+// LSP Location[] (0-based lines; column 0 - navigation granularity is the line)
+STATIC FUNCTION LocationsJson( aLoc )
+
+   LOCAL aOut := {}, aL
+
+   FOR EACH aL IN aLoc
+      AAdd( aOut, { ;
+         "uri" => "file://" + aL[ 1 ], ;
+         "range" => { ;
+            "start" => { "line" => aL[ 2 ] - 1, "character" => 0 }, ;
+            "end"   => { "line" => aL[ 2 ] - 1, "character" => 0 } } } )
+   NEXT
+
+   RETURN hb_jsonEncode( aOut, .T. )
 
 STATIC FUNCTION SrcLine( aSrc, nLine )
    RETURN iif( nLine >= 1 .AND. nLine <= Len( aSrc ), ;

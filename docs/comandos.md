@@ -115,8 +115,13 @@ nova no fim do módulo, substituindo a seleção pela chamada. Implementado:
 | `call-graph` (quem chama quem no projeto) | `calls` do dump | leitura |
 | `find-dynamic-calls` (relatório de `Do("...")`/macros para auditoria) | varredura de strings + `usesMacro` | leitura |
 
-## Integração VSCode (Fase 2+ da entrega)
+## Integração VSCode — ✅ ([vscode/](../vscode/))
 
-Todos os comandos de escrita emitem `--json` no formato **LSP WorkspaceEdit**;
-`usages` ganhará `--json` no formato `Location[]`. A extensão fina traduz:
-F2 → `rename-*`, Shift+F12 → `usages`, code action → `extract-function`.
+Extensão **fina** implementada (`vscode/extension.js`, sem build step): coleta
+argumentos (palavra sob o cursor, função acima do cursor, seleção), invoca o
+CLI e mostra resultados — **quem aplica, verifica e faz rollback é sempre o
+CLI**. Comandos: Usages (painel de referências nativo via `usages --json` em
+`Location[]`), Rename local/param, Rename function (oferece `--force` após
+mostrar os avisos de referências textuais), Reorder parameters, Extract
+selection. Configuração: `hbrefactor.binPath`, `hbrefactor.hbBin` (HB_BIN),
+`hbrefactor.project`. Instalação e atalhos: [vscode/README.md](../vscode/README.md).
