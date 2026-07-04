@@ -311,6 +311,47 @@ check "last line renamed"          $?
 grep -q "verified: all 2 module" "$D/out.log"
 check "byte-identical verification" $?
 
+echo "case 25: aliased variables (M-> and alias->) visible in usages"
+D=$(fresh case25)
+printf '\nFUNCTION UsaAlias()\n\n   M->xGlob := 1\n\n   RETURN M->xGlob + CLIENTES->saldo\n' >> "$D/b.prg"
+( cd "$D" && "$BIN" usages fix01.hbp xGlob > mv.log 2>&1 && "$BIN" usages fix01.hbp saldo > fld.log 2>&1 )
+check "both usages exit 0"         $?
+grep -q "write (memvar) in USAALIAS" "$D/mv.log"
+check "M-> write listed as memvar" $?
+grep -q "read (field) in USAALIAS" "$D/fld.log"
+check "alias-> read listed as field" $?
+
+echo "case 26: usages --json carries real columns"
+D=$(fresh case26)
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
+python3 - "$D/locs.json" <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+assert any(l["range"]["start"]["character"] > 0 for l in locs), "no real column found"
+assert all(l["range"]["end"]["character"] >= l["range"]["start"]["character"] for l in locs)
+PYEOF
+check "columns present in Location[]" $?
+
+echo "case 27: rename-function warns about DYNAMIC in .hbx export file"
+D=$(fresh case27)
+printf 'DYNAMIC Dupla\n' > "$D/exports.hbx"
+printf 'exports.hbx\n' >> "$D/fix01.hbp"
+( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+RC=$?
+check "refused without --force"    $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "DYNAMIC DUPLA in export file" "$D/out.log"
+check "hbx warning listed"         $?
+
+echo "case 28: project as a plain list of .prg files (no .hbp)"
+D=$(fresh case28)
+( cd "$D" && "$BIN" usages "a.prg,b.prg" Dupla > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "definition (function)" "$D/out.log"
+check "definition found"           $?
+grep -q "call in MAIN" "$D/out.log"
+check "call found"                 $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

@@ -64,15 +64,23 @@ ajuste de recusas que se mostrarem falso-positivas.
 produção com verificação verde, e as fricções encontradas viram itens das
 fases seguintes ou correções feitas.
 
-### Fase 5 — Completar a cobertura do oráculo
+### Fase 5 — Completar a cobertura do oráculo ✅ (2026-07-04)
 
-**Escopo**: (a) variáveis com alias (`FIELD->x`, `M->x`, `alias->x`) no dump
-(caminho `GenPushAliasedVar`); (b) dedup das duplicatas de pré/pós-decremento;
-(c) coluna real no `usages --json` (via tokenizer); (d) `.hbx`/`REQUEST`/
-`EXTERNAL`/`DYNAMIC` na varredura do `rename-function`; (e) projetos sem
-`.hbp` (lista explícita).
-**Critério**: casos de teste para cada item; dump schema 3 se houver campo
-novo; `.hrb` sem `-x` segue byte-idêntico.
+- (a) ✅ variáveis com alias no dump: `M->`/`MEMVAR->` → `memvar`,
+  `FIELD->`/`alias->` → `field`, hooks em `GenPush/PopAliasedVar` (caso 25).
+- (b) **decidido não-fazer**: dedup das duplicatas de pré/pós-decremento no
+  compilador exigiria contexto que o `hb_compVariableFind` não tem; o
+  consumidor já trata a lista por linha como conjunto e o `StmtEdits` renomeia
+  por token — as duplicatas não têm efeito prático. Reabrir só se o uso real
+  mostrar dano (ex.: contagens erradas no `usages` incomodarem).
+- (c) ✅ coluna real no `usages --json` (caso 26).
+- (d) ✅ `.hbx`/`DYNAMIC` no `rename-function` (entradas `-hbx=`/`.hbx` do
+  `.hbp`; caso 27); `REQUEST`/`EXTERNAL` em fonte já eram cobertos pela
+  varredura fora-do-oráculo.
+- (e) ✅ projeto como lista de `.prg` sem `.hbp` (caso 28).
+- Fricção da rodada 1 incorporada: `StmtEdits` para statements continuados.
+Critério cumprido: casos 24-28; schema inalterado (2 — sem campo novo);
+`.hrb` sem `-x` byte-idêntico re-verificado.
 
 ### Fase 6 — `rename-define` (o rename que falta)
 

@@ -379,6 +379,20 @@ STATIC FUNCTION RenameFunction( aArgs )
       ENDIF
    NEXT
 
+   // .hbx export files (DYNAMIC declarations consumed by hbmk2)
+   FOR EACH cPath IN hProj[ "hbx" ]
+      nI := 0
+      FOR EACH cClean IN hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
+         nI++
+         aLines := hb_ATokens( AllTrim( cClean ) )
+         IF Len( aLines ) >= 2 .AND. Upper( aLines[ 2 ] ) == cUpOld .AND. ;
+            hb_AScan( { "DYNAMIC", "ANNOUNCE", "REQUEST", "EXTERNAL" }, Upper( aLines[ 1 ] ),,, .T. ) > 0
+            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nI ) + ;
+                  ": " + Upper( aLines[ 1 ] ) + " " + cUpOld + " in export file (not renamed)" )
+         ENDIF
+      NEXT
+   NEXT
+
    IF ! Empty( aWarn )
       FOR EACH cWhy IN aWarn
          OutStd( "warning: " + cWhy + hb_eol() )
@@ -1414,7 +1428,7 @@ STATIC FUNCTION Usages( aArgs )
       hStrScan := TokenScan( cSrcText, cName )
       FOR EACH hItem IN hStrScan[ "strexact" ]
          nHits++
-         AAdd( aLoc, { cPath, hItem[ 1 ] } )
+         LocAdd( aLoc, cPath, hItem[ 1 ], hStrScan )
          OutStd( cModFile + ":" + hb_ntos( hItem[ 1 ] ) + ": possible reference in string" + ;
                  SrcLine( aSrc, hItem[ 1 ] ) + hb_eol() )
       NEXT
@@ -1429,7 +1443,7 @@ STATIC FUNCTION Usages( aArgs )
 
          IF Upper( hFunc[ "name" ] ) == Upper( cName )
             nHits++
-            AAdd( aLoc, { cPath, hFunc[ "line" ] } )
+            LocAdd( aLoc, cPath, hFunc[ "line" ], hStrScan )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
          ENDIF
@@ -1437,7 +1451,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
-               AAdd( aLoc, { cPath, hItem[ "declLine" ] } )
+               LocAdd( aLoc, cPath, hItem[ "declLine" ], hStrScan )
                cCtx := SrcLine( aSrc, hItem[ "declLine" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "declLine" ] ) + ": declaration (" + ;
                   hItem[ "scope" ] + iif( hItem[ "param" ], ", parameter", "" ) + ") in " + ;
@@ -1448,7 +1462,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "occurrences" ]
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
-               AAdd( aLoc, { cPath, hItem[ "line" ] } )
+               LocAdd( aLoc, cPath, hItem[ "line" ], hStrScan )
                cCtx := SrcLine( aSrc, hItem[ "line" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + hItem[ "access" ] + ;
                   " (" + hItem[ "scope" ] + iif( hItem[ "block" ], ", codeblock", "" ) + ") in " + ;
@@ -1459,7 +1473,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "calls" ]
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
-               AAdd( aLoc, { cPath, hItem[ "line" ] } )
+               LocAdd( aLoc, cPath, hItem[ "line" ], hStrScan )
                cCtx := SrcLine( aSrc, hItem[ "line" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": call" + ;
                   iif( hItem[ "block" ], " (codeblock)", "" ) + " in " + ;
@@ -1470,7 +1484,7 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hb_HGetDef( hFunc, "sends", {} )
             IF Upper( hItem[ "sym" ] ) == Upper( cName )
                nHits++
-               AAdd( aLoc, { cPath, hItem[ "line" ] } )
+               LocAdd( aLoc, cPath, hItem[ "line" ], hStrScan )
                cCtx := SrcLine( aSrc, hItem[ "line" ] )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": send" + ;
                   iif( hItem[ "block" ], " (codeblock)", "" ) + " in " + ;
@@ -1488,7 +1502,22 @@ STATIC FUNCTION Usages( aArgs )
 
    RETURN iif( nHits > 0, EXIT_OK, EXIT_REFUSED )
 
-// LSP Location[] (0-based lines; column 0 - navigation granularity is the line)
+// collect a location with the real column when the tokenizer found the
+// identifier on that line (0 when the reference is inside a string or the
+// line belongs to a joined statement)
+STATIC PROCEDURE LocAdd( aLoc, cPath, nLine, hScan )
+
+   LOCAL aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
+
+   IF Empty( aHits )
+      AAdd( aLoc, { cPath, nLine, 0, 0 } )
+   ELSE
+      AAdd( aLoc, { cPath, nLine, aHits[ 1 ][ 1 ] - 1, aHits[ 1 ][ 2 ] } )
+   ENDIF
+
+   RETURN
+
+// LSP Location[] (0-based lines/columns)
 STATIC FUNCTION LocationsJson( aLoc )
 
    LOCAL aOut := {}, aL
@@ -1497,8 +1526,8 @@ STATIC FUNCTION LocationsJson( aLoc )
       AAdd( aOut, { ;
          "uri" => "file://" + aL[ 1 ], ;
          "range" => { ;
-            "start" => { "line" => aL[ 2 ] - 1, "character" => 0 }, ;
-            "end"   => { "line" => aL[ 2 ] - 1, "character" => 0 } } } )
+            "start" => { "line" => aL[ 2 ] - 1, "character" => aL[ 3 ] }, ;
+            "end"   => { "line" => aL[ 2 ] - 1, "character" => aL[ 3 ] + aL[ 4 ] } } } )
    NEXT
 
    RETURN hb_jsonEncode( aOut, .T. )
@@ -1829,9 +1858,26 @@ STATIC FUNCTION Refuse( cMsg )
 
 STATIC FUNCTION LoadProject( cHbp )
 
-   LOCAL cText := hb_MemoRead( cHbp )
-   LOCAL hProj, cLine, cDir
+   LOCAL cText, hProj, cLine, cDir
 
+   // no-.hbp mode: a comma-separated list of .prg sources works as an
+   // implicit project (dir of the first source becomes the include path)
+   IF Lower( hb_FNameExt( cHbp ) ) == ".prg" .OR. ".prg," $ Lower( cHbp )
+      cDir := hb_FNameDir( hb_ATokens( cHbp, "," )[ 1 ] )
+      IF Empty( cDir )
+         cDir := "." + hb_ps()
+      ENDIF
+      hProj := { "dir" => cDir, "files" => {}, "inc" => { cDir }, "hbx" => {} }
+      FOR EACH cLine IN hb_ATokens( cHbp, "," )
+         cLine := AllTrim( cLine )
+         IF ! Empty( cLine )
+            AAdd( hProj[ "files" ], PathAt( cDir, cLine ) )
+         ENDIF
+      NEXT
+      RETURN hProj
+   ENDIF
+
+   cText := hb_MemoRead( cHbp )
    IF Empty( cText )
       RETURN NIL
    ENDIF
@@ -1841,7 +1887,7 @@ STATIC FUNCTION LoadProject( cHbp )
       cDir := "." + hb_ps()
    ENDIF
 
-   hProj := { "dir" => cDir, "files" => {}, "inc" => { cDir } }
+   hProj := { "dir" => cDir, "files" => {}, "inc" => { cDir }, "hbx" => {} }
 
    FOR EACH cLine IN hb_ATokens( StrTran( cText, Chr( 13 ), "" ), Chr( 10 ) )
       cLine := AllTrim( cLine )
@@ -1849,8 +1895,12 @@ STATIC FUNCTION LoadProject( cHbp )
       CASE Empty( cLine ) .OR. Left( cLine, 1 ) == "#"
       CASE Left( cLine, 2 ) == "-i"
          AAdd( hProj[ "inc" ], PathAt( cDir, SubStr( cLine, 3 ) ) )
+      CASE Left( cLine, 5 ) == "-hbx="
+         AAdd( hProj[ "hbx" ], PathAt( cDir, SubStr( cLine, 6 ) ) )
       CASE Lower( hb_FNameExt( cLine ) ) == ".prg"
          AAdd( hProj[ "files" ], PathAt( cDir, cLine ) )
+      CASE Lower( hb_FNameExt( cLine ) ) == ".hbx"
+         AAdd( hProj[ "hbx" ], PathAt( cDir, cLine ) )
       ENDCASE
    NEXT
 
