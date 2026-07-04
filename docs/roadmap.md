@@ -38,7 +38,14 @@ decisões de produto e autorizações (commits sensíveis, PR upstream): Diego.
 Regra de manutenção: **este documento é vivo** — toda fase concluída ganha
 status aqui, e nenhuma fase começa sem escopo e critério de pronto escritos.
 
-### Fase 4 — Dogfooding em projeto real (PRÓXIMA)
+### Fase 4 — Dogfooding em projeto real (EM ANDAMENTO)
+
+> **Status 2026-07-04**: rodada 1 (a ferramenta sobre si mesma) concluída —
+> ver [dogfooding.md](dogfooding.md). Fricção real encontrada e corrigida:
+> renames em statements continuados por `;` recusavam (`StmtEdits` resolve o
+> statement inteiro; caso 24). Auto-refatoração aplicada: `hHit`→`aHit` em 4
+> funções, verificação byte-idêntica. `make test` 85/85. **Pendente: rodada 2
+> num projeto de produção — aguarda o Diego apontar o projeto.**
 
 **Por que primeiro**: todas as decisões restantes (o que dói, o que falta,
 quais recusas são conservadoras demais) devem vir de fricção real, não de

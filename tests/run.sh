@@ -299,6 +299,18 @@ check "PRIVATE init write listed"  $?
 grep -q "read (memvar_implicit) in COMPRIVADA" "$D/priv.log"
 check "later read listed"          $?
 
+echo "case 24: rename inside a ;-continued statement (token on middle line)"
+D=$(fresh case24)
+( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Continuada cMsg cTexto > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "^           cTexto + ;$" "$D/a.prg"
+check "middle continuation line renamed" $?
+grep -q "RETURN cTexto" "$D/a.prg"
+check "last line renamed"          $?
+grep -q "verified: all 2 module" "$D/out.log"
+check "byte-identical verification" $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

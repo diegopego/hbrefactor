@@ -1,0 +1,6 @@
+# projeto da própria ferramenta - usado pelo Makefile e pelo dogfooding
+# (a ferramenta analisa e refatora o próprio fonte com este arquivo)
+-w3
+-es2
+-gtcgi
+src/hbrefactor.prg

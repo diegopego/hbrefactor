@@ -35,3 +35,13 @@ FUNCTION Rotulada()
    MOSTRA nVisto
 
    RETURN nVisto
+
+FUNCTION Continuada()
+
+   LOCAL cMsg := "abc"
+
+   OutStd( "x" + ;
+           cMsg + ;
+           "y" )
+
+   RETURN cMsg

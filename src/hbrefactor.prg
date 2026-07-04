@@ -75,8 +75,8 @@ STATIC FUNCTION RenameLocal( aArgs )
    LOCAL lDryRun := .F., cJsonOut := ""
    LOCAL hProj, cSrcPath, cTmp, cText, cTextNew
    LOCAL hDump, hFunc, aLines, hScan, aEdits
-   LOCAL hPpo, nLine, cClean, cPpoLine
-   LOCAL aHits, hHit, nPos, cOut
+   LOCAL hPpo, nLine, cClean
+   LOCAL aHit, nPos, cOut
    LOCAL nI
 
    IF Len( aArgs ) < 6
@@ -161,25 +161,12 @@ STATIC FUNCTION RenameLocal( aArgs )
    // on both sides); the -gh -l byte-compare after the edit remains the
    // final safety net for any subtle rule interaction
    hPpo := PpoMap( cTmp + hb_ps() + FNameBase( cSrcPath ) + ".ppo" )
-   FOR EACH nLine IN aLines
-      cClean := Squeeze( hb_HGetDef( hScan[ "clean" ], nLine, "" ) )
-      cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
-      IF !( cClean == cPpoLine ) .AND. ;
-         CountIdent( cPpoLine, cOld ) != Len( hb_HGetDef( hScan[ "hits" ], nLine, {} ) )
-         RETURN Refuse( "line " + hb_ntos( nLine ) + " is rewritten by the preprocessor - refusing unsafe rename" )
-      ENDIF
-   NEXT
-
-   // --- build edit list ------------------------------------------------------
    aEdits := {}
    FOR EACH nLine IN aLines
-      aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
-      IF Empty( aHits )
-         RETURN Refuse( "line " + hb_ntos( nLine ) + ": oracle reports an occurrence but no matching token found" )
+      cClean := ""
+      IF ! StmtEdits( hScan, hPpo, nLine, cOld, cNew, aEdits, @cClean )
+         RETURN Refuse( cClean )
       ENDIF
-      FOR EACH hHit IN aHits
-         AAdd( aEdits, { nLine, hHit[ 1 ], hHit[ 2 ], cNew } )
-      NEXT
    NEXT
 
    IF Empty( aEdits )
@@ -188,8 +175,8 @@ STATIC FUNCTION RenameLocal( aArgs )
 
    // --- report / dry run -----------------------------------------------------
    OutStd( "rename-local: " + cOld + " -> " + cNew + " in " + cFunc + " (" + cFile + ")" + hb_eol() )
-   FOR EACH hHit IN aEdits
-      OutStd( "  " + cFile + ":" + hb_ntos( hHit[ 1 ] ) + ":" + hb_ntos( hHit[ 2 ] ) + hb_eol() )
+   FOR EACH aHit IN aEdits
+      OutStd( "  " + cFile + ":" + hb_ntos( aHit[ 1 ] ) + ":" + hb_ntos( aHit[ 2 ] ) + hb_eol() )
    NEXT
 
    IF ! Empty( cJsonOut )
@@ -237,8 +224,8 @@ STATIC FUNCTION RenameFunction( aArgs )
    LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
    LOCAL aDefs := {}, hDumps := { => }, hEditLines := { => }, aScope
    LOCAL lStatic, nI, cUpOld, cUpNew
-   LOCAL aWarn := {}, hScan, hPpo, aLines, nLine, cClean, cPpoLine
-   LOCAL hFileEdits := { => }, aEdits, aHits, hHit
+   LOCAL aWarn := {}, hScan, hPpo, aLines, nLine, cClean
+   LOCAL hFileEdits := { => }, aEdits, aHit
    LOCAL hOrig := { => }, cText, cWhy, nTotal := 0
 
    IF Len( aArgs ) < 4
@@ -365,8 +352,8 @@ STATIC FUNCTION RenameFunction( aArgs )
       // verified). It reports them precisely so the human decides:
       // exact match = very likely a call by name (Do(), dispatch tables);
       // substring   = probably a label/message
-      FOR EACH hHit IN hScan[ "strexact" ]
-         AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hHit[ 1 ] ) + ;
+      FOR EACH aHit IN hScan[ "strexact" ]
+         AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( aHit[ 1 ] ) + ;
                ": string equals '" + cOld + "' - likely a call by name, review manually" )
       NEXT
       FOR EACH nLine IN hScan[ "strhits" ]
@@ -379,11 +366,12 @@ STATIC FUNCTION RenameFunction( aArgs )
          ENDIF
       ENDIF
       // identifier tokens on lines the oracle did not report (REQUEST,
-      // EXTERNAL, homonymous variables...) - flag for human review
+      // EXTERNAL, homonymous variables...) - flag for human review; a hit
+      // belongs to an oracle line when it sits anywhere inside the
+      // ;-continued statement that ENDS at that oracle line
       IF hb_AScan( aScope, {| c | c == cPath } ) > 0
          FOR EACH nLine IN hb_HKeys( hScan[ "hits" ] )
-            IF Empty( hb_HGetDef( hEditLines, cPath, {} ) ) .OR. ;
-               hb_AScan( hEditLines[ cPath ], nLine ) == 0
+            IF ! LineCovered( hScan[ "clean" ], hb_HGetDef( hEditLines, cPath, {} ), nLine )
                AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
                      ": identifier '" + cOld + "' outside compiled references (not renamed)" )
             ENDIF
@@ -408,21 +396,10 @@ STATIC FUNCTION RenameFunction( aArgs )
       aLines := ASort( hEditLines[ cPath ] )
       aEdits := {}
       FOR EACH nLine IN aLines
-         cClean := Squeeze( hb_HGetDef( hScan[ "clean" ], nLine, "" ) )
-         cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
-         IF !( cClean == cPpoLine ) .AND. ;
-            CountIdent( cPpoLine, cOld ) != Len( hb_HGetDef( hScan[ "hits" ], nLine, {} ) )
-            RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
-                           " is rewritten by the preprocessor - refusing unsafe rename" )
+         cClean := ""
+         IF ! StmtEdits( hScan, hPpo, nLine, cOld, cNew, aEdits, @cClean )
+            RETURN Refuse( hb_FNameNameExt( cPath ) + ": " + cClean )
          ENDIF
-         aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
-         IF Empty( aHits )
-            RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
-                           ": oracle reports a reference but no matching token found" )
-         ENDIF
-         FOR EACH hHit IN aHits
-            AAdd( aEdits, { nLine, hHit[ 1 ], hHit[ 2 ], cNew } )
-         NEXT
       NEXT
       hFileEdits[ cPath ] := aEdits
       hOrig[ cPath ] := cText
@@ -431,8 +408,8 @@ STATIC FUNCTION RenameFunction( aArgs )
 
    OutStd( "rename-function: " + cOld + " -> " + cNew + iif( lStatic, " (static, single module)", "" ) + hb_eol() )
    FOR EACH cPath IN hb_HKeys( hFileEdits )
-      FOR EACH hHit IN hFileEdits[ cPath ]
-         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( hHit[ 1 ] ) + ":" + hb_ntos( hHit[ 2 ] ) + hb_eol() )
+      FOR EACH aHit IN hFileEdits[ cPath ]
+         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aHit[ 1 ] ) + ":" + hb_ntos( aHit[ 2 ] ) + hb_eol() )
       NEXT
    NEXT
 
@@ -488,7 +465,7 @@ STATIC FUNCTION ReorderParams( aArgs )
    LOCAL aParams := {}, aNew, aPerm := {}, lIdentity
    LOCAL hSites := { => }, aBad := {}, aWarn := {}
    LOCAL nI, nJ, cUpFunc, hScan, hPpo, cText, aSrc
-   LOCAL hFileEdits := { => }, hOrig := { => }, aEdits, aHits, hHit, hSpan
+   LOCAL hFileEdits := { => }, hOrig := { => }, aEdits, aHits, aHit, hSpan
    LOCAL nLine, cClean, cPpoLine, cWhy, nTotal := 0
 
    IF Len( aArgs ) < 4
@@ -640,8 +617,8 @@ STATIC FUNCTION ReorderParams( aArgs )
             RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
                            ": no matching token found" )
          ENDIF
-         FOR EACH hHit IN aHits
-            hSpan := ParseParenSpan( aSrc[ nLine ], hHit[ 1 ] + hHit[ 2 ] )
+         FOR EACH aHit IN aHits
+            hSpan := ParseParenSpan( aSrc[ nLine ], aHit[ 1 ] + aHit[ 2 ] )
             IF hSpan == NIL
                AAdd( aBad, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
                      ": cannot parse argument list (multi-line call?)" )
@@ -675,8 +652,8 @@ STATIC FUNCTION ReorderParams( aArgs )
    OutStd( "reorder-params: " + cFunc + "( " + ArrJoin( aParams, ", " ) + " ) -> ( " + ;
            ArrJoin( aNew, ", " ) + " )" + hb_eol() )
    FOR EACH cPath IN hb_HKeys( hFileEdits )
-      FOR EACH hHit IN hFileEdits[ cPath ]
-         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( hHit[ 1 ] ) + hb_eol() )
+      FOR EACH aHit IN hFileEdits[ cPath ]
+         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aHit[ 1 ] ) + hb_eol() )
       NEXT
    NEXT
    IF ! Empty( cJsonOut )
@@ -1538,7 +1515,7 @@ STATIC FUNCTION RenameStatic( aArgs )
    LOCAL cHbp, cFile, cOld, cNew, cFuncFilter := "", lDryRun := .F.
    LOCAL hProj, cTmp, cSrcPath, hDump, hFunc, hDecl, hOcc
    LOCAL aDecls := {}, hDeclFunc, lFileWide, aLines := {}
-   LOCAL hScan, hPpo, nLine, cClean, cPpoLine, aHits, hHit, aEdits := {}
+   LOCAL hScan, hPpo, nLine, cClean, aHit, aEdits := {}
    LOCAL cText, cTextNew, nI, cPath
 
    IF Len( aArgs ) < 5
@@ -1634,19 +1611,10 @@ STATIC FUNCTION RenameStatic( aArgs )
    hScan := TokenScan( cText, cOld )
    hPpo := PpoMap( cTmp + hb_ps() + FNameBase( cSrcPath ) + ".ppo" )
    FOR EACH nLine IN ASort( aLines )
-      cClean := Squeeze( hb_HGetDef( hScan[ "clean" ], nLine, "" ) )
-      cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
-      IF !( cClean == cPpoLine ) .AND. ;
-         CountIdent( cPpoLine, cOld ) != Len( hb_HGetDef( hScan[ "hits" ], nLine, {} ) )
-         RETURN Refuse( "line " + hb_ntos( nLine ) + " is rewritten by the preprocessor - refusing" )
+      cClean := ""
+      IF ! StmtEdits( hScan, hPpo, nLine, cOld, cNew, aEdits, @cClean )
+         RETURN Refuse( cClean )
       ENDIF
-      aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
-      IF Empty( aHits )
-         RETURN Refuse( "line " + hb_ntos( nLine ) + ": oracle reports an occurrence but no matching token found" )
-      ENDIF
-      FOR EACH hHit IN aHits
-         AAdd( aEdits, { nLine, hHit[ 1 ], hHit[ 2 ], cNew } )
-      NEXT
    NEXT
    IF Empty( aEdits )
       RETURN Refuse( "nothing to rename" )
@@ -1654,8 +1622,8 @@ STATIC FUNCTION RenameStatic( aArgs )
 
    OutStd( "rename-static: " + cOld + " -> " + cNew + ;
            iif( lFileWide, " (file-wide, " + cFile + ")", " (in " + hDeclFunc[ "name" ] + ")" ) + hb_eol() )
-   FOR EACH hHit IN aEdits
-      OutStd( "  " + cFile + ":" + hb_ntos( hHit[ 1 ] ) + ":" + hb_ntos( hHit[ 2 ] ) + hb_eol() )
+   FOR EACH aHit IN aEdits
+      OutStd( "  " + cFile + ":" + hb_ntos( aHit[ 1 ] ) + ":" + hb_ntos( aHit[ 2 ] ) + hb_eol() )
    NEXT
    IF lDryRun
       OutStd( "dry run - no changes written" + hb_eol() )
@@ -2217,6 +2185,66 @@ STATIC FUNCTION TokenScan( cText, cName )
 
    RETURN { "hits" => hHits, "clean" => hClean, "strhits" => aStrHits, ;
             "strexact" => aStrExact, "strids" => aStrIds }
+
+// resolve an oracle line (always the LAST physical line of a ;-continued
+// statement - the compiler's currLine and the .ppo agree on that) to the
+// whole statement, validate the joined text against the preprocessed line
+// and collect the matching tokens across all its physical lines as edits
+STATIC FUNCTION StmtEdits( hScan, hPpo, nLine, cOld, cNew, aEdits, cErr )
+
+   LOCAL nStart := StmtStart( hScan[ "clean" ], nLine )
+   LOCAL nN, cClean := "", cPiece
+   LOCAL aHits, aHit, aNew := {}, cPpoLine
+
+   FOR nN := nStart TO nLine
+      cPiece := RTrim( hb_HGetDef( hScan[ "clean" ], nN, "" ) )
+      IF nN < nLine .AND. Right( cPiece, 1 ) == ";"
+         cPiece := hb_StrShrink( cPiece, 1 )
+      ENDIF
+      cClean += " " + cPiece
+      aHits := hb_HGetDef( hScan[ "hits" ], nN, {} )
+      FOR EACH aHit IN aHits
+         AAdd( aNew, { nN, aHit[ 1 ], aHit[ 2 ], cNew } )
+      NEXT
+   NEXT
+
+   cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
+   IF !( Squeeze( cClean ) == cPpoLine ) .AND. ;
+      CountIdent( cPpoLine, cOld ) != Len( aNew )
+      cErr := "line " + hb_ntos( nLine ) + " is rewritten by the preprocessor - refusing unsafe rename"
+      RETURN .F.
+   ENDIF
+   IF Empty( aNew )
+      cErr := "line " + hb_ntos( nLine ) + ": oracle reports an occurrence but no matching token found"
+      RETURN .F.
+   ENDIF
+   FOR EACH aHit IN aNew
+      AAdd( aEdits, aHit )
+   NEXT
+
+   RETURN .T.
+
+// first physical line of the ;-continued statement that ends at nLine
+STATIC FUNCTION StmtStart( hClean, nLine )
+
+   DO WHILE nLine > 1 .AND. ;
+      Right( RTrim( hb_HGetDef( hClean, nLine - 1, "" ) ), 1 ) == ";"
+      nLine--
+   ENDDO
+
+   RETURN nLine
+
+// is nLine inside any ;-continued statement whose LAST line is in aOracle?
+STATIC FUNCTION LineCovered( hClean, aOracle, nLine )
+
+   LOCAL nEnd := nLine
+
+   // walk forward to the end of the statement nLine belongs to
+   DO WHILE Right( RTrim( hb_HGetDef( hClean, nEnd, "" ) ), 1 ) == ";"
+      nEnd++
+   ENDDO
+
+   RETURN hb_AScan( aOracle, nEnd ) > 0
 
 // count identifier tokens equal to cName in a single (comment-free) line,
 // with the same string and ->/: context rules used by TokenScan
