@@ -3,3 +3,6 @@ tests/tmp/
 *.hrb
 *.ppo
 *.occ.json
+
+# settings de teste com caminhos da máquina (binPath/hbBin) — não versionar
+tests/fix01/.vscode/

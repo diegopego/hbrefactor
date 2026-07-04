@@ -31,6 +31,10 @@ PROCEDURE Main()
       nExit := ExtractFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "unused-locals"
+      nExit := UnusedLocals( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "call-graph"
+      nExit := CallGraph( aArgs )
    OTHERWISE
       Usage()
       nExit := EXIT_USAGE
@@ -50,6 +54,8 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor reorder-params <project.hbp> <function> <name1,name2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <project.hbp> <file.prg> <first>-<last> <newname> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project.hbp> <name> [--func <function>]" + hb_eol() )
+   OutStd( "  hbrefactor unused-locals <project.hbp>" + hb_eol() )
+   OutStd( "  hbrefactor call-graph <project.hbp> [<function>]" + hb_eol() )
 
    RETURN
 
@@ -1502,6 +1508,110 @@ STATIC FUNCTION LocationsJson( aLoc )
    NEXT
 
    RETURN hb_jsonEncode( aOut, .T. )
+
+// ---------------------------------------------------------------------------
+// unused-locals: delegate to the compiler's own analysis (-w3 warnings
+// W0003 "declared but not used" and W0032 "assigned but not used").
+// The -x dump cannot see never-used locals: the optimizer removes them
+// before the dump is saved - the warnings are emitted earlier and are
+// exactly the report we want.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION UnusedLocals( aArgs )
+
+   LOCAL hProj, cPath, cInc := "", cOut, cErr, cLine
+   LOCAL nFound := 0
+
+   IF Len( aArgs ) < 2
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   hProj := LoadProject( aArgs[ 2 ] )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + aArgs[ 2 ] + "'" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "inc" ]
+      cInc += " -I" + cPath
+   NEXT
+
+   FOR EACH cPath IN hProj[ "files" ]
+      cOut := cErr := ""
+      hb_processRun( HarbourBin() + " " + cPath + " -n -q0 -w3 -s" + cInc,, @cOut, @cErr )
+      FOR EACH cLine IN hb_ATokens( StrTran( cOut + cErr, Chr( 13 ), "" ), Chr( 10 ) )
+         IF "W0003" $ cLine .OR. "W0032" $ cLine
+            nFound++
+            OutStd( AllTrim( cLine ) + hb_eol() )
+         ENDIF
+      NEXT
+   NEXT
+   OutStd( hb_ntos( nFound ) + " finding(s)" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// call-graph: who calls whom, from the compiled call records (read-only).
+// With a function argument: its callers and callees only.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION CallGraph( aArgs )
+
+   LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
+   LOCAL cFilter := "", hDefined := { => }, cModFile, cCallee
+   LOCAL hSeen, cKey
+
+   IF Len( aArgs ) < 2
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   hProj := LoadProject( aArgs[ 2 ] )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + aArgs[ 2 ] + "'" )
+   ENDIF
+   IF Len( aArgs ) >= 3
+      cFilter := Upper( aArgs[ 3 ] )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! CompileAll( hProj, "", cTmp, "before", .T. )
+      RETURN Refuse( "project does not compile - fix build errors first" )
+   ENDIF
+
+   // project-defined names (to distinguish internal calls from RTL/external)
+   FOR EACH cPath IN hProj[ "files" ]
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      IF hDump == NIL
+         RETURN Refuse( "missing occurrence dump for '" + cPath + "'" )
+      ENDIF
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF ! hFunc[ "fileDecl" ]
+            hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
+         ENDIF
+      NEXT
+   NEXT
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      cModFile := hb_FNameNameExt( cPath )
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         hSeen := { => }
+         FOR EACH hItem IN hFunc[ "calls" ]
+            cCallee := Upper( hItem[ "sym" ] )
+            cKey := Upper( hFunc[ "name" ] ) + ">" + cCallee
+            IF cKey $ hSeen
+               LOOP
+            ENDIF
+            hSeen[ cKey ] := .T.
+            IF Empty( cFilter ) .OR. Upper( hFunc[ "name" ] ) == cFilter .OR. cCallee == cFilter
+               OutStd( cModFile + ": " + hFunc[ "name" ] + " -> " + hItem[ "sym" ] + ;
+                  iif( cCallee $ hDefined, "  [" + hDefined[ cCallee ] + "]", "  [external]" ) + hb_eol() )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN EXIT_OK
 
 STATIC FUNCTION SrcLine( aSrc, nLine )
    RETURN iif( nLine >= 1 .AND. nLine <= Len( aSrc ), ;

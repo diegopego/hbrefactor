@@ -104,6 +104,20 @@ nova no fim do módulo, substituindo a seleção pela chamada. Implementado:
 
 ## Planejados (ordem do [roadmap](roadmap.md))
 
+### `unused-locals <hbp>` — ✅
+Relatório de locais nunca usadas (`W0003`) e atribuídas-mas-nunca-lidas
+(`W0032`), **delegado ao próprio compilador** (`harbour -w3 -s` por módulo).
+Nota de arquitetura: o dump `-x` não enxerga locais nunca usadas — o
+otimizador as elimina antes do save; os warnings são emitidos antes e são
+exatamente o relatório desejado. Reuso da análise do oráculo, não
+reimplementação.
+
+### `call-graph <hbp> [<função>]` — ✅
+Quem chama quem, a partir dos `calls` do dump: arestas únicas
+`arquivo: CHAMADOR -> CHAMADO [módulo-onde-definido | external]`; com
+argumento, filtra para chamadores+chamados da função. Mesmas cegueiras
+documentadas do `calls` (Eval/sends de método).
+
 ## Candidatos (aceitos em princípio, sem fase definida)
 
 | Comando | Base já existente | Risco |
@@ -111,8 +125,6 @@ nova no fim do módulo, substituindo a seleção pela chamada. Implementado:
 | `rename-static-var` | dump já traz `scope: static` + filewide | S |
 | `rename-define` (símbolo de `#define`/`#command`) | replay com biblioteca do pp | H |
 | `inline-local` (substituir var de uso único pela expressão) | `used` no dump | S/H |
-| `unused-locals` (relatório de locais nunca lidas) | `iUsed`/access no dump | leitura |
-| `call-graph` (quem chama quem no projeto) | `calls` do dump | leitura |
 | `find-dynamic-calls` (relatório de `Do("...")`/macros para auditoria) | varredura de strings + `usesMacro` | leitura |
 
 ## Integração VSCode — ✅ ([vscode/](../vscode/))

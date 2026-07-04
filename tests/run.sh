@@ -233,6 +233,32 @@ assert any(l["uri"].endswith("a.prg") for l in locs), "call loc"
 PYEOF
 check "Location[] valid with def+call" $?
 
+echo "case 19: unused-locals reports never-used and assigned-never-read"
+D=$(fresh case19)
+printf '\nFUNCTION ComSobras()\n\n   LOCAL nNada\n   LOCAL nSobra := 1\n   LOCAL nUsada := 2\n\n   RETURN nUsada\n' >> "$D/b.prg"
+( cd "$D" && "$BIN" unused-locals fix01.hbp > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "'NNADA' declared but not used" "$D/out.log"
+check "never-used local reported"  $?
+grep -q "'NSOBRA' is assigned but not used" "$D/out.log"
+check "assigned-never-read reported" $?
+grep -qv "NUSADA" "$D/out.log"
+check "used local not reported"    $?
+
+echo "case 20: call-graph shows cross-module and external calls"
+D=$(fresh case20)
+( cd "$D" && "$BIN" call-graph fix01.hbp > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "a.prg: MAIN -> DUPLA  \[b.prg\]" "$D/out.log"
+check "cross-module edge with module" $?
+grep -q "a.prg: MAIN -> QOUT  \[external\]" "$D/out.log"
+check "external callee tagged"     $?
+( cd "$D" && "$BIN" call-graph fix01.hbp Dupla > filt.log 2>&1 )
+grep -q "MAIN -> DUPLA" "$D/filt.log" && ! grep -q "QOUT" "$D/filt.log"
+check "filter by function works"   $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

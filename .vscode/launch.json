@@ -1,0 +1,16 @@
+{
+  // F5 abre uma segunda janela (Extension Development Host) rodando a
+  // extensão a partir de vscode/, já com a pasta de teste tests/fix01 aberta.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run hbrefactor extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode",
+        "${workspaceFolder}/tests/fix01"
+      ]
+    }
+  ]
+}
