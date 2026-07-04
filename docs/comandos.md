@@ -33,16 +33,25 @@ call — v3); usos do nome **em strings** (`Do("F")`, macros) não aparecem — 
 Fase 1 o `usages` ganha uma seção "possíveis referências textuais" via
 varredura de literais.
 
-## Planejados (ordem do [roadmap](roadmap.md))
+### `rename-function <hbp> <velho> <novo> [--file <f>] [--force]` — Fase 1 ✅
+Rename de `FUNCTION`/`PROCEDURE`/`STATIC FUNCTION` em todos os módulos do
+projeto. Implementado:
+- **STATIC** (S): edição restrita ao módulo definidor (inalcançável por nome
+  fora dele — testado); `--file` desambigua statics homônimas.
+- **Pública** (S+H): definição e chamadas vêm do oráculo (`calls` do dump);
+  referências **textuais** — strings contendo o nome, `HB_FUNC(NOME)` em
+  BEGINDUMP, tokens fora do oráculo (`REQUEST`, `EXTERNAL`, homônimos) — são
+  listadas como warnings e **nunca editadas**; sem `--force` a operação é
+  recusada.
+- Colisões recusadas: nome novo já definido/referenciado no projeto, regra
+  de pp, reservada.
+- **Verificação estrutural de HRB** (leitor mínimo do formato de
+  `src/vm/runner.c`): tabela de símbolos igual exceto as entradas
+  renomeadas (scope/tipo preservados), **pcode byte-idêntico**, módulos não
+  tocados byte-idênticos; rollback automático. Idempotência A→B→A coberta
+  por teste.
 
-### `rename-function <hbp> <velho> <novo>` — Fase 1
-Rename de `FUNCTION`/`PROCEDURE`/`STATIC FUNCTION` em todos os módulos.
-`STATIC FUNCTION` é **S** (inalcançável por macro/`Do()` — testado);
-função pública é **S + H**: declaração e chamadas vêm do oráculo (sound),
-mas strings com o nome (`Do("F")`, `.hbx`, `HB_FUNC` em BEGINDUMP) entram no
-fluxo de **confirmação site a site** que nasce nesta fase. Critério: `.hrb`
-idêntico exceto as entradas esperadas da tabela de símbolos (comparador
-estrutural de HRB faz parte da entrega) + build do projeto + idempotência.
+## Planejados (ordem do [roadmap](roadmap.md))
 
 ### `rename-param <hbp> <arquivo> <função> <velho> <novo>` — Fase 2 (curto)
 Parâmetro é local: o motor da Fase 0 já cobre; falta apenas fixture dedicada

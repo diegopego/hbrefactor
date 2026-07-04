@@ -22,6 +22,8 @@ PROCEDURE Main()
    DO CASE
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-local"
       nExit := RenameLocal( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-function"
+      nExit := RenameFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
    OTHERWISE
@@ -38,6 +40,7 @@ STATIC PROCEDURE Usage()
    OutStd( "hbrefactor " + APP_VERSION + " - Harbour refactoring tool" + hb_eol() )
    OutStd( "Usage:" + hb_eol() )
    OutStd( "  hbrefactor rename-local <project.hbp> <file.prg> <function> <old> <new> [--dry-run] [--json <out>]" + hb_eol() )
+   OutStd( "  hbrefactor rename-function <project.hbp> <old> <new> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project.hbp> <name> [--func <function>]" + hb_eol() )
 
    RETURN
@@ -199,6 +202,350 @@ STATIC FUNCTION RenameLocal( aArgs )
    OutStd( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + " module(s) byte-identical (-gh -l)" + hb_eol() )
 
    RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// rename-function: rename FUNCTION/PROCEDURE across the whole project.
+// STATIC functions are edited only inside their defining module (they are
+// unreachable by name from elsewhere). String literals containing the name
+// are never edited automatically: they are listed and require --force to
+// proceed (leaving them untouched).
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION RenameFunction( aArgs )
+
+   LOCAL cHbp, cOld, cNew, cOnlyFile := "", lForce := .F., lDryRun := .F., cJsonOut := ""
+   LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
+   LOCAL aDefs := {}, hDumps := { => }, hEditLines := { => }, aScope
+   LOCAL lStatic, nI, cUpOld, cUpNew
+   LOCAL aWarn := {}, hScan, hPpo, aLines, nLine, cClean, cPpoLine
+   LOCAL hFileEdits := { => }, aEdits, aHits, hHit
+   LOCAL hOrig := { => }, cText, cWhy, nTotal := 0
+
+   IF Len( aArgs ) < 4
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+
+   cHbp := aArgs[ 2 ]
+   cOld := aArgs[ 3 ]
+   cNew := aArgs[ 4 ]
+   FOR nI := 5 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--force"
+         lForce := .T.
+      CASE Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      CASE Lower( aArgs[ nI ] ) == "--file" .AND. nI < Len( aArgs )
+         cOnlyFile := aArgs[ ++nI ]
+      CASE Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
+         cJsonOut := aArgs[ ++nI ]
+      ENDCASE
+   NEXT
+
+   IF ! IsValidIdent( cNew )
+      RETURN Refuse( "new name '" + cNew + "' is not a valid identifier" )
+   ENDIF
+   IF IsReserved( cNew )
+      RETURN Refuse( "new name '" + cNew + "' is a reserved word" )
+   ENDIF
+   IF Upper( cOld ) == Upper( cNew )
+      RETURN Refuse( "old and new names are identical" )
+   ENDIF
+   cUpOld := Upper( cOld )
+   cUpNew := Upper( cNew )
+
+   hProj := LoadProject( cHbp )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + cHbp + "'" )
+   ENDIF
+
+   cTmp := WorkDir()
+   IF ! CompileAll( hProj, "", cTmp, "before", .T. )
+      RETURN Refuse( "project does not compile - fix build errors first" )
+   ENDIF
+
+   // --- aggregate definitions and detect collisions --------------------------
+   FOR EACH cPath IN hProj[ "files" ]
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      IF hDump == NIL
+         RETURN Refuse( "missing occurrence dump for '" + cPath + "'" )
+      ENDIF
+      hDumps[ cPath ] := hDump
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF ! hFunc[ "fileDecl" ]
+            IF Upper( hFunc[ "name" ] ) == cUpNew
+               RETURN Refuse( "'" + cNew + "' is already defined in " + hb_FNameNameExt( cPath ) )
+            ENDIF
+            IF Upper( hFunc[ "name" ] ) == cUpOld
+               AAdd( aDefs, { cPath, hFunc } )
+            ENDIF
+         ENDIF
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF Upper( hItem[ "sym" ] ) == cUpNew
+               RETURN Refuse( "'" + cNew + "' is already referenced in " + hb_FNameNameExt( cPath ) + ;
+                              " (possibly a runtime/library function)" )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   IF Empty( aDefs )
+      RETURN Refuse( "function '" + cOld + "' is not defined in this project" )
+   ENDIF
+
+   IF ! Empty( cOnlyFile )
+      FOR nI := Len( aDefs ) TO 1 STEP -1
+         IF !( Lower( hb_FNameNameExt( aDefs[ nI ][ 1 ] ) ) == Lower( hb_FNameNameExt( cOnlyFile ) ) )
+            hb_ADel( aDefs, nI, .T. )
+         ENDIF
+      NEXT
+      IF Empty( aDefs )
+         RETURN Refuse( "no definition of '" + cOld + "' in '" + cOnlyFile + "'" )
+      ENDIF
+   ENDIF
+
+   IF Len( aDefs ) > 1
+      IF aDefs[ 1 ][ 2 ][ "static" ]
+         RETURN Refuse( "'" + cOld + "' is STATIC in more than one module - use --file to pick one" )
+      ENDIF
+      RETURN Refuse( "'" + cOld + "' has more than one public definition - fix the project first" )
+   ENDIF
+   lStatic := aDefs[ 1 ][ 2 ][ "static" ]
+
+   // STATIC functions are invisible outside their module: edit only there
+   aScope := iif( lStatic, { aDefs[ 1 ][ 1 ] }, hProj[ "files" ] )
+
+   FOR EACH cPath IN aScope
+      IF DefineCollision( hProj, cPath, cNew )
+         RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule" )
+      ENDIF
+   NEXT
+
+   // --- collect edit lines (definition + every compiled call) ---------------
+   hEditLines[ aDefs[ 1 ][ 1 ] ] := {}
+   AddLine( hEditLines[ aDefs[ 1 ][ 1 ] ], aDefs[ 1 ][ 2 ][ "line" ] )
+   FOR EACH cPath IN aScope
+      FOR EACH hFunc IN hDumps[ cPath ][ "functions" ]
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld
+               IF ! ( cPath $ hEditLines )
+                  hEditLines[ cPath ] := {}
+               ENDIF
+               AddLine( hEditLines[ cPath ], hItem[ "line" ] )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   // --- H scan: textual references the compiler cannot vouch for ------------
+   FOR EACH cPath IN hProj[ "files" ]
+      cText := hb_MemoRead( cPath )
+      hScan := TokenScan( cText, cOld )
+      FOR EACH nLine IN hScan[ "strhits" ]
+         AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+               ": string literal contains '" + cOld + "' (not renamed)" )
+      NEXT
+      IF "HB_FUNC" $ Upper( cText ) .AND. cUpOld $ Upper( cText )
+         IF "HB_FUNC(" + cUpOld $ StrTran( Upper( cText ), " ", "" )
+            AAdd( aWarn, hb_FNameNameExt( cPath ) + ": HB_FUNC( " + cUpOld + " ) found in C dump (not renamed)" )
+         ENDIF
+      ENDIF
+      // identifier tokens on lines the oracle did not report (REQUEST,
+      // EXTERNAL, homonymous variables...) - flag for human review
+      IF hb_AScan( aScope, {| c | c == cPath } ) > 0
+         FOR EACH nLine IN hb_HKeys( hScan[ "hits" ] )
+            IF Empty( hb_HGetDef( hEditLines, cPath, {} ) ) .OR. ;
+               hb_AScan( hEditLines[ cPath ], nLine ) == 0
+               AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                     ": identifier '" + cOld + "' outside compiled references (not renamed)" )
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   IF ! Empty( aWarn )
+      FOR EACH cWhy IN aWarn
+         OutStd( "warning: " + cWhy + hb_eol() )
+      NEXT
+      IF ! lForce
+         RETURN Refuse( "textual references found (see warnings) - re-run with --force to proceed without touching them" )
+      ENDIF
+   ENDIF
+
+   // --- build and apply edits -------------------------------------------------
+   FOR EACH cPath IN hb_HKeys( hEditLines )
+      cText := hb_MemoRead( cPath )
+      hScan := TokenScan( cText, cOld )
+      hPpo := PpoMap( cTmp + hb_ps() + FNameBase( cPath ) + ".ppo" )
+      aLines := ASort( hEditLines[ cPath ] )
+      aEdits := {}
+      FOR EACH nLine IN aLines
+         cClean := Squeeze( hb_HGetDef( hScan[ "clean" ], nLine, "" ) )
+         cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
+         IF !( cClean == cPpoLine ) .AND. ;
+            CountIdent( cPpoLine, cOld ) != Len( hb_HGetDef( hScan[ "hits" ], nLine, {} ) )
+            RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                           " is rewritten by the preprocessor - refusing unsafe rename" )
+         ENDIF
+         aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
+         IF Empty( aHits )
+            RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                           ": oracle reports a reference but no matching token found" )
+         ENDIF
+         FOR EACH hHit IN aHits
+            AAdd( aEdits, { nLine, hHit[ 1 ], hHit[ 2 ], cNew } )
+         NEXT
+      NEXT
+      hFileEdits[ cPath ] := aEdits
+      hOrig[ cPath ] := cText
+      nTotal += Len( aEdits )
+   NEXT
+
+   OutStd( "rename-function: " + cOld + " -> " + cNew + iif( lStatic, " (static, single module)", "" ) + hb_eol() )
+   FOR EACH cPath IN hb_HKeys( hFileEdits )
+      FOR EACH hHit IN hFileEdits[ cPath ]
+         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( hHit[ 1 ] ) + ":" + hb_ntos( hHit[ 2 ] ) + hb_eol() )
+      NEXT
+   NEXT
+
+   IF ! Empty( cJsonOut )
+      hb_MemoWrit( cJsonOut, WorkspaceEditJsonMulti( hFileEdits ) )
+   ENDIF
+   IF lDryRun
+      OutStd( "dry run - no changes written" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   FOR EACH cPath IN hb_HKeys( hFileEdits )
+      hb_MemoWrit( cPath, ApplyEdits( hOrig[ cPath ], hFileEdits[ cPath ] ) )
+   NEXT
+
+   // --- verification -----------------------------------------------------------
+   IF ! CompileAll( hProj, "", cTmp, "after" )
+      RollbackAll( hOrig )
+      RETURN Refuse( "project stopped compiling after rename - rolled back" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      cWhy := ""
+      IF cPath $ hFileEdits
+         IF ! HrbEquivalent( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ), ;
+                             hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ), ;
+                             cUpOld, cUpNew, @cWhy )
+            RollbackAll( hOrig )
+            RETURN Refuse( "verification FAILED for " + hb_FNameNameExt( cPath ) + ": " + cWhy + " - rolled back" )
+         ENDIF
+      ELSEIF !( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ) == ;
+                hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ) )
+         RollbackAll( hOrig )
+         RETURN Refuse( "verification FAILED: untouched module " + hb_FNameNameExt( cPath ) + " changed - rolled back" )
+      ENDIF
+   NEXT
+
+   OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed as expected, pcode byte-identical" + hb_eol() )
+
+   RETURN EXIT_OK
+
+STATIC PROCEDURE RollbackAll( hOrig )
+
+   LOCAL cPath
+
+   FOR EACH cPath IN hb_HKeys( hOrig )
+      hb_MemoWrit( cPath, hOrig[ cPath ] )
+   NEXT
+
+   RETURN
+
+// ---------------------------------------------------------------------------
+// minimal HRB reader (format: src/vm/runner.c) and structural comparison:
+// after a function rename the symbol tables must differ ONLY in the renamed
+// entries and every pcode stream must stay byte-identical
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION HrbParse( cBody )
+
+   LOCAL hHrb := { "syms" => {}, "funcs" => {} }
+   LOCAL nAt, nCount, nI, nZero, cName, nSize
+
+   IF !( hb_BLeft( cBody, 4 ) == Chr( 0xC0 ) + "HRB" )
+      RETURN NIL
+   ENDIF
+   nAt := 7                                   // signature (4) + version (2), 1-based
+   nCount := Bin2L( hb_BSubStr( cBody, nAt, 4 ) )
+   nAt += 4
+   FOR nI := 1 TO nCount
+      nZero := hb_BAt( Chr( 0 ), cBody, nAt )
+      cName := hb_BSubStr( cBody, nAt, nZero - nAt )
+      AAdd( hHrb[ "syms" ], { cName, hb_BPeek( cBody, nZero + 1 ), hb_BPeek( cBody, nZero + 2 ) } )
+      nAt := nZero + 3
+   NEXT
+   nCount := Bin2L( hb_BSubStr( cBody, nAt, 4 ) )
+   nAt += 4
+   FOR nI := 1 TO nCount
+      nZero := hb_BAt( Chr( 0 ), cBody, nAt )
+      cName := hb_BSubStr( cBody, nAt, nZero - nAt )
+      nAt := nZero + 1
+      nSize := Bin2L( hb_BSubStr( cBody, nAt, 4 ) )
+      nAt += 4
+      AAdd( hHrb[ "funcs" ], { cName, hb_BSubStr( cBody, nAt, nSize ) } )
+      nAt += nSize
+   NEXT
+
+   RETURN hHrb
+
+STATIC FUNCTION HrbEquivalent( cBefore, cAfter, cUpOld, cUpNew, cWhy )
+
+   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
+   LOCAL nI, cExpect
+
+   IF hB == NIL .OR. hA == NIL
+      cWhy := "cannot parse .hrb"
+      RETURN .F.
+   ENDIF
+   IF Len( hB[ "syms" ] ) != Len( hA[ "syms" ] ) .OR. Len( hB[ "funcs" ] ) != Len( hA[ "funcs" ] )
+      cWhy := "symbol/function count changed"
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( hB[ "syms" ] )
+      cExpect := iif( hB[ "syms" ][ nI ][ 1 ] == cUpOld, cUpNew, hB[ "syms" ][ nI ][ 1 ] )
+      IF !( hA[ "syms" ][ nI ][ 1 ] == cExpect ) .OR. ;
+         hA[ "syms" ][ nI ][ 2 ] != hB[ "syms" ][ nI ][ 2 ] .OR. ;
+         hA[ "syms" ][ nI ][ 3 ] != hB[ "syms" ][ nI ][ 3 ]
+         cWhy := "unexpected symbol change at #" + hb_ntos( nI ) + " (" + hA[ "syms" ][ nI ][ 1 ] + ")"
+         RETURN .F.
+      ENDIF
+   NEXT
+   FOR nI := 1 TO Len( hB[ "funcs" ] )
+      cExpect := iif( hB[ "funcs" ][ nI ][ 1 ] == cUpOld, cUpNew, hB[ "funcs" ][ nI ][ 1 ] )
+      IF !( hA[ "funcs" ][ nI ][ 1 ] == cExpect )
+         cWhy := "unexpected function name change (" + hA[ "funcs" ][ nI ][ 1 ] + ")"
+         RETURN .F.
+      ENDIF
+      IF !( hA[ "funcs" ][ nI ][ 2 ] == hB[ "funcs" ][ nI ][ 2 ] )
+         cWhy := "pcode changed in function " + hA[ "funcs" ][ nI ][ 1 ]
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
+STATIC FUNCTION WorkspaceEditJsonMulti( hFileEdits )
+
+   LOCAL hEdit := { "changes" => { => } }
+   LOCAL cPath, aChanges, aE
+
+   FOR EACH cPath IN hb_HKeys( hFileEdits )
+      aChanges := {}
+      FOR EACH aE IN hFileEdits[ cPath ]
+         AAdd( aChanges, { ;
+            "range" => { ;
+               "start" => { "line" => aE[ 1 ] - 1, "character" => aE[ 2 ] - 1 }, ;
+               "end"   => { "line" => aE[ 1 ] - 1, "character" => aE[ 2 ] - 1 + aE[ 3 ] } }, ;
+            "newText" => aE[ 4 ] } )
+      NEXT
+      hEdit[ "changes" ][ "file://" + cPath ] := aChanges
+   NEXT
+
+   RETURN hb_jsonEncode( hEdit, .T. )
 
 // ---------------------------------------------------------------------------
 // usages: list every definition, declaration, use and call of a symbol
@@ -423,8 +770,6 @@ STATIC FUNCTION CompileAll( hProj, cTarget, cTmp, cTag, lDumpAll )
               " -o" + cTmp + hb_ps() + FNameBase( cPath ) + "." + cTag + ".hrb"
       IF cTag == "before" .AND. ( lDumpAll .OR. cPath == cTarget )
          cCmd += " -x" + cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json"
-      ENDIF
-      IF cPath == cTarget .AND. cTag == "before"
          cCmd += " -p" + cTmp + hb_ps()
       ENDIF
       cOut := cErr := ""
@@ -534,12 +879,12 @@ STATIC PROCEDURE AddLine( aLines, nLine )
 
 STATIC FUNCTION TokenScan( cText, cName )
 
-   LOCAL hHits := { => }, hClean := { => }
+   LOCAL hHits := { => }, hClean := { => }, aStrHits := {}
    LOCAL cUp := Upper( cName )
    LOCAL nLen := hb_BLen( cText )
    LOCAL nAt := 1, nLine := 1, nCol := 1
    LOCAL cState := "code"            // code | dq | sq | br | lc | bc
-   LOCAL cLineBuf := "", cPrev1 := "", cPrev2 := ""
+   LOCAL cLineBuf := "", cStrBuf := "", cPrev1 := "", cPrev2 := ""
    LOCAL lLineStart := .T.
    LOCAL cCh, cNx, nStart, nColStart, cTok
 
@@ -548,8 +893,12 @@ STATIC FUNCTION TokenScan( cText, cName )
       cNx := hb_BSubStr( cText, nAt + 1, 1 )
 
       IF cCh == Chr( 10 )
+         IF ( cState == "dq" .OR. cState == "sq" .OR. cState == "br" ) .AND. cUp $ Upper( cStrBuf )
+            AddLine( aStrHits, nLine )
+         ENDIF
          hClean[ nLine ] := cLineBuf
          cLineBuf := ""
+         cStrBuf := ""
          nLine++
          nCol := 1
          nAt++
@@ -580,7 +929,13 @@ STATIC FUNCTION TokenScan( cText, cName )
          IF ( cState == "dq" .AND. cCh == '"' ) .OR. ;
             ( cState == "sq" .AND. cCh == "'" ) .OR. ;
             ( cState == "br" .AND. cCh == "]" )
+            IF cUp $ Upper( cStrBuf )
+               AddLine( aStrHits, nLine )
+            ENDIF
+            cStrBuf := ""
             cState := "code"
+         ELSE
+            cStrBuf += cCh
          ENDIF
          nAt++ ; nCol++
          LOOP
@@ -642,7 +997,7 @@ STATIC FUNCTION TokenScan( cText, cName )
    ENDDO
    hClean[ nLine ] := cLineBuf
 
-   RETURN { "hits" => hHits, "clean" => hClean }
+   RETURN { "hits" => hHits, "clean" => hClean, "strhits" => aStrHits }
 
 // count identifier tokens equal to cName in a single (comment-free) line,
 // with the same string and ->/: context rules used by TokenScan

@@ -1,6 +1,10 @@
 # Tarefa 4 — Roadmap incremental com critérios de pronto
 
-> **Status (2026-07-04): Fase 0 CONCLUÍDA — `make test` 17/17 verde.**
+> **Status (2026-07-04): Fases 0 e 1 CONCLUÍDAS — `make test` 38/38 verde**
+> (`rename-local`, `usages`, `rename-function` com comparador estrutural de
+> HRB, política H de strings com `--force`, statics por módulo, idempotência).
+> Pendências da Fase 1 anotadas: `.hbx`/`DYNAMIC` não varridos; sends de
+> método e `Eval` não aparecem em `calls` (v3 do dump).
 > Pipeline completo funcionando: dump `-x` → linhas do oráculo → tokenizer
 > (coluna) → checagem pp por contagem de tokens (linha reescrita é aceita
 > somente se o identificador passou intacto pela regra) → edição → verificação

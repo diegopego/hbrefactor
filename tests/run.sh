@@ -108,6 +108,49 @@ check "detached codeblock capture listed" $?
 grep -q "a.prg:13: read (local) in MAIN" "$D/out.log"
 check "read listed"                $?
 
+echo "case 10: rename-function across modules + idempotence (A->B->A)"
+D=$(fresh case10)
+( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
+check "definition renamed (b.prg)" $?
+grep -q "Dobrar( i )" "$D/a.prg"
+check "call renamed (a.prg)"       $?
+grep -q "pcode byte-identical" "$D/out.log"
+check "structural verification"    $?
+( cd "$D" && "$BIN" rename-function fix01.hbp Dobrar Dupla > out2.log 2>&1 )
+cmp -s "$D/a.prg" "$HERE/fix01/a.prg" && cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
+check "idempotence: A->B->A restores sources" $?
+
+echo "case 11: string literal with the function name (refuse without --force)"
+D=$(fresh case11)
+printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
+( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+RC=$?
+check "exit != 0 without --force"  $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "string literal contains 'Dupla'" "$D/out.log"
+check "warning lists the string"   $?
+( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar --force > out2.log 2>&1 )
+RC=$?
+check "exit 0 with --force"        $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q '"Dupla"' "$D/a.prg"
+check "string left untouched"      $?
+grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
+check "definition renamed"         $?
+
+echo "case 12: STATIC FUNCTION renamed inside its module only"
+D=$(fresh case12)
+( cd "$D" && "$BIN" rename-function fix01.hbp Meio Metade > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "STATIC FUNCTION Metade( nN )" "$D/b.prg"
+check "static definition renamed"  $?
+grep -q "Metade( nV ) + Metade( nV )" "$D/b.prg"
+check "internal calls renamed"     $?
+cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
+check "a.prg untouched"            $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]
