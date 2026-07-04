@@ -31,6 +31,29 @@ Regra transversal (da memória do projeto): fluxos definidos vivem em **Makefile
 
 ---
 
+## Backlog pós-roadmap (consolidado em 2026-07-04; sem ordem comprometida)
+
+**Patch `-x` no harbour-core (dump v3)** — melhorias no oráculo:
+1. `PRIVATE x := init` / `PUBLIC`: declaração e escrita inicial não aparecem (caminho RTVAR não instrumentado) — pré-requisito para qualquer comando sobre memvars.
+2. Variáveis com alias (`FIELD->x`, `M->x`) — caminho `GenPushAliasedVar`.
+3. Sends de método e `Eval` em `calls` (hoje otimizados como mensagem, invisíveis) — melhora `usages`/`call-graph` e habilita rename de método no futuro.
+4. Dedup das duplicatas de pré/pós-decremento em fallback (cosmético; consumidor já trata por linha).
+
+**Ferramenta (hbrefactor)**:
+5. `rename-function`: varrer `.hbx`/`DYNAMIC`/`REQUEST`/`EXTERNAL` e (opcional) arquivos de projeto além dos `.prg`.
+6. `extract-function`: permitir `EXIT`/`LOOP` quando o loop inteiro está dentro da seleção (hoje já permitido) e `RETURN` quando a seleção é o rabo da função (hoje recusado — avaliar).
+7. Lexer do pp (`hb_pp_lexNew`) no lugar do tokenizer próprio, expondo-o ao .prg (exigiria patch pequeno no core: wrapper `__pp_lex*`) — elimina divergências residuais de tokenização.
+8. `usages --json` com coluna real (via tokenizer) em vez de character 0.
+9. Projetos sem `.hbp` (lista explícita/glob) e fidelidade ao parsing do hbmk2 (macros/plataformas em `.hbp`/`.hbc`).
+
+**Candidatos do catálogo** (ver [comandos.md](comandos.md)): `rename-static-var` (S, quase pronto), `rename-define` (H, replay via biblioteca pp), `inline-local` (S/H), `find-dynamic-calls` (leitura).
+
+**Extensão VSCode**: refinamentos conforme uso real (keybindings padrão, preview via `--dry-run --json`, code actions).
+
+**Upstream**: PR do `-x` para o harbour-core — **adiado por decisão do Diego**; quando for a hora: entrada no ChangeLog via `bin/commit.hb`, formatação `uncrustify -c bin/harbour.ucf` (uncrustify não está instalado nesta máquina), texto do PR com as evidências do inventário.
+
+---
+
 ## Fase 0 — Smoke test: rename de `LOCAL` em uma função
 
 **Por que esta fase**: opera 100% em território **S** da tabela S/H/X (macro não enxerga LOCAL — testado; escopo resolvido com exatidão pelo compilador). O sucesso ou fracasso mede o *pipeline*, não heurísticas.
