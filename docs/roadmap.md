@@ -1,6 +1,13 @@
 # Tarefa 4 — Roadmap incremental com critérios de pronto
 
-> **Status (2026-07-04): Fases 0, 1 e 2 CONCLUÍDAS — `make test` 49/49 verde**
+> **Status (2026-07-04): Fases 0-3 CONCLUÍDAS — `make test` 58/58 verde.**
+> Fase 3 (`extract-function` v1) fechou o roadmap original: data flow pelo
+> dump, estrutura pelo `.ppo`, recusas conservadoras, verificação com
+> rollback. A régua da arquitetura foi respeitada sem novo patch: a estrutura
+> não foi "adivinhada" do fonte — foi lida do texto pós-pp, que é o que o
+> compilador vê. Se os limites v1 (uma saída, sem EXIT para fora, etc.)
+> apertarem no uso real, o próximo degrau é o dump estrutural (v3).
+> Status anterior:
 > (Fase 2: `rename-param` e `reorder-params` com recusa de aridade menor e
 > prova de comportamento idêntico por execução no caso 14.)
 > Status anterior:

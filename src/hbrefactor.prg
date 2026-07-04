@@ -27,6 +27,8 @@ PROCEDURE Main()
       nExit := RenameFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "reorder-params"
       nExit := ReorderParams( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "extract-function"
+      nExit := ExtractFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
    OTHERWISE
@@ -46,6 +48,7 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor rename-param <project.hbp> <file.prg> <function> <old> <new> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-function <project.hbp> <old> <new> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor reorder-params <project.hbp> <function> <name1,name2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor extract-function <project.hbp> <file.prg> <first>-<last> <newname> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project.hbp> <name> [--func <function>]" + hb_eol() )
 
    RETURN
@@ -902,6 +905,474 @@ STATIC FUNCTION WorkspaceEditJsonMulti( hFileEdits )
    NEXT
 
    RETURN hb_jsonEncode( hEdit, .T. )
+
+// ---------------------------------------------------------------------------
+// extract-function: move a range of complete statements into a new STATIC
+// function/procedure. Data flow comes from the -x dump (per-line accesses);
+// structure balance is checked on the .ppo text (what the compiler really
+// sees, immune to #command expansions); everything ambiguous is refused.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION ExtractFunction( aArgs )
+
+   LOCAL cHbp, cFile, cRange, cNewName, lDryRun := .F.
+   LOCAL hProj, cTmp, cSrcPath, cPath, hDump, hDumps := { => }, hFunc, hItem
+   LOCAL nFirst, nLast, nI, nFuncEnd, hTarget := NIL
+   LOCAL hPpo, cText, aSrc, cMsg, hScanAmp
+   LOCAL aVars := {}, hVar, cOut := "", lOutParam := .F., aParams := {}, aFuncs
+   LOCAL cEol, cIndent, cCall, cNewFunc, cTextNew, cWhy
+
+   IF Len( aArgs ) < 5
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cHbp     := aArgs[ 2 ]
+   cFile    := aArgs[ 3 ]
+   cRange   := aArgs[ 4 ]
+   cNewName := aArgs[ 5 ]
+   FOR nI := 6 TO Len( aArgs )
+      IF Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      ENDIF
+   NEXT
+
+   nI := At( "-", cRange )
+   IF nI == 0
+      RETURN Refuse( "range must be <first>-<last> (source line numbers)" )
+   ENDIF
+   nFirst := Val( Left( cRange, nI - 1 ) )
+   nLast  := Val( SubStr( cRange, nI + 1 ) )
+   IF nFirst <= 0 .OR. nLast < nFirst
+      RETURN Refuse( "invalid line range" )
+   ENDIF
+
+   IF ! IsValidIdent( cNewName )
+      RETURN Refuse( "new name '" + cNewName + "' is not a valid identifier" )
+   ENDIF
+   IF IsReserved( cNewName )
+      RETURN Refuse( "new name '" + cNewName + "' is a reserved word" )
+   ENDIF
+
+   hProj := LoadProject( cHbp )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + cHbp + "'" )
+   ENDIF
+   cSrcPath := ProjectMember( hProj, cFile )
+   IF cSrcPath == ""
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cHbp + "'" )
+   ENDIF
+   IF DefineCollision( hProj, cSrcPath, cNewName )
+      RETURN Refuse( "new name '" + cNewName + "' collides with a preprocessor rule" )
+   ENDIF
+
+   cTmp := WorkDir()
+   IF ! CompileAll( hProj, "", cTmp, "before", .T. )
+      RETURN Refuse( "project does not compile - fix build errors first" )
+   ENDIF
+
+   // new name must not clash with anything defined or referenced anywhere
+   FOR EACH cPath IN hProj[ "files" ]
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      IF hDump == NIL
+         RETURN Refuse( "missing occurrence dump for '" + cPath + "'" )
+      ENDIF
+      hDumps[ cPath ] := hDump
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == Upper( cNewName )
+            RETURN Refuse( "'" + cNewName + "' is already defined in " + hb_FNameNameExt( cPath ) )
+         ENDIF
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF Upper( hItem[ "sym" ] ) == Upper( cNewName )
+               RETURN Refuse( "'" + cNewName + "' is already referenced in " + hb_FNameNameExt( cPath ) )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   // --- locate the enclosing function and its line range --------------------
+   aFuncs := {}
+   FOR EACH hFunc IN hDumps[ cSrcPath ][ "functions" ]
+      IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "line" ] > 0
+         AAdd( aFuncs, hFunc )
+      ENDIF
+   NEXT
+   ASort( aFuncs,,, {| x, y | x[ "line" ] < y[ "line" ] } )
+   FOR nI := 1 TO Len( aFuncs )
+      IF aFuncs[ nI ][ "line" ] < nFirst .AND. ;
+         ( nI == Len( aFuncs ) .OR. aFuncs[ nI + 1 ][ "line" ] > nLast )
+         hTarget := aFuncs[ nI ]
+         nFuncEnd := iif( nI == Len( aFuncs ), 0x7FFFFFFF, aFuncs[ nI + 1 ][ "line" ] - 1 )
+         EXIT
+      ENDIF
+   NEXT
+   IF hTarget == NIL
+      RETURN Refuse( "line range is not fully inside a single function" )
+   ENDIF
+   IF hTarget[ "usesMacro" ]
+      // conservative: macro anywhere in the function makes moved semantics
+      // unprovable (macro may read memvars created around the selection)
+      OutStd( "warning: function uses & macros - review carefully" + hb_eol() )
+   ENDIF
+
+   cText := hb_MemoRead( cSrcPath )
+   aSrc := hb_ATokens( StrTran( cText, Chr( 13 ), "" ), Chr( 10 ) )
+   IF nLast > Len( aSrc )
+      RETURN Refuse( "range beyond end of file" )
+   ENDIF
+
+   // macro operator inside the selection text: refuse (cannot be proven)
+   hScanAmp := TokenScan( cText, "hbrf_dummy" )
+   FOR nI := nFirst TO nLast
+      IF "&" $ hb_HGetDef( hScanAmp[ "clean" ], nI, "" )
+         RETURN Refuse( "line " + hb_ntos( nI ) + " uses a macro (&) - refusing" )
+      ENDIF
+   NEXT
+
+   // selection must not cut a ';'-continued statement
+   hPpo := PpoMap( cTmp + hb_ps() + FNameBase( cSrcPath ) + ".ppo" )
+   IF Empty( AllTrim( hb_HGetDef( hPpo, nFirst, "" ) ) ) .AND. ;
+      ! Empty( AllTrim( hb_HGetDef( hScanAmp[ "clean" ], nFirst, "" ) ) )
+      RETURN Refuse( "selection starts in the middle of a continued statement" )
+   ENDIF
+   IF Right( RTrim( hb_HGetDef( hScanAmp[ "clean" ], nLast, "" ) ), 1 ) == ";"
+      RETURN Refuse( "selection ends in the middle of a continued statement" )
+   ENDIF
+
+   // --- structure balance on the preprocessed text ---------------------------
+   cMsg := StructureCheck( hPpo, nFirst, nLast )
+   IF ! Empty( cMsg )
+      RETURN Refuse( cMsg )
+   ENDIF
+
+   // --- variable data flow from the oracle -----------------------------------
+   FOR EACH hItem IN hTarget[ "declarations" ]
+      IF !( hItem[ "scope" ] == "local" )
+         LOOP
+      ENDIF
+      hVar := { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
+                "declIn" => ( hItem[ "declLine" ] >= nFirst .AND. hItem[ "declLine" ] <= nLast ), ;
+                "in" => {}, "after" => .F., "firstIn" => "" }
+      FOR EACH hFunc IN hTarget[ "occurrences" ]     // reuse hFunc as iterator
+         IF Upper( hFunc[ "sym" ] ) == Upper( hItem[ "sym" ] )
+            DO CASE
+            CASE hFunc[ "line" ] >= nFirst .AND. hFunc[ "line" ] <= nLast
+               AAdd( hVar[ "in" ], hFunc )
+               IF Empty( hVar[ "firstIn" ] )
+                  hVar[ "firstIn" ] := hFunc[ "access" ]
+               ENDIF
+            CASE hFunc[ "line" ] > nLast .AND. hFunc[ "line" ] <= nFuncEnd
+               hVar[ "after" ] := .T.
+            ENDCASE
+         ENDIF
+      NEXT
+      IF ! Empty( hVar[ "in" ] )
+         AAdd( aVars, hVar )
+      ENDIF
+   NEXT
+
+   FOR EACH hVar IN aVars
+      IF hVar[ "declIn" ]
+         IF hVar[ "after" ]
+            RETURN Refuse( "'" + hVar[ "sym" ] + "' is declared inside the selection but used after it" )
+         ENDIF
+         LOOP                                    // moves together with the code
+      ENDIF
+      cWhy := Spelling( cText, aSrc, hVar[ "sym" ], hVar[ "declLine" ] )   // original casing
+      IF VarWrittenIn( hVar ) .AND. hVar[ "after" ]
+         IF ! Empty( cOut )
+            RETURN Refuse( "more than one variable modified and used after the selection ('" + ;
+                           cOut + "' and '" + cWhy + "') - refusing" )
+         ENDIF
+         cOut := cWhy
+         lOutParam := !( hVar[ "firstIn" ] == "write" )
+         IF lOutParam
+            AAdd( aParams, cWhy )
+         ENDIF
+      ELSE
+         AAdd( aParams, cWhy )
+      ENDIF
+   NEXT
+
+   // --- assemble ---------------------------------------------------------------
+   cEol := iif( Chr( 13 ) + Chr( 10 ) $ cText, Chr( 13 ) + Chr( 10 ), Chr( 10 ) )
+   cIndent := Space( Len( aSrc[ nFirst ] ) - Len( LTrim( aSrc[ nFirst ] ) ) )
+   cCall := cIndent + iif( Empty( cOut ), "", cOut + " := " ) + cNewName + ;
+            "( " + ArrJoin( aParams, ", " ) + " )"
+   IF Empty( aParams )
+      cCall := cIndent + iif( Empty( cOut ), "", cOut + " := " ) + cNewName + "()"
+   ENDIF
+
+   cNewFunc := cEol + iif( Empty( cOut ), "STATIC PROCEDURE ", "STATIC FUNCTION " ) + ;
+               cNewName + "( " + ArrJoin( aParams, ", " ) + " )" + cEol + cEol
+   IF Empty( aParams )
+      cNewFunc := cEol + iif( Empty( cOut ), "STATIC PROCEDURE ", "STATIC FUNCTION " ) + ;
+                  cNewName + "()" + cEol + cEol
+   ENDIF
+   IF ! Empty( cOut ) .AND. ! lOutParam
+      cNewFunc += "   LOCAL " + cOut + cEol + cEol
+   ENDIF
+   FOR nI := nFirst TO nLast
+      cNewFunc += aSrc[ nI ] + cEol
+   NEXT
+   cNewFunc += cEol + "   RETURN" + iif( Empty( cOut ), "", " " + cOut ) + cEol
+
+   OutStd( "extract-function: lines " + hb_ntos( nFirst ) + "-" + hb_ntos( nLast ) + ;
+           " of " + hTarget[ "name" ] + " -> " + cNewName + ;
+           "( " + ArrJoin( aParams, ", " ) + " )" + ;
+           iif( Empty( cOut ), "", " returning " + cOut ) + hb_eol() )
+   IF lDryRun
+      OutStd( "dry run - no changes written" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   cTextNew := ReplaceLines( cText, nFirst, nLast, cCall, cEol ) + cNewFunc
+   hb_MemoWrit( cSrcPath, cTextNew )
+
+   // --- verification ------------------------------------------------------------
+   IF ! CompileAll( hProj, "", cTmp, "after" )
+      hb_MemoWrit( cSrcPath, cText )
+      RETURN Refuse( "project stopped compiling after extraction - rolled back" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      cWhy := ""
+      IF cPath == cSrcPath
+         IF ! HrbExtractCheck( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ), ;
+                               hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ), ;
+                               Upper( cNewName ), @cWhy )
+            hb_MemoWrit( cSrcPath, cText )
+            RETURN Refuse( "verification FAILED: " + cWhy + " - rolled back" )
+         ENDIF
+      ELSEIF !( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ) == ;
+                hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ) )
+         hb_MemoWrit( cSrcPath, cText )
+         RETURN Refuse( "verification FAILED: untouched module changed - rolled back" )
+      ENDIF
+   NEXT
+
+   OutStd( "verified: symbols preserved (+" + cNewName + "); run your test suite to confirm behavior" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// original spelling of a symbol (the dump uppercases it): take the token
+// as written on its declaration line, or the first match in the file
+STATIC FUNCTION Spelling( cText, aSrc, cSym, nDeclLine )
+
+   LOCAL hS := TokenScan( cText, cSym )
+   LOCAL aHits := hb_HGetDef( hS[ "hits" ], nDeclLine, {} )
+   LOCAL nLine
+
+   IF ! Empty( aHits ) .AND. nDeclLine <= Len( aSrc )
+      RETURN SubStr( aSrc[ nDeclLine ], aHits[ 1 ][ 1 ], aHits[ 1 ][ 2 ] )
+   ENDIF
+   FOR EACH nLine IN ASort( hb_HKeys( hS[ "hits" ] ) )
+      IF nLine <= Len( aSrc )
+         aHits := hS[ "hits" ][ nLine ]
+         RETURN SubStr( aSrc[ nLine ], aHits[ 1 ][ 1 ], aHits[ 1 ][ 2 ] )
+      ENDIF
+   NEXT
+
+   RETURN cSym
+
+STATIC FUNCTION VarWrittenIn( hVar )
+
+   LOCAL hOcc
+
+   FOR EACH hOcc IN hVar[ "in" ]
+      IF !( hOcc[ "access" ] == "read" )      // write, ref and use are all writes, pessimistically
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// keyword-level structure balance over preprocessed lines: every control
+// structure opened in the range must close inside it, and no statement may
+// jump across the border
+STATIC FUNCTION StructureCheck( hPpo, nFirst, nLast )
+
+   LOCAL aStack := {}, nLine, aWords, nW, cW, cNx, lLoopOpen
+
+   FOR nLine := nFirst TO nLast
+      aWords := LineWords( hb_HGetDef( hPpo, nLine, "" ) )
+      nW := 1
+      DO WHILE nW <= Len( aWords )
+         cW := aWords[ nW ][ 1 ]
+         cNx := iif( nW < Len( aWords ), aWords[ nW + 1 ][ 1 ], "" )
+         DO CASE
+         CASE cW == "IF" .AND. !( aWords[ nW ][ 2 ] == "(" )
+            AAdd( aStack, "IF" )
+         CASE cW == "ENDIF"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "IF" )
+               RETURN "line " + hb_ntos( nLine ) + ": ENDIF closes a structure opened outside the selection"
+            ENDIF
+            ASize( aStack, Len( aStack ) - 1 )
+         CASE cW == "DO" .AND. ( cNx == "WHILE" .OR. cNx == "CASE" )
+            AAdd( aStack, cNx )
+            nW++
+         CASE cW == "WHILE" .AND. !( aWords[ nW ][ 2 ] == "(" )
+            // bare WHILE opener (the DO WHILE form was consumed above)
+            AAdd( aStack, "WHILE" )
+         CASE cW == "ENDDO"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "WHILE" )
+               RETURN "line " + hb_ntos( nLine ) + ": ENDDO closes a structure opened outside the selection"
+            ENDIF
+            ASize( aStack, Len( aStack ) - 1 )
+         CASE cW == "FOR"
+            AAdd( aStack, "FOR" )
+         CASE cW == "NEXT"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "FOR" )
+               RETURN "line " + hb_ntos( nLine ) + ": NEXT closes a structure opened outside the selection"
+            ENDIF
+            ASize( aStack, Len( aStack ) - 1 )
+         CASE cW == "ENDCASE"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "CASE" )
+               RETURN "line " + hb_ntos( nLine ) + ": ENDCASE closes a structure opened outside the selection"
+            ENDIF
+            ASize( aStack, Len( aStack ) - 1 )
+         CASE cW == "SWITCH" .AND. !( aWords[ nW ][ 2 ] == "(" )
+            AAdd( aStack, "SWITCH" )
+         CASE cW == "ENDSWITCH"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "SWITCH" )
+               RETURN "line " + hb_ntos( nLine ) + ": ENDSWITCH closes a structure opened outside the selection"
+            ENDIF
+            ASize( aStack, Len( aStack ) - 1 )
+         CASE cW == "BEGIN" .AND. cNx == "SEQUENCE"
+            AAdd( aStack, "SEQ" )
+            nW++
+         CASE cW == "END"
+            IF Empty( aStack )
+               RETURN "line " + hb_ntos( nLine ) + ": END closes a structure opened outside the selection"
+            ENDIF
+            ASize( aStack, Len( aStack ) - 1 )
+            IF cNx == "SEQUENCE" .OR. cNx == "IF" .OR. cNx == "CASE" .OR. cNx == "WHILE"
+               nW++
+            ENDIF
+         CASE cW == "ELSE" .OR. cW == "ELSEIF"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "IF" )
+               RETURN "line " + hb_ntos( nLine ) + ": " + cW + " belongs to an IF outside the selection"
+            ENDIF
+         CASE cW == "CASE" .OR. cW == "OTHERWISE"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "CASE" .OR. ATail( aStack ) == "SWITCH" )
+               RETURN "line " + hb_ntos( nLine ) + ": " + cW + " belongs to a structure outside the selection"
+            ENDIF
+         CASE cW == "RECOVER" .OR. cW == "ALWAYS"
+            IF Empty( aStack ) .OR. !( ATail( aStack ) == "SEQ" )
+               RETURN "line " + hb_ntos( nLine ) + ": " + cW + " belongs to a SEQUENCE outside the selection"
+            ENDIF
+         CASE cW == "RETURN"
+            RETURN "line " + hb_ntos( nLine ) + ": RETURN inside the selection - refusing"
+         CASE cW == "EXIT" .OR. cW == "LOOP"
+            lLoopOpen := hb_AScan( aStack, "FOR" ) > 0 .OR. hb_AScan( aStack, "WHILE" ) > 0
+            IF ! lLoopOpen
+               RETURN "line " + hb_ntos( nLine ) + ": " + cW + " would jump out of the selection"
+            ENDIF
+         CASE cW == "BREAK" .AND. !( aWords[ nW ][ 2 ] == "(" )
+            IF hb_AScan( aStack, "SEQ" ) == 0
+               RETURN "line " + hb_ntos( nLine ) + ": BREAK would jump out of the selection"
+            ENDIF
+         CASE ( cW == "PRIVATE" .OR. cW == "PUBLIC" .OR. cW == "PARAMETERS" .OR. ;
+                cW == "MEMVAR" .OR. cW == "FIELD" ) .AND. nW == 1
+            RETURN "line " + hb_ntos( nLine ) + ": " + cW + " declaration inside the selection - refusing"
+         ENDCASE
+         nW++
+      ENDDO
+   NEXT
+   IF ! Empty( aStack )
+      RETURN "selection opens a " + ATail( aStack ) + " that closes outside it"
+   ENDIF
+
+   RETURN ""
+
+// uppercase words of a preprocessed line (strings blanked), each with the
+// first non-blank character that follows it
+STATIC FUNCTION LineWords( cLine )
+
+   LOCAL aWords := {}, nAt := 1, nLen := Len( cLine )
+   LOCAL cCh, cQuote := "", nStart, cWord, nJ, cAfter
+
+   DO WHILE nAt <= nLen
+      cCh := SubStr( cLine, nAt, 1 )
+      IF ! Empty( cQuote )
+         IF cCh == cQuote
+            cQuote := ""
+         ENDIF
+      ELSEIF cCh == '"' .OR. cCh == "'"
+         cQuote := cCh
+      ELSEIF IsIdStart( cCh )
+         nStart := nAt
+         DO WHILE nAt <= nLen .AND. IsIdChar( SubStr( cLine, nAt, 1 ) )
+            nAt++
+         ENDDO
+         cWord := Upper( SubStr( cLine, nStart, nAt - nStart ) )
+         cAfter := ""
+         nJ := nAt
+         DO WHILE nJ <= nLen
+            IF !( SubStr( cLine, nJ, 1 ) == " " )
+               cAfter := SubStr( cLine, nJ, 1 )
+               EXIT
+            ENDIF
+            nJ++
+         ENDDO
+         AAdd( aWords, { cWord, cAfter } )
+         LOOP
+      ENDIF
+      nAt++
+   ENDDO
+
+   RETURN aWords
+
+STATIC FUNCTION ReplaceLines( cText, nFirst, nLast, cNewLine, cEol )
+
+   LOCAL aOffs := LineOffsets( cText )
+   LOCAL nStart := aOffs[ nFirst ]
+   LOCAL nEnd := iif( nLast + 1 <= Len( aOffs ), aOffs[ nLast + 1 ], hb_BLen( cText ) + 1 )
+
+   RETURN hb_BLeft( cText, nStart - 1 ) + cNewLine + cEol + hb_BSubStr( cText, nEnd )
+
+// after an extraction the module must keep every symbol/function it had
+// (same scopes) plus exactly the new static function; matching is by name
+// because the insertion point shifts positional order
+STATIC FUNCTION HrbExtractCheck( cBefore, cAfter, cUpNew, cWhy )
+
+   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
+   LOCAL nI, nJ, lFound
+
+   IF hB == NIL .OR. hA == NIL
+      cWhy := "cannot parse .hrb"
+      RETURN .F.
+   ENDIF
+   IF Len( hA[ "syms" ] ) != Len( hB[ "syms" ] ) + 1 .OR. ;
+      Len( hA[ "funcs" ] ) != Len( hB[ "funcs" ] ) + 1
+      cWhy := "expected exactly one new symbol and one new function"
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( hB[ "syms" ] )
+      lFound := .F.
+      FOR nJ := 1 TO Len( hA[ "syms" ] )
+         IF hA[ "syms" ][ nJ ][ 1 ] == hB[ "syms" ][ nI ][ 1 ] .AND. ;
+            hA[ "syms" ][ nJ ][ 2 ] == hB[ "syms" ][ nI ][ 2 ]
+            lFound := .T.
+            EXIT
+         ENDIF
+      NEXT
+      IF ! lFound
+         cWhy := "symbol lost or changed: " + hB[ "syms" ][ nI ][ 1 ]
+         RETURN .F.
+      ENDIF
+   NEXT
+   lFound := .F.
+   FOR nJ := 1 TO Len( hA[ "syms" ] )
+      IF hA[ "syms" ][ nJ ][ 1 ] == cUpNew
+         lFound := .T.
+         EXIT
+      ENDIF
+   NEXT
+   IF ! lFound
+      cWhy := "new symbol " + cUpNew + " not found"
+      RETURN .F.
+   ENDIF
+
+   RETURN .T.
 
 // ---------------------------------------------------------------------------
 // usages: list every definition, declaration, use and call of a symbol

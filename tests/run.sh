@@ -192,6 +192,33 @@ check "reason mentions implicit NIL" $?
 cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "b.prg untouched"            $?
 
+echo "case 16: extract-function (FOR loop) preserves behavior"
+D=$(fresh case16)
+( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-11 Acumula > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "STATIC PROCEDURE Acumula( bAcum, i )" "$D/a.prg"
+check "new static procedure created" $?
+grep -q "^   Acumula( bAcum, i )$" "$D/a.prg"
+check "selection replaced by call" $?
+( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
+check "program output identical"   $?
+
+echo "case 17: extract-function refuses a cut FOR/NEXT and RETURN in range"
+D=$(fresh case17)
+( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-10 Metade2 > out.log 2>&1 )
+RC=$?
+check "cut FOR refused"            $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "closes outside it" "$D/out.log"
+check "reason mentions open structure" $?
+( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 13-16 Fim2 > out2.log 2>&1 )
+RC=$?
+check "RETURN in range refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
+cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
+check "a.prg untouched"            $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

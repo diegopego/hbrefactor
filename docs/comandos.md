@@ -81,13 +81,28 @@ parênteses/colchetes/chaves e strings). Implementado:
   tocados byte-idênticos; rollback automático. O critério de comportamento
   (saída do programa idêntica) é exercido na suíte (caso 14).
 
-## Planejados (ordem do [roadmap](roadmap.md))
+### `extract-function <hbp> <arquivo> <ini>-<fim> <nome>` — Fase 3 ✅
+Extrai um intervalo de statements completos para `STATIC FUNCTION`/`PROCEDURE`
+nova no fim do módulo, substituindo a seleção pela chamada. Implementado:
+- **Data flow pelo oráculo**: ocorrências por linha (read/write/ref) decidem
+  parâmetros (grafia original recuperada do fonte), variável de saída
+  (≤1 modificada-e-usada-depois → `RETURN`; write-first vira LOCAL da nova
+  função) e locais que se movem com o código.
+- **Estrutura pelo `.ppo`**: balanceador de IF/ENDIF, DO WHILE/ENDDO,
+  FOR/NEXT, DO CASE/ENDCASE, SWITCH, BEGIN SEQUENCE/END sobre o texto
+  pós-pp (imune a `#command` que expande para controle), com pilha tipada e
+  `END` genérico.
+- **Recusas**: estrutura aberta cruzando a borda; `RETURN`; `EXIT`/`LOOP`/
+  `BREAK` que saltariam para fora; `ELSE`/`CASE`/`RECOVER` órfãos; seleção
+  cortando statement continuado por `;`; macro `&` na seleção; `PRIVATE`/
+  `PUBLIC`/`PARAMETERS`/`FIELD` declarados dentro; >1 variável de saída;
+  local declarada dentro e usada depois.
+- **Verificação**: recompila tudo; módulo editado deve preservar todos os
+  símbolos/funções (por nome) + exatamente a nova função; demais módulos
+  byte-idênticos; rollback automático. Comportamento provado na suíte
+  (caso 16: saída do programa idêntica).
 
-### `extract-function <hbp> <arquivo> <linhas> <nome>` — Fase 3
-Extrai seleção para `STATIC FUNCTION` nova; parâmetros/retorno inferidos das
-ocorrências por linha do dump (variáveis usadas dentro × fora da seleção).
-Recusas: `RETURN`/`EXIT`/`LOOP` cruzando a borda, `PRIVATE` criada dentro e
-usada fora, macro na seleção sem confirmação.
+## Planejados (ordem do [roadmap](roadmap.md))
 
 ## Candidatos (aceitos em princípio, sem fase definida)
 
