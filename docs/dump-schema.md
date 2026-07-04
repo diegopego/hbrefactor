@@ -68,9 +68,25 @@ Interface entre o patch do compilador (gravador de ocorrências, branch do harbo
 3. A gravação ocorre **durante o parse** (antes de `hbdead.c`): ocorrências em código morto **aparecem** — é o que garante soundness sobre o fallback `-gh -b` (arquitetura, Decisão 1a).
 4. Erro de compilação ⇒ dump não é gravado (parcial nunca é emitido).
 
-## Limitações conhecidas do patch v1 (verificadas em teste)
+## Patch v3 (2026-07-04) — `schema: 2`
 
-1. **`PRIVATE`/`PUBLIC` com inicialização** (`PRIVATE x := 5`): nem a declaração nem a escrita inicial aparecem (codegen via RTVAR, caminho não instrumentado). A *leitura* posterior aparece (como `memvar`/`memvar_implicit`). Memvars são território H de qualquer forma; corrigir no patch v2.
+- **`sends`** por função: toda mensagem de objeto (`o:msg`, `o:msg :=` como
+  `_MSG`, `WITH OBJECT`) e **`Eval()`** (compilado como send de `EVAL`),
+  gravadas em `hb_compGenMessage()` (`hbmain.c`). Formato igual a `calls`:
+  `{ "sym", "line", "block" }`.
+- **`PRIVATE`/`PUBLIC` com inicialização**: criação e escrita inicial agora
+  aparecem como ocorrência `{scope: "memvar", access: "write"}` (`"use"` sem
+  init), gravadas em `hb_compRTVariableGen()` (**harbour.y** — único ponto
+  onde o compilador ainda conhece os nomes; exigiu regenerar o parser:
+  `bison -d -o harboury.c harbour.y && mv harboury.c harbour.yyc && mv
+  harboury.h harbour.yyh` — o include interno DEVE chamar `harboury.h`, é o
+  nome que a regra de build usa ao copiar). Nota: yyc/yyh regenerados com
+  bison 3.8.2 (upstream usou 3.0.2) — diff grande no arquivo gerado.
+
+## Limitações conhecidas do patch v1 (as ainda vigentes)
+
+1. ~~`PRIVATE`/`PUBLIC` com inicialização~~ — **resolvido no v3** (acima).
+   `PRIVATE &cMacro` continua invisível (nome dinâmico, zona de macro).
 2. **Variáveis com alias** (`FIELD->x`, `M->x`, `alias->x`): caminho `GenPushAliasedVar` não instrumentado no v1.
 3. **Duplicatas possíveis**: em alguns fallbacks de pré/pós-decremento o compilador resolve a variável duas vezes → dois registros para um token. O consumidor deve tratar a lista de ocorrências por linha como *conjunto* (a verdade posicional vem do lexer sobre a linha original), e recusar quando a mesma linha tiver o mesmo símbolo com **escopos distintos** (sombreamento por parâmetro de codeblock homônimo).
 4. **Função pseudo `fileDecl: true`**: cada módulo traz uma entrada com o nome do módulo e `fileDecl: true` (declarações file-wide); consumidores filtram.

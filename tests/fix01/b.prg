@@ -25,3 +25,9 @@ FUNCTION ProximoId()
    s_nContador++
 
    RETURN s_nContador
+
+FUNCTION ComPrivada()
+
+   PRIVATE xCfg := 7
+
+   RETURN xCfg

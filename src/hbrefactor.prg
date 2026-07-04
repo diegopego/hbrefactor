@@ -1489,6 +1489,17 @@ STATIC FUNCTION Usages( aArgs )
                   hFunc[ "name" ] + cCtx + hb_eol() )
             ENDIF
          NEXT
+
+         FOR EACH hItem IN hb_HGetDef( hFunc, "sends", {} )
+            IF Upper( hItem[ "sym" ] ) == Upper( cName )
+               nHits++
+               AAdd( aLoc, { cPath, hItem[ "line" ] } )
+               cCtx := SrcLine( aSrc, hItem[ "line" ] )
+               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": send" + ;
+                  iif( hItem[ "block" ], " (codeblock)", "" ) + " in " + ;
+                  hFunc[ "name" ] + cCtx + hb_eol() )
+            ENDIF
+         NEXT
       NEXT
    NEXT
 

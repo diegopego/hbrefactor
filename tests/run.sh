@@ -284,6 +284,21 @@ check "string naming function reported" $?
 grep -q "function DINAMICA uses & macros" "$D/out.log"
 check "macro zone reported"        $?
 
+echo "case 23: dump v3 - sends (Eval) and PRIVATE initialization visible"
+D=$(fresh case23)
+( cd "$D" && "$BIN" usages fix01.hbp Eval > eval.log 2>&1 )
+RC=$?
+check "usages Eval exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "a.prg:10: send in MAIN" "$D/eval.log"
+check "Eval listed as send"        $?
+( cd "$D" && "$BIN" usages fix01.hbp xCfg > priv.log 2>&1 )
+RC=$?
+check "usages xCfg exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "write (memvar) in COMPRIVADA" "$D/priv.log"
+check "PRIVATE init write listed"  $?
+grep -q "read (memvar_implicit) in COMPRIVADA" "$D/priv.log"
+check "later read listed"          $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]
