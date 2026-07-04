@@ -28,6 +28,8 @@ FUNCTION ProximoId()
 
 FUNCTION ComPrivada()
 
+   MEMVAR xCfg
+
    PRIVATE xCfg := 7
 
    RETURN xCfg

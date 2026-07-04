@@ -24,6 +24,15 @@ fresh() { # fresh <case-name> -> echoes work dir
    echo "$d"
 }
 
+echo "case 0: base fixtures compile clean under the flags the .hbp declares"
+# the fixture project declares -w3 -es2; the fixtures themselves must be
+# warning-clean idiomatic Harbour (a warning that slips through here is a
+# fixture bug, e.g. a bare PRIVATE reference without a MEMVAR declaration)
+for f in a.prg b.prg; do
+   "$HB_BIN/harbour" "$HERE/fix01/$f" -n -q0 -w3 -es2 -s -I"$HERE/fix01" > /dev/null 2>&1
+   check "$f clean under -w3 -es2"  $?
+done
+
 echo "case 1: rename nTotal->nSoma in Main (success + verification)"
 D=$(fresh case1)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal nSoma > out.log 2>&1 )
@@ -296,7 +305,7 @@ RC=$?
 check "usages xCfg exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "write (memvar) in COMPRIVADA" "$D/priv.log"
 check "PRIVATE init write listed"  $?
-grep -q "read (memvar_implicit) in COMPRIVADA" "$D/priv.log"
+grep -q "read (memvar) in COMPRIVADA" "$D/priv.log"
 check "later read listed"          $?
 
 echo "case 24: rename inside a ;-continued statement (token on middle line)"
