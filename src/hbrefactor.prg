@@ -346,6 +346,14 @@ STATIC FUNCTION RenameFunction( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       cText := hb_MemoRead( cPath )
       hScan := TokenScan( cText, cOld )
+      // strings are DATA: the tool never edits them (their meaning cannot be
+      // verified). It reports them precisely so the human decides:
+      // exact match = very likely a call by name (Do(), dispatch tables);
+      // substring   = probably a label/message
+      FOR EACH hHit IN hScan[ "strexact" ]
+         AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hHit[ 1 ] ) + ;
+               ": string equals '" + cOld + "' - likely a call by name, review manually" )
+      NEXT
       FOR EACH nLine IN hScan[ "strhits" ]
          AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
                ": string literal contains '" + cOld + "' (not renamed)" )
@@ -904,7 +912,7 @@ STATIC FUNCTION Usages( aArgs )
 
    LOCAL cHbp, cName, cFuncFilter := ""
    LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
-   LOCAL nHits := 0, nI, cModFile, aSrc, cCtx
+   LOCAL nHits := 0, nI, cModFile, aSrc, cCtx, cSrcText, hStrScan
 
    IF Len( aArgs ) < 3
       Usage()
@@ -935,7 +943,16 @@ STATIC FUNCTION Usages( aArgs )
          RETURN Refuse( "missing occurrence dump for '" + cPath + "'" )
       ENDIF
       cModFile := hb_FNameNameExt( cPath )
-      aSrc := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
+      cSrcText := hb_MemoRead( cPath )
+      aSrc := hb_ATokens( StrTran( cSrcText, Chr( 13 ), "" ), Chr( 10 ) )
+
+      // possible references by name inside string literals (read-only info)
+      hStrScan := TokenScan( cSrcText, cName )
+      FOR EACH hItem IN hStrScan[ "strexact" ]
+         nHits++
+         OutStd( cModFile + ":" + hb_ntos( hItem[ 1 ] ) + ": possible reference in string" + ;
+                 SrcLine( aSrc, hItem[ 1 ] ) + hb_eol() )
+      NEXT
 
       FOR EACH hFunc IN hDump[ "functions" ]
          IF hFunc[ "fileDecl" ]
@@ -1232,13 +1249,13 @@ STATIC PROCEDURE AddLine( aLines, nLine )
 
 STATIC FUNCTION TokenScan( cText, cName )
 
-   LOCAL hHits := { => }, hClean := { => }, aStrHits := {}
+   LOCAL hHits := { => }, hClean := { => }, aStrHits := {}, aStrExact := {}
    LOCAL cUp := Upper( cName )
    LOCAL nLen := hb_BLen( cText )
    LOCAL nAt := 1, nLine := 1, nCol := 1
    LOCAL cState := "code"            // code | dq | sq | br | lc | bc
    LOCAL cLineBuf := "", cStrBuf := "", cPrev1 := "", cPrev2 := ""
-   LOCAL lLineStart := .T.
+   LOCAL lLineStart := .T., nStrCol := 0
    LOCAL cCh, cNx, nStart, nColStart, cTok
 
    DO WHILE nAt <= nLen
@@ -1282,7 +1299,11 @@ STATIC FUNCTION TokenScan( cText, cName )
          IF ( cState == "dq" .AND. cCh == '"' ) .OR. ;
             ( cState == "sq" .AND. cCh == "'" ) .OR. ;
             ( cState == "br" .AND. cCh == "]" )
-            IF cUp $ Upper( cStrBuf )
+            IF Upper( cStrBuf ) == cUp
+               // string literal is EXACTLY the searched name: very likely
+               // a call/reference by name (Do(), dispatch tables, macros)
+               AAdd( aStrExact, { nLine, nStrCol, Len( cStrBuf ) } )
+            ELSEIF cUp $ Upper( cStrBuf )
                AddLine( aStrHits, nLine )
             ENDIF
             cStrBuf := ""
@@ -1309,11 +1330,11 @@ STATIC FUNCTION TokenScan( cText, cName )
          cState := "bc"
          nAt += 2 ; nCol += 2
       CASE cCh == '"'
-         cState := "dq" ; cLineBuf += cCh ; nAt++ ; nCol++
+         cState := "dq" ; nStrCol := nCol + 1 ; cLineBuf += cCh ; nAt++ ; nCol++
       CASE cCh == "'"
-         cState := "sq" ; cLineBuf += cCh ; nAt++ ; nCol++
+         cState := "sq" ; nStrCol := nCol + 1 ; cLineBuf += cCh ; nAt++ ; nCol++
       CASE cCh == "[" .AND. !( cPrev1 $ ")]}" ) .AND. ! IsIdChar( cPrev1 )
-         cState := "br" ; cLineBuf += cCh ; nAt++ ; nCol++
+         cState := "br" ; nStrCol := nCol + 1 ; cLineBuf += cCh ; nAt++ ; nCol++
       CASE IsIdStart( cCh )
          nStart := nAt
          nColStart := nCol
@@ -1350,7 +1371,7 @@ STATIC FUNCTION TokenScan( cText, cName )
    ENDDO
    hClean[ nLine ] := cLineBuf
 
-   RETURN { "hits" => hHits, "clean" => hClean, "strhits" => aStrHits }
+   RETURN { "hits" => hHits, "clean" => hClean, "strhits" => aStrHits, "strexact" => aStrExact }
 
 // count identifier tokens equal to cName in a single (comment-free) line,
 // with the same string and ->/: context rules used by TokenScan

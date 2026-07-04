@@ -129,8 +129,11 @@ printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
 ( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
 RC=$?
 check "exit != 0 without --force"  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "string literal contains 'Dupla'" "$D/out.log"
-check "warning lists the string"   $?
+grep -q "string equals 'Dupla' - likely a call by name" "$D/out.log"
+check "warning classifies exact-name string" $?
+( cd "$D" && "$BIN" usages fix01.hbp Dupla > usages.log 2>&1 )
+grep -q "possible reference in string" "$D/usages.log"
+check "usages reports the string reference" $?
 ( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar --force > out2.log 2>&1 )
 RC=$?
 check "exit 0 with --force"        $([ $RC -eq 0 ] && echo 0 || echo 1)

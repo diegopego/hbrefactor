@@ -43,6 +43,17 @@ projeto. Implementado:
   BEGINDUMP, tokens fora do oráculo (`REQUEST`, `EXTERNAL`, homônimos) — são
   listadas como warnings e **nunca editadas**; sem `--force` a operação é
   recusada.
+
+**Política de strings (decisão de projeto, 2026-07-04)**: strings são
+*dados* — seu significado não é verificável por recompilação, então a
+ferramenta **nunca as edita**, nem por opt-in (uma flag "renomeie strings
+iguais ao nome" foi considerada e rejeitada como remendo: adivinharia
+intenção e exigiria enfraquecer o comparador de pcode). O que a ferramenta
+faz é **relatar com precisão** para a decisão humana: warning distinto para
+string **exatamente igual** ao nome ("likely a call by name" — `Do()`,
+tabelas de dispatch) vs. string que apenas **contém** o nome (rótulo,
+mensagem); e o `usages` lista os matches exatos como "possible reference in
+string".
 - Colisões recusadas: nome novo já definido/referenciado no projeto, regra
   de pp, reservada.
 - **Verificação estrutural de HRB** (leitor mínimo do formato de
