@@ -51,18 +51,26 @@ projeto. Implementado:
   tocados byte-idênticos; rollback automático. Idempotência A→B→A coberta
   por teste.
 
+### `rename-param <hbp> <arquivo> <função> <velho> <novo>` — Fase 2 ✅
+Parâmetro é local: mesmo motor (e mesmas garantias byte-idênticas) da Fase 0,
+com validação de que o alvo é de fato parâmetro. **S**.
+
+### `reorder-params <hbp> <função> <nome1,nome2,...> [--file] [--force]` — Fase 2 ✅
+Reordena os parâmetros declarados e permuta os argumentos de **todos** os
+call sites compilados (parser de lista com balanceamento de
+parênteses/colchetes/chaves e strings). Implementado:
+- **Recusa** (sem override): call site com aridade ≠ nº de parâmetros
+  ("implicit NIL would move"), chamada multi-linha (continuação `;`),
+  variádicas; nova ordem deve ser permutação exata dos nomes declarados.
+- **`--force`** só para strings contendo o nome (nunca editadas).
+- Nota: `PCount()` no corpo **não** é risco em reorder puro — a quantidade
+  passada em cada site não muda.
+- Verificação: recompila tudo; tabela de símbolos e conjunto de funções
+  imutáveis (o pcode muda legitimamente — ordem de push); módulos não
+  tocados byte-idênticos; rollback automático. O critério de comportamento
+  (saída do programa idêntica) é exercido na suíte (caso 14).
+
 ## Planejados (ordem do [roadmap](roadmap.md))
-
-### `rename-param <hbp> <arquivo> <função> <velho> <novo>` — Fase 2 (curto)
-Parâmetro é local: o motor da Fase 0 já cobre; falta apenas fixture dedicada
-e mensagem específica. **S**.
-
-### `reorder-params <hbp> <função> <nova-ordem>` — Fase 2
-Reordena parâmetros atualizando todos os call sites (via `calls` do dump +
-parsing da lista de argumentos com balanceamento). **H** nos casos: chamada
-com menos argumentos (NIL implícito muda de posição), `PCount()` no corpo,
-`hb_ExecFromArray`/`Do()` com array. Critério: testes de comportamento
-(o pcode muda legitimamente).
 
 ### `extract-function <hbp> <arquivo> <linhas> <nome>` — Fase 3
 Extrai seleção para `STATIC FUNCTION` nova; parâmetros/retorno inferidos das

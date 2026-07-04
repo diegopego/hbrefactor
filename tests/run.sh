@@ -151,6 +151,44 @@ check "internal calls renamed"     $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+echo "case 13: rename-param (parameter is a local; non-param refused)"
+D=$(fresh case13)
+( cd "$D" && "$BIN" rename-param fix01.hbp b.prg Dupla nV nValor > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "FUNCTION Dupla( nValor )" "$D/b.prg"
+check "parameter renamed in signature" $?
+grep -q "nValor + nValor" "$D/b.prg"
+check "parameter renamed in body"  $?
+( cd "$D" && "$BIN" rename-param fix01.hbp b.prg Dupla nR nRes > out2.log 2>&1 )
+RC=$?
+check "non-parameter refused"      $([ $RC -ne 0 ] && echo 0 || echo 1)
+
+echo "case 14: reorder-params preserves behavior (program output identical)"
+D=$(fresh case14)
+( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+( cd "$D" && "$BIN" reorder-params fix01.hbp Sub2 nB,nA > out.log 2>&1 )
+RC=$?
+check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "FUNCTION Sub2( nB, nA )" "$D/b.prg"
+check "definition reordered"       $?
+grep -q "Sub2( 3, 10 )" "$D/a.prg"
+check "call site arguments swapped" $?
+( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
+check "program output identical"   $?
+
+echo "case 15: reorder-params refuses call site with fewer arguments"
+D=$(fresh case15)
+printf '\nFUNCTION ChamaCurta()\n\n   RETURN Sub2( 5 )\n' >> "$D/a.prg"
+( cd "$D" && "$BIN" reorder-params fix01.hbp Sub2 nB,nA > out.log 2>&1 )
+RC=$?
+check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "implicit NIL would move" "$D/out.log"
+check "reason mentions implicit NIL" $?
+cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
+check "b.prg untouched"            $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

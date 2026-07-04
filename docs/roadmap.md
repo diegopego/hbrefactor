@@ -1,6 +1,9 @@
 # Tarefa 4 — Roadmap incremental com critérios de pronto
 
-> **Status (2026-07-04): Fases 0 e 1 CONCLUÍDAS — `make test` 38/38 verde**
+> **Status (2026-07-04): Fases 0, 1 e 2 CONCLUÍDAS — `make test` 49/49 verde**
+> (Fase 2: `rename-param` e `reorder-params` com recusa de aridade menor e
+> prova de comportamento idêntico por execução no caso 14.)
+> Status anterior:
 > (`rename-local`, `usages`, `rename-function` com comparador estrutural de
 > HRB, política H de strings com `--force`, statics por módulo, idempotência).
 > Pendências da Fase 1 anotadas: `.hbx`/`DYNAMIC` não varridos; sends de

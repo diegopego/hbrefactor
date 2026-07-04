@@ -20,10 +20,13 @@ PROCEDURE Main()
    LOCAL nExit
 
    DO CASE
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-local"
+   CASE Len( aArgs ) >= 1 .AND. ( Lower( aArgs[ 1 ] ) == "rename-local" .OR. ;
+                                  Lower( aArgs[ 1 ] ) == "rename-param" )
       nExit := RenameLocal( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-function"
       nExit := RenameFunction( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "reorder-params"
+      nExit := ReorderParams( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
    OTHERWISE
@@ -40,7 +43,9 @@ STATIC PROCEDURE Usage()
    OutStd( "hbrefactor " + APP_VERSION + " - Harbour refactoring tool" + hb_eol() )
    OutStd( "Usage:" + hb_eol() )
    OutStd( "  hbrefactor rename-local <project.hbp> <file.prg> <function> <old> <new> [--dry-run] [--json <out>]" + hb_eol() )
+   OutStd( "  hbrefactor rename-param <project.hbp> <file.prg> <function> <old> <new> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-function <project.hbp> <old> <new> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor reorder-params <project.hbp> <function> <name1,name2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project.hbp> <name> [--func <function>]" + hb_eol() )
 
    RETURN
@@ -123,7 +128,7 @@ STATIC FUNCTION RenameLocal( aArgs )
       RETURN Refuse( "function '" + cFunc + "' not found in '" + cFile + "'" )
    ENDIF
 
-   aLines := CollectTargetLines( hFunc, cOld, cNew )
+   aLines := CollectTargetLines( hFunc, cOld, cNew, Lower( aArgs[ 1 ] ) == "rename-param" )
    IF HB_ISSTRING( aLines )          // refusal message
       RETURN Refuse( aLines )
    ENDIF
@@ -444,6 +449,349 @@ STATIC FUNCTION RenameFunction( aArgs )
    OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed as expected, pcode byte-identical" + hb_eol() )
 
    RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// reorder-params: change the declared parameter order of a function and
+// permute the arguments of every compiled call site accordingly (semantics
+// preserved). Call sites whose argument count differs from the parameter
+// count are listed and the operation is refused (implicit NIL would move).
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION ReorderParams( aArgs )
+
+   LOCAL cHbp, cFunc, cOrder, cOnlyFile := "", lForce := .F., lDryRun := .F., cJsonOut := ""
+   LOCAL hProj, cTmp, cPath, hDump, hFunc, hItem
+   LOCAL aDefs := {}, hDumps := { => }, aScope, lStatic
+   LOCAL aParams := {}, aNew, aPerm := {}, lIdentity
+   LOCAL hSites := { => }, aBad := {}, aWarn := {}
+   LOCAL nI, nJ, cUpFunc, hScan, hPpo, cText, aSrc
+   LOCAL hFileEdits := { => }, hOrig := { => }, aEdits, aHits, hHit, hSpan
+   LOCAL nLine, cClean, cPpoLine, cWhy, nTotal := 0
+
+   IF Len( aArgs ) < 4
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cHbp   := aArgs[ 2 ]
+   cFunc  := aArgs[ 3 ]
+   cOrder := aArgs[ 4 ]
+   FOR nI := 5 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--force"
+         lForce := .T.
+      CASE Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      CASE Lower( aArgs[ nI ] ) == "--file" .AND. nI < Len( aArgs )
+         cOnlyFile := aArgs[ ++nI ]
+      CASE Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
+         cJsonOut := aArgs[ ++nI ]
+      ENDCASE
+   NEXT
+   cUpFunc := Upper( cFunc )
+
+   hProj := LoadProject( cHbp )
+   IF hProj == NIL
+      RETURN Refuse( "cannot read project file '" + cHbp + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! CompileAll( hProj, "", cTmp, "before", .T. )
+      RETURN Refuse( "project does not compile - fix build errors first" )
+   ENDIF
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hDump := ReadDump( cTmp + hb_ps() + FNameBase( cPath ) + ".occ.json" )
+      IF hDump == NIL
+         RETURN Refuse( "missing occurrence dump for '" + cPath + "'" )
+      ENDIF
+      hDumps[ cPath ] := hDump
+      FOR EACH hFunc IN hDump[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUpFunc
+            AAdd( aDefs, { cPath, hFunc } )
+         ENDIF
+      NEXT
+   NEXT
+   IF Empty( aDefs )
+      RETURN Refuse( "function '" + cFunc + "' is not defined in this project" )
+   ENDIF
+   IF ! Empty( cOnlyFile )
+      FOR nI := Len( aDefs ) TO 1 STEP -1
+         IF !( Lower( hb_FNameNameExt( aDefs[ nI ][ 1 ] ) ) == Lower( hb_FNameNameExt( cOnlyFile ) ) )
+            hb_ADel( aDefs, nI, .T. )
+         ENDIF
+      NEXT
+   ENDIF
+   IF Len( aDefs ) != 1
+      RETURN Refuse( "ambiguous or missing definition of '" + cFunc + "' - use --file" )
+   ENDIF
+   lStatic := aDefs[ 1 ][ 2 ][ "static" ]
+   aScope := iif( lStatic, { aDefs[ 1 ][ 1 ] }, hProj[ "files" ] )
+
+   // declared parameters, in order
+   FOR EACH hItem IN aDefs[ 1 ][ 2 ][ "declarations" ]
+      IF hItem[ "param" ]
+         AAdd( aParams, hItem[ "sym" ] )
+      ENDIF
+   NEXT
+   IF Empty( aParams )
+      RETURN Refuse( "'" + cFunc + "' has no ()-declared parameters" )
+   ENDIF
+
+   aNew := hb_ATokens( cOrder, "," )
+   FOR nI := 1 TO Len( aNew )
+      aNew[ nI ] := AllTrim( aNew[ nI ] )
+   NEXT
+   IF Len( aNew ) != Len( aParams )
+      RETURN Refuse( "new order must list all " + hb_ntos( Len( aParams ) ) + " parameter(s)" )
+   ENDIF
+   lIdentity := .T.
+   FOR nI := 1 TO Len( aNew )
+      nJ := 0
+      FOR EACH cWhy IN aParams          // reuse cWhy as scratch iterator
+         IF Upper( cWhy ) == Upper( aNew[ nI ] )
+            nJ := cWhy:__enumIndex()
+            EXIT
+         ENDIF
+      NEXT
+      IF nJ == 0 .OR. hb_AScan( aPerm, nJ ) > 0
+         RETURN Refuse( "new order must be a permutation of: " + ArrJoin( aParams, ", " ) )
+      ENDIF
+      AAdd( aPerm, nJ )
+      IF nJ != nI
+         lIdentity := .F.
+      ENDIF
+   NEXT
+   IF lIdentity
+      RETURN Refuse( "new order is identical to the current one" )
+   ENDIF
+
+   // sites: definition line + every compiled call line inside the scope
+   hSites[ aDefs[ 1 ][ 1 ] ] := {}
+   AddLine( hSites[ aDefs[ 1 ][ 1 ] ], aDefs[ 1 ][ 2 ][ "line" ] )
+   FOR EACH cPath IN aScope
+      FOR EACH hFunc IN hDumps[ cPath ][ "functions" ]
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF Upper( hItem[ "sym" ] ) == cUpFunc
+               IF ! ( cPath $ hSites )
+                  hSites[ cPath ] := {}
+               ENDIF
+               AddLine( hSites[ cPath ], hItem[ "line" ] )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   // textual references (strings) - never edited; require --force
+   FOR EACH cPath IN hProj[ "files" ]
+      hScan := TokenScan( hb_MemoRead( cPath ), cFunc )
+      FOR EACH nLine IN hScan[ "strhits" ]
+         AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+               ": string literal contains '" + cFunc + "' (arguments there cannot be reordered)" )
+      NEXT
+   NEXT
+   IF ! Empty( aWarn )
+      FOR EACH cWhy IN aWarn
+         OutStd( "warning: " + cWhy + hb_eol() )
+      NEXT
+      IF ! lForce
+         RETURN Refuse( "textual references found - re-run with --force to proceed without touching them" )
+      ENDIF
+   ENDIF
+
+   // build edits per site
+   FOR EACH cPath IN hb_HKeys( hSites )
+      cText := hb_MemoRead( cPath )
+      aSrc := hb_ATokens( StrTran( cText, Chr( 13 ), "" ), Chr( 10 ) )
+      hScan := TokenScan( cText, cFunc )
+      hPpo := PpoMap( cTmp + hb_ps() + FNameBase( cPath ) + ".ppo" )
+      aEdits := {}
+      FOR EACH nLine IN ASort( hSites[ cPath ] )
+         cClean := Squeeze( hb_HGetDef( hScan[ "clean" ], nLine, "" ) )
+         cPpoLine := Squeeze( hb_HGetDef( hPpo, nLine, "" ) )
+         IF !( cClean == cPpoLine ) .AND. ;
+            CountIdent( cPpoLine, cFunc ) != Len( hb_HGetDef( hScan[ "hits" ], nLine, {} ) )
+            RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                           " is rewritten by the preprocessor - refusing" )
+         ENDIF
+         aHits := hb_HGetDef( hScan[ "hits" ], nLine, {} )
+         IF Empty( aHits )
+            RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                           ": no matching token found" )
+         ENDIF
+         FOR EACH hHit IN aHits
+            hSpan := ParseParenSpan( aSrc[ nLine ], hHit[ 1 ] + hHit[ 2 ] )
+            IF hSpan == NIL
+               AAdd( aBad, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                     ": cannot parse argument list (multi-line call?)" )
+               LOOP
+            ENDIF
+            // definition line keeps the parameter names; call sites carry args
+            IF Len( hSpan[ "pieces" ] ) != Len( aParams )
+               AAdd( aBad, hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                     ": " + hb_ntos( Len( hSpan[ "pieces" ] ) ) + " argument(s) for " + ;
+                     hb_ntos( Len( aParams ) ) + " parameter(s) - implicit NIL would move" )
+               LOOP
+            ENDIF
+            AAdd( aEdits, { nLine, hSpan[ "start" ], hSpan[ "len" ], ;
+                            ReorderPieces( hSpan[ "pieces" ], aPerm ) } )
+         NEXT
+      NEXT
+      IF ! Empty( aEdits )
+         hFileEdits[ cPath ] := aEdits
+         hOrig[ cPath ] := cText
+         nTotal += Len( aEdits )
+      ENDIF
+   NEXT
+
+   IF ! Empty( aBad )
+      FOR EACH cWhy IN aBad
+         OutErr( "blocked: " + cWhy + hb_eol() )
+      NEXT
+      RETURN Refuse( "call sites incompatible with reorder (fix them first)" )
+   ENDIF
+
+   OutStd( "reorder-params: " + cFunc + "( " + ArrJoin( aParams, ", " ) + " ) -> ( " + ;
+           ArrJoin( aNew, ", " ) + " )" + hb_eol() )
+   FOR EACH cPath IN hb_HKeys( hFileEdits )
+      FOR EACH hHit IN hFileEdits[ cPath ]
+         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( hHit[ 1 ] ) + hb_eol() )
+      NEXT
+   NEXT
+   IF ! Empty( cJsonOut )
+      hb_MemoWrit( cJsonOut, WorkspaceEditJsonMulti( hFileEdits ) )
+   ENDIF
+   IF lDryRun
+      OutStd( "dry run - no changes written" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   FOR EACH cPath IN hb_HKeys( hFileEdits )
+      hb_MemoWrit( cPath, ApplyEdits( hOrig[ cPath ], hFileEdits[ cPath ] ) )
+   NEXT
+
+   // verification: everything must recompile; symbol tables and function
+   // sets must be unchanged; pcode of edited modules legitimately changes
+   // (push order), so behavior equality is delegated to the project's tests
+   IF ! CompileAll( hProj, "", cTmp, "after" )
+      RollbackAll( hOrig )
+      RETURN Refuse( "project stopped compiling after reorder - rolled back" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      cWhy := ""
+      IF cPath $ hFileEdits
+         IF ! HrbSymbolsEqual( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ), ;
+                               hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ), @cWhy )
+            RollbackAll( hOrig )
+            RETURN Refuse( "verification FAILED for " + hb_FNameNameExt( cPath ) + ": " + cWhy + " - rolled back" )
+         ENDIF
+      ELSEIF !( hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".before.hrb" ) == ;
+                hb_MemoRead( cTmp + hb_ps() + FNameBase( cPath ) + ".after.hrb" ) )
+         RollbackAll( hOrig )
+         RETURN Refuse( "verification FAILED: untouched module " + hb_FNameNameExt( cPath ) + " changed - rolled back" )
+      ENDIF
+   NEXT
+
+   OutStd( "verified: " + hb_ntos( nTotal ) + " site(s) reordered; symbols unchanged; run your test suite to confirm behavior" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// parse "( arg1, arg2, ... )" starting right after the function name token;
+// returns start column and length of the inside text plus the top-level
+// pieces, or NIL when there is no balanced list on this line
+STATIC FUNCTION ParseParenSpan( cLine, nCol )
+
+   LOCAL nLen := Len( cLine ), nDepth, nStart
+   LOCAL aPieces := {}, nPieceStart, cCh, cQuote := ""
+
+   DO WHILE nCol <= nLen .AND. SubStr( cLine, nCol, 1 ) == " "
+      nCol++
+   ENDDO
+   IF nCol > nLen .OR. !( SubStr( cLine, nCol, 1 ) == "(" )
+      RETURN NIL
+   ENDIF
+   nStart := nCol + 1
+   nPieceStart := nStart
+   nDepth := 1
+   nCol++
+   DO WHILE nCol <= nLen
+      cCh := SubStr( cLine, nCol, 1 )
+      IF ! Empty( cQuote )
+         IF cCh == cQuote
+            cQuote := ""
+         ENDIF
+      ELSEIF cCh == '"' .OR. cCh == "'"
+         cQuote := cCh
+      ELSEIF cCh $ "([{"
+         nDepth++
+      ELSEIF cCh $ ")]}"
+         nDepth--
+         IF nDepth == 0
+            IF nCol > nStart .OR. ! Empty( AllTrim( SubStr( cLine, nStart, nCol - nStart ) ) )
+               AAdd( aPieces, AllTrim( SubStr( cLine, nPieceStart, nCol - nPieceStart ) ) )
+            ENDIF
+            IF Len( aPieces ) == 1 .AND. Empty( aPieces[ 1 ] )
+               aPieces := {}
+            ENDIF
+            RETURN { "start" => nStart, "len" => nCol - nStart, "pieces" => aPieces }
+         ENDIF
+      ELSEIF cCh == "," .AND. nDepth == 1
+         AAdd( aPieces, AllTrim( SubStr( cLine, nPieceStart, nCol - nPieceStart ) ) )
+         nPieceStart := nCol + 1
+      ENDIF
+      nCol++
+   ENDDO
+
+   RETURN NIL          // unbalanced: call continues on the next line
+
+STATIC FUNCTION ReorderPieces( aPieces, aPerm )
+
+   LOCAL cOut := "", nI
+
+   FOR nI := 1 TO Len( aPerm )
+      cOut += iif( nI == 1, " ", ", " ) + aPieces[ aPerm[ nI ] ]
+   NEXT
+
+   RETURN cOut + " "
+
+STATIC FUNCTION ArrJoin( aArr, cSep )
+
+   LOCAL cOut := "", cItem
+
+   FOR EACH cItem IN aArr
+      cOut += iif( cItem:__enumIsFirst(), "", cSep ) + cItem
+   NEXT
+
+   RETURN cOut
+
+// structural check for transformations that must keep the symbol table and
+// the function set intact while pcode legitimately changes
+STATIC FUNCTION HrbSymbolsEqual( cBefore, cAfter, cWhy )
+
+   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
+   LOCAL nI
+
+   IF hB == NIL .OR. hA == NIL
+      cWhy := "cannot parse .hrb"
+      RETURN .F.
+   ENDIF
+   IF Len( hB[ "syms" ] ) != Len( hA[ "syms" ] ) .OR. Len( hB[ "funcs" ] ) != Len( hA[ "funcs" ] )
+      cWhy := "symbol/function count changed"
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( hB[ "syms" ] )
+      IF !( hA[ "syms" ][ nI ][ 1 ] == hB[ "syms" ][ nI ][ 1 ] ) .OR. ;
+         hA[ "syms" ][ nI ][ 2 ] != hB[ "syms" ][ nI ][ 2 ]
+         cWhy := "symbol table changed (" + hA[ "syms" ][ nI ][ 1 ] + ")"
+         RETURN .F.
+      ENDIF
+   NEXT
+   FOR nI := 1 TO Len( hB[ "funcs" ] )
+      IF !( hA[ "funcs" ][ nI ][ 1 ] == hB[ "funcs" ][ nI ][ 1 ] )
+         cWhy := "function set changed (" + hA[ "funcs" ][ nI ][ 1 ] + ")"
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
 
 STATIC PROCEDURE RollbackAll( hOrig )
 
@@ -822,10 +1170,12 @@ STATIC FUNCTION PickFunc( hDump, cFunc )
    RETURN NIL
 
 // returns the set (array) of line numbers to edit, or a string refusal message
-STATIC FUNCTION CollectTargetLines( hFunc, cOld, cNew )
+STATIC FUNCTION CollectTargetLines( hFunc, cOld, cNew, lParamOnly )
 
    LOCAL cUp := Upper( cOld ), cUpNew := Upper( cNew )
    LOCAL hDecl, hOcc, aLines := {}, lFound := .F.
+
+   hb_default( @lParamOnly, .F. )
 
    // the target must be a declared LOCAL (or parameter) of this function
    FOR EACH hDecl IN hFunc[ "declarations" ]
@@ -836,12 +1186,15 @@ STATIC FUNCTION CollectTargetLines( hFunc, cOld, cNew )
          IF !( hDecl[ "scope" ] == "local" )
             RETURN "'" + cOld + "' is " + hDecl[ "scope" ] + ", not LOCAL - out of Phase 0 scope"
          ENDIF
+         IF lParamOnly .AND. ! hDecl[ "param" ]
+            RETURN "'" + cOld + "' is a LOCAL, not a parameter - use rename-local"
+         ENDIF
          lFound := .T.
          AddLine( aLines, hDecl[ "declLine" ] )
       ENDIF
    NEXT
    IF ! lFound
-      RETURN "'" + cOld + "' is not a LOCAL of this function"
+      RETURN "'" + cOld + "' is not a " + iif( lParamOnly, "parameter", "LOCAL" ) + " of this function"
    ENDIF
 
    FOR EACH hOcc IN hFunc[ "occurrences" ]

@@ -11,6 +11,7 @@ PROCEDURE Main()
    NEXT
 
    ? "Total:", nSoma   // nTotal no comentario nao deve mudar
+   ? "Subtracao:", Sub2( 10, 3 )
 
    RETURN
 

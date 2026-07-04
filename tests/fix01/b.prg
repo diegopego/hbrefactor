@@ -13,3 +13,7 @@ FUNCTION UsaMeio( nV )
 STATIC FUNCTION Meio( nN )
 
    RETURN nN * 0.5
+
+FUNCTION Sub2( nA, nB )
+
+   RETURN nA - nB
