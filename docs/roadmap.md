@@ -31,7 +31,77 @@ Regra transversal (da memória do projeto): fluxos definidos vivem em **Makefile
 
 ---
 
-## Backlog pós-roadmap (consolidado em 2026-07-04; sem ordem comprometida)
+## Roadmap v2 — Fases 4-9 (planejado em 2026-07-04)
+
+Responsável pela ferramenta: Claude (planejamento, implementação, verificação);
+decisões de produto e autorizações (commits sensíveis, PR upstream): Diego.
+Regra de manutenção: **este documento é vivo** — toda fase concluída ganha
+status aqui, e nenhuma fase começa sem escopo e critério de pronto escritos.
+
+### Fase 4 — Dogfooding em projeto real (PRÓXIMA)
+
+**Por que primeiro**: todas as decisões restantes (o que dói, o que falta,
+quais recusas são conservadoras demais) devem vir de fricção real, não de
+especulação — a régua do projeto desde o inventário. Os fixtures provam
+correção; só uso real prova utilidade.
+
+**Escopo**: usar a ferramenta num projeto Harbour real do Diego (e no próprio
+hbrefactor via `.hbp` dele — a ferramenta refatorando a si mesma): `usages`,
+`unused-locals`, `call-graph`, `find-dynamic-calls` primeiro (leitura, sem
+risco), depois renames reais com verificação.
+**Entregáveis**: relatório de fricções (docs/dogfooding.md); correções de
+robustez que surgirem (projetos grandes, includes complexos, `.hbp` com
+flags/macros — ex.: o `-w3`/`-es2` que o Diego já pôs no fixture);
+ajuste de recusas que se mostrarem falso-positivas.
+**Critério de pronto**: ≥1 rename e ≥1 relatório executados num projeto de
+produção com verificação verde, e as fricções encontradas viram itens das
+fases seguintes ou correções feitas.
+
+### Fase 5 — Completar a cobertura do oráculo
+
+**Escopo**: (a) variáveis com alias (`FIELD->x`, `M->x`, `alias->x`) no dump
+(caminho `GenPushAliasedVar`); (b) dedup das duplicatas de pré/pós-decremento;
+(c) coluna real no `usages --json` (via tokenizer); (d) `.hbx`/`REQUEST`/
+`EXTERNAL`/`DYNAMIC` na varredura do `rename-function`; (e) projetos sem
+`.hbp` (lista explícita).
+**Critério**: casos de teste para cada item; dump schema 3 se houver campo
+novo; `.hrb` sem `-x` segue byte-idêntico.
+
+### Fase 6 — `rename-define` (o rename que falta)
+
+**Escopo**: renomear símbolo de `#define`/`#[x]command`/`#[x]translate` do
+projeto (`.ch` compartilhado incluso): usos encontrados por replay com a
+biblioteca do pp (`__pp_AddRule`/`__pp_Process`), abreviação dBase de
+`#command` tratada com conservadorismo (H).
+**Critério forte disponível**: rename consistente (regra + usos) produz
+expansão idêntica → `.ppo` normalizado e `.hrb` **byte-idênticos** — mesmo
+padrão-ouro da Fase 0.
+
+### Fase 7 — `inline-local`
+
+**Escopo**: substituir local de atribuição única pela expressão (dual do
+extract): S quando a expressão é pura e usada uma vez; H/recusa com chamadas
+de função (ordem de efeitos) — dados do dump (`used`, access) + ppo.
+**Critério**: fixtures de comportamento (execução idêntica) + recusas.
+
+### Fase 8 — Extensão madura
+
+**Escopo**: conforme fricção da Fase 4 — keybindings padrão (F2/Shift+F12),
+preview de edições (`--dry-run --json` → diff virtual), code action para
+extract na seleção, empacotamento `.vsix`.
+**Critério**: Diego usa no dia a dia sem abrir terminal para os fluxos comuns.
+
+### Fase 9 — Upstream do `-x` (bloqueada: só quando o Diego mandar)
+
+Checklist pronto: ChangeLog via `bin/commit.hb`; `uncrustify -c
+bin/harbour.ucf` (instalar uncrustify); avisar no PR que `harbour.yyc/yyh`
+foram regenerados com bison 3.8.2 (upstream: 3.0.2) e oferecer regen pelos
+mantenedores; texto do PR com evidências do inventário e o hbrefactor como
+consumidor real.
+
+---
+
+## Backlog detalhado (itens das fases acima, consolidado em 2026-07-04)
 
 **Patch `-x` no harbour-core (dump v3)** — melhorias no oráculo:
 1. `PRIVATE x := init` / `PUBLIC`: declaração e escrita inicial não aparecem (caminho RTVAR não instrumentado) — pré-requisito para qualquer comando sobre memvars.
