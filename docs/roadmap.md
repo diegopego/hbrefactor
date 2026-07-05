@@ -68,12 +68,13 @@ byte-idênticos; binário sem `-x` byte-idêntico ao master; fixtures de tortura
 #command, stringify, codeblock aninhado) → `.ast.json` conferido campo a campo
 (coluna exata; col=null só onde deve; blocks; árvore de statement).
 
-> **⚠ CONFLITO DE FLAG `-x` (ver backlog item 0)**: o switch `-x[<file>|
-> <dir>/]` escolhido para o dump AST colide com o `-x[<prefix>]` que o
-> compilador **já** documenta (prefixo do init de símbolos, saída `.c`). A
-> decisão sobre trocar a letra/forma do switch mexe aqui (`compast.c` + parse
-> do switch), no `-prgflag=-x<dir>/` do hbmk2, no Makefile e na ferramenta —
-> resolver ANTES da B6. Investigação e trecho da doc no backlog.
+> **`-x` — resolvido (2026-07-05)**: não há conflito real. O `-x[<prefix>]`
+> (prefixo do init de símbolos, saída `.c`) foi REMOVIDO do compilador em
+> 2015-02-17 (druzus, reescrita do parser de linha de comando; `ChangeLog.txt`)
+> — a letra `x` está livre há 11 anos e não carrega significado vivo. Mantido
+> `-x`; racional gravado no próprio código (`cmdcheck.c`, `case 'X'`). A doc
+> órfã que ainda anuncia o flag removido (`doc/en/compiler.txt`,
+> `src/main/harbour.1`) fica intocada por ora (decisão do Diego).
 
 ### Fase B1 — Fundação do hbrefactor novo ✅ (2026-07-05)
 
@@ -525,35 +526,16 @@ recusa na dúvida — é o padrão de edição, não decisão sintática própri
 
 ## Backlog (herdado + novo, por valor)
 
-0. **CONFLITO DE FLAG `-x` (investigar/decidir)**: pela documentação do
-   compilador do Harbour, `-x` **já existe** e faz outra coisa —
-   `-x[<prefix>]` define o prefixo do nome da função de init de símbolos
-   (gerada automaticamente por módulo, só na saída `.c`), usado para evitar
-   símbolos duplicados ao linkar com bibliotecas de terceiros. O switch do
-   dump AST reusou `-x[<file>|<dir>/]` e pode COLIDIR com esse. Tarefa:
-   confirmar no fonte do compilador como `-x` é parseado hoje (quem ganha
-   `-x<algo>`, se é ambíguo `<prefix>` vs `<dir>/`), e decidir — (i) trocar o
-   switch do AST por outra letra/forma livre, ou (ii) provar que a forma
-   `<dir>/`/`<file>` não conflita com a semântica de prefixo. Bloqueia/entra
-   na B6 (PR upstream): o switch escolhido precisa não quebrar o `-x` legado.
-   Trecho da doc:
-   > `-x[<prefix>]`  set symbol init function name prefix (for `.c` only) —
-   > Sets the prefix added to the generated symbol init function name (in C
-   > output currently). This function is generated automatically for every PRG
-   > module compiled. This additional prefix can be used to suppress problems
-   > with duplicated symbols during linking an application with some third
-   > party libraries.
-
-1. **Velocidade em projetos grandes**: `-inc` do hbmk2 já dá dumps
+0. **Velocidade em projetos grandes**: `-inc` do hbmk2 já dá dumps
    incrementais na Fase B1; verificação proporcional à edição (compilar só o
    alvo) fica para quando o uso real doer.
-2. **rename-define**: ABSORVIDO pela Fase B4 (DSLs de pré-processador) — o
+1. **rename-define**: ABSORVIDO pela Fase B4 (DSLs de pré-processador) — o
    `#define` constante é o caso degenerado de regra sem markers. Caso de
    estudo herdado: regra `( x & y ) => HB_BITAND` de um hbcompat.ch legado
    que sequestra `!&(...)` — vira fixture de recusa/aviso da B4.
-3. **rename-method**: exige nomes de mensagem de `__clsAddMsg` (declaração
+2. **rename-method**: exige nomes de mensagem de `__clsAddMsg` (declaração
    METHOD é invisível — nome viaja como string); avaliar se entra no ast-1
    ou num ast-2. hbhttpd (CREATE CLASS) é o alvo de teste.
-4. Dedup de duplicatas de pré/pós-decremento: não-fazer mantido (v2).
-5. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
+3. Dedup de duplicatas de pré/pós-decremento: não-fazer mantido (v2).
+4. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
    final e conversões de projeto — só depois de suíte + hbhttpd verdes.
