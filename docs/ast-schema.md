@@ -51,7 +51,14 @@ Garantias e limites (provados na fixture de tortura e no lexdiff):
 - TAB conta como 1 byte (coluna byte-exata, não visual).
 - Statement continuado por `;`: cada token carrega sua linha física real.
 - Operadores de 1 caractere costumam vir com col=null (call sites literais
-  no tokenizer do pp) — não conte com coluna de pontuação.
+  no tokenizer do pp) — não conte com coluna de pontuação. Isso inclui
+  `( ) [ ] { } , := |`: **fechamentos e vírgulas nunca têm coluna**.
+- STRING (type 41): `col` aponta o **conteúdo** (o delimitador de abertura
+  está em col-1) e `len` é o comprimento do valor NORMALIZADO. O span
+  original só é reconstruível para string trivial (delimitador + conteúdo
+  byte-idêntico + fechamento casando: `".."`, `'..'`, `[..]`); string com
+  escape (`e"..."`) não confere byte a byte — valide e recuse (padrão
+  `StrDelimsOk`/`TokStartCol`/`TokEndCol` no fonte da ferramenta).
 - Nome consumido pela regra SEM marker (ex.: `METHOD Paint() CLASS UWMenu`
   colado em `UWMENU_PAINT`) NÃO aparece com posição — é a lacuna que a fase
   B4 (`ppApplications`) cobre.
@@ -130,8 +137,38 @@ Semânticas importantes:
   (min/max de subárvore com folga), NÃO para recortar sub-expressões. Para
   argumentos de chamada: balancear o STREAM por TIPO de token a partir do
   padrão nome+`(` (ver `CallSitesArgs()` no fonte) — multi-linha de graça.
+- **Recorte de argumento por span** (`BuildArgSpan()`): o argumento é uma
+  FAIXA DE ÍNDICES do stream; o miolo é copiado entre o primeiro e o último
+  token POSICIONADOS, strings são estendidas aos delimitadores (validação
+  byte-exata) e os tokens de borda SEM posição (`)` `]` `}` `{` `|`...) são
+  casados um a um contra o fonte pulando espaço/`;` — qualquer
+  não-conferência (comentário no meio, escape) recusa. Sem isso,
+  `Foo( Len( "a,b)c" ), 2 )` seria cortado no meio da string.
+- **Edição de linha de declaração** (`DeclCutRange()`): decisão POR
+  VARIÁVEL — o vão entre o nome e os vizinhos posicionados deve ser só
+  espaço + UMA vírgula (a esquerda do primeiro nome: só espaço até o
+  LOCAL; atrás do último: nada). `LOCAL nI, cI, cRet := ""` libera nI e cI
+  mesmo com o inicializador de cRet na mesma linha.
+- **Estrutura de controle**: `blocks[]` pareado por pilha (open/close da
+  mesma kind) dá os pares { kind, linhaAbre, linhaFecha } — recusas de
+  extração por estrutura cruzando borda saem daí, sem varrer texto.
 - **Strings candidatas a call-by-name**: tokens `type==41` com `line>0` e
   texto identificador — nunca editar; relato + `--force`.
+- **Stringify NÃO tem linha**: o token de string gerado por `<"v">` nasce
+  sintetizado com `line 0`/`prov 'n'` (o clone de marker preserva posição
+  do IDENTIFICADOR, não da string gerada). Guarda de recusa por nome-em-
+  string deve varrer **sem** filtro de linha quando a verificação do
+  comando não é byte-idêntica (lição do inline-local; rename sobrevive
+  porque o `.hrb` byte-exato pega a string mudada).
+- **Pureza p/ duplicar expressão** (`ExprPure()`): allowlist sobre os `et`
+  da árvore — folhas NIL/NUMERIC/DATE/TIMESTAMP/STRING/LOGICAL/VARIABLE e
+  combinadores IIF/LIST/OR/AND/NOT/EQUAL/EQ/NE/IN/LT/GT/LE/GE/PLUS/MINUS/
+  MULT/DIV/MOD/POWER/NEGATE; o resto recusa (tabela completa de nomes em
+  `s_szExprNames`, compast.c).
+- **Init de LOCAL**: `LOCAL x := expr` gera statement `ASSIGN` (left =
+  VARIABLE x, line = declLine) E occurrence `write` na declLine; um init
+  por #define expande para tokens SEM posição — recorte do texto falha por
+  construção (conservador).
 
 ## Evolução
 

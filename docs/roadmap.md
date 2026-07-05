@@ -68,6 +68,13 @@ byte-idênticos; binário sem `-x` byte-idêntico ao master; fixtures de tortura
 #command, stringify, codeblock aninhado) → `.ast.json` conferido campo a campo
 (coluna exata; col=null só onde deve; blocks; árvore de statement).
 
+> **⚠ CONFLITO DE FLAG `-x` (ver backlog item 0)**: o switch `-x[<file>|
+> <dir>/]` escolhido para o dump AST colide com o `-x[<prefix>]` que o
+> compilador **já** documenta (prefixo do init de símbolos, saída `.c`). A
+> decisão sobre trocar a letra/forma do switch mexe aqui (`compast.c` + parse
+> do switch), no `-prgflag=-x<dir>/` do hbmk2, no Makefile e na ferramenta —
+> resolver ANTES da B6. Investigação e trecho da doc no backlog.
+
 ### Fase B1 — Fundação do hbrefactor novo ✅ (2026-07-05)
 
 > **Status**: CONCLUÍDA junto com a B0 (mecanismo no core provado: fixture de
@@ -102,9 +109,50 @@ fixtures + hbhttpd (dumps antigos gerados com o binário do branch velho, que
 segue na árvore principal); `make lexdiff` — colunas do AST vs TokenScan —
 com **0 divergências não adjudicadas** (adjudicadas → armadilhas-shx.md).
 
-### Fase B2 — Comandos re-assentados sobre a AST (EM ANDAMENTO)
+### Fase B2 — Comandos re-assentados sobre a AST ✅ (2026-07-05)
 
-> **Status 2026-07-05**: 10 comandos vivos na segunda encarnação
+> **Status FINAL 2026-07-05 — fase concluída.** Specs (a)-(d) executadas;
+> critério de pronto cumprido: `make test` verde completo com o run.sh da
+> segunda encarnação (34 casos / 125 checks), ida-e-volta byte-exata dos
+> renames (suíte + hbhttpd), dogfooding no hbhttpd (usages 0,5s;
+> rename-local A→B→A byte-exato; reorder-params A→B→A byte-exato;
+> extract-function real em UHtmlEncode verificado e revertido;
+> rename-function pegando o DYNAMIC do .hbx real), e nenhuma réplica
+> sintática no fonte novo (v0.3.0, ~2.500 linhas, 11 comandos).
+>
+> **(b) `extract-function` implementado** com fatos do compilador:
+> estrutura por pares de `blocks[]` (pilha), saltos RETURN/EXIT/LOOP/BREAK
+> por tokens + cobertura de par inteiro na seleção, data flow por
+> occurrences (dentro/antes/depois; write-first+uso posterior = valor de
+> retorno; só-dentro = migração da declaração), recusas para macro na
+> seleção, declaração não-local na seleção e codeblock capturando local
+> viva fora; verificação HrbExtractCheck (+1 símbolo exato) + rollback;
+> grafia original via tokens. **Migração de declaração POR VARIÁVEL**
+> (`DeclCutRange`): vãos entre vizinhos posicionados validados no texto —
+> `LOCAL nI, cI, cRet := ""` migra nI/cI mesmo com inicializador alheio na
+> linha (provado no hbhttpd; caso 33).
+>
+> **(c) `usages --json` re-validado** contra os asserts python dos casos
+> 18/26 (Location[] com def+call e colunas reais).
+>
+> **(d) run.sh reescrito**: casos 0-30 preservados (greps adaptados às
+> mensagens novas), modo degradado da era occ removido, casos novos
+> 31 (reorder multi-linha + `,`/`)` em string de argumento — fecha a
+> pendência da spec (a)), 32 (rename-function em statement continuado) e
+> 33 (migração por variável). `make test` = contrato executável.
+>
+> **LIÇÃO DE DESIGN (registrada também no ast-schema.md)**: fechamentos,
+> vírgulas e chaves NUNCA têm coluna no dump, e o `len` de string é o valor
+> normalizado sem delimitadores — recorte de argumento por
+> primeiro/último token posicionado corta `Foo( Len( "a,b)c" ), 2 )` no
+> meio. O desenho certo (`BuildArgSpan`): faixa de ÍNDICES do stream +
+> extensão de string validada byte a byte + casamento das bordas sem
+> posição contra o fonte, com recusa em qualquer não-conferência. De
+> quebra, `ApplyRangeEdits` deixou de pular edição não-conferente em
+> silêncio (a verificação de símbolos do reorder não pegaria semântica
+> trocada): agora recusa com rollback.
+>
+> Status anterior (histórico): 10 comandos vivos na segunda encarnação
 > (src/hbrefactor.prg v0.2.0, ~1.700 linhas, ZERO sintaxe replicada):
 > `usages` (colunas reais), `rename-local`/`rename-param` (coleta por SPAN
 > de função + tokens; casos 1-7/13/24 verdes; ida-e-volta byte-exata em
@@ -131,7 +179,7 @@ corretamente** (poder novo — a era occ recusava). HrbSymbolsEqual portado.
 Falta na suíte: caso com `,`/`)` dentro de string em argumento (spans por
 token tornam trivial — só provar).
 
-**(b) `extract-function <proj> <arq> <ini>-<fim> <nome> [--dry-run]`**
+**(b) `extract-function <proj> <arq> <ini>-<fim> <nome> [--dry-run]` ✅ (2026-07-05)**
 - Estrutura: `blocks[]` da função substitui o StructureCheck — recusar se
   qualquer `open` no intervalo não tem `close` no intervalo e vice-versa
   (parear por pilha, mesma kind). RETURN/EXIT/LOOP/BREAK cruzando a borda:
@@ -147,10 +195,10 @@ token tornam trivial — só provar).
 - Grafia original dos nomes: recuperar do fonte via tokens (dump é uppercase
   em declarations/occurrences; tokens têm o texto original).
 
-**(c) `--json` (casos 18/26)**: `usages --json` já emite LSP Location[];
+**(c) `--json` (casos 18/26) ✅ (2026-07-05)**: `usages --json` já emite LSP Location[];
   re-validar contra os asserts python dos casos 18/26 do run.sh antigo.
 
-**(d) run.sh da segunda encarnação**: reescrever tests/run.sh dirigindo a
+**(d) run.sh da segunda encarnação ✅ (2026-07-05)**: reescrever tests/run.sh dirigindo a
   ferramenta nova (mesmos comportamentos; números de caso preservados onde
   fizer sentido; casos novos: multi-linha do reorder, span/continuação do
   rename-function). `make test` volta a ser o contrato executável. Remover
@@ -162,7 +210,40 @@ novo; ida-e-volta byte-exata dos renames; dogfooding no hbhttpd (usages +
 1 rename por comando); TokenScan/LineWords/ParseParenSpan/StructureCheck/
 StmtEdits ausentes do fonte novo (já verdade hoje).
 
-### Fase B3 — Poderes novos
+### Fase B3 — Poderes novos ✅ (2026-07-05)
+
+> **Status FINAL 2026-07-05 — fase concluída** (v0.3.0, 12 comandos;
+> `make test` 37 casos / 143 checks verdes).
+>
+> **reorder-params com ARGUMENTO multi-linha**: já saiu de graça do
+> `BuildArgSpan` da B2 (spans reais de fonte, não presos à linha) — o `;`
+> de continuação viaja dentro do texto do argumento e o resultado é
+> válido. Provado no caso 34 com execução idêntica.
+>
+> **`inline-local <proj> <arq> <função> <nome> [--dry-run]`**: substitui as
+> leituras de uma LOCAL pela expressão do init e remove a declaração.
+> Portões (a expressão é DUPLICADA e reavaliada em cada uso):
+> 1. **Pureza por allowlist da árvore do compilador**: folhas
+>    NIL/NUMERIC/DATE/TIMESTAMP/STRING/LOGICAL/VARIABLE + combinadores
+>    IIF/LIST/OR/AND/NOT/EQUAL/EQ/NE/IN/LT/GT/LE/GE/PLUS/MINUS/MULT/DIV/
+>    MOD/POWER/NEGATE; qualquer outro et (FUNCALL, SEND, MACRO, ARRAYAT,
+>    ARRAY/HASH que criam identidade, atribuições, ++/--) recusa.
+> 2. Única escrita = o init; leituras simples (access read), fora de
+>    codeblock; variáveis da expressão não reescritas depois do próprio
+>    init; declaração sozinha na linha, sem continuação nem comentário.
+> 3. **Nome citado em string recusa SEM filtro de linha** — o token do
+>    stringify (`<"v">`) nasce sintetizado com line 0/prov 'n' e a
+>    verificação de símbolos NÃO pegaria a troca (diferente do rename, que
+>    tem a rede byte-idêntica). Pego no caso 36; registrado no ast-schema.
+> 4. Init vindo de #define recusa por construção (o valor expandido não
+>    tem posição no fonte - BuildArgSpan falha; o texto certo seria o
+>    próprio nome da regra, território da B4).
+> Verificação: HrbSymbolsEqual no módulo editado (pcode muda
+> legitimamente) + demais módulos byte-idênticos + rollback.
+> Casos 35 (execução idêntica em função executada pelo Main da fixture) e
+> 36 (5 recusas). Dogfooding hbhttpd: recusas corretas e explicadas
+> (nCount++ = "use"; cI reescrita) - o corpus real não tem candidato
+> limpo, que é o comportamento esperado de um portão conservador.
 
 **Escopo**: reorder-params multi-linha (spans reais de argumentos);
 inline-local (árvore de expressão + análise de pureza).
@@ -336,9 +417,132 @@ prova de zero impacto (árvore inteira com/sem `-x`, binário idêntico ao
 master, macro build no-op); regen bison 3.8.2 documentado; split opcional em
 2 PRs (pp-posição; módulo AST). ChangeLog via `bin/commit.hb`; uncrustify.
 
+### Fase B-infra — suíte de testes paralela (pool dinâmico), em duas etapas
+
+> Racional completo (análise das formas e das tecnologias, eixo a eixo):
+> [testes-paralelos.md](testes-paralelos.md). Aqui fica a spec executável.
+
+**Forma** (travada, comum às duas etapas): `make test` roda os ~34 casos em
+**pool dinâmico de processos** (teto ~`nproc`, workers puxam o próximo caso ao
+liberar — auto-balanceia as pontas longas 14/16/31 que compilam+linkam+executam),
+**grão por-caso** (fronteira que o `fresh()` já dá em `tests/tmp/caseN`), cada
+caso com working dir **e** `TMPDIR` isolados, **resultado por artefato** (exit +
+saída capturada, mata a intercalação) com **tally no join** (some com os
+contadores globais `PASS`/`FAIL`). Thread/socket/`make -j`/GNU parallel/tmux
+avaliados e descartados (ver [testes-paralelos.md](testes-paralelos.md)).
+
+**Pré-requisito de código (R1, absoluto)**: `WorkDir()`
+([src/hbrefactor.prg:211-218](../src/hbrefactor.prg#L211-L218)) usa
+`hb_DirTemp() + "hbrefactor_" + timestamp` de **resolução de 1 s, sem
+PID/aleatório** → duas invocações no mesmo segundo colidem no mesmo scratch e se
+sobrescrevem. Dar nome **único** (PID + contador/aleatório). Corrige também
+qualquer uso concorrente real (editor/LSP). **Nenhuma forma paralela é correta
+antes disto.**
+
+- **Etapa 1 — runner em Bash pool** (agora; drift ~zero, zero dep nova).
+  Reestrutura `tests/run.sh`: cada caso vira unidade invocável sem estado global;
+  despacho `xargs -P`/`wait -n` com teto; `TMPDIR=tests/tmp/caseN` por caso;
+  artefato + tally no join; mantém os asserts atuais; `JOBS=1` reproduz o
+  sequencial para depurar um caso. `make test` continua a porta de entrada.
+- **Etapa 2 — migração para Harbour `hb_processOpen`** (quando reescrever o
+  `run.sh`; dogfood + toolchain única). Runner em `.prg` com pool nativo
+  (spawn+pipe+exit), **removendo o Python** dos casos 18/26 via `hb_jsonDecode`.
+  Mesma forma; só troca a tecnologia.
+
+**Critério de pronto (mecânico, por etapa)**: (i) **paridade** — mesmo conjunto
+pass/fail que o runner anterior (sequencial → Etapa 1; Etapa 1 → Etapa 2), diff
+por caso, zero regressão / zero falso-verde; (ii) **sem flakiness** — suíte
+paralela 10× seguidas sem falha intermitente (prova o isolamento de scratch);
+(iii) **ganho** — wall-time paralelo < baseline sequencial, redução da ordem de
+`min(nproc, nº de casos)`, limitada pelas pontas longas; (iv) `make test` verde e
+`JOBS=1` sequencial para depuração.
+
 ---
 
+## Auditoria de gramática duplicada (2026-07-05, pedido do Diego) ✅
+
+Varredura completa do fonte novo atrás de conhecimento sintático replicado e
+responsabilidades transferíveis ao compilador/Harbour. Gatilho: Diego pegou o
+`IsReserved` — e estava certo: a lista divergia do oráculo nas duas direções
+(prova empírica: 26 de 39 "reservadas" eram ACEITAS pelo compilador como
+variável, ex. LOOP/EXIT/EACH/STATIC; ENDFOR, rejeitado, faltava). Não existe
+"lista de reservadas" consultável no compilador: reserva é CONTEXTUAL na
+gramática — flatten em lista é que era o erro.
+
+**A. Transferido ao compilador/Harbour (feito nesta auditoria):**
+1. `IsReserved` + `IsValidIdent` + `IsIdStart/IsIdChar` **APAGADAS** →
+   `NameAccepted()`: um trecho mínimo (`LOCAL <nome>` p/ variável;
+   `FUNCTION <nome>()` p/ função) vai a **`hb_compileFromBuf()`** — o
+   compilador como BIBLIOTECA (hbcmplib.c, o mesmo embutido do hbmk2;
+   hbmk2 linka `hbcplr` sozinho ao ver a referência) — com o dialeto
+   `-k*` do projeto. Sem processo externo, sem arquivo temporário. Bônus:
+   a tabela interna de funções protegidas do compilador
+   (`hb_compGetFuncID`/`HB_FN_RESERVED`, que rejeita `FUNCTION Len()`)
+   passa a valer de graça. Sobrou só `OneWord()` (anti-injeção do trecho:
+   nome sem espaço/controle — não sabe o que é identificador).
+2. `find-dynamic-calls`: cheque de "string parece identificador" APAGADO —
+   nome ∈ funções do projeto (fato do compilador) já implica identificador.
+3. `rename-function` ganhou dois guardas de sequestro de chamadas:
+   **`CoreFunction()`** (aviso + `--force` quando o nome novo é função do
+   core/runtime - defini-la no projeto sombreia a nativa) e recusa dura
+   quando o nome novo **já é chamado** no projeto (fato `calls[]` do dump).
+   Caso 37 cobre os seis comportamentos.
+   **Achados do Diego integrados (2026-07-05)**: `CoreFunction` usa DUAS
+   fontes existentes do Harbour - **`include/harbour.hbx`** (lista canônica
+   COMPLETA das 1.591 públicas do core, achada pelos `-i` que o hbmk2
+   resolveu; pega `hb_MilliSeconds` etc.) e **`hb_IsFunction()`**
+   (símbolos vivos no runtime da ferramenta) como complemento. Provado
+   que `hb_IsFunction` sozinho NÃO via função core não-linkada na
+   ferramenta (`HB_MILLISECONDS` → .F. em binário que não a referencia) -
+   o `.hbx` era a peça que faltava. Dos demais achados: `-hbx=` p/
+   públicas do projeto = já coberto por `functions[]` do dump;
+   `__dynsCount/__dynsGetName` (padrão do profiler.prg) = mesma
+   limitação de linkage do hb_IsFunction, dispensados.
+
+**B. Réplicas conservadoras REMANESCENTES, com plano (não urgente):**
+1. `DefineCollision`/`PpHeadIn` (parse textual de cabeças de diretiva +
+   includes diretos) — MANTIDA de propósito: é o único guarda antecipado no
+   caso extract-function × #command (a verificação estrutural tem fresta
+   teórica ali); para renames a rede byte-exata cobre 100%. Morre na B4,
+   quando `ppRules`/`ppApplications` derem os fatos reais de diretivas.
+2. `StrDelimsOk`/`TokStartCol`/`TokEndCol` (delimitadores de string `"` `'`
+   `[..]`) — validação byte-exata conservadora, recusa o que não prova
+   (e"..." etc.). Ideal futuro: dump `ast-2` carregar o span ORIGINAL da
+   string (1 campo no posTrack do pp). Registrado no ast-schema.md.
+3. Cheque textual de continuação (`Right(RTrim(linha),1) == ";"`) em 2
+   pontos — falso positivo só RECUSA (conservador); fatos de statement
+   multi-linha podem substituir depois.
+4. Convenção `<CLASSE>_<MÉTODO>` (usages/PickFunc) — já marcada para morrer
+   com o lifting da B4.
+
+**C. Não-réplicas (auditadas e mantidas):** `HrbParse`+comparadores (formato
+de ARQUIVO .hrb, não gramática; a alternativa `hb_hrbLoad` carregaria o
+código no VM da ferramenta — pior); `CmdTokens` (parse do trace do hbmk2,
+glue de builder); `ErrLines` (apresentação); `unused-locals` (já delega
+W0003/W0032 ao compilador); `GapOnlySpace/GapOneComma/MatchBack/MatchFwd`
+(validação de vãos entre tokens CONHECIDOS do stream, byte a byte, com
+recusa na dúvida — é o padrão de edição, não decisão sintática própria).
+
 ## Backlog (herdado + novo, por valor)
+
+0. **CONFLITO DE FLAG `-x` (investigar/decidir)**: pela documentação do
+   compilador do Harbour, `-x` **já existe** e faz outra coisa —
+   `-x[<prefix>]` define o prefixo do nome da função de init de símbolos
+   (gerada automaticamente por módulo, só na saída `.c`), usado para evitar
+   símbolos duplicados ao linkar com bibliotecas de terceiros. O switch do
+   dump AST reusou `-x[<file>|<dir>/]` e pode COLIDIR com esse. Tarefa:
+   confirmar no fonte do compilador como `-x` é parseado hoje (quem ganha
+   `-x<algo>`, se é ambíguo `<prefix>` vs `<dir>/`), e decidir — (i) trocar o
+   switch do AST por outra letra/forma livre, ou (ii) provar que a forma
+   `<dir>/`/`<file>` não conflita com a semântica de prefixo. Bloqueia/entra
+   na B6 (PR upstream): o switch escolhido precisa não quebrar o `-x` legado.
+   Trecho da doc:
+   > `-x[<prefix>]`  set symbol init function name prefix (for `.c` only) —
+   > Sets the prefix added to the generated symbol init function name (in C
+   > output currently). This function is generated automatically for every PRG
+   > module compiled. This additional prefix can be used to suppress problems
+   > with duplicated symbols during linking an application with some third
+   > party libraries.
 
 1. **Velocidade em projetos grandes**: `-inc` do hbmk2 já dá dumps
    incrementais na Fase B1; verificação proporcional à edição (compilar só o
