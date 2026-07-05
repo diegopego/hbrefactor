@@ -8,6 +8,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      // experimento local — work/hbhttpd é ignorado pelo git.
+      // NÃO versionar esta entrada: aponta para caminho pessoal.
+      // PRIMEIRA da lista = default do F5.
+      "name": "Run ext (work/hbhttpd)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode",
+        "${workspaceFolder}/work/hbhttpd"
+      ]
+    },
+    {
       // experimento local — work/bravo-experimento é ignorado pelo git.
       // NÃO versionar esta entrada: aponta para caminho pessoal.
       "name": "Run ext (bravo-experimento)",
