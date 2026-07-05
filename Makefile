@@ -2,14 +2,13 @@
 #
 # HB_BIN: directory with the harbour/hbmk2 binaries carrying the AST dump
 #         switch (-x) from harbour-core branch feature/compiler-ast-dump
-#         (worktree ~/devel/harbour-core/harbour-ast)
 #
 # The tool is being rewritten on top of the compiler AST (.ast.json,
 # schema ast-1) - see docs/roadmap.md (v3). The first incarnation lives in
 # smoketest/hbrefactor-occ.prg as reference; tests/ keeps the behaviour
 # contract the new tool must honour case by case.
 
-HB_BIN ?= $(HOME)/devel/harbour-core/harbour-ast/bin/linux/gcc
+HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 

@@ -7,7 +7,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/.."
 HB_BIN="${1:?uso: lexdiff.sh <dir HB_BIN com harbour -x ast>}"
 HB=${HB:-$HOME/devel/harbour-core/harbour}
-OLD_BIN="${OLD_BIN:-$HB/bin/linux/gcc}"   # binário da era occ (opcional)
+OLD_BIN="${OLD_BIN:-}"   # binário da era occ (opcional; aponte p/ um build
+                          # do branch feature/refactoring-mechanism se quiser
+                          # reativar a paridade occ<->ast — andaime da B1)
 D="$HERE/tmp/lexdiff"; rm -rf "$D"; mkdir -p "$D"
 
 CORPUS="$ROOT/tests/fix01/a.prg $ROOT/tests/fix01/b.prg \
@@ -20,7 +22,7 @@ done
 
 "$ROOT/bin/lexdiff" "$D" $CORPUS || exit 1
 
-if [ -x "$OLD_BIN/harbour" ] && ! cmp -s "$OLD_BIN/harbour" "$HB_BIN/harbour"; then
+if [ -n "$OLD_BIN" ] && [ -x "$OLD_BIN/harbour" ] && ! cmp -s "$OLD_BIN/harbour" "$HB_BIN/harbour"; then
    echo "--- paridade occ<->ast:"
    fail=0
    for f in $CORPUS; do
