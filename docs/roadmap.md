@@ -415,8 +415,12 @@ CLI; manter os 9 comandos; preview `--dry-run --json` se a fricção pedir.
 
 **Escopo**: mensagem com consumidor real; 1 arquivo novo + ganchos opt-in;
 prova de zero impacto (árvore inteira com/sem `-x`, binário idêntico ao
-master, macro build no-op); regen bison 3.8.2 documentado; split opcional em
-2 PRs (pp-posição; módulo AST). ChangeLog via `bin/commit.hb`; uncrustify.
+master, macro build no-op); **build limpo** (o `compast.c` introduz um
+warning do gcc — `compast.c:578` `-Wtype-limits`: `iType >= 0` sempre
+verdadeiro porque `HB_EXPRTYPE` é enum sem sinal; corrigir tirando o
+`iType >= 0 &&`, o limite de cima já basta); regen bison 3.8.2 documentado;
+split opcional em 2 PRs (pp-posição; módulo AST). ChangeLog via
+`bin/commit.hb`; uncrustify.
 
 ### Fase B-infra — suíte de testes paralela (pool dinâmico), em duas etapas
 
