@@ -205,7 +205,10 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    LOCAL cPath := hb_DirSepAdd( cTmp ) + hb_FNameName( cModPath ) + ".ast.json"
    LOCAL hAst := hb_jsonDecode( hb_MemoRead( cPath ) )
 
-   IF ! HB_ISHASH( hAst ) .OR. ! hb_HGetDef( hAst, "schema", "" ) == "ast-1"
+   // ast-2 = ast-1 + ppRules/ppApplications (fase B4); o leitor usa só
+   // seções presentes em ambos, comandos de DSL exigem ast-2 onde preciso
+   IF ! HB_ISHASH( hAst ) .OR. ;
+      hb_AScan( { "ast-1", "ast-2" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 

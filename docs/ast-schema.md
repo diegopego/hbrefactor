@@ -1,8 +1,10 @@
-# Schema `ast-1` — o dump AST do compilador (spec)
+# Schema `ast-2` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
-commit `2cca58e4b8`, arquivo `src/compiler/compast.c`) e o hbrefactor.
-Um `.ast.json` por módulo compilado com `-x`.
+arquivos `src/compiler/compast.c` + rastreamento de regras em
+`src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
+com `-x`. O `ast-2` (fase B4) = `ast-1` (commit `2cca58e4b8`) + seções
+`ppRules`/`ppApplications`; todo o resto é idêntico byte a byte.
 
 **Como gerar** (a ferramenta faz isso via `AstDumps()`):
 ```
@@ -66,6 +68,66 @@ Garantias e limites (provados na fixture de tortura e no lexdiff):
   parser (o pp as consome) — sem tokens.
 - Tokens de `#include` aparecem com prov 'i' e line do ARQUIVO INCLUÍDO
   (col null) — filtrar por prov ao mapear para o módulo.
+
+## `ppRules[]` + `ppApplications[]` — as regras de pp e cada aplicação (ast-2)
+
+A lacuna que estas seções fecham: as PALAVRAS de uma DSL de pp
+(`REPEAT`, `MENUITEM`, `ACTION`, `METHOD`...) são consumidas pelo
+preprocessador e nunca chegam ao yylex — não existem em `tokens[]`.
+O rastreamento fica em `ppcore.c` (mesmo padrão da posTbl da B0: lógica
+no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
+único de aplicação (`hb_pp_patternReplace`) e nos pontos de registro de
+`#define`/`#[x]translate`/`#[x]command`.
+
+```jsonc
+"ppRules": [
+  { "id": 2,               // índice estável no módulo; referenciado por
+                           // ppApplications[].rule
+    "kind": "command",     // define|translate|xtranslate|command|xcommand
+    "file": "menu.ch",     // arquivo da DIRETIVA; null = regra builtin
+                           // (std rules compiladas, -D, dyn defines)
+    "line": 3,             // linha da diretiva (0 quando builtin)
+    "head": "MENUITEM",    // palavra-cabeça; null se a regra começa com
+                           // match marker
+    "markers": 4 } ],      // nº de match markers da regra
+
+"ppApplications": [        // UMA entrada por aplicação, na ORDEM em que o
+                           // pp as fez (multi-passe visível: aplicação
+                           // sobre resultado de outra regra aparece depois)
+  { "rule": 2, "line": 8,  // linha de input corrente na aplicação
+    "tokens": [            // os tokens CONSUMIDOS (o span casado no fonte)
+      { "line": 8, "col": 3, "len": 8, "type": 21, "prov": "s",
+        "marker": 0,       // 0 = palavra/literal DA PRÓPRIA REGRA;
+                           // N = recheio do match marker N (1-based)
+        "text": "MENUITEM" } ] } ]
+```
+
+Garantias e limites (provados no smoke test da B4):
+- **Palavra de DSL** = token com `marker == 0`: em aplicação no módulo
+  principal vem com linha/coluna byte-exatas (`prov 's'`) — é a posição
+  que `usages-dsl`/`rename-dsl` editam. Regras builtin aplicadas
+  aparecem com `file: null` (registro lazy na 1ª aplicação).
+- Recheio de marker (`marker == N`) segue as MESMAS regras de posição de
+  `tokens[]`: identificador que atravessou por marker mantém posição;
+  token vindo de expansão anterior (multi-passe) vem com `col null` e
+  linha/prov apontando a ORIGEM (ex.: valor de `#define` aponta a linha
+  do `.ch`, `prov 'i'`).
+- `#[x]translate` opera SUBSTITUINDO no meio da statement (aplicações em
+  qualquer posição); `#[x]command` só casa statement inteira e **o uso
+  tem que estar numa linha só** (continuação exige `;`) — famílias
+  distintas, testar ambas (nota do Diego, 2026-07-05).
+- Aplicações dentro de includes vêm com tokens `prov 'i'` — filtrar
+  como em `tokens[]`.
+- Diretiva processada em linha lógica: `line` da regra/aplicação segue a
+  convenção do pp (linha de input corrente).
+- **Validação cruzada disponível**: `harbour -p+` gera `.ppt` com uma
+  linha por aplicação — sai do MESMO funil (`hb_pp_patternReplace`);
+  `ppApplications` deve casar 1:1 com o `.ppt` do módulo.
+- **Armadilha std.ch em fixtures**: `#command ENDIF <*x*> => endif`
+  (std.ch:71) tem wild marker que ENGOLE `; ENDDO` que venha atrás na
+  expansão — `UNTIL <c> => IF <c> ; EXIT ; ENDIF ; ENDDO` perde o ENDDO
+  (comportamento PRÉ-EXISTENTE do Harbour, provado em binário pristino).
+  Forma que funciona: `IF <c> ; EXIT ; END ; END`.
 
 ## `functions[]` — um item por FUNCTION/PROCEDURE (+ pseudo-função fileDecl)
 

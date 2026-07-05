@@ -253,6 +253,45 @@ novos na suíte.
 
 ### Fase B4 — DSLs customizadas de pré-processador (caso especial, análise registrada)
 
+> **Status 2026-07-05 — mecanismo no core PRONTO e VERIFICADO (item 1 da
+> lista abaixo); comandos da ferramenta (item 2) e fixtures da suíte
+> pendentes.** Implementado em `src/pp/ppcore.c` (mesmo padrão da posTbl
+> B0: lógica no pp, ganchos de 1 linha gated por `fTrackPos`): registro
+> de regra nos pontos de `#define` (defineNew→defineAdd) e
+> `#[x]translate`/`#[x]command` (directiveNew), aplicação no funil único
+> `hb_pp_patternReplace` — com os marker results ainda vivos, o que dá a
+> atribuição token→marker sem replicar gramática (marker 0 = palavra
+> literal da regra). Regras builtin/API (std rules, -D) ganham registro
+> LAZY na 1ª aplicação com `file: null`. Tabelas por módulo (limpas em
+> hb_pp_reset), 5 accessors públicos em hbpp.h, emissão em compast.c;
+> schema → **ast-2** (spec: [ast-schema.md](ast-schema.md)).
+> **Verificação**: smoke test com DSL (REPEAT@5:3, UNTIL@7:3,
+> MENUITEM@8:3 + ACTION/AT com colunas exatas; recheio de marker com
+> proveniência certa — valor de #define aponta a linha do .ch; multi-
+> passe visível); varredura dos 112 .prg de src/ → 112/112 `.hrb`
+> byte-idênticos com/sem `-x`, 112/112 dumps ast-2 válidos (27.417
+> aplicações registradas), 0 divergências; leitor da ferramenta aceita
+> ast-1|ast-2 e `make test` verde (38 casos / 155 checks).
+>
+> **Notas do Diego (2026-07-05) incorporadas ao escopo das fixtures:**
+> 1. O comando de DSL da fixture deve receber MÚLTIPLOS argumentos
+>    (testar reposicionamento de argumentos, entre outros) — o smoke já
+>    usa `MENUITEM <label> ACTION <act> AT <row>, <col>` com o resultado
+>    reordenando os markers.
+> 2. Além do `.ppo`, o `-p+` do harbour gera `.ppt` (trace do pp, uma
+>    linha por aplicação, saída do MESMO funil onde vive o gancho) —
+>    instrumento de validação cruzada 1:1 de `ppApplications`.
+> 3. `#command`/`#xcommand`: o USO precisa estar numa linha só (multi-
+>    linha exige `;`); `#[x]translate` opera SUBSTITUINDO no meio da
+>    statement — as fixtures devem cobrir as duas famílias.
+>
+> **Armadilha pré-existente descoberta (vira fixture)**: a std.ch tem
+> `#command ENDIF <*x*> => endif` — o wild marker engole `; ENDDO` que
+> venha depois na expansão (provado em binário pristino; não é regressão
+> do branch). `UNTIL <c> => IF <c> ; EXIT ; ENDIF ; ENDDO` perde o ENDDO
+> e dá E0017; a forma clássica que funciona: `IF <c> ; EXIT ; END ; END`.
+> O exemplo de UNTIL abaixo mantém a forma ilustrativa original.
+
 **O caso**: programadores criam "DSLs" com diretivas — `#command`/`#xcommand`/
 `#translate`/`#xtranslate`/`#define` — que encapsulam código Harbour:
 
@@ -341,12 +380,46 @@ ou nos sends de `ADDMETHOD` que a expansão gera. Consequências de projeto:
    a ferramenta nunca vaza `MenuAdd(...)` para o usuário a menos que ele
    peça a expansão (`--show-expansion` como opção de depuração).
 
+**Specs de teste — DSLs complexas (nota do Diego, 2026-07-05; formato
+spec-driven para execução em sessão nova).** Os testes de refatoração de
+DSL criada com `#command`/`#xcommand`/`#[x]translate`/`#define` precisam
+cobrir DSLs COMPLEXAS, não só as didáticas. Cada spec abaixo é um caso da
+suíte (fixture mini-projeto ≥2 .prg + .ch próprio quando a DSL for do
+usuário; include de sistema quando for do core):
+
+- **S1 — DSL didática multi-argumento** (já no smoke da B4): dado
+  `#command MENUITEM <label> ACTION <act> AT <row>, <col>` (resultado
+  REORDENA os markers) e `#xtranslate SQUARED(<n>)`, quando `usages-dsl`/
+  `rename-dsl` rodam, então definição+aplicações saem com colunas exatas
+  e o rename verifica `.ppo`/`.hrb` byte-idênticos. O comando de teste
+  TEM que receber mais de um argumento (reposicionamento de argumentos
+  entre as coisas a provar).
+- **S2 — classes hbclass.ch (caso canônico de DSL complexa)**: dado um
+  mini-projeto com `CREATE CLASS ... METHOD Paint() ... ENDCLASS` e
+  `METHOD Paint() CLASS UWMenu` (multi-regra, multi-passe, nomes gerados
+  `UWMENU_PAINT`), quando `usages Paint` roda, então a resposta vem no
+  vocabulário método/classe via lifting por `ppApplications` (nunca
+  `UWMENU_PAINT`, salvo `--show-expansion`); as aplicações das regras do
+  hbclass.ch aparecem com spans no fonte do usuário.
+- **S3 — comando complexo do core estilo TBROWSE/@...SAY** (std.ch, com
+  cláusulas opcionais `[...]`, markers repetíveis e lista): dado fonte
+  usando `@ row, col SAY ... GET ...`/TBROWSE-família, quando o dump é
+  gerado, então cada aplicação registra a regra builtin (`file: null`)
+  com os recheios de marker certos — e a ferramenta NÃO oferece
+  rename-dsl de regra sem arquivo (não há diretiva a editar; relato).
+- **S4 — as duas famílias**: `#[x]command` (uso preso a uma linha; multi-
+  linha só com `;`) e `#[x]translate` (substituição no meio da statement,
+  inclusive múltiplas na mesma linha) — casos separados provando spans
+  corretos em ambos.
+- **S5 — validação cruzada `.ppt`**: `harbour -p+` no módulo da fixture;
+  `ppApplications` casa 1:1 (contagem, ordem, linhas) com o trace.
+
 **Critério de pronto da fase**: fixture com a DSL acima (REPEAT/UNTIL +
 MENUITEM) num mini-projeto ≥2 .prg + .ch: `usages-dsl` lista definição e
 aplicações com colunas; `rename-dsl MENUITEM MENU_ITEM` edita .ch + usos e
 verifica `.ppo`/`.hrb` byte-idênticos; seleção de extract cortando REPEAT é
 recusada; **`usages Paint` numa fixture com classe responde no vocabulário
-método/classe (lifting provado)**; suíte verde.
+método/classe (lifting provado)**; specs S1-S5 na suíte; suíte verde.
 
 ### Fase B4b — Variáveis de escopo dinâmico e afins (caso especial, análise registrada)
 
