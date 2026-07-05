@@ -102,13 +102,65 @@ fixtures + hbhttpd (dumps antigos gerados com o binário do branch velho, que
 segue na árvore principal); `make lexdiff` — colunas do AST vs TokenScan —
 com **0 divergências não adjudicadas** (adjudicadas → armadilhas-shx.md).
 
-### Fase B2 — Comandos re-assentados sobre a AST
+### Fase B2 — Comandos re-assentados sobre a AST (EM ANDAMENTO)
 
-**Escopo**: os 10 comandos reimplementados/ajustados um a um sobre o núcleo
-AST; TokenScan/LineWords/ParseParenSpan/StructureCheck/StmtEdits REMOVIDOS
-(modo degradado rotulado só para módulo que não compila, em read-only).
-**Critério**: casos da suíte (o contrato de comportamento) verdes comando a
-comando; ida-e-volta byte-exata dos renames; dogfooding no hbhttpd.
+> **Status 2026-07-05**: 10 comandos vivos na segunda encarnação
+> (src/hbrefactor.prg v0.2.0, ~1.700 linhas, ZERO sintaxe replicada):
+> `usages` (colunas reais), `rename-local`/`rename-param` (coleta por SPAN
+> de função + tokens; casos 1-7/13/24 verdes; ida-e-volta byte-exata em
+> fixture e hbhttpd inclusive métodos `Classe:Método`), `rename-static`
+> (file-wide + de função; caso 21), `rename-function` (spans de índice das
+> statements p/ continuação `;`; strings=relato+`--force`; comparador
+> estrutural HrbEquivalent; casos 10-12), `unused-locals` (19),
+> `call-graph` (20), `find-dynamic-calls` (22; strings do próprio stream),
+> `dump`. Receitas de consumo documentadas em [ast-schema.md](ast-schema.md)
+> — LER ANTES de mexer na ferramenta.
+
+**Restante da fase, como specs executáveis:**
+
+**(a) `reorder-params` ✅ (2026-07-05)** — implementado com LIÇÃO DE DESIGN
+importante, registrada também no ast-schema.md: os `tok` (birthTok) dos nós
+da árvore nascem ATRASADOS pelo lookahead do bison — spans de subárvore NÃO
+servem para recortar argumentos. O desenho certo: **balancear o STREAM de
+tokens por TIPO** (padrão nome+`(`; 50/51/52/53/54/55 controlam profundidade,
+29=`,` separa no nível 1), varrendo o SPAN DA FUNÇÃO (o registro de call em
+statement continuado aponta a última linha física; o token do nome sabe a
+sua). Resultado: casos 14 (comportamento idêntico por execução) e 15
+("implicit NIL would move") verdes, e **call site multi-linha reordenado
+corretamente** (poder novo — a era occ recusava). HrbSymbolsEqual portado.
+Falta na suíte: caso com `,`/`)` dentro de string em argumento (spans por
+token tornam trivial — só provar).
+
+**(b) `extract-function <proj> <arq> <ini>-<fim> <nome> [--dry-run]`**
+- Estrutura: `blocks[]` da função substitui o StructureCheck — recusar se
+  qualquer `open` no intervalo não tem `close` no intervalo e vice-versa
+  (parear por pilha, mesma kind). RETURN/EXIT/LOOP/BREAK cruzando a borda:
+  detectar por tokens type 21 com esses textos no intervalo fora de
+  bloco-fechado (regra da era occ) OU pelas statements.
+- Data flow: occurrences da função no intervalo vs fora (antes/depois):
+  参 = usada dentro+fora; write-first sem uso posterior = LOCAL da nova;
+  usada só dentro (sem before/after, decl fora) = MIGRA a declaração
+  (comportamento provado no caso 16 da era occ - ver
+  smoketest/hbrefactor-occ.prg DeclNameRemoval como referência).
+- Verificação: HrbExtractCheck (símbolos +1 exato; portar) + rollback +
+  execução idêntica (caso 16).
+- Grafia original dos nomes: recuperar do fonte via tokens (dump é uppercase
+  em declarations/occurrences; tokens têm o texto original).
+
+**(c) `--json` (casos 18/26)**: `usages --json` já emite LSP Location[];
+  re-validar contra os asserts python dos casos 18/26 do run.sh antigo.
+
+**(d) run.sh da segunda encarnação**: reescrever tests/run.sh dirigindo a
+  ferramenta nova (mesmos comportamentos; números de caso preservados onde
+  fizer sentido; casos novos: multi-linha do reorder, span/continuação do
+  rename-function). `make test` volta a ser o contrato executável. Remover
+  o modo degradado da era occ que não existe mais (cobertura parcial fica
+  para quando um projeto real quebrado voltar ao escopo).
+
+**Critério de pronto da fase**: `make test` verde completo com o run.sh
+novo; ida-e-volta byte-exata dos renames; dogfooding no hbhttpd (usages +
+1 rename por comando); TokenScan/LineWords/ParseParenSpan/StructureCheck/
+StmtEdits ausentes do fonte novo (já verdade hoje).
 
 ### Fase B3 — Poderes novos
 

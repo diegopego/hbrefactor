@@ -1,0 +1,142 @@
+# Schema `ast-1` — o dump AST do compilador (spec)
+
+Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
+commit `2cca58e4b8`, arquivo `src/compiler/compast.c`) e o hbrefactor.
+Um `.ast.json` por módulo compilado com `-x`.
+
+**Como gerar** (a ferramenta faz isso via `AstDumps()`):
+```
+hbmk2 <alvos-do-projeto> -hbcmp -rebuild -q '-prgflag=-x<dir>/'
+# → <dir>/<módulo>.ast.json por módulo. -rebuild: obrigatório com -inc.
+# Direto: harbour f.prg -n -q2 -gh -o... -x<dir>/   (-x só salva quando há
+# geração de saída: -gh/-gc; NÃO salva com -s)
+```
+
+## Topo
+
+```jsonc
+{ "schema": "ast-1",
+  "generator": "Harbour 3.2.0dev (...)",
+  "module": "core.prg",          // nome capturado no PARSE (não o -o)
+  "hasCDump": false,             // módulo tem #pragma BEGINDUMP
+  "tokens": [...], "functions": [...] }
+```
+
+## `tokens[]` — o stream que o compilador consumiu
+
+Um item por token entregue ao parser (yylex), na ordem de consumo. O ÍNDICE
+no array é a identidade referenciada por `statements[].expr.tok` e
+`blocks[].tok`.
+
+```jsonc
+{ "line": 42,      // linha FÍSICA no arquivo indicado por prov
+  "col": 8,        // coluna 0-based em BYTES na linha física; null = sem
+                   // posição no fonte (sintetizado por regra de pp, veio de
+                   // include, separador). REGRA DE OURO: col não-null é
+                   // byte-exato — fonte[line][col..col+len) == text para
+                   // identificadores (para strings, text é o valor
+                   // NORMALIZADO; o span original inclui delimitadores)
+  "len": 6,
+  "type": 21,      // HB_PP_TOKEN_TYPE: 21=identificador/keyword, 41=string,
+                   // 42=número, 30=';' separador, 58=SEND ':', 59=ALIAS '->',
+                   // 50/51='(' ')' ... (include/hbpp.h)
+  "prov": "s",     // 's' = fonte principal COM posição; 'i' = include;
+                   // 'n' = sintetizado (texto de regra, sem coluna)
+  "text": "nTotal" }
+```
+
+Garantias e limites (provados na fixture de tortura e no lexdiff):
+- Identificador que atravessa regra de pp via **match marker** mantém
+  linha/coluna do fonte original (inclusive stringify `#<x>`).
+- TAB conta como 1 byte (coluna byte-exata, não visual).
+- Statement continuado por `;`: cada token carrega sua linha física real.
+- Operadores de 1 caractere costumam vir com col=null (call sites literais
+  no tokenizer do pp) — não conte com coluna de pontuação.
+- Nome consumido pela regra SEM marker (ex.: `METHOD Paint() CLASS UWMenu`
+  colado em `UWMENU_PAINT`) NÃO aparece com posição — é a lacuna que a fase
+  B4 (`ppApplications`) cobre.
+- Tokens EOL não são emitidos. Linhas de diretiva (#...) não chegam ao
+  parser (o pp as consome) — sem tokens.
+- Tokens de `#include` aparecem com prov 'i' e line do ARQUIVO INCLUÍDO
+  (col null) — filtrar por prov ao mapear para o módulo.
+
+## `functions[]` — um item por FUNCTION/PROCEDURE (+ pseudo-função fileDecl)
+
+A primeira entrada com `"fileDecl": true` é o container do nível de módulo
+(STATICs file-wide, código solto). Métodos de classe aparecem com o nome da
+função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
+
+```jsonc
+{ "name": "MAIN", "kind": "procedure"|"function", "static": false,
+  "fileDecl": false, "line": 5, "usesMacro": false,   // & macro no pcode
+  "declarations": [   // variáveis declaradas, com escopo RESOLVIDO
+    { "sym": "NTOTAL", "scope": "local"|"static"|"field"|"memvar"|"private",
+      "declLine": 7, "used": 1, "param": false } ],
+  "occurrences": [    // cada referência de variável (parse-time)
+    { "sym": "NTOTAL", "scope": "local"|"detached"|"static"|"memvar"|
+                        "field"|"memvar_implicit",
+      "line": 12,     // ATENÇÃO: statement continuado → ÚLTIMA linha física
+      "access": "read"|"write"|"ref"|"use",
+      "block": false, // true = dentro de corpo de codeblock
+      "filewide": true /* só quando static file-wide */ } ],
+  "calls":  [ { "sym": "DUPLA", "line": 10, "block": false } ],
+  "sends":  [ { "sym": "EVAL",  "line": 10, "block": false } ],
+  "blocks": [   // eventos de estrutura de controle, do próprio parser
+    { "kind": "if"|"while"|"for"|"case"|"switch"|"sequence",
+      "event": "open"|"close", "line": 24, "tok": 118 } ],
+  "statements": [   // árvore de expressão PRÉ-reduce de cada statement/push
+    { "kind": "stmt"|"push", "line": 12, "block": false,
+      "expr": { "et": "ASSIGN",          // nome do HB_ET_*/HB_EO_*
+                "line": 12, "tok": 7,    // tok = índice em tokens[] no
+                                         // NASCIMENTO do nó (aproximado ±1
+                                         // por lookahead; use span da
+                                         // subárvore p/ delimitar)
+                "left":  { "et": "VARIABLE", "val": "NTOTAL", ... },
+                "right": { "et": "NUMERIC",  "val": 0, ... } } } ] }
+```
+
+Filhos por `et`: operadores → `left`/`right` (unário: sem right);
+`FUNCALL` → `fun`+`parms`; `SEND` → `msg`/`msgmacro`+`obj`+`parms`;
+`ARRAYAT` → `base`+`index`; `ARRAY/HASH/LIST/ARGLIST/IIF` → `items[]`;
+`CODEBLOCK` → `cbflags`+`body[]`; `ALIASVAR/ALIASEXPR` → `alias`+`var`+
+`expr`; `SETGET` → `var`+`expr`; `MACRO` → `val`+`expr`; `RTVAR` → `val`.
+Folhas com `val`: VARIABLE, FUNNAME, STRING (+ NUMERIC/LOGICAL/DATE).
+
+Semânticas importantes:
+- `stmt` = statement-expressão completo; `push` = expressão empurrada em
+  contexto de valor (condição de IF/WHILE, valor de RETURN, limites de FOR).
+- Sombra léxica JÁ DECIDIDA: em cada occurrence o `scope` é o que o
+  compilador resolveu ali (parâmetro de codeblock homônimo = `local`+
+  `block:true`; captura de local externa = `detached`).
+- PRIVATE/PUBLIC com init aparecem em occurrences como `memvar` `write`
+  (hook RTVar) + call `__MVPRIVATE`/`__MVPUBLIC`.
+
+## Receitas de consumo (as que a ferramenta usa)
+
+- **Coluna de um símbolo numa linha**: tokens com `type==21`, `prov=='s'`,
+  `col!=null`, `Upper(text)==alvo` naquela linha.
+- **Excluir contexto `:msg` / `alias->campo`**: pular token cujo ANTERIOR NO
+  STREAM tem type 58 ou 59 (nível compilador — não use texto).
+- **rename de LOCAL**: coletar por SPAN DA FUNÇÃO (da line da função até a
+  line da próxima), não por linhas de occurrence (continuação `;` aponta a
+  última linha física). Recusar antes: parâmetro de codeblock homônimo
+  (occurrence `local`+`block` do velho OU do novo nome).
+- **Continuação em call sites** (rename-function): resolver linha→tokens
+  pelos SPANS DE ÍNDICE das statements dessa linha (min/max de `tok` na
+  subárvore) + complemento por linha física (`LineTokens()` no fonte novo).
+- **ARMADILHA do `tok` (birthTok)**: os índices nascem ATRASADOS pelo
+  lookahead do bison (ex.: `NUMERIC 10` com tok apontando a vírgula seguinte;
+  `FUNNAME` nasce ainda mais tarde). Servem para DELIMITAR statements
+  (min/max de subárvore com folga), NÃO para recortar sub-expressões. Para
+  argumentos de chamada: balancear o STREAM por TIPO de token a partir do
+  padrão nome+`(` (ver `CallSitesArgs()` no fonte) — multi-linha de graça.
+- **Strings candidatas a call-by-name**: tokens `type==41` com `line>0` e
+  texto identificador — nunca editar; relato + `--force`.
+
+## Evolução
+
+O schema é livre para evoluir (liberação de 2026-07-05: sem compromisso de
+compatibilidade com a era occ). Próximas seções planejadas: `ppRules` +
+`ppApplications` (fase B4 — DSLs e lifting p/ vocabulário do fonte);
+avaliar `sends` de `__clsAddMsg` (rename-method, B4/backlog). Ao mudar,
+versionar `"schema"` e atualizar este documento NO MESMO commit.

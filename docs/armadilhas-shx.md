@@ -1,4 +1,4 @@
-# Tarefa 2 — Armadilhas da linguagem: tabela de decisão S/H/X
+# Armadilhas da linguagem Harbour: tabela de decisão S/H/X
 
 Classificação de cada construção problemática do Harbour para refatoração automatizada:
 
@@ -6,9 +6,9 @@ Classificação de cada construção problemática do Harbour para refatoração
 - **(H)** — refatorável com heurística + **confirmação obrigatória do usuário**;
 - **(X)** — fora de escopo: a ferramenta detecta e **recusa** (ou exige fluxo dedicado).
 
-Método: como no inventário ([inventario-ecossistema.md](inventario-ecossistema.md)), afirmações marcadas **[testado]** foram verificadas executando código nesta data (2026-07-04); referências de fonte apontam para o harbour-core (`$HB_ROOT`).
+Método: afirmações marcadas **[testado]** foram verificadas executando código em 2026-07-04 (era do smoke test — inventário completo em [smoketest/inventario-ecossistema.md](smoketest/inventario-ecossistema.md)); referências de fonte apontam para o harbour-core (`$HB_ROOT`).
 
-Premissa de leitura: a classificação abaixo assume o *desenho* em que o compilador atua como oráculo de escopo (§1.4 do inventário). A decisão de arquitetura em si (Tarefa 3) permanece aberta — ver "Premissa a QUESTIONAR" no inventário.
+Premissa de leitura (ATUALIZADA 2026-07-05): o desenho "compilador como oráculo" virou realidade e foi além — a fonte dos fatos hoje é a AST emitida pelos ganchos do compilador ([ast-schema.md](ast-schema.md), [arquitetura.md](arquitetura.md)). A classificação S/H/X abaixo continua sendo a régua de risco por CONSTRUÇÃO DE LINGUAGEM e orienta as fases B4/B4b do [roadmap.md](roadmap.md); menções a mecanismos da era anterior (diff .prg×.ppo etc.) descrevem COMO se provava na época, não como a ferramenta atual opera.
 
 ---
 
