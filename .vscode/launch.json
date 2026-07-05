@@ -1,10 +1,26 @@
 {
   // F5 abre uma segunda janela (Extension Development Host) rodando a
-  // extensão a partir de vscode/, já com a pasta de teste tests/fix01 aberta.
+  // extensão a partir de vscode/. Escolha a configuração no dropdown do
+  // painel "Run and Debug"; a primeira é o default do F5.
+  //
+  // binPath/hbBin ficam nas configurações globais do usuário
+  // (~/.vscode-server/data/User/settings.json) — máquina, não repo.
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run hbrefactor extension",
+      // experimento local — work/bravo-experimento é ignorado pelo git.
+      // NÃO versionar esta entrada: aponta para caminho pessoal.
+      "name": "Run ext (bravo-experimento)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode",
+        "${workspaceFolder}/work/bravo-experimento"
+      ]
+    },
+    {
+      // portável — usa só ${workspaceFolder}; ok para commit.
+      "name": "Run ext (tests/fix01)",
       "type": "extensionHost",
       "request": "launch",
       "args": [

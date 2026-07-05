@@ -1,204 +1,303 @@
-# Tarefa 4 — Roadmap incremental com critérios de pronto
-
-> **Status (2026-07-04): Fases 0-3 CONCLUÍDAS — `make test` 58/58 verde.**
-> Fase 3 (`extract-function` v1) fechou o roadmap original: data flow pelo
-> dump, estrutura pelo `.ppo`, recusas conservadoras, verificação com
-> rollback. A régua da arquitetura foi respeitada sem novo patch: a estrutura
-> não foi "adivinhada" do fonte — foi lida do texto pós-pp, que é o que o
-> compilador vê. Se os limites v1 (uma saída, sem EXIT para fora, etc.)
-> apertarem no uso real, o próximo degrau é o dump estrutural (v3).
-> Status anterior:
-> (Fase 2: `rename-param` e `reorder-params` com recusa de aridade menor e
-> prova de comportamento idêntico por execução no caso 14.)
-> Status anterior:
-> (`rename-local`, `usages`, `rename-function` com comparador estrutural de
-> HRB, política H de strings com `--force`, statics por módulo, idempotência).
-> Pendências da Fase 1 anotadas: `.hbx`/`DYNAMIC` não varridos; sends de
-> método e `Eval` não aparecem em `calls` (v3 do dump).
-> Pipeline completo funcionando: dump `-x` → linhas do oráculo → tokenizer
-> (coluna) → checagem pp por contagem de tokens (linha reescrita é aceita
-> somente se o identificador passou intacto pela regra) → edição → verificação
-> `-gh -l` byte-idêntica por módulo com **rollback automático** (provado no
-> caso 7: símbolo consumido por marker de stringify muda o pcode → restaura
-> byte-exato). Fixtures são mini-projetos de 2 `.prg` + `.ch` + `.hbp`.
-> Pendências anotadas: warning para referências textuais fora do oráculo
-> (strings/stringify não renomeados), lexer do pp no lugar do tokenizer
-> próprio (v2), fixture de parâmetro renomeado.
-
-Fases do hbrefactor, cada uma com escopo, entregáveis e **critério de "pronto" mecânico** (verificável por comando, não por opinião). Fundamenta-se em [inventario-ecossistema.md](inventario-ecossistema.md), [armadilhas-shx.md](armadilhas-shx.md) e [arquitetura.md](arquitetura.md).
-
-Regra transversal (da memória do projeto): fluxos definidos vivem em **Makefile** no repo hbrefactor (testes, fixtures, verificação); hbmk2 direto é só experimentação.
-
----
-
-## Roadmap v2 — Fases 4-9 (planejado em 2026-07-04)
+# Roadmap v3 — hbrefactor sobre AST do compilador (2026-07-05)
 
 Responsável pela ferramenta: Claude (planejamento, implementação, verificação);
-decisões de produto e autorizações (commits sensíveis, PR upstream): Diego.
+decisões de produto e autorizações (commits, PR upstream): Diego.
 Regra de manutenção: **este documento é vivo** — toda fase concluída ganha
 status aqui, e nenhuma fase começa sem escopo e critério de pronto escritos.
-
-### Fase 4 — Dogfooding em projeto real (EM ANDAMENTO)
-
-> **Status 2026-07-04**: rodada 1 (a ferramenta sobre si mesma) concluída —
-> ver [dogfooding.md](dogfooding.md). Fricção real encontrada e corrigida:
-> renames em statements continuados por `;` recusavam (`StmtEdits` resolve o
-> statement inteiro; caso 24). Auto-refatoração aplicada: `hHit`→`aHit` em 4
-> funções, verificação byte-idêntica. `make test` 85/85. **Pendente: rodada 2
-> num projeto de produção — aguarda o Diego apontar o projeto.**
-
-**Por que primeiro**: todas as decisões restantes (o que dói, o que falta,
-quais recusas são conservadoras demais) devem vir de fricção real, não de
-especulação — a régua do projeto desde o inventário. Os fixtures provam
-correção; só uso real prova utilidade.
-
-**Escopo**: usar a ferramenta num projeto Harbour real do Diego (e no próprio
-hbrefactor via `.hbp` dele — a ferramenta refatorando a si mesma): `usages`,
-`unused-locals`, `call-graph`, `find-dynamic-calls` primeiro (leitura, sem
-risco), depois renames reais com verificação.
-**Entregáveis**: relatório de fricções (docs/dogfooding.md); correções de
-robustez que surgirem (projetos grandes, includes complexos, `.hbp` com
-flags/macros — ex.: o `-w3`/`-es2` que o Diego já pôs no fixture);
-ajuste de recusas que se mostrarem falso-positivas.
-**Critério de pronto**: ≥1 rename e ≥1 relatório executados num projeto de
-produção com verificação verde, e as fricções encontradas viram itens das
-fases seguintes ou correções feitas.
-
-### Fase 5 — Completar a cobertura do oráculo ✅ (2026-07-04)
-
-- (a) ✅ variáveis com alias no dump: `M->`/`MEMVAR->` → `memvar`,
-  `FIELD->`/`alias->` → `field`, hooks em `GenPush/PopAliasedVar` (caso 25).
-- (b) **decidido não-fazer**: dedup das duplicatas de pré/pós-decremento no
-  compilador exigiria contexto que o `hb_compVariableFind` não tem; o
-  consumidor já trata a lista por linha como conjunto e o `StmtEdits` renomeia
-  por token — as duplicatas não têm efeito prático. Reabrir só se o uso real
-  mostrar dano (ex.: contagens erradas no `usages` incomodarem).
-- (c) ✅ coluna real no `usages --json` (caso 26).
-- (d) ✅ `.hbx`/`DYNAMIC` no `rename-function` (entradas `-hbx=`/`.hbx` do
-  `.hbp`; caso 27); `REQUEST`/`EXTERNAL` em fonte já eram cobertos pela
-  varredura fora-do-oráculo.
-- (e) ✅ projeto como lista de `.prg` sem `.hbp` (caso 28).
-- Fricção da rodada 1 incorporada: `StmtEdits` para statements continuados.
-Critério cumprido: casos 24-28; schema inalterado (2 — sem campo novo);
-`.hrb` sem `-x` byte-idêntico re-verificado.
-
-### Fase 6 — `rename-define` (o rename que falta)
-
-**Escopo**: renomear símbolo de `#define`/`#[x]command`/`#[x]translate` do
-projeto (`.ch` compartilhado incluso): usos encontrados por replay com a
-biblioteca do pp (`__pp_AddRule`/`__pp_Process`), abreviação dBase de
-`#command` tratada com conservadorismo (H).
-**Critério forte disponível**: rename consistente (regra + usos) produz
-expansão idêntica → `.ppo` normalizado e `.hrb` **byte-idênticos** — mesmo
-padrão-ouro da Fase 0.
-
-### Fase 7 — `inline-local`
-
-**Escopo**: substituir local de atribuição única pela expressão (dual do
-extract): S quando a expressão é pura e usada uma vez; H/recusa com chamadas
-de função (ordem de efeitos) — dados do dump (`used`, access) + ppo.
-**Critério**: fixtures de comportamento (execução idêntica) + recusas.
-
-### Fase 8 — Extensão madura
-
-**Escopo**: conforme fricção da Fase 4 — keybindings padrão (F2/Shift+F12),
-preview de edições (`--dry-run --json` → diff virtual), code action para
-extract na seleção, empacotamento `.vsix`.
-**Critério**: Diego usa no dia a dia sem abrir terminal para os fluxos comuns.
-
-### Fase 9 — Upstream do `-x` (bloqueada: só quando o Diego mandar)
-
-Checklist pronto: ChangeLog via `bin/commit.hb`; `uncrustify -c
-bin/harbour.ucf` (instalar uncrustify); avisar no PR que `harbour.yyc/yyh`
-foram regenerados com bison 3.8.2 (upstream: 3.0.2) e oferecer regen pelos
-mantenedores; texto do PR com evidências do inventário e o hbrefactor como
-consumidor real.
+Regra transversal: fluxos definidos vivem em **Makefile**; hbmk2 direto é só
+experimentação. Histórico completo do smoke test: [roadmap-v2-arquivado.md](roadmap-v2-arquivado.md).
 
 ---
 
-## Backlog detalhado (itens das fases acima, consolidado em 2026-07-04)
+## O que o smoke test provou (Fases 0-5 do v2, concluídas)
 
-**Patch `-x` no harbour-core (dump v3)** — melhorias no oráculo:
-1. `PRIVATE x := init` / `PUBLIC`: declaração e escrita inicial não aparecem (caminho RTVAR não instrumentado) — pré-requisito para qualquer comando sobre memvars.
-2. Variáveis com alias (`FIELD->x`, `M->x`) — caminho `GenPushAliasedVar`.
-3. Sends de método e `Eval` em `calls` (hoje otimizados como mensagem, invisíveis) — melhora `usages`/`call-graph` e habilita rename de método no futuro.
-4. Dedup das duplicatas de pré/pós-decremento em fallback (cosmético; consumidor já trata por linha).
+O hbrefactor atual (~2.700 linhas .prg, 118 checks, 10 comandos, dogfooding em
+hbhttpd e staff500/101 módulos) e o patch `-x` do branch
+`feature/refactoring-mechanism` são **um smoke test bem-sucedido** — por ordem
+do Diego, tudo neles pode ser redesenhado/reescrito/descartado, aproveitando só
+o que for útil. O que se provou e SOBREVIVE como fundação:
 
-**Ferramenta (hbrefactor)**:
-5. `rename-function`: varrer `.hbx`/`DYNAMIC`/`REQUEST`/`EXTERNAL` e (opcional) arquivos de projeto além dos `.prg`.
-6. `extract-function`: permitir `EXIT`/`LOOP` quando o loop inteiro está dentro da seleção (hoje já permitido) e `RETURN` quando a seleção é o rabo da função (hoje recusado — avaliar).
-7. Lexer do pp (`hb_pp_lexNew`) no lugar do tokenizer próprio, expondo-o ao .prg (exigiria patch pequeno no core: wrapper `__pp_lex*`) — elimina divergências residuais de tokenização.
-8. `usages --json` com coluna real (via tokenizer) em vez de character 0.
-9. Projetos sem `.hbp` (lista explícita/glob) e fidelidade ao parsing do hbmk2 (macros/plataformas em `.hbp`/`.hbc`).
+1. **Compilador como oráculo** via ganchos de 1 linha + arquivo novo
+   (padrão `compoccur.c`) — funciona, `.hrb` byte-idêntico sem o switch.
+2. **Verificação editor ≠ verificador**: recompilar antes/depois, comparar
+   byte a byte (ou comparadores estruturais de HRB), rollback automático —
+   pegou erro real (caso 7/stringify).
+3. **hbmk2 como resolvedor de projeto** (`-traceonly`) — parsing próprio de
+   .hbp/.hbc foi apagado; princípio "reutilizar o builder oficial".
+4. **Fixtures como contrato de comportamento** (mini-projetos ≥2 .prg + .ch +
+   .hbp; recusas; ida-e-volta byte-exata; execução idêntica).
+5. **Limite encontrado que motivou o pivô**: réplicas sintáticas na ferramenta
+   (TokenScan, StructureCheck, ParseParenSpan, LineWords, StmtEdits) são
+   frágeis e a do reorder-params tinha rede fraca — a fonte da verdade
+   sintática tem que ser o compilador.
 
-**Candidatos do catálogo** (ver [comandos.md](comandos.md)): `rename-static-var` (S, quase pronto), `rename-define` (H, replay via biblioteca pp), `inline-local` (S/H), `find-dynamic-calls` (leitura).
+## Decisão de arquitetura (2026-07-05, ordem do Diego)
 
-**Extensão VSCode**: refinamentos conforme uso real (keybindings padrão, preview via `--dry-run --json`, code actions).
-
-**Upstream**: PR do `-x` para o harbour-core — **adiado por decisão do Diego**; quando for a hora: entrada no ChangeLog via `bin/commit.hb`, formatação `uncrustify -c bin/harbour.ucf` (uncrustify não está instalado nesta máquina), texto do PR com as evidências do inventário.
-
----
-
-## Fase 0 — Smoke test: rename de `LOCAL` em uma função
-
-**Por que esta fase**: opera 100% em território **S** da tabela S/H/X (macro não enxerga LOCAL — testado; escopo resolvido com exatidão pelo compilador). O sucesso ou fracasso mede o *pipeline*, não heurísticas.
-
-**Escopo**: `hbrefactor rename --local <projeto.hbp> <arquivo> <função> <nome-antigo> <nome-novo>`. A transformação em si é local a uma função, mas **a unidade de operação é o projeto desde o dia zero**: requisito firme — os fixtures são mini-projetos `.hbp` com **no mínimo dois `.prg`** (e um `.ch` compartilhado), nunca um arquivo solto. É isso que prova que a ferramenta lida com as complexidades de projeto (descoberta via `.hbp`, include paths, dump por módulo, verificação por módulo) e não apenas com refatoração de arquivo único. Cobre parâmetros (são locais) e locais capturadas por codeblock (*detached*).
-
-**Entregáveis**:
-1. **Patch v1 no harbour-core** (branch existente): gravador de ocorrências — flag novo que, durante o parse, acumula `{símbolo, escopo resolvido, função contêiner, arquivo, linha}` para variáveis e despeja JSON (`"schema": 1`). Enxerto em `hb_compVariableFind()` + geradores; molde do compi18n.
-2. **Núcleo hbrefactor** (Harbour): lê o dump; localiza a coluna re-tokenizando a linha original com o lexer do pp (`spaces + len`); aplica edição textual; recusa com mensagem clara os casos fora do escopo da fase (linha transformada pelo pp → detectada via diff `.prg`×`.ppo`; função contendo `HB_P_MACRO*` → aviso, prossegue pois LOCAL é S).
-3. **Suíte de fixtures** (Makefile: `make test`): shadowing (mesmo nome em funções distintas), parâmetro, captura em codeblock, homônimo FIELD/MEMVAR declarado, nome novo colidindo com reservada (`nIL`!) ou com local existente → recusa.
-
-**Critério de pronto (o mais forte de todas as fases)**: nomes de locais **não existem no pcode** sem `-b` — portanto `harbour -gh -l` de **cada módulo do projeto** deve ser **byte-idêntico** (`cmp`) antes/depois. Cada fixture (mini-projeto ≥2 `.prg` + `.ch` + `.hbp`) exige: (a) texto de saída esperado exato no arquivo tocado; (b) `.hrb` de **todos** os módulos idênticos byte a byte — o que prova também que a ferramenta **não tocou** os arquivos que não devia; (c) o projeto inteiro compila via `.hbp` sem warning novo (`-w3`).
-
-## Fase 1 — Rename de função/procedure em projeto multi-arquivo
-
-**Escopo**: rename de `FUNCTION`/`PROCEDURE` (públicas e `STATIC`) em projeto definido por `.hbp`/`.hbc` (requisito de escala da arquitetura). Primeira fronteira **H**: nomes em strings.
-
-**Entregáveis**:
-1. **Patch v2**: dump estende a chamadas/declarações de funções e métodos (o schema v1 já nasce com esses campos previstos).
-2. Leitura de `.hbp` + `.hbc` referenciados (fontes, incpaths, defines); investigar aqui o mecanismo do hbmk2 para enumerar fontes resolvidos (risco 5 da arquitetura).
-3. Mecanismo de **confirmação** no CLI (nasce aqui, vale para tudo que é H): varredura de literais string case-insensitive, `HB_FUNC(NOME)`/`HB_FUNC_EXTERN` em blocos BEGINDUMP, `.hbx`/`DYNAMIC`/`REQUEST`; lista de sites aceitar/recusar; saída JSON WorkspaceEdit + relatório S/H/X.
-4. `STATIC FUNCTION` tratada como S (inalcançável por macro/`Do()` — testado).
-
-**Critério de pronto**: nomes de função **aparecem** na tabela de símbolos do `.hrb` — o critério vira comparação estrutural: `.hrb` de cada arquivo idêntico byte a byte **exceto** as entradas de símbolo esperadas (comparador de HRB faz parte da entrega); build completo do projeto-fixture via Makefile passa; rename A→B seguido de B→A restaura os fontes byte a byte (idempotência); fixtures H exigem que *sem* confirmação nada seja tocado.
-
-## Fase 2 — Reordenar/renomear parâmetros com atualização de call sites
-
-**Escopo**: renomear parâmetro (= Fase 0, é local) e **reordenar** parâmetros atualizando todos os call sites do projeto.
-
-**Entregáveis**: parsing da lista de argumentos no call site (lexer do pp + balanceamento de parênteses — sem regex); política explícita para: chamadas com menos argumentos que parâmetros (NIL implícito — reordenar pode **mudar semântica** → H, confirmação com preview por site), `PCount()`/`hb_PCount` no corpo (H: a função inspeciona aridade), `hb_ExecFromArray`/`Do()` com array de args (H), chamada via macro (recusa/confirmação).
-
-**Critério de pronto**: aqui o `.hrb` **legitimamente muda** (ordem de push de argumentos) — o critério migra para: fixtures com **testes de comportamento** (executar antes/depois via `hbmk2` + comparar saída), build completo limpo, idempotência da transformação inversa, e relatório obrigatório dos sites H com decisão registrada.
-
-## Fase 3 — Extração de função + interação profunda com o pp
-
-**Escopo**: extrair seleção para `STATIC FUNCTION` nova; inferência de parâmetros/retorno a partir das locais usadas dentro/fora da seleção (o dump por linha dá exatamente isso); tratamento dos casos pp da S/H/X §4 (rename de símbolo de `#define`/`#command` com replay via biblioteca do pp).
-
-**Recusas explícitas** (X nesta fase): seleção contendo `RETURN`/`EXIT`/`LOOP` que atravessa a borda, `PRIVATE` criada na seleção e usada fora, macro `&` dentro da seleção sem confirmação.
-
-**Critério de pronto**: build completo + fixtures de comportamento (como Fase 2) + caso-teste canônico: extrair, compilar, saída do programa idêntica; o texto extraído re-formatado com `hbformat` sem divergência adicional.
+Branch **novo** a partir do master: `feature/compiler-ast-dump`. O compilador
+ganha ganchos de 1 linha (gated por flag, zero impacto sem o switch) que
+alimentam uma estrutura nova (`src/compiler/compast.c`) e emitem uma **AST por
+módulo** (`.ast.json`, schema `ast-1`): stream de tokens com coluna real e
+proveniência através do pp, declarações/escopos/usos (paridade com o occ),
+calls/sends, estrutura de blocos, árvores de statement com spans. **O dump é
+gerado através do hbmk2** (`-prgflag=-x<dir>/`) — funciona com qualquer projeto
+que o hbmk2 aceite. O hbrefactor se **redesenha** sobre essa AST e apaga toda
+réplica sintática. Motor de decisão+edição+verificação permanece FORA do
+compilador. Detalhes: plano da sessão + [arquitetura.md](arquitetura.md).
 
 ---
 
-## Incremental vs. construir tudo de uma vez — resposta
+## Fases (escopo + critério de pronto mecânico)
 
-**Começar pela Fase 0. A investigação reforçou essa inclinação em vez de enfraquecê-la**, por quatro razões técnicas:
+> **bravo-experimento: FORA DO ESCOPO (ordem do Diego, 2026-07-05).** O ERP
+> legado será REMOVIDO de `work/` pelo Diego e só volta quando ele liberar —
+> depois que o hbrefactor estiver funcionando nos testes da suíte e no
+> `work/hbhttpd`. Nenhuma fase abaixo depende dele; a conversão `.hbp` que
+> chegou a ser planejada fica suspensa junto. Corpus de validação do projeto:
+> **fixtures da suíte + work/hbhttpd**.
 
-1. **A fundação ficou barata — logo não há o que "construir de uma vez".** O que a Tarefa 1 revelou (pp linkável com lexer pronto, compilador como biblioteca testado, `-gh -l` como verificador) elimina justamente os componentes caros que justificariam um big-bang (parser próprio, motor de verificação). O que resta de difícil não é infraestrutura: são as **heurísticas H** — e heurística se ganha caso a caso, com fixtures, não de uma vez.
-2. **A Fase 0 valida a interface entre os dois repos com o menor patch possível.** O contrato dump-JSON é a peça arriscada da arquitetura (risco 2). Prová-lo com um consumidor real e um patch mínimo maximiza a chance do PR upstream — um patch grande "para todas as fases" sem consumidor é o perfil que o core recusa.
-3. **O critério de pronto da Fase 0 é o mais forte que existirá** (byte-idêntico): se o pipeline inteiro — dump → coluna via lexer → edição → recompilação → `cmp` — passa nesse padrão, os elos estão provados antes de entrarmos em território onde o critério é necessariamente mais fraco (Fases 2-3).
-4. **Refatoração errada é pior que nenhuma** (princípio inegociável do plano): o custo de um big-bang não é só desperdício — é entregar casos H mal calibrados junto com os S, minando a confiança na ferramenta no primeiro erro silencioso.
+### Fase B0 — Mecanismo AST no core (branch novo)
 
-**Concessão ao "pensar grande"** (o que se projeta agora, mesmo implementando depois): o **schema do dump** já nasce com os campos das Fases 1-2 (funções, métodos, chamadas) para o patch do compilador não churnar a cada fase — mudar o patch upstream é caro; mudar o hbrefactor é barato. Idem o formato WorkspaceEdit, estável desde o dia 1.
+**Escopo**: `compast.c` + ganchos de 1 linha (yylex/ExprNew/GenStatement+Push
+via macro no-op p/ macro build/FunctionAdd/VariableAdd/VariableFind/r-w-x/
+calls/sends/RTVar/blocos da gramática/codeblocks/save-free) + posição no pp
+(hash lateral: tokenizer primário + `hb_pp_tokenClone`) + switch `-x[<file>|
+<dir>/]` + infra (fAst, cmdcheck, hbusage, Makefile).
+**Critério**: harbour-core inteiro compilado com/sem `-x` → `.hrb` todos
+byte-idênticos; binário sem `-x` byte-idêntico ao master; fixtures de tortura
+(tab, comentário inline, `[..]`, string multi-linha, `;`, linha reescrita por
+#command, stringify, codeblock aninhado) → `.ast.json` conferido campo a campo
+(coluna exata; col=null só onde deve; blocks; árvore de statement).
+
+### Fase B1 — Fundação do hbrefactor novo ✅ (2026-07-05)
+
+> **Status**: CONCLUÍDA junto com a B0 (mecanismo no core provado: fixture de
+> tortura 86/86 tokens byte-exatos incl. stringify e linhas reescritas;
+> varredura de 112 módulos de src/ com `.hrb` byte-idênticos com/sem `-x` e
+> novo vs antigo; `hbmk2 -prgflag=-x<dir>/` gerando dumps por módulo).
+> Ferramenta nova (src/hbrefactor.prg v0.2.0): LoadProject via
+> `-traceonly -rebuild`, dumps via hbmk2, leitor ast-1, `usages` com colunas
+> reais (hbhttpd em 0,58s). `make lexdiff`: 4.405 concordantes, 324
+> adjudicadas por desenho (diretivas; continuação `;`; nomes consumidos por
+> regra/hbclass — a família que a B4 exporá; sends/alias que o TS excluía),
+> **0 divergências reais** — e a porta ACHOU BUG no TokenScan arquivado
+> (`x-- > y` lido como seta de alias através do espaço; AST correto,
+> byte-provado). Paridade occ↔ast: 0 faltando / 0 não classificados em todo
+> o corpus. Fricções corrigidas: `-traceonly` mudo sem `-rebuild` em projeto
+> `-inc` em dia; nome do `-o` vazando no fallback do nome do dump.
+>
+> **Liberação (Diego, 2026-07-05): compatibilidade com o primeiro
+> experimento NÃO é requisito.** O lexdiff e o comparador occ↔ast foram
+> instrumentos de CONFIANÇA na transição — cumprido o papel, não são
+> contratos. A estrutura da AST (schema, seções, granularidade) e a própria
+> ferramenta podem ser recriadas da forma IDEAL, inclusive redesenhadas do
+> zero, sempre que conveniente. O que permanece como contrato é o
+> COMPORTAMENTO provado (fixtures: recusas, ida-e-volta byte-exata,
+> verificação com rollback) — não formatos nem estruturas internas da era
+> smoke test.
+
+**Escopo**: dumps via `hbmk2 <alvos> -prgflag=-x<dir>/ -s`; leitor de
+`.ast.json`; núcleo de fatos novo (tokens/blocos/statements/escopos).
+**Critério**: comparador `occ↔ast-projection` campo-idêntico sobre as
+fixtures + hbhttpd (dumps antigos gerados com o binário do branch velho, que
+segue na árvore principal); `make lexdiff` — colunas do AST vs TokenScan —
+com **0 divergências não adjudicadas** (adjudicadas → armadilhas-shx.md).
+
+### Fase B2 — Comandos re-assentados sobre a AST
+
+**Escopo**: os 10 comandos reimplementados/ajustados um a um sobre o núcleo
+AST; TokenScan/LineWords/ParseParenSpan/StructureCheck/StmtEdits REMOVIDOS
+(modo degradado rotulado só para módulo que não compila, em read-only).
+**Critério**: casos da suíte (o contrato de comportamento) verdes comando a
+comando; ida-e-volta byte-exata dos renames; dogfooding no hbhttpd.
+
+### Fase B3 — Poderes novos
+
+**Escopo**: reorder-params multi-linha (spans reais de argumentos);
+inline-local (árvore de expressão + análise de pureza).
+**Critério**: fixtures de comportamento (execução idêntica) + recusas; checks
+novos na suíte.
+
+### Fase B4 — DSLs customizadas de pré-processador (caso especial, análise registrada)
+
+**O caso**: programadores criam "DSLs" com diretivas — `#command`/`#xcommand`/
+`#translate`/`#xtranslate`/`#define` — que encapsulam código Harbour:
+
+```
+#xcommand REPEAT => DO WHILE .T.
+#xcommand UNTIL <cond> => IF <cond> ; EXIT ; ENDIF ; ENDDO
+#command MENUITEM <label> ACTION <act> => MenuAdd( <label>, {|| <act> } )
+```
+
+O fonte passa a conter construções que **não existem na linguagem** — e é esse
+fonte que a refatoração edita. Três sub-problemas, com situações distintas:
+
+**(a) Símbolos Harbour DENTRO de uso de DSL — JÁ RESOLVIDO (provado no B0).**
+Identificadores que atravessam a regra via match marker (`<cond>`, `<act>`)
+chegam ao compilador como clones que **preservam linha/coluna do fonte
+original** (proveniência no `hb_pp_tokenClone`; fixture de tortura: 86/86
+byte-exatos, incluindo stringify). Rename de local/var/função usada dentro de
+`MENUITEM "x" ACTION Foo( nTotal )` funciona pelo fluxo normal: o dump dá a
+posição exata de `nTotal`/`Foo`, a edição é no fonte, a verificação recompila.
+
+**(b) Estrutura de bloco CRIADA pela DSL — JÁ RESOLVIDO por construção.** Os
+eventos de bloco vêm das ações da gramática sobre o código **expandido** (é o
+que o compilador vê): `REPEAT`/`UNTIL` geram `while open/close` nas linhas
+físicas certas. `extract-function` que corta uma DSL no meio (seleção com
+`REPEAT` sem o `UNTIL`) é recusado pelo balanceamento — sem heurística.
+
+**(c) As PALAVRAS da própria DSL — LACUNA, é o trabalho desta fase.** Os
+tokens `REPEAT`/`MENUITEM`/`ACTION` são **consumidos pelo pp** e nunca chegam
+ao yylex: não estão no stream do dump. Renomear a palavra da DSL (definição +
+todos os usos), achar usos de uma diretiva (`usages` de DSL) ou avisar que uma
+edição toca área casada por regra exige fatos novos:
+
+1. **Dump ast-2 — seção `ppRules` + `ppApplications`**: gancho único em
+   `hb_pp_patternReplace` (ppcore.c:4587 — funil de TODA aplicação de
+   define/translate/command, com `pState`+`pRule`+tokens casados, que JÁ têm
+   posição na tabela do pp) exporta, por aplicação: id da regra, tipo, span
+   dos tokens consumidos no fonte (inclusive a posição da palavra-chave) e
+   linha. Um segundo gancho pequeno no registro de regra (`hb_pp_ruleAdd`-
+   like) exporta a definição: arquivo/linha da diretiva, cabeça, markers.
+   Mesmo padrão do B0: lógica no compast/pp-side, chamadas de 1 linha.
+2. **Comandos novos sobre esses fatos**: `usages-dsl <palavra>` (aplicações +
+   definição); `rename-dsl` = renomear a cabeça na diretiva + em todos os
+   sites de aplicação (a posição da palavra vem de `ppApplications`).
+   Absorve o antigo item "rename-define" do backlog (um `#define` constante é
+   o caso degenerado: regra sem markers).
+3. **Critério forte disponível (padrão-ouro da Fase 0 do smoke test)**:
+   rename consistente (definição + usos) produz expansão idêntica → `.ppo`
+   normalizado e `.hrb` **byte-idênticos** antes/depois. A verificação
+   independente continua sendo o juiz.
+
+**Recusas/armadilhas a registrar em fixtures** (território H herdado da
+tabela S/H/X): abreviação dBase de `#command` (4 letras — `MENUITEM` casa
+`MENU`? conservadorismo: recusar quando a nova/velha palavra colide por
+abreviação com outra regra); regras re-aplicadas em multi-passe (proveniência
+atravessa clone-de-clone — já coberto, mas fixture dedicada); palavra de DSL
+igual a identificador comum no mesmo projeto (o dump distingue: aplicação de
+regra × token do stream); `#undef`/redefinição no meio do projeto (a mesma
+palavra pode ser DSL num módulo e não noutro — fatos são POR MÓDULO, decidir
+por módulo); stringify/duplicação de marker no resultado (edição é no fonte,
+recompile-verify cobre — provado).
+
+**Princípio de apresentação (nota do Diego, 2026-07-05): o programador vê o
+COMANDO, não a transformação.** As classes do hbclass.ch são o exemplo
+clássico e canônico: quem escreve `METHOD Paint() CLASS UWMenu` pensa em
+"método Paint da classe UWMenu" — nunca em `UWMENU_PAINT()`, `__clsAddMsg`
+ou nos sends de `ADDMETHOD` que a expansão gera. Consequências de projeto:
+
+1. **A ferramenta responde no vocabulário do fonte.** `usages Paint` deve
+   dizer "definição do método Paint (classe UWMenu), widgets.prg:309" — não
+   "função UWMENU_PAINT" nem "convenção de nome" (a heurística de sufixo da
+   era smoke test morre quando os fatos reais existirem).
+2. **`ppApplications` é a ponte de volta (lifting).** Cada aplicação de
+   regra liga: span consumido no FONTE (tokens com posição, ex.: `METHOD`,
+   `Paint`, `CLASS`, `UWMenu` na linha 309) ⇄ regra aplicada (hbclass.ch,
+   linha da diretiva) ⇄ artefatos da EXPANSÃO (a função `UWMENU_PAINT` que
+   aparece em `functions`, os sends gerados). Com o mapa, todo fato do
+   mundo expandido é traduzido de volta para o comando que o programador
+   escreveu antes de ser exibido ou editado.
+3. **Medição já existente**: a porta `lexdiff` da B1 adjudicou no hbhttpd
+   exatamente essa família (nomes de método/classe consumidos pela regra,
+   linhas `METHOD ... CLASS ...` sem tokens) — são os sites que hoje só o
+   TokenScan textual enxerga e que o `ppApplications` tornará fatos de
+   primeira classe, com a regra e o span exatos em vez de texto solto.
+4. **Vale para toda DSL, não só classes**: `MENUITEM ... ACTION ...` deve
+   aparecer como "comando MENUITEM (regra sua, arquivo X)" nos relatórios —
+   a ferramenta nunca vaza `MenuAdd(...)` para o usuário a menos que ele
+   peça a expansão (`--show-expansion` como opção de depuração).
+
+**Critério de pronto da fase**: fixture com a DSL acima (REPEAT/UNTIL +
+MENUITEM) num mini-projeto ≥2 .prg + .ch: `usages-dsl` lista definição e
+aplicações com colunas; `rename-dsl MENUITEM MENU_ITEM` edita .ch + usos e
+verifica `.ppo`/`.hrb` byte-idênticos; seleção de extract cortando REPEAT é
+recusada; **`usages Paint` numa fixture com classe responde no vocabulário
+método/classe (lifting provado)**; suíte verde.
+
+### Fase B4b — Variáveis de escopo dinâmico e afins (caso especial, análise registrada)
+
+**O caso**: em Harbour uma variável pode ser LOCAL/parâmetro (léxica),
+STATIC (léxica ao módulo/função), PRIVATE/PUBLIC (memvar de escopo
+**DINÂMICO** — criada em runtime e visível em toda a extensão dinâmica, isto
+é, nos callees da função criadora), declarada MEMVAR, não declarada
+(memvar implícita) ou FIELD/`alias->` (ligada a workarea em runtime). Entre
+elas há **shadowing** em dois eixos: léxico (um LOCAL `x` numa função vence
+qualquer memvar `x` ali) e dinâmico (um PRIVATE `x` sombreia o PUBLIC `x`
+enquanto viver; dois PRIVATEs homônimos em ramos distintos do call stack).
+
+**O que o compilador já decide — e o dump ast-1 já entrega (não adivinhamos):**
+- Cada ocorrência vem com o escopo **resolvido pelo compilador** para aquele
+  ponto: `local`/`detached`/`static`(+filewide)/`memvar`/`field`/
+  `memvar_implicit`. O shadowing LÉXICO intra-função, portanto, já chega
+  decidido: se `x` é LOCAL na função F, os usos em F vêm como `local`; na
+  função G sem o LOCAL, vêm como `memvar` — são coisas diferentes e o dump
+  as distingue por construção.
+- Criações PRIVATE/PUBLIC com init (hook RTVar, acesso w/u), declarações
+  MEMVAR por função, `M->`/`alias->` classificados, calls/sends (para
+  raciocinar sobre extensão dinâmica) e `usesMacro` por função (macro pode
+  criar/ler memvar invisível ao compilador).
+
+**O que é análise NOVA da ferramenta (nenhum gancho novo no core):**
+1. **Modelo de visibilidade por nome** (`usages-memvar <nome>`, read-only):
+   criadores (PRIVATE/PUBLIC, com módulo/função/linha), declaradores
+   (MEMVAR), usos por classe; **alcance dinâmico potencial** de cada PRIVATE
+   = fecho transitivo dos callees a partir do criador, pelo call graph do
+   projeto; furos do fecho sinalizados: chamadas dinâmicas
+   (`find-dynamic-calls`), sends (métodos), funções fora do projeto,
+   `usesMacro` no alcance.
+2. **Relato de shadowing**: (a) função no alcance com LOCAL homônimo — usos
+   ali NÃO são a memvar (o dump já os liga ao local; mostrar como
+   "sombreado"); (b) mais de um criador PRIVATE homônimo; (c) PUBLIC +
+   PRIVATE homônimos (sombra dinâmica); (d) mesma memvar criada em módulos
+   distintos.
+3. **Política de rename (território H por natureza)**:
+   `rename-memvar` só quando o fecho é FECHADO e limpo — um único criador,
+   todos os usos alcançáveis a partir dele, nenhum furo (dinâmico/macro/
+   externo), nenhum homônimo — senão relato e recusa. **Recusa-chave (muda
+   binding em silêncio)**: renomear memvar para um nome que alguma função do
+   alcance declara LOCAL — o uso deixaria de ser memvar e viraria o local;
+   o inverso idem (rename-local para nome de memvar visível — a recusa por
+   colisão do smoke test continua valendo, agora com o mapa completo).
+   FIELD/`alias->`: dado externo (schema de tabela) — **relato, nunca
+   edição** (política de strings estendida a campos).
+4. **STATIC**: léxica — continua S (rename-static provado no smoke test);
+   o filewide do dump cobre o caso módulo-inteiro.
+
+**Critério de pronto**: fixture armada com shadowing nos dois eixos
+(PUBLIC x + PRIVATE x em callee + LOCAL x numa terceira função + uso
+implícito + criação via macro numa quarta) num mini-projeto ≥2 .prg:
+`usages-memvar` imprime o mapa correto (criadores, alcance, sombreados,
+furos); `rename-memvar` recusa nos casos sujos com mensagem explicando o
+furo, executa no caso limpo com **comportamento idêntico por execução**
+(padrão da Fase 2 do smoke test) e ida-e-volta byte-exata dos fontes.
+
+### Fase B5 — Extensão VSCode re-apontada
+
+**Escopo**: a extensão é fina (CLI faz tudo) — ajustar specs/saídas ao novo
+CLI; manter os 9 comandos; preview `--dry-run --json` se a fricção pedir.
+**Critério**: Diego usa no dia a dia; sem regressão nos fluxos atuais.
+
+### Fase B6 — PR upstream (bloqueada: só quando o Diego mandar)
+
+**Escopo**: mensagem com consumidor real; 1 arquivo novo + ganchos opt-in;
+prova de zero impacto (árvore inteira com/sem `-x`, binário idêntico ao
+master, macro build no-op); regen bison 3.8.2 documentado; split opcional em
+2 PRs (pp-posição; módulo AST). ChangeLog via `bin/commit.hb`; uncrustify.
 
 ---
 
-## Sequência imediata (Fase 0 destrinchada)
+## Backlog (herdado + novo, por valor)
 
-1. Desenhar o schema JSON do dump (v1 com campos reservados p/ Fase 1) — documento curto neste repo.
-2. Patch v1 no branch do harbour-core + rebuild do compilador (`make` no core, conforme fluxo do projeto).
-3. Núcleo hbrefactor mínimo (dump → plano de edição → aplicar) + Makefile com `make test`.
-4. Fixtures da Fase 0 verdes com o critério byte-idêntico.
-5. Só então: decisão de submeter o PR upstream (com autorização explícita para qualquer commit).
+1. **Velocidade em projetos grandes**: `-inc` do hbmk2 já dá dumps
+   incrementais na Fase B1; verificação proporcional à edição (compilar só o
+   alvo) fica para quando o uso real doer.
+2. **rename-define**: ABSORVIDO pela Fase B4 (DSLs de pré-processador) — o
+   `#define` constante é o caso degenerado de regra sem markers. Caso de
+   estudo herdado: regra `( x & y ) => HB_BITAND` de um hbcompat.ch legado
+   que sequestra `!&(...)` — vira fixture de recusa/aviso da B4.
+3. **rename-method**: exige nomes de mensagem de `__clsAddMsg` (declaração
+   METHOD é invisível — nome viaja como string); avaliar se entra no ast-1
+   ou num ast-2. hbhttpd (CREATE CLASS) é o alvo de teste.
+4. Dedup de duplicatas de pré/pós-decremento: não-fazer mantido (v2).
+5. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
+   final e conversões de projeto — só depois de suíte + hbhttpd verdes.

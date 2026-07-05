@@ -3,6 +3,13 @@ tests/tmp/
 *.hrb
 *.ppo
 *.occ.json
+*.ast.json
 
 # settings de teste com caminhos da máquina (binPath/hbBin) — não versionar
 tests/fix01/.vscode/
+
+# área de experimentos (cópias de projetos de produção p/ dogfooding)
+work/
+
+# artefatos de build incremental do hbmk2 em fixtures/experimentos
+.hbmk/

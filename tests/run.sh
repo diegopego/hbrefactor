@@ -207,10 +207,16 @@ D=$(fresh case16)
 ( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-11 Acumula > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "STATIC PROCEDURE Acumula( bAcum, i )" "$D/a.prg"
+grep -q "STATIC PROCEDURE Acumula( bAcum )" "$D/a.prg"
 check "new static procedure created" $?
-grep -q "^   Acumula( bAcum, i )$" "$D/a.prg"
+grep -q "^   Acumula( bAcum )$" "$D/a.prg"
 check "selection replaced by call" $?
+# 'i' is used only inside the selection: its declaration must migrate into
+# the new function (leaving it in Main breaks the project's -w3 -es2 build)
+grep -q "^   LOCAL i$" "$D/a.prg"
+check "selection-only local moved into new function" $?
+[ "$(grep -c "LOCAL i" "$D/a.prg")" -eq 1 ]
+check "declaration removed from Main" $?
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
@@ -360,6 +366,98 @@ grep -q "definition (function)" "$D/out.log"
 check "definition found"           $?
 grep -q "call in MAIN" "$D/out.log"
 check "call found"                 $?
+
+echo "case 29: real-project .hbp dialect (-inc, \${hb_name}.hbx, .hbc dep, class)"
+# mirrors what dogfooding on contrib/hbhttpd required: hbmk2 switches the
+# tool must skip (-inc), target-name macros, a dependency .hbc contributing
+# incpaths=, the system include dir (hbclass.ch) derived from HB_BIN, and
+# methods addressable by name (hbclass.ch names them <Class>_<Method>)
+D=$(fresh case29)
+mkdir -p "$D/dep"
+printf 'incpaths=.\n' > "$D/dep/dep.hbc"
+printf '#define DEP_TAXA 0\n' > "$D/dep/dep.ch"
+cat > "$D/c.prg" <<'EOF'
+#include "hbclass.ch"
+#include "dep.ch"
+
+CREATE CLASS Conta
+
+   VAR nSaldo INIT 0
+
+   METHOD Deposita( nValor )
+
+ENDCLASS
+
+METHOD Deposita( nValor ) CLASS Conta
+
+   LOCAL nNovo := ::nSaldo + nValor + DEP_TAXA
+
+   ::nSaldo := nNovo
+
+   RETURN Self
+EOF
+printf -- '-inc\n-w3 -es2\n${hb_name}.hbx\n\na.prg\nb.prg\nc.prg\n\ndep/dep.hbc\n' > "$D/case29.hbp"
+printf 'DYNAMIC Dupla\n' > "$D/case29.hbx"
+( cd "$D" && "$BIN" usages case29.hbp Deposita > out.log 2>&1 )
+RC=$?
+check "usages exit 0 (project compiles)" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "possible method definition (CONTA_DEPOSITA, name convention)" "$D/out.log"
+check "method definition via name convention" $?
+( cd "$D" && "$BIN" rename-local case29.hbp c.prg Deposita nNovo nCalc > ren.log 2>&1 )
+RC=$?
+check "rename-local by method name"  $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "verified: all 3 module" "$D/ren.log"
+check "3 modules verified"           $?
+( cd "$D" && "$BIN" rename-local case29.hbp c.prg Conta:Deposita nCalc nNovo > ren2.log 2>&1 )
+RC=$?
+check "rename-local by Class:Method" $([ $RC -eq 0 ] && echo 0 || echo 1)
+( cd "$D" && "$BIN" rename-function case29.hbp Dupla Dobrar > hbx.log 2>&1 )
+RC=$?
+check "hbx via \${hb_name} refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "DYNAMIC DUPLA in export file" "$D/hbx.log"
+check "hbx warning proves macro expansion" $?
+
+echo "case 30: broken build is reported, never silent"
+D=$(fresh case30)
+printf '\nFUNCTION Quebrada()\n\n   RETURN NaoFecha(\n' >> "$D/b.prg"
+( cd "$D" && "$BIN" unused-locals fix01.hbp > out.log 2>&1 )
+RC=$?
+check "unused-locals exit != 0"    $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "does not compile" "$D/out.log"
+check "refusal names the failure"  $?
+grep -q " Error E" "$D/out.log"
+check "compiler error line shown"  $?
+( cd "$D" && "$BIN" usages fix01.hbp Dupla > usages.log 2>&1 )
+RC=$?
+check "usages exit != 0"           $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q " Error E" "$D/usages.log"
+check "usages surfaces the error"  $?
+
+echo "case 31: legacy monolith - broken module elsewhere must not block work"
+# read-only commands report partial coverage; single-module renames verify
+# against the modules that do compile; renaming inside the broken module
+# itself is refused
+D=$(fresh case31)
+printf '\nFUNCTION Quebrada()\n\n   RETURN NaoFecha(\n' >> "$D/b.prg"
+( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal nSoma > out.log 2>&1 )
+RC=$?
+check "rename in healthy module exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+diff -q "$D/a.prg" "$HERE/fix01/expected/a_renamed.prg" > /dev/null 2>&1
+check "a.prg renamed as expected"   $?
+grep -q "verified: all 1 module" "$D/out.log"
+check "verified against compiling subset" $?
+grep -q "partial coverage - 1 of 2" "$D/out.log"
+check "partial coverage reported"  $?
+( cd "$D" && "$BIN" rename-local fix01.hbp b.prg Dupla nV nX > out2.log 2>&1 )
+RC=$?
+check "rename in broken module refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "itself does not compile" "$D/out2.log"
+check "refusal says the target is broken" $?
+( cd "$D" && "$BIN" usages fix01.hbp nSoma --func Main > usages.log 2>&1 )
+grep -q "declaration (local) in MAIN" "$D/usages.log"
+check "usages still answers from healthy modules" $?
+grep -q "partial coverage" "$D/usages.log"
+check "usages notes partial coverage" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"
