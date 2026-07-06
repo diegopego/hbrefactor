@@ -2736,6 +2736,8 @@ STATIC FUNCTION ReorderParams( aArgs )
    LOCAL cDefFile := "", hDef := NIL, aParams := {}, aNew, aPerm := {}
    LOCAL hEdits := { => }, aE, aWarn := {}, cText, hOrig := { => }
    LOCAL cUpFunc, aArgsSpans, aSigHits, nTotal := 0, cWhy
+   LOCAL aIdent, lIsMethod, cUpMsg := "", nAt, aOwnerClasses := {}
+   LOCAL hOwn, cOwn, aSpell, hF, cCallName
 
    IF Len( aArgs ) < 4
       Usage()
@@ -2765,31 +2767,35 @@ STATIC FUNCTION ReorderParams( aArgs )
       RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
    ENDIF
 
-   // definição e lista de parâmetros (na ordem de declaração)
+   // definição e lista de parâmetros. PickFunc resolve nome puro, Classe:Metodo
+   // e nome de método (reuso da P1a); um método tem a assinatura em
+   // ppApplications (colapsa em tokens[]) e há SENDS a reordenar
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ast-1 ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
       ENDIF
       hAst[ "__src" ] := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
       hAsts[ cPath ] := hAst
-      FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUpFunc
-            IF ! Empty( cOnlyFile ) .AND. ;
-               ! Lower( hb_FNameNameExt( cPath ) ) == Lower( hb_FNameNameExt( cOnlyFile ) )
-               LOOP
-            ENDIF
-            IF hDef != NIL
-               RETURN Refuse( "'" + cFunc + "' definida em mais de um módulo - use --file" )
-            ENDIF
-            hDef := hFunc
-            cDefFile := cPath
+   NEXT
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ! Empty( cOnlyFile ) .AND. ;
+         ! Lower( hb_FNameNameExt( cPath ) ) == Lower( hb_FNameNameExt( cOnlyFile ) )
+         LOOP
+      ENDIF
+      hFunc := PickFunc( hAsts[ cPath ], cFunc )
+      IF hFunc != NIL .AND. ! hFunc[ "fileDecl" ]
+         IF hDef != NIL
+            RETURN Refuse( "'" + cFunc + "' definida em mais de um módulo - use --file" )
          ENDIF
-      NEXT
+         hDef := hFunc
+         cDefFile := cPath
+      ENDIF
    NEXT
    IF hDef == NIL
       RETURN Refuse( "função '" + cFunc + "' não está definida no projeto" )
    ENDIF
+   cUpFunc := Upper( hDef[ "name" ] )         // nome REAL (gerado, p/ métodos)
    FOR EACH hItem IN hDef[ "declarations" ]
       IF hItem[ "param" ]
          AAdd( aParams, hItem[ "sym" ] )        // uppercase do dump
@@ -2798,6 +2804,19 @@ STATIC FUNCTION ReorderParams( aArgs )
    IF Len( aParams ) < 2
       RETURN Refuse( "'" + cFunc + "' tem menos de 2 parâmetros" )
    ENDIF
+
+   // método? identidade (classe+método) do nome gerado; assinatura e política
+   // de send diferem de uma função comum. cUpMsg = a MENSAGEM (nome do método)
+   aIdent := GenNameParts( hAsts[ cDefFile ], hDef )
+   lIsMethod := Len( aIdent ) >= 2
+   IF lIsMethod
+      IF ( nAt := At( ":", cFunc ) ) > 0
+         cUpMsg := Upper( AllTrim( SubStr( cFunc, nAt + 1 ) ) )
+      ELSE
+         cUpMsg := ATail( aIdent )              // convenção <Classe>_<Metodo>
+      ENDIF
+   ENDIF
+   cCallName := iif( lIsMethod, cUpMsg, cUpFunc )
 
    // nova ordem: permutação exata
    aNew := hb_ATokens( Upper( cOrder ), "," )
@@ -2815,6 +2834,42 @@ STATIC FUNCTION ReorderParams( aArgs )
       AAdd( aPerm, nJ )
    NEXT
 
+   // grafia real de cada parâmetro (o dump é uppercase): na assinatura do
+   // método os sites vêm de ppApplications (SigParamHits), numa função comum
+   // da própria linha (SigSpell)
+   aSpell := Array( Len( aParams ) )
+   FOR nI := 1 TO Len( aParams )
+      IF lIsMethod
+         aSigHits := SigParamHits( hAsts[ cDefFile ], aIdent, aParams[ nI ] )
+         aSpell[ nI ] := iif( Empty( aSigHits ), aParams[ nI ], ;
+                              SpellAt( cDefFile, aSigHits[ 1 ], Len( aParams[ nI ] ) ) )
+      ELSE
+         aSpell[ nI ] := SigSpell( cDefFile, hAsts[ cDefFile ], hDef, aParams[ nI ] )
+      ENDIF
+   NEXT
+
+   // política de unicidade da mensagem (mesma do rename-method): sends não
+   // carregam classe, então só reordenamos os :Msg( quando o método pertence
+   // a UMA classe do projeto - senão o despacho é dinâmico e ambíguo
+   IF lIsMethod
+      FOR EACH cPath IN hProj[ "files" ]
+         hF   := PpMarkerSeeds( hAsts[ cPath ], cUpMsg )
+         hOwn := PpMarkerOwners( hAsts[ cPath ], ;
+                    PpMarkerArtifacts( hAsts[ cPath ], hF[ "pairs" ], cUpMsg ), ;
+                    FuncStmtSpans( hAsts[ cPath ] ), cUpMsg )
+         FOR EACH cOwn IN hb_HKeys( hOwn )
+            IF hb_AScan( aOwnerClasses, cOwn,,, .T. ) == 0
+               AAdd( aOwnerClasses, cOwn )
+            ENDIF
+         NEXT
+      NEXT
+      IF Len( aOwnerClasses ) > 1
+         RETURN Refuse( "'" + cFunc + "': a mensagem é membro de mais de uma classe (" + ;
+                        ArrJoin( aOwnerClasses, ", " ) + ") - send é despacho dinâmico, " + ;
+                        "reordenar os argumentos seria ambíguo; recuso" )
+      ENDIF
+   ENDIF
+
    // edições por módulo: assinatura (nomes) + call sites (argumentos)
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -2823,16 +2878,32 @@ STATIC FUNCTION ReorderParams( aArgs )
          IF hFunc[ "fileDecl" ]
             LOOP
          ENDIF
-         // assinatura: troca os NOMES dos parâmetros pela nova ordem
+         // assinatura: troca os NOMES dos parâmetros pela nova ordem. Método:
+         // os sites (protótipo no CREATE CLASS + linha METHOD ... CLASS) vêm
+         // de ppApplications, pois colapsam em tokens[] (P1a). Comum: da
+         // própria linha da função
          IF cPath == cDefFile .AND. Upper( hFunc[ "name" ] ) == cUpFunc
             FOR nI := 1 TO Len( aParams )
-               aSigHits := LineTokens( hAst, hFunc, hFunc[ "line" ], aParams[ nI ] )
-               IF Len( aSigHits ) != 1
-                  RETURN Refuse( "parâmetro '" + aParams[ nI ] + "' não localizado com precisão na assinatura" )
+               IF lIsMethod
+                  aSigHits := SigParamHits( hAst, aIdent, aParams[ nI ] )
+                  IF Empty( aSigHits )
+                     RETURN Refuse( "parâmetro '" + aParams[ nI ] + ;
+                                    "' não localizado na assinatura do método" )
+                  ENDIF
+                  FOR EACH hItem IN aSigHits          // hItem = { linha, col1based }
+                     AAdd( aE, { hItem[ 1 ], hItem[ 2 ], ;
+                                 SpellAt( cPath, hItem, Len( aParams[ nI ] ) ), ;
+                                 aSpell[ aPerm[ nI ] ] } )
+                  NEXT
+               ELSE
+                  aSigHits := LineTokens( hAst, hFunc, hFunc[ "line" ], aParams[ nI ] )
+                  IF Len( aSigHits ) != 1
+                     RETURN Refuse( "parâmetro '" + aParams[ nI ] + "' não localizado com precisão na assinatura" )
+                  ENDIF
+                  AAdd( aE, { aSigHits[ 1 ][ 1 ], aSigHits[ 1 ][ 2 ], ;
+                              SpellAt( cPath, aSigHits[ 1 ], Len( aParams[ nI ] ) ), ;
+                              aSpell[ aPerm[ nI ] ] } )
                ENDIF
-               AAdd( aE, { aSigHits[ 1 ][ 1 ], aSigHits[ 1 ][ 2 ], ;
-                           SpellAt( cPath, aSigHits[ 1 ], Len( aParams[ nI ] ) ), ;
-                           SigSpell( cPath, hAst, hFunc, aParams[ aPerm[ nI ] ] ) } )
             NEXT
          ENDIF
          // call sites: varredura do span da função (registro de call em
@@ -2857,10 +2928,33 @@ STATIC FUNCTION ReorderParams( aArgs )
             NEXT
          ENDIF
       NEXT
-      // strings citando a função
+      // método: os SENDS (o:Msg(a,b)) são as arestas dinâmicas - reordena os
+      // argumentos como numa chamada. Varredura do módulo inteiro (send em
+      // qualquer função); a unicidade da mensagem já foi garantida acima
+      IF lIsMethod
+         aArgsSpans := SendSitesArgs( hAst, cUpMsg, @cWhy )
+         IF aArgsSpans == NIL
+            RETURN Refuse( hb_FNameNameExt( cPath ) + ": " + cWhy )
+         ENDIF
+         FOR EACH hItem IN aArgsSpans          // hItem = spans de UM send
+            IF Len( hItem ) < Len( aParams )
+               RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + ;
+                              hb_ntos( iif( Empty( hItem ), 0, hItem[ 1 ][ 1 ] ) ) + ;
+                              ": send com " + hb_ntos( Len( hItem ) ) + " arg(s) < " + ;
+                              hb_ntos( Len( aParams ) ) + " parâmetro(s) - implicit NIL would move" )
+            ENDIF
+            FOR nI := 1 TO Len( aParams )
+               AAdd( aE, { hItem[ nI ][ 1 ], hItem[ nI ][ 2 ], ;
+                           hItem[ nI ][ 3 ], hItem[ aPerm[ nI ] ][ 3 ] } )
+            NEXT
+         NEXT
+      ENDIF
+      // strings citando a função/mensagem (possível acesso por nome:
+      // __objSendMsg, &; string DERIVADA por regra tem "from" e não é isso)
       FOR EACH hItem IN hAst[ "tokens" ]
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUpFunc
+            Upper( hItem[ "text" ] ) == cCallName .AND. ;
+            !( lIsMethod .AND. hb_HHasKey( hItem, "from" ) )
             AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
                   ": string igual a '" + cFunc + "' - possível chamada por nome" )
          ENDIF
@@ -2935,8 +3029,8 @@ STATIC FUNCTION ReorderParams( aArgs )
 // NIL+cWhy em recusa.
 STATIC FUNCTION CallSitesArgs( hAst, hFunc, cUpFunc, cWhy )
 
-   LOCAL aToks := hAst[ "tokens" ], nI, nJ, nDepth, hTok, nArgFrom
-   LOCAL aAll := {}, aIdx, aSpans, aSpan, aPrev, nEnd := 0, aR
+   LOCAL aToks := hAst[ "tokens" ], nI, hTok
+   LOCAL aAll := {}, aSpans, aPrev, nEnd := 0
 
    cWhy := ""
    FOR EACH hTok IN hAst[ "functions" ]
@@ -2960,45 +3054,85 @@ STATIC FUNCTION CallSitesArgs( hAst, hFunc, cUpFunc, cWhy )
          IF nI + 1 > Len( aToks ) .OR. aToks[ nI + 1 ][ "type" ] != 50
             LOOP
          ENDIF
-         aIdx := {}
-         nDepth := 1
-         nArgFrom := nI + 2
-         FOR nJ := nI + 2 TO Len( aToks )
-            hTok := aToks[ nJ ]
-            DO CASE
-            CASE hTok[ "type" ] == 50 .OR. hTok[ "type" ] == 52 .OR. hTok[ "type" ] == 54
-               nDepth++
-            CASE hTok[ "type" ] == 51 .OR. hTok[ "type" ] == 53 .OR. hTok[ "type" ] == 55
-               nDepth--
-               IF nDepth == 0
-                  IF nJ > nArgFrom
-                     AAdd( aIdx, { nArgFrom, nJ - 1 } )
-                  ELSEIF ! Empty( aIdx )
-                     cWhy := "argumento vazio na chamada da linha " + ;
-                             hb_ntos( aToks[ nI ][ "line" ] )
-                     RETURN NIL
-                  ENDIF
-                  EXIT
-               ENDIF
-            CASE hTok[ "type" ] == 29 .AND. nDepth == 1
-               IF nJ == nArgFrom
-                  cWhy := "argumento vazio na chamada da linha " + ;
-                          hb_ntos( aToks[ nI ][ "line" ] )
-                  RETURN NIL
-               ENDIF
+         aSpans := ArgSpansAt( hAst, nI, @cWhy )
+         IF aSpans == NIL
+            RETURN NIL
+         ENDIF
+         AAdd( aAll, aSpans )
+      ENDIF
+   NEXT
+
+   RETURN aAll
+
+// spans dos argumentos de UMA chamada/send cujo token do nome está em
+// nNameIdx (o token seguinte é '('): balanceia o STREAM por TIPO (50/52/54
+// abrem, 51/53/55 fecham, 29=',' de nível 1 separa) até o ')' casado e
+// materializa cada faixa por BuildArgSpan. Reutilizado por CallSitesArgs
+// (FUNCALL) e SendSitesArgs (SEND). Devolve { {linha,col1based,texto}, ... }
+// ou NIL+cWhy.
+STATIC FUNCTION ArgSpansAt( hAst, nNameIdx, cWhy )
+
+   LOCAL aToks := hAst[ "tokens" ], nJ, nDepth := 1, hTok
+   LOCAL nArgFrom := nNameIdx + 2, aIdx := {}, aSpans := {}, aR, aSpan
+   LOCAL nCallLine := aToks[ nNameIdx ][ "line" ]
+
+   FOR nJ := nNameIdx + 2 TO Len( aToks )
+      hTok := aToks[ nJ ]
+      DO CASE
+      CASE hTok[ "type" ] == 50 .OR. hTok[ "type" ] == 52 .OR. hTok[ "type" ] == 54
+         nDepth++
+      CASE hTok[ "type" ] == 51 .OR. hTok[ "type" ] == 53 .OR. hTok[ "type" ] == 55
+         nDepth--
+         IF nDepth == 0
+            IF nJ > nArgFrom
                AAdd( aIdx, { nArgFrom, nJ - 1 } )
-               nArgFrom := nJ + 1
-            ENDCASE
-         NEXT
-         aSpans := {}
-         FOR EACH aR IN aIdx
-            aSpan := BuildArgSpan( hAst, aR[ 1 ], aR[ 2 ], @cWhy )
-            IF aSpan == NIL
-               cWhy += " (chamada da linha " + hb_ntos( aToks[ nI ][ "line" ] ) + ")"
+            ELSEIF ! Empty( aIdx )
+               cWhy := "argumento vazio na chamada da linha " + hb_ntos( nCallLine )
                RETURN NIL
             ENDIF
-            AAdd( aSpans, aSpan )
-         NEXT
+            EXIT
+         ENDIF
+      CASE hTok[ "type" ] == 29 .AND. nDepth == 1
+         IF nJ == nArgFrom
+            cWhy := "argumento vazio na chamada da linha " + hb_ntos( nCallLine )
+            RETURN NIL
+         ENDIF
+         AAdd( aIdx, { nArgFrom, nJ - 1 } )
+         nArgFrom := nJ + 1
+      ENDCASE
+   NEXT
+   FOR EACH aR IN aIdx
+      aSpan := BuildArgSpan( hAst, aR[ 1 ], aR[ 2 ], @cWhy )
+      IF aSpan == NIL
+         cWhy += " (chamada da linha " + hb_ntos( nCallLine ) + ")"
+         RETURN NIL
+      ENDIF
+      AAdd( aSpans, aSpan )
+   NEXT
+
+   RETURN aSpans
+
+// spans dos argumentos de todo SEND da mensagem cUpMsg no módulo: token type
+// 21 posicionado cujo ANTERIOR é ':' (type 58) e o SEGUINTE é '(' - o mesmo
+// recorte de args de uma chamada (ArgSpansAt). Send sem '(' (acesso a DADO,
+// não chamada) é ignorado; a política de unicidade da mensagem já decidiu que
+// todos os :Msg( despacham para a mesma classe. NIL+cWhy em recusa.
+STATIC FUNCTION SendSitesArgs( hAst, cUpMsg, cWhy )
+
+   LOCAL aToks := hAst[ "tokens" ], nI, hTok, aPrev, aAll := {}, aSpans
+
+   cWhy := ""
+   FOR nI := 1 TO Len( aToks )
+      hTok  := aToks[ nI ]
+      aPrev := iif( nI > 1, aToks[ nI - 1 ], NIL )
+      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+         hTok[ "col" ] != NIL .AND. Upper( hTok[ "text" ] ) == cUpMsg .AND. ;
+         aPrev != NIL .AND. aPrev[ "type" ] == 58 .AND. ;
+         nI + 1 <= Len( aToks ) .AND. aToks[ nI + 1 ][ "type" ] == 50
+         aSpans := ArgSpansAt( hAst, nI, @cWhy )
+         IF aSpans == NIL
+            RETURN NIL
+         ENDIF
          AAdd( aAll, aSpans )
       ENDIF
    NEXT

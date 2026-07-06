@@ -29,7 +29,7 @@ markers posicionados de `ppApplications`.
 
 | Comando | Método de classe | Função gerada por DSL |
 |---|---|---|
-| reorder-params | recusa limpa (não resolve método) | funciona |
+| reorder-params | ~~recusa limpa (não resolve método)~~ **P1b: OK** | funciona |
 | extract-function | falha controlada (não modela `Self`; rollback) | recusa limpa (N/A) |
 | inline-local | funciona | N/A |
 | rename-param/local | ~~falha controlada (esquece a assinatura)~~ **P1a: OK** | ~~**corrompia** (double-apply)~~ **P0: OK** |

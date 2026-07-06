@@ -395,6 +395,21 @@ Semânticas importantes:
   protótipo↔implementação pela assinatura INTEIRA (nomes de param inclusos), então
   os três sites TÊM que mover juntos, senão `W0001 declaration mismatch`; nome de
   param não entra no pcode, então a verificação byte-idêntica dos `.hrb` vale.
+- **reorder-params ciente de método (B4e P1b)** (`SendSitesArgs` + `ArgSpansAt`
+  + `PpMarkerOwners`): reordenar os params de um método reordena (a) a
+  ASSINATURA — protótipo + `METHOD ... CLASS`, pelos mesmos sites de
+  `ppApplications` da P1a (`SigParamHits`), o corpo intacto; e (b) os
+  ARGUMENTOS nos call sites de SEND. O recorte de argumentos (balancear o
+  stream por tipo a partir de nome+`(`, quebrar em vírgulas de nível 1,
+  materializar por `BuildArgSpan`) foi extraído de `CallSitesArgs` para
+  `ArgSpansAt` e reusado por `SendSitesArgs`, que ancora no token da MENSAGEM
+  (type 21 posicionado, anterior `:` type 58, seguido de `(`). Send é despacho
+  DINÂMICO: os sends não carregam classe, então só é seguro reordenar quando a
+  mensagem pertence a UMA classe do projeto — `PpMarkerOwners` (donos por
+  co-derivação) sobre o nome do método; > 1 classe ⇒ recusa NOMEANDO as classes
+  (mesma política do rename-method). O pcode muda de verdade (ordem de push);
+  a verificação é `HrbSymbolsEqual` (símbolos/funções intactos) + rollback, não
+  byte-idêntico.
 
 ## Evolução
 

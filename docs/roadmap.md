@@ -788,13 +788,29 @@ corrompe nem falha de forma confusa.
 > — pronta p/ P1b). Caso 55 (proto+impl+corpo editados, nH intacto, execução
 > idêntica, round-trip byte-exato, 2º método independente). Suíte 302/0.
 
-**Pendente (P1b–P3, ver spec)**: P1b reorder-params ciente de método
-(resolução + call sites de send + política de unicidade de mensagem); P2a
-extract-function em corpo de método — **decisão do Diego (2026-07-06): suporte
-PLENO** (extrair para um novo `METHOD` da classe, com `Self`/`::` convergindo),
-não a recusa-limpa que a spec recomendava (sub-fase maior); P2b call-graph
-resolvendo nome de método + arestas de send dinâmicas; P3 find-dynamic-calls
-filtrando o ruído do `&` da expansão do hbclass.
+> **P1b entregue (2026-07-06)**: `reorder-params` ciente de método. (1)
+> Resolução por `PickFunc` (nome puro, `Classe:Método`, nome de método). (2) A
+> assinatura (protótipo no `CREATE CLASS` + linha `METHOD ... CLASS`) reordena
+> pelos sites de `ppApplications` (`SigParamHits`/`GenNameParts` da P1a, pois
+> colapsa em `tokens[]`); o corpo NÃO é tocado (params guardam os nomes). (3)
+> Os call sites de SEND (`o:Msg(a,b)`) reordenam os argumentos: o recorte de
+> args foi extraído de `CallSitesArgs` para `ArgSpansAt` e reusado por
+> `SendSitesArgs` (token da mensagem, anterior `:` type 58, seguido de `(`). (4)
+> Política de unicidade da mensagem (mesma do rename-method, via
+> `PpMarkerOwners`): só reordena os sends quando o método é de UMA classe do
+> projeto — senão recusa NOMEANDO as classes (send é despacho dinâmico). O
+> pcode muda legitimamente (ordem de push) → `HrbSymbolsEqual` (símbolos/funções
+> intactos) + rollback. Caso 56 na fixture `fixsig/`: reorder de `Widget:Grow`
+> edita assinatura + send, execução idêntica, round-trip byte-exato; reorder de
+> `Widget:Resize` (homônimo em Widget+Panel) recusa nomeando as classes. Suíte
+> 313/0.
+
+**Pendente (P2a–P3, ver spec)**: P2a extract-function em corpo de método —
+**decisão do Diego (2026-07-06): suporte PLENO** (extrair para um novo `METHOD`
+da classe, com `Self`/`::` convergindo), não a recusa-limpa que a spec
+recomendava (sub-fase maior; confirmar o desenho antes de codar o volume); P2b
+call-graph resolvendo nome de método + arestas de send dinâmicas; P3
+find-dynamic-calls filtrando o ruído do `&` da expansão do hbclass.
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 

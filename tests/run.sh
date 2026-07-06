@@ -1180,6 +1180,42 @@ check "second method's param renames independently" $([ $RC -eq 0 ] && echo 0 ||
 grep -q "METHOD Grow( nDx, nDelta )" "$D/w1.prg" && grep -q "METHOD Resize( nW, nH )" "$D/w1.prg"
 check "Grow signature moved, Resize signature untouched" $?
 
+echo "case 56: B4e P1b - reorder-params ciente de método (assinatura + sends + unicidade)"
+# reordenar o param de um método move a assinatura (protótipo + METHOD...CLASS,
+# via ppApplications como na P1a) E os argumentos nos call sites de SEND
+# (o:Msg(a,b)). Só reordena sends quando a mensagem é de UMA classe do projeto
+# (senão o despacho é dinâmico e ambíguo - recusa nomeando as classes, mesma
+# política do rename-method). O corpo não é tocado; o pcode muda legitimamente
+# (ordem de push) e a verificação exige símbolos/funções intactos.
+D=$(freshsig case56)
+( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" reorder-params fixsig.hbp Widget:Grow "nDy,nDx" > ren.log 2>&1 )
+RC=$?
+check "reorder of a unique method exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+test "$(grep -c "METHOD Grow( nDy, nDx )" "$D/w1.prg")" = "2"
+check "prototype AND implementation signature reordered" $?
+grep -q "hb_ntos( nDx + nDy )" "$D/w1.prg"
+check "method body left untouched (params keep their names)" $?
+grep -q "oW:Grow( 2, 1 )" "$D/w2.prg"
+check "send call site arguments reordered" $?
+grep -q "símbolos intactos" "$D/ren.log"
+check "verified: symbols/functions intact (pcode legitimately changed)" $?
+( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after reorder" $?
+( cd "$D" && "$BIN" reorder-params fixsig.hbp Widget:Grow "nDx,nDy" > /dev/null 2>&1 )
+cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg" && cmp -s "$D/w2.prg" "$HERE/fixsig/w2.prg"
+check "A->B->A round-trip byte-exact"  $?
+# Resize é homônimo (Widget e Panel) -> send é despacho dinâmico -> recusa
+( cd "$D" && "$BIN" reorder-params fixsig.hbp Widget:Resize "nH,nW" > amb.log 2>&1 )
+RC=$?
+check "method owned by two classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "mais de uma classe" "$D/amb.log" && grep -q "PANEL" "$D/amb.log"
+check "refusal names the classes and the dynamic dispatch" $?
+cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg" && cmp -s "$D/w2.prg" "$HERE/fixsig/w2.prg"
+check "sources untouched by the refusal" $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]
