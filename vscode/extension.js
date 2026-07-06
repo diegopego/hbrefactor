@@ -176,6 +176,39 @@ async function cmdRenameDsl() {
   report(`rename-dsl ${word} -> ${novo}`, res);
 }
 
+// renomeia um NOME DE MATCH MARKER de diretiva de pp sob o cursor - o nome
+// que o programador escreve e que preenche um <marker> (método de classe do
+// hbclass, palavra capturada de qualquer DSL) e todos os artefatos que a
+// expansão deriva dele. rename-pp-marker e rename-method são a mesma engine
+// (fase B4d): o rastro de derivação do dump ast-3 acha declaração,
+// implementação, sends e os artefatos gerados (símbolos colados, strings de
+// stringify), edita o fonte e prevê/verifica cada artefato - sem nada
+// por-DSL. O CLI recusa e faz rollback em qualquer divergência.
+async function cmdRenamePpMarker() {
+  const c = await ctx();
+  if (!c) return;
+  const word = wordAt(c.editor);
+  if (!word) return;
+  const novo = await vscode.window.showInputBox({
+    prompt: `Novo nome para o marker ${word} (declaração, implementação, sends e artefatos derivados)` });
+  if (!novo) return;
+  await saveAll();
+  let res = await run(['rename-pp-marker', c.spec, word, novo], c.cwd);
+  // strings iguais ao nome (possível acesso por nome, __objSendMsg/:&) não
+  // são editadas: o CLI pede confirmação via --force. (Um método definido
+  // por mais de uma classe é recusa por DESENHO - send é despacho dinâmico;
+  // a mensagem do CLI explica e não há --force que a contorne.)
+  if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
+    report(`rename-pp-marker ${word} -> ${novo} (referências textuais)`, res);
+    const go = await vscode.window.showWarningMessage(
+      'Há strings iguais ao nome (possível acesso por nome) que NÃO serão alteradas. Prosseguir mesmo assim?',
+      'Prosseguir (--force)', 'Cancelar');
+    if (go !== 'Prosseguir (--force)') return;
+    res = await run(['rename-pp-marker', c.spec, word, novo, '--force'], c.cwd);
+  }
+  report(`rename-pp-marker ${word} -> ${novo}`, res);
+}
+
 async function cmdRenameStatic() {
   const c = await ctx();
   if (!c) return;
@@ -248,6 +281,7 @@ function activate(context) {
     vscode.commands.registerCommand('hbrefactor.renameLocal', cmdRenameLocal),
     vscode.commands.registerCommand('hbrefactor.renameFunction', cmdRenameFunction),
     vscode.commands.registerCommand('hbrefactor.renameDsl', cmdRenameDsl),
+    vscode.commands.registerCommand('hbrefactor.renamePpMarker', cmdRenamePpMarker),
     vscode.commands.registerCommand('hbrefactor.renameStatic', cmdRenameStatic),
     vscode.commands.registerCommand('hbrefactor.reorderParams', cmdReorderParams),
     vscode.commands.registerCommand('hbrefactor.extractFunction', cmdExtractFunction),

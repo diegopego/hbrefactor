@@ -1,5 +1,5 @@
 #!/bin/bash
-# hbrefactor test runner - second incarnation (compiler AST, schema ast-1/2)
+# hbrefactor test runner - second incarnation (compiler AST, schema ast-2/3)
 # Every fixture is a PROJECT (>= 2 .prg + shared .ch + .hbp): the tool must
 # prove it operates at project level, never on a lone file.
 #
@@ -14,8 +14,12 @@
 # Cases 44-46 are phase B4b (dynamically scoped memvars): fixture fixmv/
 # armed with shadowing on both axes, '&' creation and an implicit memvar.
 # Cases 47-49 are phase B4c (rename-method): fixture fixmth/ with two
-# classes - class facts read keyword-free from the EXPANDED registration
-# code the compiler saw (strings in the class function's statements).
+# classes - since B4d the class facts come from the DERIVATION TRACE the
+# pp records at expansion time ("from" in the ast-3 dump), not from shape
+# anchors over the expanded code. Cases 50-53 are phase B4d (specs G2-G6):
+# fixture fixppm/ with an INVENTED DSL - nothing of it exists in any core
+# include and the tool mentions none of its words; usages lifts and
+# rename-pp-marker predicts every derived artifact from the trace alone.
 
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -63,6 +67,13 @@ freshmth() { # freshmth <case-name> -> fixture with two classes (B4c)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
    cp "$HERE"/fixmth/*.prg "$HERE"/fixmth/*.hbp "$d"/
+   echo "$d"
+}
+
+freshppm() { # freshppm <case-name> -> fixture with an INVENTED pp DSL (B4d)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixppm/*.prg "$HERE"/fixppm/*.ch "$HERE"/fixppm/*.hbp "$d"/
    echo "$d"
 }
 
@@ -1008,6 +1019,100 @@ check "bare-name round-trip byte-exact" $?
 ( cd "$D" && "$BIN" rename-method fixmth.hbp Soma Junta > amb.log 2>&1 )
 RC=$?
 check "ambiguous bare name refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
+
+echo "case 50: B4d G2/G6 - invented DSL: usages lifts in source vocabulary"
+for f in e1.prg e2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixppm/$f" -n -q0 -w3 -es2 -s -I"$HERE/fixppm" > /dev/null 2>&1
+   check "fixppm/$f clean under -w3 -es2"  $?
+done
+D=$(freshppm case50)
+( cd "$D" && "$BIN" usages fixppm.hbp Click > out.log 2>&1 )
+RC=$?
+check "usages of a prefix-pasted marker name exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "e1.prg:8: handler definition Click" "$D/out.log"
+check "definition lifted in the DSL's own vocabulary (rule head)" $?
+! grep -q "on_Click" "$D/out.log"
+check "generated name never leaks without --show-expansion" $?
+( cd "$D" && "$BIN" usages fixppm.hbp Click --show-expansion > exp.log 2>&1 )
+grep -q "handler definition Click -> ON_CLICK" "$D/exp.log"
+check "--show-expansion reveals the pasted function" $?
+( cd "$D" && "$BIN" usages fixppm.hbp Salva > sal.log 2>&1 )
+grep -q "e1.prg:5: registro definition Salva" "$D/sal.log" && \
+   grep -q "e2.prg:8:12: name through pp rule (#xcommand DISPARA" "$D/sal.log"
+check "definition and derived cross-module use site, exact positions" $?
+( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Click Novo > ren.log 2>&1 )
+RC=$?
+check "prefix-paste marker rename exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "predicted: ON_CLICK -> ON_NOVO" "$D/ren.log"
+check "ON_CLICK -> ON_NOVO predicted from the trace (G2)" $?
+grep -q "verified: 1 edit(s); derived artifacts renamed as predicted" "$D/ren.log"
+check "verification computed from the trace" $?
+( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after rename" $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Novo Click > /dev/null 2>&1 )
+cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
+check "A->B->A round-trip byte-exact"  $?
+
+echo "case 51: B4d G3 - pure stringify: the derived string is a predicted fact"
+D=$(freshppm case51)
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Pronto Feito > ren.log 2>&1 )
+RC=$?
+check "stringify-only marker rename exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q 'predicted string: "Pronto" -> "Feito"' "$D/ren.log"
+check "derived string change predicted, not warned" $?
+( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > saida.txt 2>/dev/null )
+grep -q '\[Feito\]' "$D/saida.txt" && ! grep -q '\[Pronto\]' "$D/saida.txt"
+check "runtime string regenerated from the edited identifier" $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Feito Pronto > /dev/null 2>&1 )
+cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
+check "A->B->A round-trip byte-exact"  $?
+
+echo "case 52: B4d G4 - clone+paste+stringify in ONE rule; derived call crosses modules"
+D=$(freshppm case52)
+( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Salva Grava > ren.log 2>&1 )
+RC=$?
+check "multi-derivation marker rename exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "e1.prg:5:10" "$D/ren.log" && grep -q "e2.prg:8:12" "$D/ren.log"
+check "definition and derived call site edited, both modules" $?
+grep -q "predicted: REG_SALVA -> REG_GRAVA" "$D/ren.log" && \
+   grep -q 'predicted string: "Salva" -> "Grava"' "$D/ren.log"
+check "pasted symbol and stringified string both predicted" $?
+( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+sed 's/Salva/Grava/g' "$D/saida_antes.txt" | cmp -s - "$D/saida_depois.txt"
+check "output changed exactly as the prediction says" $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Grava Salva > /dev/null 2>&1 )
+cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
+check "A->B->A round-trip byte-exact"  $?
+
+echo "case 53: B4d G5 - co-derivation: neighbour intact; collisions refused by name"
+D=$(freshppm case53)
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Motor Trem > ren.log 2>&1 )
+RC=$?
+check "renaming one of two co-derived names exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "predicted: MOTOR_RODA -> TREM_RODA" "$D/ren.log"
+check "pasted artifact predicted with the neighbour (Roda) intact" $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Trem Motor > /dev/null 2>&1 )
+cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg"
+check "A->B->A round-trip byte-exact"  $?
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Motor Freio > col.log 2>&1 )
+RC=$?
+check "predicted symbol colliding with existing function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "FREIO_RODA" "$D/col.log" && grep -q "já existe como função" "$D/col.log"
+check "refusal NAMES the predicted artifact (G5)" $?
+printf '\nFUNCTION Chama()\n   RETURN on_Click()\n' >> "$D/e1.prg"
+cp "$D/e1.prg" "$D/e1.saved"
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Click Novo > orf.log 2>&1 )
+RC=$?
+check "source spelling a generated name gates the rename" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "soletra o nome gerado 'on_Click'" "$D/orf.log"
+check "refusal points at the spelled generated name" $?
+cmp -s "$D/e1.prg" "$D/e1.saved" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
+check "sources untouched by all refusals" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

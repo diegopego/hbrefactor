@@ -1,10 +1,12 @@
-# Schema `ast-2` — o dump AST do compilador (spec)
+# Schema `ast-3` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
-arquivos `src/compiler/compast.c` + rastreamento de regras em
-`src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-2` (fase B4) = `ast-1` (commit `2cca58e4b8`) + seções
-`ppRules`/`ppApplications`; todo o resto é idêntico byte a byte.
+arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
+em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
+com `-x`. O `ast-3` (fase B4d) = `ast-2` (fase B4) + o campo `from` (rastro
+de derivação) nos tokens SINTETIZADOS; o `ast-2` = `ast-1`
+(commit `2cca58e4b8`) + seções `ppRules`/`ppApplications`. Todo o resto é
+idêntico byte a byte entre as versões.
 
 **Como gerar** (a ferramenta faz isso via `AstDumps()`):
 ```
@@ -16,14 +18,15 @@ hbmk2 <alvos-do-projeto> -hbcmp -rebuild -q '-prgflag=-x<dir>/'
 
 **ARMADILHA de relink (custou um diagnóstico)**: o hbmk2 compila .prg com
 o compilador EMBUTIDO (linka `libhbcplr`/`libhbpp`) — um hbmk2 velho emite
-dumps do schema ANTIGO mesmo com o `bin/.../harbour` novo (visto: ast-1
-sem `ppRules` via hbmk2, ast-2 pelo harbour direto). Conferência:
+dumps do schema ANTIGO mesmo com o `bin/.../harbour` novo (visto na B4:
+ast-1 sem `ppRules` via hbmk2, ast-2 pelo harbour direto; vale igual para
+ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 `strings $HB_BIN/hbmk2 | grep ast-`; cura: `rm $HB_BIN/hbmk2 && make`.
 
 ## Topo
 
 ```jsonc
-{ "schema": "ast-1",
+{ "schema": "ast-3",           // versão emitida hoje (ast-1→ast-2→ast-3)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -68,12 +71,60 @@ Garantias e limites (provados na fixture de tortura e no lexdiff):
   escape (`e"..."`) não confere byte a byte — valide e recuse (padrão
   `StrDelimsOk`/`TokStartCol`/`TokEndCol` no fonte da ferramenta).
 - Nome consumido pela regra SEM marker (ex.: `METHOD Paint() CLASS UWMenu`
-  colado em `UWMENU_PAINT`) NÃO aparece com posição — é a lacuna que a fase
-  B4 (`ppApplications`) cobre.
+  colado em `UWMENU_PAINT`) não nasce com coluna própria — mas o token
+  sintetizado carrega o campo `from` (ast-3, abaixo) apontando de QUAL
+  marker cada faixa de bytes deriva. É a proveniência da COLAGEM e do
+  STRINGIFY, não só do clone; fecha a lacuna que a B4 (`ppApplications`)
+  só cobria pela posição do span casado.
 - Tokens EOL não são emitidos. Linhas de diretiva (#...) não chegam ao
   parser (o pp as consome) — sem tokens.
 - Tokens de `#include` aparecem com prov 'i' e line do ARQUIVO INCLUÍDO
   (col null) — filtrar por prov ao mapear para o módulo.
+
+### Campo `from` — rastro de derivação do token sintetizado (ast-3)
+
+Todo token que o pp SINTETIZA a partir de uma regra (colagem de keywords,
+recheio de marker clonado, string de stringify) carrega `from`: um array
+com um item por FAIXA DE BYTES derivada dentro do `text` deste token.
+Registrado em `ppcore.c` no instante da síntese (mesmo padrão da posTbl da
+B0: lógica no pp, ganchos de 1 linha gated por `fTrackPos`, tabela por
+módulo limpa em `hb_pp_reset`, accessors em `hbpp.h`, emissão em
+`compast.c`). Genérico por construção: vale para hbclass.ch e para qualquer
+diretiva já existente ou inventada.
+
+```jsonc
+{ "line": 0, "col": null, "len": 12, "type": 21, "prov": "n",
+  "text": "UWMenu_Paint",
+  "from": [ { "app": 12, "marker": 2, "op": "paste", "at": 0, "len": 6 },
+            { "app": 12, "marker": 1, "op": "paste", "at": 7, "len": 5 } ] }
+```
+
+- `app`: índice em `ppApplications[]` da aplicação de onde a faixa deriva
+  (0-based, MESMA indexação que `ppApplications[].rule` usa contra
+  `ppRules`). O `from` só referencia aplicações ANTERIORES (multi-passe:
+  proveniência sempre para trás).
+- `marker`: número do match marker (1-based) daquela aplicação de onde a
+  faixa veio — o marker carrega a EXPRESSÃO inteira; `at`/`len` recortam só
+  o nome.
+- `op`: a operação de síntese —
+  - `"clone"`: recheio de marker copiado no resultado (preserva posição);
+  - `"paste"`: concatenação de keywords do resultado
+    (`<Class>_<Method>` => `UWMENU_PAINT`);
+  - `"stringify"`: marker despejado numa string (`<"Method">` => `"Paint"`).
+- `at`/`len`: offset e comprimento EM BYTES da faixa dentro do `text` DESTE
+  token. O separador LITERAL entre partes coladas (o `_` de `UWMENU_PAINT`,
+  o `on_` de `on_Click`) é texto da própria regra e NÃO tem item `from`.
+  Uma string de stringify puro tem um único item `op: "stringify"` com
+  `at: 0`.
+
+Exemplos provados (fixtures fixmth/fixppm):
+- hbclass: `UWMenu_Paint` (função gerada, type 21, prov 'n') traz
+  `from = [ {paste, marker de UWMenu, at 0 len 6}, {paste, marker de Paint,
+  at 7 len 5} ]`; a string `"Paint"` do registro traz
+  `from = [ {stringify, marker de Paint, at 0 len 5} ]`.
+- DSL de prefixo (`#xcommand HANDLER <n> => FUNCTION on_<n>`): `on_Click`
+  traz `from = [ {paste, marker de Click, at 3 len 5} ]` — só a faixa do
+  nome; `on_` é literal da regra, sem `from`.
 
 ## `ppRules[]` + `ppApplications[]` — as regras de pp e cada aplicação (ast-2)
 
@@ -118,6 +169,12 @@ Garantias e limites (provados no smoke test da B4):
   token vindo de expansão anterior (multi-passe) vem com `col null` e
   linha/prov apontando a ORIGEM (ex.: valor de `#define` aponta a linha
   do `.ch`, `prov 'i'`).
+- Os tokens CONSUMIDOS aqui também podem trazer `from` (ast-3, mesmo
+  formato de `tokens[]`): quando o token consumido é RESULTADO de uma
+  expansão anterior (multi-passe), a proveniência é copiada no INSTANTE da
+  aplicação — o token morre com a substituição, então a cópia tem que ser
+  feita ali. É o que dá o fecho de derivação transitivo (clone-de-composto)
+  sem depender do token ainda estar vivo depois.
 - `#[x]translate` opera SUBSTITUINDO no meio da statement (aplicações em
   qualquer posição); `#[x]command` só casa statement inteira e **o uso
   tem que estar numa linha só** (continuação exige `;`) — famílias
@@ -252,23 +309,40 @@ Semânticas importantes:
 - **M-> é memvar**: token do nome após `->` (type 59) cujo token anterior
   ao alias é `M` = uso da própria memvar (editável); qualquer outro
   `alias->` e `:msg` (type 58) ficam de fora (`MvLineHits`).
-- **Fatos de classe SEM palavra-chave (B4c)**: o compilador é cego a
-  classes (construto de runtime), mas COMPILOU o código expandido do
-  hbclass.ch - a função de REGISTRO da classe empurra o nome da classe e
-  de todos os membros como STRINGs na árvore de statements. Âncoras por
-  forma: função de classe = empurra STRING igual ao próprio nome
-  (`ClassRegs`); membros = STRINGs dos statements dela (`StmtStrings`,
-  walk genérico); site de declaração = marker posicionado de
-  `ppApplications` dentro do span da função de classe (`DeclHits`);
-  implementação = `MethodLift`. Send site editável = token type 21 cujo
-  anterior é type 58 (`SendLineHits`). Atribuição a membro vira send
-  `_NOME` - é o detector de VAR/DATA (rename-method recusa).
-- **Verificação quando o pcode muda de verdade** (rename-method): o
-  módulo da classe embute os nomes de mensagem em strings de registro -
-  não há byte-idêntico; `HrbSymbolsRenamed` confere símbolos/funções
-  módulo um MAPA de renomes esperados ({MSG→NOVA, CLS_MSG→CLS_NOVA}) e
-  os demais módulos seguem `HrbEquivalent` byte-idênticos; execução
-  idêntica fecha o contrato na suíte.
+- **Modelo de NOME DE MARKER (B4d) — substitui as âncoras por forma da B4c**:
+  nome de marker = o valor que o programador escreve e que preenche um match
+  marker (`<x>`) de uma diretiva de pp, atravessando-a. Sobre o `from` (ast-3):
+  - **Sementes** (`PpMarkerSeeds`): pares `(aplicação, marker)` alimentados
+    pelo nome escrito; fecho transitivo numa passada (o `from` só referencia
+    aplicações anteriores, então uma varredura para trás basta).
+  - **Artefatos** (`PpMarkerArtifacts`/`PpMarkerRanges`): tokens cujo `from`
+    alcança as sementes; a FAIXA (`at`/`len`) soletra o nome — recorte
+    byte-exato, porque o marker carrega a expressão inteira e a faixa
+    devolve só o nome. Resolução recursiva por clone-de-composto no
+    multi-passe (usa o `from` copiado nos tokens consumidos de
+    `ppApplications`).
+  - **Donos** (`PpMarkerOwners`) por CO-DERIVAÇÃO: no hbclass são as classes;
+    genérico = o OUTRO nome da co-derivação — `paste` que nomeia uma função
+    torna esse outro nome dono; `stringify` contido numa função gerada por
+    expansão torna o nome dela dono.
+  - Send site editável = token type 21 cujo anterior é type 58
+    (`SendLineHits`, inalterado). Atribuição a membro vira send `_NOME` —
+    detector de VAR/DATA (rename recusa).
+  - As âncoras por FORMA da B4c (`ClassRegs`/`StmtStrings`/`DeclHits`/
+    `MethodLift`) foram REMOVIDAS do código: não há mais colagem `_`
+    tentada nem comparação de STRING == nome de função.
+- **Verificação quando o pcode muda de verdade** (rename-pp-marker/
+  rename-method): o módulo da classe embute os nomes de mensagem em strings
+  de registro — não há byte-idêntico. O mapa de símbolos/strings esperado
+  é COMPUTADO do rastro (`PredictText`: substitui as faixas do nome de marker
+  pelo nome novo em cada artefato), não mais declarado à mão. A saída do
+  rename mostra `predicted: SIMBOLO -> NOVO` e `predicted string: ...`;
+  `HrbSymbolsRenamed` confere cada símbolo/string prevista no dump
+  pós-edição, os demais módulos seguem `HrbEquivalent` byte-idênticos e a
+  execução idêntica fecha o contrato na suíte. Recusa por co-derivação
+  (G5): símbolo previsto que já existe como função → recusa NOMEANDO o
+  artefato; fonte que soletra manualmente um nome gerado que mudaria →
+  recusa apontando o site órfão.
 - **Pureza p/ duplicar expressão** (`ExprPure()`): allowlist sobre os `et`
   da árvore — folhas NIL/NUMERIC/DATE/TIMESTAMP/STRING/LOGICAL/VARIABLE e
   combinadores IIF/LIST/OR/AND/NOT/EQUAL/EQ/NE/IN/LT/GT/LE/GE/PLUS/MINUS/
@@ -295,21 +369,27 @@ Semânticas importantes:
   `.ppo` e `.hrb -gh -l` de TODOS os módulos byte-idênticos, senão
   rollback. O `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de
   `-o`/cwd) — preservar um `.ppo` pré-existente do usuário.
-- **Lifting método/classe** (`MethodLift`): função gerada por DSL casa com
-  a aplicação NA MESMA LINHA cujos recheios de marker (identificadores
-  posicionados) concatenam `A_B == nome da função` — devolve classe,
-  método e a posição REAL do nome no fonte. Vale para qualquer DSL que
-  cole `<A>_<B>` (hbclass.ch é o caso canônico); preferir o par cujo
-  token está na linha da função (a aplicação DECLARED repete o nome com a
-  posição da declaração). A convenção textual de sufixo da era smoke test
-  morreu junto com `DefineCollision`/`PpHeadIn` (hoje `RuleHeadCollision`
-  sobre `ppRules`, com abreviação dBase incluída).
+- **Lifting generalizado** (`PpMarkerLift` + `SeedRootRule`, substitui
+  `MethodLift`): `usages <nome>` responde no VOCABULÁRIO DO FONTE usando a
+  CABEÇA DA REGRA RAIZ que consumiu o nome — `method definition` no
+  hbclass, `handler definition` numa DSL de handlers, `registro
+  definition` etc. — sem nenhuma tabela por família. O nome GERADO
+  (`UWMENU_PAINT`, `ON_CLICK`...) só aparece com `--show-expansion`. Vale
+  para qualquer diretiva existente ou inventada; não há mais colagem
+  `<A>_<B>` tentada. (`RuleHeadCollision` sobre `ppRules`, com abreviação
+  dBase incluída, segue cobrindo a colisão de cabeça de regra.)
 
 ## Evolução
 
 O schema é livre para evoluir (liberação de 2026-07-05: sem compromisso de
 compatibilidade com a era occ). `ppRules` + `ppApplications` entregues no
-ast-2 (fase B4, consumidos por usages/rename-dsl/lifting). Próximo a
-avaliar: `sends` de `__clsAddMsg` (rename-method, backlog); span original
-de string no posTrack (mataria `StrDelimsOk`). Ao mudar, versionar
-`"schema"` e atualizar este documento NO MESMO commit.
+ast-2 (fase B4, consumidos por usages/rename-dsl/lifting). O campo `from`
+(rastro de derivação nos tokens sintetizados) entregue no **ast-3**
+(fase B4d, 2026-07-06), consumido pelo modelo de nome de marker — usages
+(lifting generalizado), rename-pp-marker e rename-method (açúcar). O schema
+versionou de ast-2 para ast-3. O leitor da ferramenta (`ReadAst`) aceita
+`ast-2` OU `ast-3`; comandos que EXIGEM o rastro (rename-method /
+rename-pp-marker) recusam dump antigo pedindo recompilar `harbour` E `hbmk2`
+do branch (`FromReady` = schema == `ast-3`). Próximo a avaliar: span
+original de string no posTrack (mataria `StrDelimsOk`). Ao mudar,
+versionar `"schema"` e atualizar este documento NO MESMO commit.

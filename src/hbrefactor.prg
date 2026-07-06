@@ -48,7 +48,11 @@ PROCEDURE Main()
       nExit := RenameDsl( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-memvar"
       nExit := RenameMemvar( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-method"
+   CASE Len( aArgs ) >= 1 .AND. ( Lower( aArgs[ 1 ] ) == "rename-method" .OR. ;
+                                  Lower( aArgs[ 1 ] ) == "rename-pp-marker" )
+      // mesmo motor (B4d): rename-method é o açúcar com política de
+      // mensagem; rename-pp-marker renomeia qualquer nome que preencha um
+      // match marker de diretiva de pp (e os artefatos que ele deriva)
       nExit := RenameMethod( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
@@ -78,6 +82,7 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-method <projeto> <Classe:Método> <novo> [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor rename-pp-marker <projeto> <nome> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor unused-locals <projeto>" + hb_eol() )
    OutStd( "  hbrefactor call-graph <projeto> [<função>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <projeto>" + hb_eol() )
@@ -214,10 +219,11 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    LOCAL cPath := hb_DirSepAdd( cTmp ) + hb_FNameName( cModPath ) + ".ast.json"
    LOCAL hAst := hb_jsonDecode( hb_MemoRead( cPath ) )
 
-   // ast-2 = ast-1 + ppRules/ppApplications (fase B4); o leitor usa só
-   // seções presentes em ambos, comandos de DSL exigem ast-2 onde preciso
+   // ast-3 = ast-2 + rastro de derivação ("from" nos tokens sintetizados,
+   // fase B4d); o leitor usa só seções presentes em ambos - comandos que
+   // exigem o rastro recusam o dump antigo com mensagem clara (FromReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-1", "ast-2" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -322,15 +328,15 @@ STATIC FUNCTION Usages( aArgs )
             LocAdd( aLoc, cPath, hFunc[ "line" ], TokenCols( hAst, hFunc[ "line" ], cName ), Len( cName ) )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
-         ELSEIF ( aLift := MethodLift( hAst, hFunc ) ) != NIL .AND. Upper( aLift[ 2 ] ) == cUp
-            // lifting B4: o programador escreveu METHOD Paint() CLASS UWMenu;
-            // a função gerada (UWMENU_PAINT) é detalhe da expansão - a
-            // resposta vem no vocabulário do fonte, com a posição real do
-            // nome do método vinda de ppApplications
+         ELSEIF FromReady( hAst ) .AND. ( aLift := PpMarkerLift( hAst, hFunc, cUp ) ) != NIL
+            // lifting B4d: o programador escreveu METHOD Paint() CLASS
+            // UWMenu (ou HANDLER Click de qualquer DSL); a função gerada é
+            // detalhe da expansão - a resposta vem no vocabulário do fonte
+            // (a cabeça da regra raiz), com a posição real do nome escrito
             nHits++
             LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( cName ) )
-            OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": method definition " + ;
-               aLift[ 2 ] + " (class " + aLift[ 1 ] + ")" + ;
+            OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
+               aLift[ 1 ] + iif( Empty( aLift[ 2 ] ), "", " (class " + aLift[ 2 ] + ")" ) + ;
                iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
                SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
          ENDIF
@@ -392,6 +398,12 @@ STATIC FUNCTION Usages( aArgs )
       // o nome pode ser palavra de DSL de pp (consumida antes do yylex e
       // portanto invisível em tokens[]): diretivas e aplicações (ast-2)
       nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ) )
+
+      // sites do NOME DE MARKER que atravessam diretivas (B4d): posições
+      // escritas que nenhum relator acima cobriu (decl. de método/handler...)
+      IF FromReady( hAst )
+         nHits += PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, Len( cName ), lShowExp )
+      ENDIF
    NEXT
 
    // memvar: mapa de visibilidade DINÂMICA (criadores, alcance, sombras,
@@ -705,14 +717,18 @@ STATIC FUNCTION ApplyTokenEdits( cText, aEdits, cOld, cNew, nLineBad )
    RETURN cText
 
 // compila cada módulo p/ .hrb portável (-gh -l: sem números de linha, nomes
-// de locais fora) com os flags que o hbmk2 resolveu p/ o projeto
-STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag )
+// de locais fora) com os flags que o hbmk2 resolveu p/ o projeto; com lAst
+// também regrava os .ast.json em cTmp (verificação de artefatos previstos)
+STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag, lAst )
 
    LOCAL cPath, cFlags := "", cTok, cOut, cErr
 
    FOR EACH cTok IN hProj[ "flags" ]
       cFlags += " " + cTok
    NEXT
+   IF hb_defaultValue( lAst, .F. )
+      cFlags += " -x" + hb_DirSepAdd( cTmp )
+   ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       cOut := cErr := ""
       IF hb_processRun( HarbourBin() + " " + cPath + " -q -gh -l" + cFlags + ;
@@ -736,7 +752,7 @@ STATIC FUNCTION HarbourBin()
 // da B4; a convenção textual <CLASSE>_<METODO> da era smoke test morreu)
 STATIC FUNCTION PickFunc( hAst, cFunc )
 
-   LOCAL hFunc, hHit := NIL, nHits := 0, aLift, nAt
+   LOCAL hFunc, hHit := NIL, nHits := 0, nAt
    LOCAL cUp := Upper( cFunc ), cClass := "", cMethod
 
    FOR EACH hFunc IN hAst[ "functions" ]
@@ -752,15 +768,44 @@ STATIC FUNCTION PickFunc( hAst, cFunc )
    ENDIF
    FOR EACH hFunc IN hAst[ "functions" ]
       IF ! hFunc[ "fileDecl" ] .AND. ;
-         ( aLift := MethodLift( hAst, hFunc ) ) != NIL .AND. ;
-         Upper( aLift[ 2 ] ) == cMethod .AND. ;
-         ( Empty( cClass ) .OR. Upper( aLift[ 1 ] ) == cClass )
+         MethodImplOf( hAst, hFunc, cClass, cMethod ) != NIL
          nHits++
          hHit := hFunc
       ENDIF
    NEXT
 
    RETURN iif( nHits == 1, hHit, NIL )
+
+// a função IMPLEMENTA Classe:Metodo? Fato do rastro (B4d): o token do nome
+// da função é um artefato composto cujas faixas de "from" soletram o método
+// (e a classe, quando dada). Devolve { cClasse, cMetodo, aFrom } ou NIL -
+// os textos na grafia REAL do composto (a colagem preserva caixa)
+STATIC FUNCTION MethodImplOf( hAst, hFunc, cUpClass, cUpMethod )
+
+   LOCAL hTok, hFrom, cPart, cM, cC, aFromM
+   LOCAL cUpName := Upper( hFunc[ "name" ] )
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+         Upper( hTok[ "text" ] ) == cUpName .AND. ! ( cUpName == cUpMethod )
+         cM := cC := ""
+         aFromM := NIL
+         FOR EACH hFrom IN hTok[ "from" ]
+            cPart := SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] )
+            IF Upper( cPart ) == cUpMethod .AND. Empty( cM )
+               cM := cPart
+               aFromM := hFrom
+            ELSEIF Empty( cC )
+               cC := cPart
+            ENDIF
+         NEXT
+         IF ! Empty( cM ) .AND. ( Empty( cUpClass ) .OR. Upper( cC ) == cUpClass )
+            RETURN { cC, cM, aFromM }
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN NIL
 
 STATIC FUNCTION ProjectMember( hProj, cFile )
 
@@ -3172,50 +3217,6 @@ STATIC FUNCTION RuleWhere( hRule )
    RETURN iif( hRule[ "file" ] == NIL, "builtin", ;
                hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) )
 
-// lifting: função gerada por DSL -> o comando que o programador escreveu.
-// Procura uma aplicação de regra NA LINHA da função cujo recheio de markers
-// contenha dois identificadores posicionados A e B com A_B == nome da função
-// (ex.: METHOD Paint() CLASS UWMenu -> UWMENU_PAINT). Devolve
-// { classe, método, linha, coluna 1-based do método } ou NIL.
-STATIC FUNCTION MethodLift( hAst, hFunc )
-
-   LOCAL hApp, hTok, aIds, nI, nJ, aHit := NIL
-   LOCAL cUpName := Upper( hFunc[ "name" ] )
-
-   IF ! hb_HHasKey( hAst, "ppApplications" )
-      RETURN NIL
-   ENDIF
-   FOR EACH hApp IN hAst[ "ppApplications" ]
-      IF hApp[ "line" ] != hFunc[ "line" ]
-         LOOP
-      ENDIF
-      aIds := {}
-      FOR EACH hTok IN hApp[ "tokens" ]
-         IF hTok[ "marker" ] > 0 .AND. hTok[ "type" ] == 21 .AND. ;
-            hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL
-            AAdd( aIds, hTok )
-         ENDIF
-      NEXT
-      FOR nI := 1 TO Len( aIds )
-         FOR nJ := 1 TO Len( aIds )
-            IF nI != nJ .AND. ;
-               Upper( aIds[ nI ][ "text" ] ) + "_" + Upper( aIds[ nJ ][ "text" ] ) == cUpName
-               // preferir o par no site da própria função (a aplicação
-               // DECLARED repete o nome com a posição da DECLARAÇÃO)
-               IF aIds[ nJ ][ "line" ] == hFunc[ "line" ]
-                  RETURN { aIds[ nI ][ "text" ], aIds[ nJ ][ "text" ], ;
-                           aIds[ nJ ][ "line" ], aIds[ nJ ][ "col" ] + 1 }
-               ELSEIF aHit == NIL
-                  aHit := { aIds[ nI ][ "text" ], aIds[ nJ ][ "text" ], ;
-                            aIds[ nJ ][ "line" ], aIds[ nJ ][ "col" ] + 1 }
-               ENDIF
-            ENDIF
-         NEXT
-      NEXT
-   NEXT
-
-   RETURN aHit
-
 // ---------------------------------------------------------------------------
 // palavras de DSL no usages - definição (diretiva) e aplicações da palavra.
 // Genérico por construção: opera só sobre os fatos ppRules/ppApplications
@@ -4240,92 +4241,339 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
    RETURN aHits
 
 // ---------------------------------------------------------------------------
-// fase B4c - rename-method. Declaração e implementação viraram fatos com
-// posição na B4 (markers de ppApplications; MethodLift). O problema duro é
-// o SEND: despacho dinâmico ('o:Paint()' não declara a classe de o) - a
-// política exige UNICIDADE da mensagem no projeto antes de editar sends.
-//
-// ZERO vocabulário de hbclass na ferramenta (revisão do Diego, 2026-07-06):
-// os fatos de classe vêm do código EXPANDIDO que o compilador compilou -
-// a função de REGISTRO da classe (a que o hbclass.ch gera com o nome da
-// classe) empurra os nomes de TODOS os membros como STRINGs na árvore de
-// statements (HBClass():New( "UWMenu", ...), :AddMethod( "Soma", ... ),
-// :AddInline, :AddMultiData...). Âncoras por FORMA, não por palavra:
-//   função de classe  = função que empurra uma STRING igual ao próprio nome
-//   membros da classe = as STRINGs empurradas pela função de classe
-//   site de declaração = marker posicionado (ppApplications) com o nome do
-//                        membro DENTRO do span da função de classe
-//   implementação      = MethodLift (colagem <CLASSE>_<MEMBRO>)
-// Strings geradas pelo stringify da declaração são INSTÁVEIS em posição
-// (com parâmetro nascem line 0) - nunca são sites: a edição do
-// identificador as regenera.
+// fase B4d - refatoração do NOME DE MATCH MARKER de diretiva de pp, sobre o
+// rastro de derivação (schema ast-3). O pp registra, no instante da
+// expansão, de QUAL marker de QUAL aplicação cada token sintetizado deriva
+// ("from": clone/paste/stringify + faixa de bytes [at, at+len) dentro do
+// token composto). Nome de marker = o valor que o programador escreve e que
+// preenche um match marker (<x>) de uma diretiva; artefatos = fecho dos
+// tokens cujo "from" alcança esse nome (transitivo: multi-passe resolve
+// pelos "from" copiados nos tokens consumidos de ppApplications). As âncoras
+// por FORMA da B4c (MethodLift/ClassRegs/StmtStrings/DeclHits) morreram aqui:
+// nenhuma colagem "_" tentada, nenhuma comparação de string com nome de
+// função - só fatos gravados pelo pp no instante da síntese. Genérico por
+// construção: vale para hbclass.ch, para as cinco famílias e para qualquer
+// diretiva que venha a ser criada no mesmo funil.
 // ---------------------------------------------------------------------------
 
-// funções de registro de classe do módulo: { NOME_UPPER => hFunc }
-STATIC FUNCTION ClassRegs( hAst )
+STATIC FUNCTION FromReady( hAst )
+   RETURN hb_HGetDef( hAst, "schema", "" ) == "ast-3"
 
-   LOCAL hRegs := { => }, hFunc
+STATIC FUNCTION PairKey( nApp, nMarker )
+   RETURN hb_ntos( nApp ) + "|" + hb_ntos( nMarker )
 
-   FOR EACH hFunc IN hAst[ "functions" ]
-      IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "line" ] > 0 .AND. ;
-         hb_HHasKey( StmtStrings( hFunc ), Upper( hFunc[ "name" ] ) )
-         hRegs[ Upper( hFunc[ "name" ] ) ] := hFunc
-      ENDIF
-   NEXT
+// a faixa [at, at+len) de um item de "from" soletra o nome? A precisão vem
+// daqui: o fecho por (aplicação, marker) é grosso - um marker carrega a
+// expressão inteira - e o recorte byte-exato devolve só o nome
+STATIC FUNCTION FromSpells( hTok, hFrom, cUp )
+   RETURN Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) ) == cUp
 
-   RETURN hRegs
+// sementes do nome de marker num módulo: pares (aplicação, marker) alimentados
+// pelo nome escrito - transitivo numa única passada, porque "from" só
+// referencia aplicações ANTERIORES - e os sites escritos {linha, col 1-based}
+STATIC FUNCTION PpMarkerSeeds( hAst, cUp )
 
-// STRINGs empurradas pela função (walk genérico da árvore de statements) -
-// para a função de registro de classe, é o conjunto de nomes de membros
-STATIC FUNCTION StmtStrings( hFunc )
-
-   LOCAL hSet := { => }, hStmt
-
-   FOR EACH hStmt IN hFunc[ "statements" ]
-      StmtStringsWalk( hStmt[ "expr" ], hSet )
-   NEXT
-
-   RETURN hSet
-
-STATIC PROCEDURE StmtStringsWalk( xNode, hSet )
-
-   LOCAL xVal
-
-   DO CASE
-   CASE HB_ISHASH( xNode )
-      IF hb_HGetDef( xNode, "et", "" ) == "STRING" .AND. ;
-         HB_ISSTRING( hb_HGetDef( xNode, "val", NIL ) )
-         hSet[ Upper( xNode[ "val" ] ) ] := .T.
-      ENDIF
-      FOR EACH xVal IN hb_HValues( xNode )
-         StmtStringsWalk( xVal, hSet )
-      NEXT
-   CASE HB_ISARRAY( xNode )
-      FOR EACH xVal IN xNode
-         StmtStringsWalk( xVal, hSet )
-      NEXT
-   ENDCASE
-
-   RETURN
-
-// sites de DECLARAÇÃO do membro: markers posicionados de aplicações de pp
-// dentro do span da função de classe (é onde o bloco CREATE..ENDCLASS vive)
-STATIC FUNCTION DeclHits( hAst, hClassFunc, cUp )
-
-   LOCAL aHits := {}, hApp, hTok
+   LOCAL hPairs := { => }, aSites := {}, hApp, hTok, nApp
 
    FOR EACH hApp IN hAst[ "ppApplications" ]
+      nApp := hApp:__enumIndex() - 1
       FOR EACH hTok IN hApp[ "tokens" ]
-         IF hTok[ "marker" ] > 0 .AND. hTok[ "type" ] == 21 .AND. ;
-            hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
-            Upper( hTok[ "text" ] ) == cUp .AND. ;
-            InFuncSpan( hAst, hClassFunc, hTok[ "line" ] )
-            AddHit( aHits, hTok )
+         IF hTok[ "marker" ] == 0
+            LOOP
+         ENDIF
+         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+            hTok[ "col" ] != NIL .AND. Upper( hTok[ "text" ] ) == cUp
+            AddHit( aSites, hTok )
+            hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
+         ELSEIF hb_HHasKey( hTok, "from" ) .AND. ;
+            ! Empty( PpMarkerRanges( hAst, hTok, hPairs, cUp ) )
+            hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
          ENDIF
       NEXT
    NEXT
 
-   RETURN aHits
+   RETURN { "pairs" => hPairs, "sites" => aSites }
+
+// faixas de bytes de um token que derivam do nome de marker. O caso direto é a
+// faixa de "from" soletrar o nome; um CLONE de token composto (multi-passe:
+// a colagem re-consumida por outra regra) soletra o composto inteiro - aí a
+// resolução desce um nível pelo apptoken consumido, cujas faixas valem aqui
+// com o mesmo offset (textos idênticos por construção). Recursivo até o fato
+STATIC FUNCTION PpMarkerRanges( hAst, hTok, hPairs, cUp )
+
+   LOCAL aRanges := {}, hFrom, hApp, hTA, aR, cPart
+
+   IF ! hb_HHasKey( hTok, "from" )
+      RETURN aRanges
+   ENDIF
+   FOR EACH hFrom IN hTok[ "from" ]
+      IF ! hb_HHasKey( hPairs, PairKey( hFrom[ "app" ], hFrom[ "marker" ] ) )
+         LOOP
+      ENDIF
+      IF FromSpells( hTok, hFrom, cUp )
+         AAdd( aRanges, { hFrom[ "at" ], hFrom[ "len" ] } )
+      ELSE
+         cPart := SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] )
+         hApp  := hAst[ "ppApplications" ][ hFrom[ "app" ] + 1 ]
+         FOR EACH hTA IN hApp[ "tokens" ]
+            IF hTA[ "marker" ] == hFrom[ "marker" ] .AND. hTA[ "text" ] == cPart
+               FOR EACH aR IN PpMarkerRanges( hAst, hTA, hPairs, cUp )
+                  AAdd( aRanges, { hFrom[ "at" ] + aR[ 1 ], aR[ 2 ] } )
+               NEXT
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN aRanges
+
+// artefatos do nome de marker no stream do módulo: tokens com faixa derivada do
+// nome. Cada item: { índice 0-based no stream, o token, faixas do nome de marker
+// {at,len} (aMine), co-derivações (aOthers - itens de "from" de OUTROS
+// nomes no mesmo token composto, ex.: a CLASSE em CLASSE_METODO) }
+STATIC FUNCTION PpMarkerArtifacts( hAst, hPairs, cUp )
+
+   LOCAL aArts := {}, hTok, hFrom, aMine, aOthers
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hb_HHasKey( hTok, "from" )
+         aMine := PpMarkerRanges( hAst, hTok, hPairs, cUp )
+         IF ! Empty( aMine )
+            aOthers := {}
+            FOR EACH hFrom IN hTok[ "from" ]
+               IF ! hb_HHasKey( hPairs, PairKey( hFrom[ "app" ], hFrom[ "marker" ] ) )
+                  AAdd( aOthers, hFrom )
+               ENDIF
+            NEXT
+            AAdd( aArts, { hTok:__enumIndex() - 1, hTok, aMine, aOthers } )
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN aArts
+
+// texto previsto de um artefato após renomear o nome de marker: substitui cada
+// faixa {at,len} que soletra o nome velho (descendente por "at" para os
+// offsets não se moverem) - é daqui que sai o mapa de símbolos/strings
+// esperado da verificação (computado do rastro, não declarado à mão)
+STATIC FUNCTION PredictText( cText, aMine, cNew )
+
+   LOCAL aSorted := AClone( aMine ), aR
+
+   ASort( aSorted,,, {| x, y | x[ 1 ] > y[ 1 ] } )
+   FOR EACH aR IN aSorted
+      cText := hb_BLeft( cText, aR[ 1 ] ) + cNew + ;
+               hb_BSubStr( cText, aR[ 1 ] + aR[ 2 ] + 1 )
+   NEXT
+
+   RETURN cText
+
+// faixa de índices de token das statements de cada função: containment de
+// artefato pelo ÍNDICE no stream (strings de registro nascem com line 0 -
+// linha não serve; o índice não mente). birthTok tem folga de lookahead,
+// suficiente para "a string está dentro desta função"
+STATIC FUNCTION FuncStmtSpans( hAst )
+
+   LOCAL aSpans := {}, hFunc, hStmt, nMin, nMax
+
+   FOR EACH hFunc IN hAst[ "functions" ]
+      nMin := -1
+      nMax := -1
+      FOR EACH hStmt IN hFunc[ "statements" ]
+         nMin := iif( nMin < 0, SpanMin( hStmt[ "expr" ] ), ;
+                      Min( nMin, SpanMin( hStmt[ "expr" ] ) ) )
+         nMax := Max( nMax, SpanMax( hStmt[ "expr" ] ) )
+      NEXT
+      IF nMin >= 0
+         AAdd( aSpans, { hFunc, nMin, nMax } )
+      ENDIF
+   NEXT
+
+   RETURN aSpans
+
+// função que contém o token de índice nTok - o span MAIS APERTADO ganha
+// (o container fileDecl pode envolver o módulo inteiro)
+STATIC FUNCTION FuncOfTokIdx( aSpans, nTok )
+
+   LOCAL aSpan, aBest := NIL
+
+   FOR EACH aSpan IN aSpans
+      IF nTok >= aSpan[ 2 ] .AND. nTok <= aSpan[ 3 ] .AND. ;
+         ( aBest == NIL .OR. aSpan[ 3 ] - aSpan[ 2 ] < aBest[ 3 ] - aBest[ 2 ] )
+         aBest := aSpan
+      ENDIF
+   NEXT
+
+   RETURN iif( aBest == NIL, NIL, aBest[ 1 ] )
+
+// a própria função NASCEU de expansão? O token do nome dela carrega "from"
+// (clone posicionado na linha da função, ou colagem sem linha)
+STATIC FUNCTION FuncDerived( hAst, hFunc )
+
+   LOCAL hTok, cUp := Upper( hFunc[ "name" ] )
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+         Upper( hTok[ "text" ] ) == cUp .AND. ;
+         ( hTok[ "line" ] == hFunc[ "line" ] .OR. hTok[ "line" ] == 0 )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+STATIC FUNCTION FuncByName( hAst, cName )
+
+   LOCAL hFunc, cUp := Upper( cName )
+
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUp
+         RETURN hFunc
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+// donos do nome de marker num módulo (no hbclass: as classes; genérico: o outro
+// nome da co-derivação). Dois fatos, nenhum vocabulário de família:
+//   paste : artefato que NOMEIA função do módulo e co-deriva de outro nome
+//           -> o outro nome é dono (implementação separada CLASSE_METODO)
+//   string: artefato de stringify contido (por índice) numa função GERADA
+//           por expansão -> o nome dela é dono (INLINE/VAR: sem colagem)
+// Uma função cujo NOME co-deriva da próprio nome de marker nunca é dona dela
+// (a string de registro de uma DSL simples vive DENTRO da função gerada -
+// isso é o artefato, não uma dona). Clones não contam: um clone
+// posicionado é o próprio nome escrito.
+// Devolve { DONO_UPPER => { "via" =>, "impl" => hFunc|NIL } }
+STATIC FUNCTION PpMarkerOwners( hAst, aArts, aSpans, cUp )
+
+   LOCAL hOwners := { => }, aArt, hTok, hFrom, hFunc, cOwn
+
+   FOR EACH aArt IN aArts
+      hTok := aArt[ 2 ]
+      IF hTok[ "type" ] == 21 .AND. ! Empty( aArt[ 4 ] ) .AND. ;
+         ( hFunc := FuncByName( hAst, hTok[ "text" ] ) ) != NIL
+         FOR EACH hFrom IN aArt[ 4 ]
+            cOwn := Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) )
+            IF ! Empty( cOwn )
+               hOwners[ cOwn ] := { "via" => "paste", "impl" => hFunc }
+            ENDIF
+         NEXT
+      ELSEIF hTok[ "type" ] == 41
+         hFunc := FuncOfTokIdx( aSpans, aArt[ 1 ] )
+         IF hFunc != NIL .AND. ! hFunc[ "fileDecl" ] .AND. ;
+            FuncDerived( hAst, hFunc ) .AND. ;
+            MethodImplOf( hAst, hFunc, "", cUp ) == NIL
+            cOwn := Upper( hFunc[ "name" ] )
+            IF ! hb_HHasKey( hOwners, cOwn )
+               hOwners[ cOwn ] := { "via" => "string", "impl" => NIL }
+            ENDIF
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN hOwners
+
+// vocabulário do fonte para um site escrito: a regra da PRIMEIRA aplicação
+// que consumiu o token naquela posição (a raiz da cadeia) - "method" para
+// hbclass, "handler" para uma DSL de handlers, sem tabela nenhuma
+STATIC FUNCTION SeedRootRule( hAst, nLine, nCol0 )
+
+   LOCAL hApp, hTok
+
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "marker" ] > 0 .AND. hTok[ "col" ] != NIL .AND. ;
+            hTok[ "line" ] == nLine .AND. hTok[ "col" ] == nCol0
+            RETURN hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN NIL
+
+// lifting genérico de definição: a função cujo NOME é artefato composto da
+// nome de marker. Devolve { método (grafia real), classe/co-derivação (grafia
+// real, "" quando não há), linha, coluna 1-based do nome escrito, vocábulo }
+// - o vocábulo é a cabeça (minúscula) da regra RAIZ que consumiu o nome:
+// "method" no hbclass, "handler" numa DSL de handlers, sem tabela nenhuma
+STATIC FUNCTION PpMarkerLift( hAst, hFunc, cUp )
+
+   LOCAL aImpl := MethodImplOf( hAst, hFunc, "", cUp )
+   LOCAL hApp, hTok, aHit := NIL, hRule, cVocab
+
+   IF aImpl == NIL
+      RETURN NIL
+   ENDIF
+   // posição real do nome escrito: apptoken posicionado, preferindo o da
+   // linha da própria função (a aplicação DECLARED repete o nome com a
+   // posição da declaração)
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "marker" ] > 0 .AND. hTok[ "type" ] == 21 .AND. ;
+            hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+            Upper( hTok[ "text" ] ) == cUp
+            IF hTok[ "line" ] == hFunc[ "line" ]
+               aHit := { hTok[ "line" ], hTok[ "col" ] + 1 }
+            ELSEIF aHit == NIL
+               aHit := { hTok[ "line" ], hTok[ "col" ] + 1 }
+            ENDIF
+         ENDIF
+      NEXT
+      IF aHit != NIL .AND. aHit[ 1 ] == hFunc[ "line" ]
+         EXIT
+      ENDIF
+   NEXT
+   IF aHit == NIL
+      RETURN NIL
+   ENDIF
+   hRule  := SeedRootRule( hAst, aHit[ 1 ], aHit[ 2 ] - 1 )
+   cVocab := iif( hRule == NIL .OR. hRule[ "head" ] == NIL, "dsl", Lower( hRule[ "head" ] ) )
+
+   RETURN { aImpl[ 2 ], aImpl[ 1 ], aHit[ 1 ], aHit[ 2 ], cVocab }
+
+// sites escritos do nome de marker que atravessam diretivas e que nenhum relator
+// clássico cobriu (declaração de método, uso em DSL de pp...) - resposta no
+// vocabulário do fonte; nomes gerados só com --show-expansion
+STATIC FUNCTION PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, nLen, lShowExp )
+
+   LOCAL hEnt := PpMarkerSeeds( hAst, cUp ), aArts, aHit, aL, lSeen
+   LOCAL hRule, cWhat, cDeriv, aArt, nHits := 0
+
+   IF Empty( hEnt[ "sites" ] )
+      RETURN 0
+   ENDIF
+   aArts := PpMarkerArtifacts( hAst, hEnt[ "pairs" ], cUp )
+   FOR EACH aHit IN hEnt[ "sites" ]
+      lSeen := .F.
+      FOR EACH aL IN aLoc
+         IF aL[ 1 ] == cPath .AND. aL[ 2 ] == aHit[ 1 ] .AND. aL[ 3 ] == aHit[ 2 ] - 1
+            lSeen := .T.
+            EXIT
+         ENDIF
+      NEXT
+      IF lSeen
+         LOOP
+      ENDIF
+      nHits++
+      hRule := SeedRootRule( hAst, aHit[ 1 ], aHit[ 2 ] - 1 )
+      cWhat := "name through pp rule" + ;
+               iif( hRule == NIL, "", " (" + RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
+      cDeriv := ""
+      IF lShowExp
+         FOR EACH aArt IN aArts
+            cDeriv += iif( Empty( cDeriv ), " -> derives ", ", " ) + ;
+                      iif( aArt[ 2 ][ "type" ] == 41, '"' + aArt[ 2 ][ "text" ] + '"', ;
+                           aArt[ 2 ][ "text" ] )
+         NEXT
+      ENDIF
+      LocAdd( aLoc, cPath, aHit[ 1 ], { aHit[ 2 ] }, nLen )
+      OutStd( cModFile + ":" + hb_ntos( aHit[ 1 ] ) + ":" + hb_ntos( aHit[ 2 ] ) + ": " + ;
+              cWhat + cDeriv + SrcLine( aSrc, aHit[ 1 ] ) + hb_eol() )
+   NEXT
+
+   RETURN nHits
 
 // tokens do nome numa linha em contexto de SEND (token anterior type 58)
 STATIC FUNCTION SendLineHits( hAst, nLine, cUp )
@@ -4348,8 +4596,9 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL cSpec, cTarget, cNew, lForce := .F., lDryRun := .F., nI, nAt
    LOCAL cClass := "", cMethod, cUpOld, cUpNew, cUpClass
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
-   LOCAL hRegs, hMembers, aOwners := {}, aDeclSites := NIL, cClassPath := ""
-   LOCAL aLift, aWarn := {}, hEdits := { => }, aE, hDeclLines := { => }, nLine
+   LOCAL hFacts := { => }, hF, aOwners := {}, cClassPath := "", lMethod
+   LOCAL aWarn := {}, hEdits := { => }, aE, nLine, aSpans, hOwn, aArts
+   LOCAL hMap := { => }, hPredStr := { => }, aPS, cPred, cOwn, aArt, hTok
    LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
 
    IF Len( aArgs ) < 4
@@ -4397,9 +4646,9 @@ STATIC FUNCTION RenameMethod( aArgs )
       IF hAst == NIL
          RETURN Refuse( "dump ausente/inválido para '" + cPath + "'" )
       ENDIF
-      IF ! PpReady( hAst )
-         RETURN Refuse( "dump sem ppRules/ppApplications (schema ast-2) - " + ;
-                        "recompile o harbour do branch feature/compiler-ast-dump" )
+      IF ! FromReady( hAst )
+         RETURN Refuse( "dump sem rastro de derivação (schema ast-3) - " + ;
+                        "recompile harbour E hbmk2 do branch feature/compiler-ast-dump" )
       ENDIF
       hAsts[ cPath ] := hAst
       IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
@@ -4408,120 +4657,187 @@ STATIC FUNCTION RenameMethod( aArgs )
       ENDIF
    NEXT
 
-   // donos do nome: funções de registro de classe que empurram o nome como
-   // STRING (código expandido que o compilador compilou) e implementações
+   // fatos por módulo: sementes (sites escritos), artefatos derivados e
+   // donos por co-derivação - tudo do rastro, nada por forma
    FOR EACH cPath IN hProj[ "files" ]
-      hAst := hAsts[ cPath ]
-      hRegs := ClassRegs( hAst )
-      FOR EACH cWhy IN hb_HKeys( hRegs )                   // reuso: nome da classe
-         hFunc := hRegs[ cWhy ]
-         hMembers := StmtStrings( hFunc )
-         IF hb_HHasKey( hMembers, cUpOld )
-            lOurs := Empty( cUpClass ) .OR. cWhy == cUpClass
-            AAdd( aOwners, { cWhy, hb_FNameNameExt( cPath ), lOurs } )
-            IF lOurs
-               aDeclSites := DeclHits( hAst, hFunc, cUpOld )
-               cClassPath := cPath
-               cUpClass := cWhy                // resolve a forma sem classe
-            ENDIF
-         ENDIF
-         // nome novo já registrado por qualquer classe = mensagem viva
-         IF hb_HHasKey( hMembers, cUpNew )
-            RETURN Refuse( "'" + cNew + "' já é membro/mensagem registrada da classe " + cWhy + ;
-                           " (" + hb_FNameNameExt( cPath ) + ") - o rename fundiria mensagens" )
-         ENDIF
-      NEXT
-      // implementações: função que faz lifting p/ (outra classe, nome novo)
-      FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ] .AND. ( aLift := MethodLift( hAst, hFunc ) ) != NIL
-            IF Upper( aLift[ 2 ] ) == cUpNew
-               RETURN Refuse( "'" + cNew + "' já é método implementado da classe " + aLift[ 1 ] + ;
-                              " (" + hb_FNameNameExt( cPath ) + ") - sequestro reverso" )
-            ENDIF
-         ENDIF
-      NEXT
-   NEXT
-   cWhy := ""
-   IF aDeclSites == NIL
-      RETURN Refuse( "método '" + cMethod + "' não encontrado" + ;
-                     iif( Empty( cClass ), "", " na classe '" + cClass + "'" ) + " no projeto" )
-   ENDIF
-   IF Empty( aDeclSites )
-      RETURN Refuse( "declaração de '" + cMethod + "' sem posição no fonte (gerada por " + ;
-                     "expansão/include) - recuso" )
-   ENDIF
-
-   // unicidade da mensagem: sends não têm classe - só renomeamos quando o
-   // nome pertence a UMA classe do projeto
-   cWhy := ""
-   FOR EACH aE IN aOwners
-      IF ! aE[ 3 ]
-         cWhy += iif( Empty( cWhy ), "", "; " ) + aE[ 1 ] + " (" + aE[ 2 ] + ")"
+      hAst   := hAsts[ cPath ]
+      aSpans := FuncStmtSpans( hAst )
+      hF     := PpMarkerSeeds( hAst, cUpOld )
+      aArts  := PpMarkerArtifacts( hAst, hF[ "pairs" ], cUpOld )
+      hOwn   := PpMarkerOwners( hAst, aArts, aSpans, cUpOld )
+      hFacts[ cPath ] := { "sites" => hF[ "sites" ], "arts" => aArts, "own" => hOwn }
+      // o nome NOVO com vida derivada em qualquer classe = mensagem viva
+      hF    := PpMarkerSeeds( hAst, cUpNew )
+      aArts := PpMarkerArtifacts( hAst, hF[ "pairs" ], cUpNew )
+      hOwn  := PpMarkerOwners( hAst, aArts, aSpans, cUpNew )
+      IF ! Empty( hOwn )
+         cOwn := hb_HKeys( hOwn )[ 1 ]
+         RETURN Refuse( "'" + cNew + "' já é membro/mensagem registrada da classe " + cOwn + ;
+                        " (" + hb_FNameNameExt( cPath ) + ") - o rename fundiria mensagens" )
       ENDIF
    NEXT
-   IF ! Empty( cWhy )
-      RETURN Refuse( "'" + cMethod + "' também é membro de: " + cWhy + ;
-                     " - send é despacho dinâmico, rename ambíguo; recuso" )
-   ENDIF
-   // membro de DADOS (VAR/DATA): atribuição vira send '_NOME' que este
-   // comando não cobre - fora do escopo v1
+
+   // donos agregados; a forma sem classe resolve no primeiro dono
    FOR EACH cPath IN hProj[ "files" ]
-      FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
-         FOR EACH hItem IN hFunc[ "sends" ]
-            IF Upper( hItem[ "sym" ] ) == "_" + cUpOld
-               RETURN Refuse( "'" + cMethod + "' recebe atribuição (send _" + cUpOld + " em " + ;
-                              hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                              ") - é VAR/DATA, não método; fora do escopo do rename-method" )
-            ENDIF
-            IF Upper( hItem[ "sym" ] ) == cUpNew
-               RETURN Refuse( "'" + cNew + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
-                              ":" + hb_ntos( hItem[ "line" ] ) + " - o rename passaria a respondê-la" )
-            ENDIF
-         NEXT
+      hOwn := hFacts[ cPath ][ "own" ]
+      FOR EACH cOwn IN hb_HKeys( hOwn )
+         IF Empty( cUpClass )
+            cUpClass := cOwn                   // resolve a forma sem classe
+         ENDIF
+         lOurs := cOwn == cUpClass
+         AAdd( aOwners, { cOwn, hb_FNameNameExt( cPath ), lOurs } )
+         IF lOurs .AND. Empty( cClassPath )
+            cClassPath := cPath
+         ENDIF
       NEXT
    NEXT
-   IF ! NameAccepted( hProj, cUpClass + "_" + cNew, .T. )
-      RETURN Refuse( "o compilador do projeto rejeita '" + cUpClass + "_" + cNew + ;
-                     "' (nome da função gerada) - escolha outro nome" )
+   lMethod := ! Empty( aOwners )
+
+   IF ! lMethod
+      // nome de marker sem dona: ou não existe, ou é nome de marker de DSL pura
+      // (HANDLER, EVENTO...) - sem mensagem não há política de send
+      IF ! Empty( cUpClass )
+         RETURN Refuse( "método '" + cMethod + "' não encontrado na classe '" + cClass + "' no projeto" )
+      ENDIF
+      lOurs := .F.
+      FOR EACH cPath IN hProj[ "files" ]
+         lOurs := lOurs .OR. ! Empty( hFacts[ cPath ][ "sites" ] )
+      NEXT
+      IF ! lOurs
+         RETURN Refuse( "método '" + cMethod + "' não encontrado no projeto" )
+      ENDIF
+      // mensagem enviada sem dona identificável = não dá para prever o
+      // efeito do rename nos sends - recusa fato-based
+      FOR EACH cPath IN hProj[ "files" ]
+         FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
+            FOR EACH hItem IN hFunc[ "sends" ]
+               IF Upper( hItem[ "sym" ] ) == cUpOld
+                  RETURN Refuse( "'" + cMethod + "' é mensagem enviada (" + ;
+                                 hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                                 ") sem classe dona identificável - recuso" )
+               ENDIF
+            NEXT
+         NEXT
+      NEXT
+   ELSE
+      IF Empty( cClassPath )
+         RETURN Refuse( "método '" + cMethod + "' não encontrado na classe '" + cClass + "' no projeto" )
+      ENDIF
+      // unicidade da mensagem: sends não têm classe - só renomeamos quando
+      // o nome pertence a UMA classe do projeto
+      cWhy := ""
+      FOR EACH aE IN aOwners
+         IF ! aE[ 3 ]
+            cWhy += iif( Empty( cWhy ), "", "; " ) + aE[ 1 ] + " (" + aE[ 2 ] + ")"
+         ENDIF
+      NEXT
+      IF ! Empty( cWhy )
+         RETURN Refuse( "'" + cMethod + "' também é membro de: " + cWhy + ;
+                        " - send é despacho dinâmico, rename ambíguo; recuso" )
+      ENDIF
+      // membro de DADOS (VAR/DATA): atribuição vira send '_NOME' que este
+      // comando não cobre - fora do escopo v1
+      FOR EACH cPath IN hProj[ "files" ]
+         FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
+            FOR EACH hItem IN hFunc[ "sends" ]
+               IF Upper( hItem[ "sym" ] ) == "_" + cUpOld
+                  RETURN Refuse( "'" + cMethod + "' recebe atribuição (send _" + cUpOld + " em " + ;
+                                 hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                                 ") - é VAR/DATA, não método; fora do escopo do rename-method" )
+               ENDIF
+               IF Upper( hItem[ "sym" ] ) == cUpNew
+                  RETURN Refuse( "'" + cNew + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
+                                 ":" + hb_ntos( hItem[ "line" ] ) + " - o rename passaria a respondê-la" )
+               ENDIF
+            NEXT
+         NEXT
+      NEXT
    ENDIF
 
-   // sites: declaração (bloco) + implementação (função com lifting) + sends
-   FOR EACH aHit IN aDeclSites
-      hDeclLines[ aHit[ 1 ] ] := .T.
-   NEXT
-   hEdits[ cClassPath ] := AClone( aDeclSites )
+   // mapa de símbolos/strings esperado, COMPUTADO do rastro: cada artefato
+   // derivado muda deterministicamente - texto previsto = faixas do nome
+   // de marker substituídas pelo nome novo
+   hMap[ cUpOld ] := cUpNew
    FOR EACH cPath IN hProj[ "files" ]
-      hAst := hAsts[ cPath ]
-      aE := iif( hb_HHasKey( hEdits, cPath ), hEdits[ cPath ], {} )
-      FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ] .AND. ( aLift := MethodLift( hAst, hFunc ) ) != NIL .AND. ;
-            Upper( aLift[ 1 ] ) == cUpClass .AND. Upper( aLift[ 2 ] ) == cUpOld
-            IF ! cPath == cClassPath
-               RETURN Refuse( "implementação de " + cUpClass + ":" + cMethod + " em módulo distinto (" + ;
-                              hb_FNameNameExt( cPath ) + ") do bloco da classe - caso não coberto; recuso" )
+      aPS := {}
+      FOR EACH aArt IN hFacts[ cPath ][ "arts" ]
+         hTok  := aArt[ 2 ]
+         cPred := PredictText( hTok[ "text" ], aArt[ 3 ], cNew )
+         IF hTok[ "type" ] == 21 .AND. !( Upper( hTok[ "text" ] ) == cUpOld )
+            hMap[ Upper( hTok[ "text" ] ) ] := Upper( cPred )
+         ELSEIF hTok[ "type" ] == 41
+            IF hb_AScan( aPS, {| a | a[ 2 ] == cPred }, , , .T. ) == 0
+               AAdd( aPS, { hTok[ "text" ], cPred } )
             ENDIF
-            AddHit( aE, { "line" => aLift[ 3 ], "col" => aLift[ 4 ] - 1 } )
-            hDeclLines[ aLift[ 3 ] ] := .T.
          ENDIF
-         FOR EACH hItem IN hFunc[ "sends" ]
-            IF Upper( hItem[ "sym" ] ) == cUpOld
-               FOR EACH aHit IN SendLineHits( hAst, hItem[ "line" ], cUpOld )
-                  AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
-               NEXT
+      NEXT
+      IF ! Empty( aPS )
+         hPredStr[ cPath ] := aPS
+      ENDIF
+   NEXT
+   // nomes previstos: o compilador do projeto tem que aceitá-los, e não
+   // podem colidir com função existente (recusa por co-derivação: renomear
+   // 'a' num artefato <a>_<b> prevê 'b' intacto - se o previsto já existe,
+   // a recusa NOMEIA o artefato)
+   FOR EACH cOwn IN hb_HKeys( hMap )
+      cPred := hMap[ cOwn ]
+      IF !( cOwn == cUpOld )
+         IF ! NameAccepted( hProj, cPred, .T. )
+            RETURN Refuse( "o compilador do projeto rejeita '" + cPred + ;
+                           "' (nome da função gerada) - escolha outro nome" )
+         ENDIF
+         FOR EACH cPath IN hProj[ "files" ]
+            IF FuncByName( hAsts[ cPath ], cPred ) != NIL
+               RETURN Refuse( "'" + cPred + "' (previsto para o artefato " + cOwn + ;
+                              ") já existe como função em " + hb_FNameNameExt( cPath ) + " - recuso" )
             ENDIF
          NEXT
+      ENDIF
+   NEXT
+   // o fonte soletra um nome gerado que vai mudar? renomear o gerador
+   // deixaria a grafia manual órfã - recusa nomeando o site
+   FOR EACH cPath IN hProj[ "files" ]
+      FOR EACH hTok IN hAsts[ cPath ][ "tokens" ]
+         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+            hTok[ "col" ] != NIL .AND. ! hb_HHasKey( hTok, "from" ) .AND. ;
+            hb_HHasKey( hMap, Upper( hTok[ "text" ] ) ) .AND. ;
+            !( Upper( hTok[ "text" ] ) == cUpOld )
+            RETURN Refuse( "o fonte soletra o nome gerado '" + hTok[ "text" ] + "' (" + ;
+                           hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
+                           ") - renomear '" + cMethod + "' o deixaria órfão; recuso" )
+         ENDIF
       NEXT
+   NEXT
+
+   // sites de edição: sementes escritas (declaração, implementação e
+   // qualquer uso que atravessou regra) + sends (fatos do compilador)
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      aE := {}
+      FOR EACH aHit IN hFacts[ cPath ][ "sites" ]
+         AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
+      NEXT
+      IF lMethod
+         FOR EACH hFunc IN hAst[ "functions" ]
+            FOR EACH hItem IN hFunc[ "sends" ]
+               IF Upper( hItem[ "sym" ] ) == cUpOld
+                  FOR EACH aHit IN SendLineHits( hAst, hItem[ "line" ], cUpOld )
+                     AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
+                  NEXT
+               ENDIF
+            NEXT
+         NEXT
+      ENDIF
       IF ! Empty( aE )
          hEdits[ cPath ] := aE
       ENDIF
-      // strings com o nome FORA das linhas de declaração/implementação =
-      // possível acesso por nome (__objSendMsg, :&) - aviso, nunca edição.
-      // (as strings GERADAS pelo stringify da declaração se regeneram da
-      // edição do identificador; com parâmetro nascem line 0 e nem aparecem)
+      // string do USUÁRIO com o nome = possível acesso por nome
+      // (__objSendMsg, :&) - aviso, nunca edição. O rastro dá o corte
+      // exato: string derivada (com "from") se regenera da edição do
+      // identificador; string sem "from" é do usuário
       FOR EACH hItem IN hAst[ "tokens" ]
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUpOld .AND. ;
-            !( cPath == cClassPath .AND. hb_HHasKey( hDeclLines, hItem[ "line" ] ) )
+            Upper( hItem[ "text" ] ) == cUpOld .AND. ! hb_HHasKey( hItem, "from" )
             AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
                   ": string igual a '" + cMethod + "' - possível acesso por nome (não será alterada)" )
          ENDIF
@@ -4542,11 +4858,24 @@ STATIC FUNCTION RenameMethod( aArgs )
       nTotal += Len( aE )
    NEXT
 
-   OutStd( "rename-method: " + cUpClass + ":" + cMethod + " -> " + cNew + hb_eol() )
+   OutStd( "rename-" + iif( lMethod, "method: " + cUpClass + ":", "pp-marker: " ) + ;
+           cMethod + " -> " + cNew + hb_eol() )
    FOR EACH cPath IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cPath ]
          OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;
                  hb_ntos( aE[ 2 ] ) + hb_eol() )
+      NEXT
+   NEXT
+   // o que o rastro PREVÊ que muda junto (símbolos gerados e strings)
+   FOR EACH cOwn IN hb_HKeys( hMap )
+      IF !( cOwn == cUpOld )
+         OutStd( "  predicted: " + cOwn + " -> " + hMap[ cOwn ] + hb_eol() )
+      ENDIF
+   NEXT
+   FOR EACH cPath IN hb_HKeys( hPredStr )
+      FOR EACH aHit IN hPredStr[ cPath ]
+         OutStd( "  predicted string: " + '"' + aHit[ 1 ] + '" -> "' + aHit[ 2 ] + '"' + ;
+                 " (" + hb_FNameNameExt( cPath ) + ")" + hb_eol() )
       NEXT
    NEXT
    IF lDryRun
@@ -4567,21 +4896,20 @@ STATIC FUNCTION RenameMethod( aArgs )
                         " não confere - rollback" )
       ENDIF
    NEXT
-   IF ! CompileHrbAll( hProj, cTmp, "after" )
+   // "after" também regrava os dumps (-x): é neles que as strings
+   // previstas são conferidas fato a fato
+   IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       RollbackAll( hOrig )
       RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
    ENDIF
-   // módulo da classe: o pcode muda DE VERDADE (strings de __clsAddMsg e
-   // nome da função gerada) - símbolos conferidos módulo-a-módulo com os
-   // DOIS mapeamentos esperados; demais módulos: byte-idêntico com o
-   // símbolo do send renomeado (HrbEquivalent). Execução idêntica é
-   // contrato da suíte.
+   // módulos com artefato derivado: o pcode muda DE VERDADE (strings de
+   // registro e nome da função gerada) - símbolos conferidos com o mapa
+   // COMPUTADO; demais módulos: byte-idêntico com o símbolo renomeado
    FOR EACH cPath IN hProj[ "files" ]
       cText := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" )
-      cWhy := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" )
-      IF cPath == cClassPath
-         IF ! HrbSymbolsRenamed( cText, cWhy, { cUpOld => cUpNew, ;
-                 cUpClass + "_" + cUpOld => cUpClass + "_" + cUpNew }, @cSpec )
+      cWhy  := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" )
+      IF ! Empty( hFacts[ cPath ][ "arts" ] )
+         IF ! HrbSymbolsRenamed( cText, cWhy, hMap, @cSpec )
             RollbackAll( hOrig )
             RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
          ENDIF
@@ -4592,9 +4920,38 @@ STATIC FUNCTION RenameMethod( aArgs )
          ENDIF
       ENDIF
    NEXT
+   // strings previstas: o dump pós-edição tem que conter cada uma,
+   // byte-exata, como artefato de stringify do nome NOVO
+   FOR EACH cPath IN hb_HKeys( hPredStr )
+      hAst := ReadAst( cTmp, cPath )
+      IF hAst == NIL .OR. ! FromReady( hAst )
+         RollbackAll( hOrig )
+         RETURN Refuse( "dump pós-edição ausente para " + hb_FNameNameExt( cPath ) + " - rollback" )
+      ENDIF
+      hF    := PpMarkerSeeds( hAst, cUpNew )
+      aArts := PpMarkerArtifacts( hAst, hF[ "pairs" ], cUpNew )
+      FOR EACH aHit IN hPredStr[ cPath ]
+         lOurs := .F.
+         FOR EACH aArt IN aArts
+            IF aArt[ 2 ][ "type" ] == 41 .AND. aArt[ 2 ][ "text" ] == aHit[ 2 ]
+               lOurs := .T.
+               EXIT
+            ENDIF
+         NEXT
+         IF ! lOurs
+            RollbackAll( hOrig )
+            RETURN Refuse( "string prevista " + '"' + aHit[ 2 ] + '"' + " não confirmada no dump de " + ;
+                           hb_FNameNameExt( cPath ) + " - rollback" )
+         ENDIF
+      NEXT
+   NEXT
 
-   OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
-           "other modules byte-identical" + hb_eol() )
+   IF lMethod
+      OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
+              "other modules byte-identical" + hb_eol() )
+   ELSE
+      OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" + hb_eol() )
+   ENDIF
 
    RETURN EXIT_OK
 

@@ -278,7 +278,9 @@ novos na suíte.
 >    DINÂMICAS que o hbclass.ch registra por método, e regras builtin).
 >    Única peça por-PADRÃO (não por-DSL): o lifting `MethodLift` casa
 >    função gerada com aplicação na mesma linha cujos markers concatenam
->    `<A>_<B>` — cobre qualquer DSL que cole nomes assim (hbclass.ch é o
+>    `<A>_<B>` [B4d: `MethodLift` removido; lifting agora vem do rastro
+>    `from`, cobrindo colagens de qualquer forma] — cobre qualquer DSL que
+>    cole nomes assim (hbclass.ch é o
 >    caso canônico), e falha para colagens diferentes (aí é relato normal
 >    de função, nunca resposta errada).
 >
@@ -303,6 +305,8 @@ novos na suíte.
 >   UWMenu)` com posição real; `UWMENU_PAINT` só com `--show-expansion`;
 >   `PickFunc` aceita `Classe:Metodo`/método puro via `MethodLift` — a
 >   convenção textual `<CLASSE>_<MÉTODO>` morreu (caso 29 atualizado).
+>   [B4d: `PickFunc` reapontado para o rastro `from` (`MethodImplOf`);
+>   `MethodLift` removido.]
 > - **Réplica textual morta** (item B.1 da auditoria): `DefineCollision`/
 >   `PpHeadIn` apagadas → `RuleHeadCollision` sobre `ppRules` em
 >   rename-local/rename-static/extract-function (cobre includes
@@ -630,13 +634,15 @@ furo, executa no caso limpo com **comportamento idêntico por execução**
 > `__clsNew` manual) não é reconhecida — relato honesto de "não
 > encontrado", nunca edição errada.
 >
-> **MORTE ANUNCIADA (ordem do Diego, 2026-07-06)**: as âncoras por forma
-> desta fase (`MethodLift`/`ClassRegs`/`StmtStrings`/`DeclHits`) são
-> INTERINAS — heurísticas sobre o RESULTADO da expansão, que cobrem a
-> colagem/stringify do hbclass mas não qualquer diretiva futura. A
-> solução definitiva e genérica é o rastro de derivação no pp (ast-3):
-> spec completa em [spec-b4d-derivacao.md](spec-b4d-derivacao.md)
-> (Fase B4d).
+> **MORTE ANUNCIADA (ordem do Diego, 2026-07-06) — CONSUMADA na B4d**: as
+> âncoras por forma desta fase (`MethodLift`/`ClassRegs`/`StmtStrings`/
+> `DeclHits`) eram INTERINAS — heurísticas sobre o RESULTADO da expansão,
+> que cobriam a colagem/stringify do hbclass mas não qualquer diretiva
+> futura. Foram REMOVIDAS do código na **Fase B4d** (2026-07-06),
+> substituídas pelo modelo de NOME DE MARKER sobre o rastro de derivação no pp
+> (schema ast-3): spec completa em
+> [spec-b4d-derivacao.md](spec-b4d-derivacao.md). Esta seção da B4c fica
+> como registro histórico (a spec original abaixo é preservada).
 
 #### Spec original (mantida como registro)
 
@@ -684,19 +690,94 @@ byte-exata; fixture de recusa com duas classes homônimas no método;
 recusa de string fora da linha de declaração sem `--force`; suíte verde;
 dogfooding no hbhttpd (1 rename real A→B→A).
 
-### Fase B4d — Refatoração genérica por rastro de derivação (planejada)
+### Fase B4d — Refatoração genérica por rastro de derivação (entregue 2026-07-06) ✅
 
-**Ordem do Diego (2026-07-06)**: funcionar com QUALQUER diretiva —
-classes, as cinco famílias, e o que vier a ser criado — sem nada
-por-DSL na ferramenta. **Spec-driven**: escopo, formato (`from` nos
-tokens sintetizados, schema ast-3), specs executáveis G1–G7 e critérios
-mecânicos em **[spec-b4d-derivacao.md](spec-b4d-derivacao.md)** —
-escritos ANTES de qualquer código, para execução em sessão nova.
-Resumo: o pp registra, no instante da expansão, de QUAL marker cada
-token sintetizado deriva (clone/colagem/stringify); lifting e renames
-passam a computar artefatos pelo fecho de derivação; as âncoras por
-forma da B4c morrem; a verificação passa a PREVER o mapa de símbolos e
-strings esperado.
+> **Status FINAL 2026-07-06 — fase concluída** (`make test` 287 passed /
+> 0 failed; specs G1–G7 verdes, casos novos 50–53 + fixture INVENTADA
+> `tests/fixppm/`; `make lexdiff` 0 divergências reais; dogfooding
+> hbhttpd: `UHttpdLog:IsOpen` A→B→A byte-exato, `Paint` recusado listando
+> as 9 classes donas). **Ordem do Diego**: funcionar com QUALQUER
+> diretiva — classes, as cinco famílias, e o que vier a ser criado — sem
+> nada por-DSL na ferramenta. Spec-driven: escopo/formato/specs G1–G7 e
+> critérios mecânicos escritos ANTES do código em
+> **[spec-b4d-derivacao.md](spec-b4d-derivacao.md)**.
+>
+> **Entregue no core (schema ast-3)**: campo `from` nos tokens
+> SINTETIZADOS — de QUAL marker cada faixa de bytes deriva
+> (`clone`/`paste`/`stringify` + `at`/`len` em bytes), gravado pelo pp no
+> INSTANTE da síntese. Mesmo padrão B0/B4: lógica no pp, ganchos de 1
+> linha gated por `fTrackPos`, tabela por módulo limpa em `hb_pp_reset`,
+> accessors em `hbpp.h`, emissão em `compast.c`. Também copiado nos tokens
+> consumidos de `ppApplications` (multi-passe: cópia no instante da
+> aplicação). Zero impacto sem `-x` provado: 112/112 `.hrb` byte-idênticos
+> com/sem `-x`; `harbour` E `hbmk2` relincados para ast-3
+> (`strings ... | grep ast-`). Leitor `ReadAst` aceita ast-2|ast-3;
+> comandos que exigem o rastro recusam dump antigo (`FromReady` = schema
+> == ast-3).
+>
+> **Entregue na ferramenta (modelo de NOME DE MARKER)**: nome de marker =
+> o valor escrito que preenche um match marker (`<x>`) de uma diretiva de
+> pp, atravessando-a. Sementes por `(app, marker)` com
+> fecho transitivo (`PpMarkerSeeds`); artefatos = fecho dos `from` com
+> recorte byte-exato pela faixa (`PpMarkerArtifacts`/`PpMarkerRanges`,
+> resolução recursiva por clone-de-composto); donos por CO-DERIVAÇÃO
+> (`PpMarkerOwners`: o outro nome do paste que nomeia função, o nome da
+> função que contém o stringify). `usages <nome>` com lifting
+> generalizado — vocabulário da regra RAIZ (`PpMarkerLift`/`SeedRootRule`:
+> "method definition" no hbclass, "handler definition" numa DSL de
+> handlers, etc.), nome gerado só com `--show-expansion`. Novo comando
+> `rename-pp-marker <proj> <nome> <novo> [--force] [--dry-run]`;
+> `rename-method` vira AÇÚCAR do mesmo motor (política extra de unicidade
+> de mensagem, porque send é despacho dinâmico). Verificação com o mapa de
+> símbolos/strings COMPUTADO do rastro (`PredictText`: substitui as faixas
+> do nome de marker pelo nome novo) — saída `predicted: SIMBOLO -> NOVO` /
+> `predicted string: ...`, cada previsão conferida no dump pós-edição
+> (`HrbSymbolsRenamed` com mapa computado; demais módulos `HrbEquivalent`
+> byte-idênticos). Recusa por co-derivação (G5): símbolo previsto que já
+> existe como função → recusa nomeando o artefato; fonte que soletra à mão
+> um nome gerado que mudaria → recusa apontando o site órfão. As âncoras
+> por FORMA da B4c (`MethodLift`/`ClassRegs`/`StmtStrings`/`DeclHits`)
+> foram REMOVIDAS do código: nenhuma colagem `_` tentada, nenhuma
+> comparação de STRING == nome de função.
+>
+> **Provas**: G1 (canônico hbclass), G2/G6 (colagem por prefixo `on_<n>`
+> numa DSL 100% inventada — nenhuma palavra dela existe em include do core
+> nem é mencionada na ferramenta — usages lifta + rename), G3 (stringify
+> puro), G4 (clone+paste+stringify na mesma regra, chamada derivada
+> cruzando módulos), G5 (co-derivação: vizinho intacto, colisões recusadas
+> por nome); casos 50–53. Regressão total (G7): suíte 287/0, `make
+> lexdiff` sem divergência nova, varredura src/ com/sem `-x` byte-idêntica.
+
+### Fase B4e — Comandos de refatoração cientes de construtos de pp (em andamento)
+
+**Ordem do Diego (2026-07-06)**: os recursos de refatoração devem ser
+completos para o máximo de casos possível — os construtos que uma diretiva
+de pp cria (método de classe, função gerada por DSL) têm que ser cobertos
+por TODOS os comandos, não só pela família B4. **Spec-driven**: matriz de
+auditoria, escopo por item (P0–P3) e critério de pronto em
+**[spec-b4e-construct-aware.md](spec-b4e-construct-aware.md)** — escrito
+ANTES do código. Princípio transversal: cada comando, sobre um construto de
+pp, ou faz a refatoração correta e verificada, ou RECUSA LIMPA — nunca
+corrompe nem falha de forma confusa.
+
+> **P0 entregue (2026-07-06)**: bug de CORRUPÇÃO SILENCIOSA no
+> `rename-local`/`rename-param`. Sites que compartilham a mesma `(linha,col)`
+> de origem — clones de um único token-fonte que a expansão de pp
+> multiplicou (o parâmetro de uma FUNCTION gerada, declarado e usado no
+> corpo, deriva do mesmo marker) — geravam edição DUPLA na span: `nA`→`nAlfa`
+> virava `nAlfalfa`, e como nome de local/param não entra no pcode o verify
+> byte-idêntico deixava passar (exit 0). Fix: `DedupHits` por posição-fonte
+> antes de aplicar as edições (vale p/ rename-local e rename-static). Caso 54
+> (regressão): parâmetro de função gerada por DSL, nome novo que estende o
+> antigo, edição única + round-trip byte-exato. Suíte 291/0.
+
+**Pendente (P1–P3, ver spec)**: P1a rename-param/local ciente da assinatura
+de método (editar a declaração no `METHOD`/`CREATE CLASS`, não só o corpo);
+P1b reorder-params ciente de método (resolução + call sites de send +
+política de unicidade de mensagem); P2a extract-function em corpo de método
+= recusa limpa por `Self` (suporte pleno depois); P2b call-graph resolvendo
+nome de método + arestas de send dinâmicas; P3 find-dynamic-calls filtrando
+o ruído do `&` da expansão do hbclass.
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
@@ -818,15 +899,18 @@ gramática — flatten em lista é que era o erro.
    textual não via).
 2. `StrDelimsOk`/`TokStartCol`/`TokEndCol` (delimitadores de string `"` `'`
    `[..]`) — validação byte-exata conservadora, recusa o que não prova
-   (e"..." etc.). Ideal futuro: dump `ast-2` carregar o span ORIGINAL da
-   string (1 campo no posTrack do pp). Registrado no ast-schema.md.
+   (e"..." etc.). Ideal futuro: o dump (schema atual `ast-3`) carregar o
+   span ORIGINAL da string (1 campo no posTrack do pp). Registrado no
+   ast-schema.md.
 3. Cheque textual de continuação (`Right(RTrim(linha),1) == ";"`) em 2
    pontos — falso positivo só RECUSA (conservador); fatos de statement
    multi-linha podem substituir depois.
 4. Convenção `<CLASSE>_<MÉTODO>` (usages/PickFunc) — **MORTA na B4
-   (2026-07-06)**: `MethodLift` sobre `ppApplications` (par de markers que
-   concatena no nome gerado) responde com a posição real e o vocabulário
-   do fonte.
+   (2026-07-06)**: o lifting sobre `ppApplications` passou a responder com
+   a posição real e o vocabulário do fonte. Na **B4d** o próprio
+   `MethodLift` (e as demais âncoras por forma da B4c) foi REMOVIDO,
+   substituído pelo lifting generalizado (`PpMarkerLift`/`SeedRootRule`)
+   sobre o rastro de derivação (`from`, schema ast-3).
 
 **C. Não-réplicas (auditadas e mantidas):** `HrbParse`+comparadores (formato
 de ARQUIVO .hrb, não gramática; a alternativa `hb_hrbLoad` carregaria o
