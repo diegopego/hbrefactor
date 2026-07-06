@@ -16,3 +16,8 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 - smoketest/hbrefactor-occ.prg é a primeira encarnação, arquivada:
   só leitura, nunca editar.
 - Commits só com autorização explícita do Diego.
+- Em sessão com o modelo Fable: delegar a subagentes **opus** para
+  economizar tokens do Fable quando realmente compensar (trabalho
+  mecânico bem especificado — varreduras, builds, baterias de teste);
+  raciocínio central e código delicado ficam no Fable, que revisa o
+  que os agentes entregam.
