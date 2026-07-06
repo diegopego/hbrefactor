@@ -84,6 +84,17 @@ freshsig() { # freshsig <case-name> -> fixture with 2+ param methods (B4e P1a/P1
    echo "$d"
 }
 
+freshext() { # freshext <case-name> -> fixture for extract-to-method (B4e P2a)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixext/*.prg "$HERE"/fixext/*.hbp "$HERE"/fixext/*.ch "$d"/
+   echo "$d"
+}
+
+extrun() { # extrun <dir> <out-file> -> build fixext copy and run it
+   ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
+}
+
 echo "case 0: base fixtures compile clean under the flags the .hbp declares"
 # the fixture project declares -w3 -es2; the fixtures themselves must be
 # warning-clean idiomatic Harbour (a warning that slips through here is a
@@ -1252,6 +1263,139 @@ grep -q "function DYN uses & macros" "$D/fd2.log"
 check "a real user macro is still flagged" $?
 grep -q "^1 finding" "$D/fd2.log"
 check "exactly the user macro, none of the class noise" $?
+
+echo "case 59: B4e P2a - extract-function em corpo de método (extract-to-method)"
+# range que usa ::/Self extrai para um NOVO METHOD da mesma classe: corpo
+# verbatim (::/sends/Super continuam válidos - mesma classe), protótipo
+# inserido após o do método de origem (mesma seção de visibilidade),
+# assinatura proto == impl (o hbclass casa a assinatura inteira - P1a).
+# Verificação por fatos previstos: +símbolo gerado (PredictText sobre o
+# composto), símbolo da mensagem, string de registro no pcode da classe.
+for f in e1.prg e2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixext/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I"$HERE/fixext" > /dev/null 2>&1
+   check "fixext/$f clean under -w3 -es2"  $?
+done
+# (a) membros lidos E escritos + send interno + migração de declaração
+D=$(freshext case59a)
+extrun "$D" saida_antes.txt
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 Miolo > ex.log 2>&1 )
+RC=$?
+check "extract of a ::-using range exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "novo método Conta:Miolo( nValor )" "$D/ex.log"
+check "reports the new METHOD of the class" $?
+grep -q "::Miolo( nValor )" "$D/e1.prg"
+check "call site is a send on Self (::)" $?
+test "$(sed -n '10p' "$D/e1.prg")" = "   METHOD Miolo( nValor )"
+check "prototype inserted right after the source method's prototype" $?
+grep -q "METHOD Miolo( nValor ) CLASS Conta" "$D/e1.prg"
+check "implementation signature matches the prototype" $?
+grep -q "LOCAL nTaxa, nLiquido" "$D/e1.prg"
+check "selection-only locals migrated into the new method" $?
+grep -q "verified: símbolos preservados (+Conta_Miolo), mensagem Miolo registrada" "$D/ex.log"
+check "verification: predicted symbol + message registration" $?
+extrun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after extract" $?
+# (b) range com ::Super: o método novo fica na MESMA classe - binding igual
+D=$(freshext case59b)
+extrun "$D" saida_antes.txt
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 64-65 PosDeposito > ex.log 2>&1 )
+RC=$?
+check "extract of a ::Super-using range exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "::PosDeposito( nValor, nAntes )" "$D/e1.prg"
+check "crossing locals become send arguments" $?
+extrun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical (Super binding preserved)" $?
+# (c) local escrita no range e usada depois: vira valor de retorno
+D=$(freshext case59c)
+extrun "$D" saida_antes.txt
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 31-34 SomaTudo > ex.log 2>&1 )
+RC=$?
+check "extract with an out-value exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "nTotal := ::SomaTudo( nQtde )" "$D/e1.prg"
+check "out-value assigned from the send" $?
+grep -q "   RETURN nTotal" "$D/e1.prg"
+check "new method returns the out-value" $?
+extrun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical with out-value" $?
+# (d) range SEM ::/Self dentro de método TAMBÉM extrai método (o alvo é
+# decidido pelo CONTÊINER, não pelo range - dogfooding do Diego, hbhttpd:
+# extrair função de dentro de método surpreende)
+D=$(freshext case59d)
+extrun "$D" saida_antes.txt
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-22 CalculaLiquido > ex.log 2>&1 )
+RC=$?
+check "extract of a Self-free range in a method exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "novo método Conta:CalculaLiquido( nValor )" "$D/ex.log"
+check "container is a method => target is a METHOD even without Self" $?
+grep -q "nLiquido := ::CalculaLiquido( nValor )" "$D/e1.prg"
+check "call site is a send with the out-value" $?
+extrun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical for the Self-free extract" $?
+
+echo "case 60: B4e P2a - recusas fato-a-fato e aviso honesto"
+# cada recusa nasce de um FATO do dump (occurrence de SELF, membro registrado
+# por stringify, send existente, protótipo sem posição); pai fora do projeto
+# é fato inexistente em compilação -> AVISO, nunca palpite (regra do Diego)
+D=$(freshext case60)
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 43-43 Pedaco > r1.log 2>&1 )
+RC=$?
+check "range reassigning Self refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "reatribui Self" "$D/r1.log"
+check "refusal names the Self reassignment" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 47-47 Pedaco > r2.log 2>&1 )
+RC=$?
+check "range passing @Self refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "por referência" "$D/r2.log"
+check "refusal names the by-reference Self" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 nReservado > r3.log 2>&1 )
+RC=$?
+check "name colliding with a class VAR refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "já é membro (VAR/DATA/METHOD) da classe CONTA" "$D/r3.log"
+check "refusal names the owning class (registration fact)" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 64-65 nReservado > r4.log 2>&1 )
+RC=$?
+check "name colliding with an INHERITED member refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "já é membro (VAR/DATA/METHOD) da classe CONTA" "$D/r4.log"
+check "ancestor chain walked to the in-project parent" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 Extrato > r5.log 2>&1 )
+RC=$?
+check "name whose generated symbol exists refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "Conta_Extrato" "$D/r5.log"
+check "refusal names the generated symbol" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 Processa > r6.log 2>&1 )
+RC=$?
+check "name already SENT in the project refused (dynamic dispatch)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "já é mensagem enviada em e2.prg:5" "$D/r6.log"
+check "refusal points at the existing send site" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e2.prg 17-17 Pedaco > r7.log 2>&1 )
+RC=$?
+check "Self-using range OUTSIDE a method refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "não é método de classe" "$D/r7.log"
+check "refusal says the container is not a method" $?
+( cd "$D" && "$BIN" extract-function fixext.hbp e2.prg 9-10 Pedaco > r8.log 2>&1 )
+RC=$?
+check "method of a class declared in an include refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "classe declarada em include" "$D/r8.log"
+check "refusal explains the prototype lives in an include" $?
+cmp -s "$D/e1.prg" "$HERE/fixext/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixext/e2.prg"
+check "sources untouched by all refusals" $?
+# pai fora do projeto: extração procede com AVISO nomeando o não-verificável
+extrun "$D" saida_antes.txt
+( cd "$D" && "$BIN" extract-function fixext.hbp e2.prg 27-28 Passo > w1.log 2>&1 )
+RC=$?
+check "class FROM an out-of-project parent still extracts" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "warning: pai HBPERSISTENT fora do projeto" "$D/w1.log"
+check "honest warning names the unverifiable parent" $?
+test "$(grep -c "warning: pai" "$D/w1.log")" = "1"
+check "only the real parent is warned (FROM word filtered by stream fact)" $?
+extrun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after warned extract" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

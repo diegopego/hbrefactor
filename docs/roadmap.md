@@ -748,7 +748,7 @@ dogfooding no hbhttpd (1 rename real A→B→A).
 > por nome); casos 50–53. Regressão total (G7): suíte 287/0, `make
 > lexdiff` sem divergência nova, varredura src/ com/sem `-x` byte-idêntica.
 
-### Fase B4e — Comandos de refatoração cientes de construtos de pp (em andamento)
+### Fase B4e — Comandos de refatoração cientes de construtos de pp ✅ (2026-07-06)
 
 **Ordem do Diego (2026-07-06)**: os recursos de refatoração devem ser
 completos para o máximo de casos possível — os construtos que uma diretiva
@@ -816,12 +816,34 @@ corrompe nem falha de forma confusa.
 > função (token type 22 posicionado, `prov 's'` — `HasUserMacro`); um `&` de
 > verdade continua flagado. Casos 57/58 na fixture `fixsig/`. Suíte 323/0.
 
-**Pendente (P2a, ver spec)**: extract-function em corpo de método —
-**decisão do Diego (2026-07-06): suporte PLENO** (extrair para um novo `METHOD`
-da classe, com `Self`/`::` convergindo), não a recusa-limpa que a spec
-recomendava. Sub-fase maior: modelar `Self`/`::`, gerar a assinatura do novo
-método + protótipo no `CREATE CLASS`, convergir os sends internos. **Confirmar
-o desenho com o Diego antes de codar o volume.** Fecha a Fase B4e.
+> **P2a entregue (2026-07-06, desenho aprovado pelo Diego antes do código)**:
+> `extract-function` em corpo de método com **suporte PLENO** (decisão do
+> Diego; a recusa-limpa ficou como piso para os sub-casos intratáveis).
+> Range em corpo de método extrai para um **novo `METHOD` da MESMA classe**
+> (alvo decidido pelo CONTÊINER, não pelo range — correção pós-dogfooding no
+> hbhttpd, mesmo dia: range sem `::` dentro de método virava função e
+> surpreendia; caso 59d):
+> o corpo move VERBATIM (`::`/sends/`Super` continuam válidos — mesma classe,
+> mesmo binding, provado por execução), o protótipo entra logo após o do
+> método de origem (mesma seção de visibilidade; PROTECTED interno funciona,
+> scope é só de runtime) e o call site vira `::Nome( args )`. A análise
+> fato-a-fato fechou SEM ast-4: Self é local comum (occurrences; sem
+> declaration no dump), identidade/símbolo previsto vêm do rastro `from`
+> (`GenNameParts`/`PredictText`), âncora do protótipo de `ppApplications`
+> (`MethodProtoAnchor`), membros por strings de stringify contidas por
+> índice na função da classe (`ClassMembersOf`), ancestrais pelos markers
+> posicionados na linha da declaração (`ClassParentsOf`; palavra `FROM`
+> filtrada por não chegar ao stream). Recusas fato-based: Self
+> reatribuído/`@Self` no range, colisão com membro (próprio ou herdado no
+> projeto), símbolo gerado existente, mensagem já ENVIADA (sombrearia
+> dispatch), classe declarada em include, Self fora de método; pai fora do
+> projeto = AVISO honesto. Verificação `HrbMethodExtractCheck`: +1 função
+> prevista, símbolos novos ⊆ {gerado, mensagem}, string de registro no
+> pcode da função da classe; rollback. Hardening no caminho: o scan de
+> saltos do extract filtra `prov 's'` (linha de token de include colide com
+> o range por coincidência). Fixture `fixext/` (2 classes + herança +
+> Super + classe em include + pai core); casos 59 (pleno, execução
+> idêntica) e 60 (recusas + aviso). **Fase B4e completa.**
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 

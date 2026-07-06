@@ -30,7 +30,7 @@ markers posicionados de `ppApplications`.
 | Comando | Método de classe | Função gerada por DSL |
 |---|---|---|
 | reorder-params | ~~recusa limpa (não resolve método)~~ **P1b: OK** | funciona |
-| extract-function | falha controlada (não modela `Self`; rollback) | recusa limpa (N/A) |
+| extract-function | ~~falha controlada (não modela `Self`; rollback)~~ **P2a: OK (suporte pleno)** | recusa limpa (N/A) |
 | inline-local | funciona | N/A |
 | rename-param/local | ~~falha controlada (esquece a assinatura)~~ **P1a: OK** | ~~**corrompia** (double-apply)~~ **P0: OK** |
 | rename-static | N/A (recusa limpa) | N/A (recusa limpa) |
@@ -77,7 +77,15 @@ módulos + rollback. **Pronto**: reordenar `UWMenu:Resize` "nH,nW" edita
 assinatura + todos os sends, execução idêntica, round-trip byte-exato;
 fixture de recusa com método homônimo em duas classes.
 
-### P2a — extract-function em corpo de método
+### P2a — extract-function em corpo de método (ENTREGUE 2026-07-06)
+
+> **ENTREGUE** com suporte pleno após desenho aprovado (tabela fato→fonte
+> sob a regra maior; nenhum ast-4 necessário). Detalhes no roadmap (B4e) e
+> receita no ast-schema.md ("extract-to-method"). Casos 59/60; suíte 362/0.
+> Desvio consciente do desenho aprovado, sinalizado ao Diego: o protótipo
+> entra APÓS O DO MÉTODO DE ORIGEM (não antes do END CLASS) — âncora 100%
+> genérica (identidade de marker, sem conhecer cabeça CREATE/END de família)
+> e visibilidade herdada do método de origem.
 
 > **DECISÃO DO DIEGO (2026-07-06)**: suporte **PLENO** já nesta fase, NÃO a
 > recusa-limpa recomendada abaixo. Extrair para um novo `METHOD` da classe
@@ -113,7 +121,12 @@ usuário continua flagado.
 
 ## Não-objetivos
 
-- Suporte pleno de extract-para-método (P2a v2) — anotado, fase própria.
+- ~~Suporte pleno de extract-para-método (P2a v2) — anotado, fase própria.~~
+  Superado: entregue NESTA fase por decisão do Diego (2026-07-06).
+- Variante "passar `Self` a uma FUNCTION" (D1): fora do v1 — `Super` perde o
+  contexto de classe fora de método e membro PROTECTED/HIDDEN esbarra no
+  scoping de runtime; o alvo METHOD não tem essas minas e o corpo move
+  verbatim igual.
 - Arestas estáticas para dispatch de send (é dinâmico por natureza; só
   anotação a partir de `sends` + unicidade).
 - Reescrever a maquinaria B4d — esta fase CONSOME o rastro `from`, não o

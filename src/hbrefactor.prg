@@ -1615,6 +1615,10 @@ STATIC FUNCTION ExtractFunction( aArgs )
    LOCAL cText, aSrc, aPairs, hTok, hVar, aVars := {}, hMovedLines
    LOCAL cOut := "", lOutParam := .F., aParams := {}, aMoved := {}
    LOCAL cEol, cIndent, cCall, cNewFunc, cTextNew, cWhy, cUpNew, hRule
+   LOCAL lUsesSelf := .F., lMethod, aGenParts, aImplInfo, cClassReal
+   LOCAL cGenNew := "", cUpGenNew := "", nAnchor := 0, aParentsUnk := {}
+   LOCAL hClassMap, aChainQ, hChainSeen, aPP, cUpCur, hMembers, aCF, cPar
+   LOCAL hOcc, hFrom, aRangeM, hAst2, hFn2, hIt2, cProtoLine
 
    IF Len( aArgs ) < 5
       Usage()
@@ -1714,6 +1718,127 @@ STATIC FUNCTION ExtractFunction( aArgs )
       OutStd( "warning: a função usa macros & - revise com cuidado" + hb_eol() )
    ENDIF
 
+   // P2a: o CONTÊINER é método? Nome composto pelo rastro (classe+mensagem)
+   // cuja primeira parte nomeia uma FUNÇÃO DE CLASSE do projeto (composto de
+   // DSL sem classe cai no caminho de função). Contêiner método => o alvo é
+   // um novo MÉTODO mesmo com range sem Self (dogfooding do Diego: extrair
+   // função de dentro de método surpreende; e método funciona sempre)
+   aGenParts := GenNameParts( hAst, hTarget )
+   hClassMap := ClassFuncMap( hAsts )
+   lMethod := Len( aGenParts ) >= 2 .AND. hb_HHasKey( hClassMap, aGenParts[ 1 ] )
+   // occurrences de SELF no range (a atribuição sintética do preâmbulo do
+   // hbclass fica na linha do METHOD, fora de qualquer range válido).
+   // Reatribuir/referenciar Self extraído mudaria o alvo (o Self do método
+   // novo é OUTRA local) - recusa
+   FOR EACH hOcc IN hTarget[ "occurrences" ]
+      IF hOcc[ "sym" ] == "SELF" .AND. hOcc[ "line" ] >= nFirst .AND. hOcc[ "line" ] <= nLast
+         IF hOcc[ "access" ] == "write"
+            RETURN Refuse( "a seleção reatribui Self (linha " + hb_ntos( hOcc[ "line" ] ) + ") - recusando" )
+         ENDIF
+         IF hOcc[ "access" ] == "ref"
+            RETURN Refuse( "a seleção passa Self por referência (linha " + hb_ntos( hOcc[ "line" ] ) + ") - recusando" )
+         ENDIF
+         lUsesSelf := .T.
+      ENDIF
+   NEXT
+   IF lUsesSelf .AND. ! lMethod
+      RETURN Refuse( "a seleção usa Self/:: mas " + hTarget[ "name" ] + ;
+                     " não é método de classe - extração recusada" )
+   ENDIF
+   IF lMethod
+      // extração PARA MÉTODO da mesma classe: o corpo move verbatim (::/sends
+      // continuam válidos; Super preserva o binding - mesma classe).
+      aImplInfo := MethodImplOf( hAst, hTarget, "", ATail( aGenParts ) )
+      IF aImplInfo == NIL
+         RETURN Refuse( "não consegui decompor o nome gerado de " + hTarget[ "name" ] )
+      ENDIF
+      cClassReal := aImplInfo[ 1 ]
+      // símbolo previsto da função gerada: o composto com a faixa do MÉTODO
+      // substituída pelo nome novo (PredictText - sem assumir separador)
+      FOR EACH hTok IN hAst[ "tokens" ]
+         IF hTok[ "type" ] == 21 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+            Upper( hTok[ "text" ] ) == Upper( hTarget[ "name" ] )
+            aRangeM := NIL
+            FOR EACH hFrom IN hTok[ "from" ]
+               IF Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) ) == ATail( aGenParts )
+                  aRangeM := { hFrom[ "at" ], hFrom[ "len" ] }
+               ENDIF
+            NEXT
+            IF aRangeM != NIL
+               cGenNew := PredictText( hTok[ "text" ], { aRangeM }, cNewName )
+               EXIT
+            ENDIF
+         ENDIF
+      NEXT
+      IF Empty( cGenNew )
+         RETURN Refuse( "não consegui prever o símbolo gerado do novo método" )
+      ENDIF
+      cUpGenNew := Upper( cGenNew )
+      // âncora do protótipo: aplicações com a identidade INTEIRA do método
+      // (P1a) cujos tokens posicionados ficam ANTES da implementação
+      nAnchor := MethodProtoAnchor( hAst, aGenParts, hTarget[ "line" ] )
+      IF nAnchor == 0
+         RETURN Refuse( "não localizei o protótipo de " + cClassReal + ":" + ATail( aGenParts ) + ;
+                        " no módulo (classe declarada em include?) - recusando" )
+      ENDIF
+      // colisões nos módulos: símbolo gerado já existente/referenciado e
+      // mensagem já ENVIADA (send é despacho dinâmico - o método novo
+      // sombrearia o dispatch existente)
+      FOR EACH cPath IN hProj[ "files" ]
+         hAst2 := hAsts[ cPath ]
+         FOR EACH hFn2 IN hAst2[ "functions" ]
+            IF ! hFn2[ "fileDecl" ] .AND. Upper( hFn2[ "name" ] ) == cUpGenNew
+               RETURN Refuse( "o símbolo gerado " + cGenNew + " já é função em " + hb_FNameNameExt( cPath ) )
+            ENDIF
+            FOR EACH hIt2 IN hFn2[ "calls" ]
+               IF Upper( hIt2[ "sym" ] ) == cUpGenNew
+                  RETURN Refuse( "o símbolo gerado " + cGenNew + " já é referenciado em " + hb_FNameNameExt( cPath ) )
+               ENDIF
+            NEXT
+            FOR EACH hIt2 IN hFn2[ "sends" ]
+               IF Upper( hIt2[ "sym" ] ) == cUpNew .OR. Upper( hIt2[ "sym" ] ) == "_" + cUpNew
+                  RETURN Refuse( "'" + cNewName + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
+                                 ":" + hb_ntos( hIt2[ "line" ] ) + " - o método novo mudaria o dispatch; recusando" )
+               ENDIF
+            NEXT
+         NEXT
+      NEXT
+      // membros da classe e dos ancestrais NO projeto (strings de registro
+      // por stringify, fato do rastro); ancestral fora do projeto = fato
+      // inexistente em compilação -> AVISO honesto, nunca palpite
+      aChainQ := { Upper( cClassReal ) }
+      hChainSeen := { => }
+      DO WHILE ! Empty( aChainQ )
+         cUpCur := ATail( aChainQ )
+         ASize( aChainQ, Len( aChainQ ) - 1 )
+         IF hb_HHasKey( hChainSeen, cUpCur ) .OR. ! hb_HHasKey( hClassMap, cUpCur )
+            LOOP
+         ENDIF
+         hChainSeen[ cUpCur ] := .T.
+         aCF := hClassMap[ cUpCur ]
+         hMembers := ClassMembersOf( aCF[ 2 ], aCF[ 3 ] )
+         IF hb_HHasKey( hMembers, cUpNew )
+            RETURN Refuse( "'" + cNewName + "' já é membro (VAR/DATA/METHOD) da classe " + cUpCur )
+         ENDIF
+         aPP := ClassParentsOf( aCF[ 2 ], cUpCur, aCF[ 3 ], hClassMap )
+         FOR EACH cPar IN aPP[ 1 ]
+            AAdd( aChainQ, cPar )
+         NEXT
+         FOR EACH cPar IN aPP[ 2 ]
+            IF hb_AScan( aParentsUnk, cPar,,, .T. ) == 0
+               AAdd( aParentsUnk, cPar )
+            ENDIF
+         NEXT
+      ENDDO
+      // strings soltas que soletram o nome novo: relato (nunca edição)
+      FOR EACH hTok IN hAst[ "tokens" ]
+         IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. Upper( hTok[ "text" ] ) == cUpNew
+            OutStd( "warning: string na linha " + hb_ntos( hTok[ "line" ] ) + ;
+                    " soletra '" + cNewName + "'" + hb_eol() )
+         ENDIF
+      NEXT
+   ENDIF
+
    // macro na seleção: semântica movida não-provável (memvar via &) - recusa
    FOR EACH hItem IN hTarget[ "statements" ]
       IF hItem[ "line" ] >= nFirst .AND. hItem[ "line" ] <= nLast .AND. ;
@@ -1749,9 +1874,12 @@ STATIC FUNCTION ExtractFunction( aArgs )
    NEXT
 
    // saltos cruzando a borda: RETURN sempre recusa; EXIT/LOOP precisam de
-   // for/while inteiro na seleção; BREAK (não-função) precisa de sequence
+   // for/while inteiro na seleção; BREAK (não-função) precisa de sequence.
+   // Só tokens prov 's': linha de token de include é a do ARQUIVO INCLUÍDO
+   // e pode colidir com o range por coincidência
    FOR EACH hTok IN hAst[ "tokens" ]
-      IF hTok[ "type" ] == 21 .AND. hTok[ "line" ] >= nFirst .AND. hTok[ "line" ] <= nLast
+      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+         hTok[ "line" ] >= nFirst .AND. hTok[ "line" ] <= nLast
          DO CASE
          CASE Upper( hTok[ "text" ] ) == "RETURN"
             RETURN Refuse( "RETURN dentro da seleção (linha " + hb_ntos( hTok[ "line" ] ) + ") - recusando" )
@@ -1861,12 +1989,22 @@ STATIC FUNCTION ExtractFunction( aArgs )
    // montagem: chamada no lugar da seleção + função nova no fim do arquivo
    cEol := iif( Chr( 13 ) + Chr( 10 ) $ cText, Chr( 13 ) + Chr( 10 ), Chr( 10 ) )
    cIndent := Space( Len( aSrc[ nFirst ] ) - Len( LTrim( aSrc[ nFirst ] ) ) )
-   cCall := cIndent + iif( Empty( cOut ), "", cOut + " := " ) + cNewName + ;
+   cCall := cIndent + iif( Empty( cOut ), "", cOut + " := " ) + ;
+            iif( lMethod, "::", "" ) + cNewName + ;
             iif( Empty( aParams ), "()", "( " + ArrJoin( aParams, ", " ) + " )" )
 
-   cNewFunc := cEol + iif( Empty( cOut ), "STATIC PROCEDURE ", "STATIC FUNCTION " ) + ;
-               cNewName + iif( Empty( aParams ), "()", "( " + ArrJoin( aParams, ", " ) + " )" ) + ;
-               cEol + cEol
+   // método: a implementação nova é METHOD ... CLASS (Self implícito de novo,
+   // corpo verbatim); função: STATIC como antes. A assinatura do protótipo é
+   // idêntica à da implementação (o hbclass casa a assinatura INTEIRA - P1a)
+   IF lMethod
+      cNewFunc := cEol + "METHOD " + cNewName + ;
+                  iif( Empty( aParams ), "()", "( " + ArrJoin( aParams, ", " ) + " )" ) + ;
+                  " CLASS " + cClassReal + cEol + cEol
+   ELSE
+      cNewFunc := cEol + iif( Empty( cOut ), "STATIC PROCEDURE ", "STATIC FUNCTION " ) + ;
+                  cNewName + iif( Empty( aParams ), "()", "( " + ArrJoin( aParams, ", " ) + " )" ) + ;
+                  cEol + cEol
+   ENDIF
    IF ! Empty( cOut ) .AND. ! lOutParam
       cNewFunc += "   LOCAL " + cOut + cEol + cEol
    ENDIF
@@ -1880,12 +2018,25 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR nI := nFirst TO nLast
       cNewFunc += aSrc[ nI ] + cEol
    NEXT
-   cNewFunc += cEol + "   RETURN" + iif( Empty( cOut ), "", " " + cOut ) + cEol
+   // método é função gerada: RETURN sempre com valor (RETURN vazio = W0005)
+   IF lMethod
+      cNewFunc += cEol + "   RETURN " + iif( Empty( cOut ), "NIL", cOut ) + cEol
+   ELSE
+      cNewFunc += cEol + "   RETURN" + iif( Empty( cOut ), "", " " + cOut ) + cEol
+   ENDIF
 
    OutStd( "extract-function: linhas " + hb_ntos( nFirst ) + "-" + hb_ntos( nLast ) + ;
-           " de " + hTarget[ "name" ] + " -> " + cNewName + ;
+           " de " + hTarget[ "name" ] + " -> " + ;
+           iif( lMethod, "novo método " + cClassReal + ":" + cNewName, cNewName ) + ;
            "( " + ArrJoin( aParams, ", " ) + " )" + ;
            iif( Empty( cOut ), "", " retornando " + cOut ) + hb_eol() )
+   IF lMethod
+      OutStd( "  protótipo METHOD " + cNewName + " inserido após a linha " + hb_ntos( nAnchor ) + ;
+              " (junto ao protótipo do método de origem)" + hb_eol() )
+      FOR EACH cPar IN aParentsUnk
+         OutStd( "  warning: pai " + cPar + " fora do projeto - membros herdados não verificáveis" + hb_eol() )
+      NEXT
+   ENDIF
    FOR nI := 1 TO Len( aMoved )
       OutStd( "  LOCAL " + aMoved[ nI ][ 3 ] + " (linha " + hb_ntos( aMoved[ nI ][ 1 ] ) + ;
               ") só é usada na seleção - migra para " + cNewName + hb_eol() )
@@ -1906,6 +2057,14 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR nI := 1 TO Len( aVars )
       cTextNew := EditLine( cTextNew, aVars[ nI ], hMovedLines[ aVars[ nI ] ], cEol )
    NEXT
+   IF lMethod
+      // protótipo por último: a âncora está acima de todas as outras
+      // edições, então inseri-la agora não desloca nenhuma linha editada
+      cProtoLine := Space( Len( aSrc[ nAnchor ] ) - Len( LTrim( aSrc[ nAnchor ] ) ) ) + ;
+                    "METHOD " + cNewName + ;
+                    iif( Empty( aParams ), "()", "( " + ArrJoin( aParams, ", " ) + " )" )
+      cTextNew := InsertLineAfter( cTextNew, nAnchor, cProtoLine, cEol )
+   ENDIF
    hb_MemoWrit( cSrcPath, cTextNew )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
@@ -1915,9 +2074,19 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       cWhy := ""
       IF cPath == cSrcPath
-         IF ! HrbExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                               hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
-                               cUpNew, @cWhy )
+         IF lMethod
+            // método: além da função gerada nova, o módulo ganha o símbolo
+            // da MENSAGEM (send ::Nome) e a registração da classe embute o
+            // nome - verificação por fatos previstos, não byte-idêntica
+            IF ! HrbMethodExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
+                                        hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
+                                        cUpGenNew, cUpNew, Upper( cClassReal ), cNewName, @cWhy )
+               hb_MemoWrit( cSrcPath, cText )
+               RETURN Refuse( "verificação FALHOU: " + cWhy + " - rollback" )
+            ENDIF
+         ELSEIF ! HrbExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
+                                   hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
+                                   cUpNew, @cWhy )
             hb_MemoWrit( cSrcPath, cText )
             RETURN Refuse( "verificação FALHOU: " + cWhy + " - rollback" )
          ENDIF
@@ -1928,7 +2097,9 @@ STATIC FUNCTION ExtractFunction( aArgs )
       ENDIF
    NEXT
 
-   OutStd( "verified: símbolos preservados (+" + cNewName + "); rode sua suíte para confirmar comportamento" + hb_eol() )
+   OutStd( "verified: símbolos preservados (+" + ;
+           iif( lMethod, cGenNew + "), mensagem " + cNewName + " registrada", cNewName + ")" ) + ;
+           "; rode sua suíte para confirmar comportamento" + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -2224,6 +2395,269 @@ STATIC FUNCTION HrbExtractCheck( cBefore, cAfter, cUpNew, cWhy )
    ENDIF
 
    RETURN .T.
+
+// pós-extração PARA MÉTODO: além da função gerada nova, o módulo ganha o
+// símbolo da MENSAGEM (o send ::Nome no método de origem) e a registração da
+// classe embute o nome novo (string no pcode da função da classe) - não há
+// byte-idêntico; cada fato PREVISTO é conferido (espírito do PredictText)
+STATIC FUNCTION HrbMethodExtractCheck( cBefore, cAfter, cUpGen, cUpMsg, cUpClass, cNewSpelled, cWhy )
+
+   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
+   LOCAL nI, nJ, lFound, cName
+
+   cWhy := ""
+   IF hB == NIL .OR. hA == NIL
+      cWhy := "não consegui ler o .hrb"
+      RETURN .F.
+   ENDIF
+   IF Len( hA[ "funcs" ] ) != Len( hB[ "funcs" ] ) + 1
+      cWhy := "esperava exatamente uma função nova"
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( hB[ "funcs" ] )
+      lFound := .F.
+      FOR nJ := 1 TO Len( hA[ "funcs" ] )
+         IF hA[ "funcs" ][ nJ ][ 1 ] == hB[ "funcs" ][ nI ][ 1 ]
+            lFound := .T.
+            EXIT
+         ENDIF
+      NEXT
+      IF ! lFound
+         cWhy := "função perdida: " + hB[ "funcs" ][ nI ][ 1 ]
+         RETURN .F.
+      ENDIF
+   NEXT
+   // todo símbolo anterior sobrevive (nome+escopo); os NOVOS só podem ser o
+   // símbolo gerado e o da mensagem
+   FOR nI := 1 TO Len( hB[ "syms" ] )
+      lFound := .F.
+      FOR nJ := 1 TO Len( hA[ "syms" ] )
+         IF hA[ "syms" ][ nJ ][ 1 ] == hB[ "syms" ][ nI ][ 1 ] .AND. ;
+            hA[ "syms" ][ nJ ][ 2 ] == hB[ "syms" ][ nI ][ 2 ]
+            lFound := .T.
+            EXIT
+         ENDIF
+      NEXT
+      IF ! lFound
+         cWhy := "símbolo perdido ou alterado: " + hB[ "syms" ][ nI ][ 1 ]
+         RETURN .F.
+      ENDIF
+   NEXT
+   FOR nI := 1 TO Len( hA[ "syms" ] )
+      cName := hA[ "syms" ][ nI ][ 1 ]
+      lFound := .F.
+      FOR nJ := 1 TO Len( hB[ "syms" ] )
+         IF hB[ "syms" ][ nJ ][ 1 ] == cName
+            lFound := .T.
+            EXIT
+         ENDIF
+      NEXT
+      IF ! lFound .AND. !( cName == cUpGen ) .AND. !( cName == cUpMsg )
+         cWhy := "símbolo inesperado: " + cName
+         RETURN .F.
+      ENDIF
+   NEXT
+   lFound := .F.
+   FOR nJ := 1 TO Len( hA[ "syms" ] )
+      IF hA[ "syms" ][ nJ ][ 1 ] == cUpGen
+         lFound := .T.
+         EXIT
+      ENDIF
+   NEXT
+   IF ! lFound
+      cWhy := "símbolo novo " + cUpGen + " não encontrado"
+      RETURN .F.
+   ENDIF
+   // fato de registro: o nome novo (grafia escrita) tem que aparecer no
+   // pcode da função da CLASSE - sem ele o método não seria registrado e o
+   // send ::Nome só falharia em runtime
+   lFound := .F.
+   FOR nI := 1 TO Len( hA[ "funcs" ] )
+      IF hA[ "funcs" ][ nI ][ 1 ] == cUpClass .AND. ;
+         hb_BAt( cNewSpelled, hA[ "funcs" ][ nI ][ 2 ] ) > 0
+         lFound := .T.
+         EXIT
+      ENDIF
+   NEXT
+   IF ! lFound
+      cWhy := "registro da mensagem " + cNewSpelled + " não encontrado na classe " + cUpClass
+      RETURN .F.
+   ENDIF
+
+   RETURN .T.
+
+// insere uma linha nova APÓS a linha nLine (cNew sem EOL)
+STATIC FUNCTION InsertLineAfter( cText, nLine, cNew, cEol )
+
+   LOCAL aOffs := LineOffsets( cText )
+   LOCAL nAt := iif( nLine + 1 <= Len( aOffs ), aOffs[ nLine + 1 ], hb_BLen( cText ) + 1 )
+
+   RETURN hb_BLeft( cText, nAt - 1 ) + cNew + cEol + hb_BSubStr( cText, nAt )
+
+// última linha física do PROTÓTIPO de um método: aplicações que carregam a
+// identidade INTEIRA do nome gerado (classe+método, como em SigParamHits)
+// cujos tokens posicionados ficam TODOS antes da linha da implementação.
+// 0 = protótipo sem posição no módulo (classe declarada em include)
+STATIC FUNCTION MethodProtoAnchor( hAst, aIdentUp, nImplLine )
+
+   LOCAL hApp, hTok, hNames, nMax, nBest := 0
+
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      hNames := { => }
+      nMax := 0
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+            hTok[ "col" ] != NIL .AND. hTok[ "marker" ] >= 1
+            hNames[ Upper( hTok[ "text" ] ) ] := .T.
+            nMax := Max( nMax, hTok[ "line" ] )
+         ENDIF
+      NEXT
+      IF nMax > 0 .AND. nMax < nImplLine .AND. IdentSubset( aIdentUp, hNames )
+         nBest := Max( nBest, nMax )
+      ENDIF
+   NEXT
+
+   RETURN nBest
+
+// funções de CLASSE do projeto: nasceram de expansão (FuncDerived) e o nome
+// NÃO é composto (composto = implementação de método). Não há vocabulário de
+// família: só rastro. { NOME => { módulo, hAst, hFunc } }
+STATIC FUNCTION ClassFuncMap( hAsts )
+
+   LOCAL hMap := { => }, cPath, hAst, hFunc
+
+   FOR EACH cPath IN hb_HKeys( hAsts )
+      hAst := hAsts[ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. Empty( GenNameParts( hAst, hFunc ) ) .AND. ;
+            FuncDerived( hAst, hFunc )
+            hMap[ Upper( hFunc[ "name" ] ) ] := { cPath, hAst, hFunc }
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN hMap
+
+// membros REGISTRADOS de uma classe: as strings de STRINGIFY contidas (por
+// índice de token - nascem com line 0) na função da classe. VAR/DATA/METHOD/
+// ACCESS viram string de registro na expansão; string escrita pelo usuário
+// não tem "from" e fica de fora
+STATIC FUNCTION ClassMembersOf( hAst, hClassFunc )
+
+   LOCAL hMembers := { => }, aSpans := FuncStmtSpans( hAst )
+   LOCAL hTok, hFrom, hOwn, cUpCF := Upper( hClassFunc[ "name" ] )
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 41 .AND. hb_HHasKey( hTok, "from" )
+         hOwn := FuncOfTokIdx( aSpans, hTok:__enumIndex() - 1 )
+         IF hOwn != NIL .AND. ! hOwn[ "fileDecl" ] .AND. Upper( hOwn[ "name" ] ) == cUpCF
+            FOR EACH hFrom IN hTok[ "from" ]
+               IF hFrom[ "op" ] == "stringify"
+                  hMembers[ Upper( hTok[ "text" ] ) ] := .T.
+                  EXIT
+               ENDIF
+            NEXT
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN hMembers
+
+// aplicações que DECLARAM a classe: o fecho de derivação do token que NOMEIA
+// a função da classe (na linha dela). Só esse token: o clone do nome usado
+// na registração de uma classe FILHA fica na linha do CREATE da filha - de
+// fora por construção
+STATIC FUNCTION ClassDeclApps( hAst, hClassFunc )
+
+   LOCAL hApps := { => }, hTok
+   LOCAL cUp := Upper( hClassFunc[ "name" ] )
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+         Upper( hTok[ "text" ] ) == cUp .AND. hTok[ "line" ] == hClassFunc[ "line" ]
+         DeclAppWalk( hAst, hTok, hApps )
+      ENDIF
+   NEXT
+
+   RETURN hApps
+
+// desce a cadeia de derivação (mesmo padrão de PpMarkerRanges): o from do
+// token aponta a aplicação; o token CONSUMIDO correspondente carrega o
+// próximo elo (a cópia feita no instante da aplicação, ast-3)
+STATIC PROCEDURE DeclAppWalk( hAst, hTok, hApps )
+
+   LOCAL hFrom, hApp, hTA, cPart
+
+   FOR EACH hFrom IN hTok[ "from" ]
+      IF hb_HHasKey( hApps, hFrom[ "app" ] )
+         LOOP
+      ENDIF
+      hApps[ hFrom[ "app" ] ] := .T.
+      hApp  := hAst[ "ppApplications" ][ hFrom[ "app" ] + 1 ]
+      cPart := SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] )
+      FOR EACH hTA IN hApp[ "tokens" ]
+         IF hTA[ "marker" ] == hFrom[ "marker" ] .AND. hTA[ "text" ] == cPart .AND. ;
+            hb_HHasKey( hTA, "from" )
+            DeclAppWalk( hAst, hTA, hApps )
+            EXIT
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN
+
+// pais da classe: os OUTROS identificadores POSICIONADOS (escritos pelo
+// usuário: FROM <pai>) nas aplicações declarantes, NA LINHA da declaração
+// da classe (= linha da função da classe; o fecho de derivação arrasta apps
+// de protótipo de método, cujos markers ficam em OUTRAS linhas - o pai de
+// verdade está escrito na própria linha do CREATE CLASS). Palavra de regra
+// tem marker 0 e token sintetizado não tem posição - ficam de fora.
+// Devolve { noProjeto[], foraDoProjeto[] }; declaração CONTINUADA por ';'
+// deixa o pai em outra linha física - fica de fora dos dois (não-detecção
+// conservadora, nunca palpite)
+STATIC FUNCTION ClassParentsOf( hAst, cUpClass, hClassFunc, hClassMap )
+
+   LOCAL hApps := ClassDeclApps( hAst, hClassFunc )
+   LOCAL aIn := {}, aOut := {}, hSeen := { => }
+   LOCAL nApp, hApp, hTok, cUp
+
+   FOR EACH nApp IN hb_HKeys( hApps )
+      hApp := hAst[ "ppApplications" ][ nApp + 1 ]
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "marker" ] >= 1 .AND. hTok[ "type" ] == 21 .AND. ;
+            hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+            hTok[ "line" ] == hClassFunc[ "line" ]
+            cUp := Upper( hTok[ "text" ] )
+            IF !( cUp == cUpClass ) .AND. ! hb_HHasKey( hSeen, cUp )
+               hSeen[ cUp ] := .T.
+               // a palavra FROM da cláusula vem sob o MESMO marker do pai;
+               // o pai de verdade CHEGA ao parser (a registração o
+               // referencia), a palavra da cláusula o pp consome - só é
+               // candidato quem existe no stream
+               IF hb_HHasKey( hClassMap, cUp )
+                  AAdd( aIn, cUp )
+               ELSEIF StreamHasIdent( hAst, cUp )
+                  AAdd( aOut, cUp )
+               ENDIF
+            ENDIF
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN { aIn, aOut }
+
+// o identificador aparece no stream que o PARSER consumiu?
+STATIC FUNCTION StreamHasIdent( hAst, cUp )
+
+   LOCAL hTok
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. Upper( hTok[ "text" ] ) == cUp
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
 
 // ---------------------------------------------------------------------------
 // inline-local - substitui os usos de uma LOCAL pela sua expressão de

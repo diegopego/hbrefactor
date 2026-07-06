@@ -419,6 +419,50 @@ Semânticas importantes:
   não há aresta estática para inventar; mensagem homônima em N classes lista os
   N alvos (ambiguidade visível). Só sends cuja mensagem É método do projeto
   entram (filtra `:New`, acesso a VAR/DATA etc.).
+- **extract-to-method (B4e P2a)**: range num corpo de MÉTODO extrai para um
+  NOVO `METHOD` da MESMA classe — o alvo é decidido pelo **CONTÊINER**, não
+  pelo range (dogfooding do Diego no hbhttpd: range sem `::` dentro de
+  método virava função e surpreendia; método funciona sempre). Contêiner é
+  método = nome composto pelo rastro CUJA PRIMEIRA PARTE nomeia uma função
+  de CLASSE do projeto (`ClassFuncMap` — composto de DSL sem classe segue
+  no caminho de função). O corpo move VERBATIM (`::`/sends/`Super`
+  continuam válidos: mesma classe ⇒ mesmo binding, provado por execução).
+  Fatos consumidos:
+  - `Self` é local comum SEM declaration no dump do método (só occurrences;
+    a atribuição sintética do preâmbulo do hbclass gera um write na LINHA do
+    `METHOD` — fora de qualquer range válido). `::` = dois tokens `:`
+    type 58 sem coluna, NENHUM token SELF no stream — uso de Self detecta-se
+    pelas occurrences, nunca por token. Write/ref de SELF no range = recusa
+    (o Self da função nova é OUTRA local; `Self := x` e `@Self` compilam).
+  - identidade classe+mensagem: `GenNameParts`/`MethodImplOf` (rastro
+    `from`); símbolo gerado previsto: `PredictText` sobre o token composto
+    (faixa do método → nome novo; nenhum separador `_` assumido).
+  - âncora do protótipo (`MethodProtoAnchor`): aplicações com a identidade
+    INTEIRA (como `SigParamHits`) cujos tokens posicionados ficam ANTES da
+    implementação — a última linha física é onde o protótipo novo entra
+    (mesma seção de visibilidade do método de origem; PROTECTED interno
+    funciona — scope só é checado em runtime). Classe declarada em include:
+    tokens `prov 'i'` sem coluna ⇒ recusa limpa.
+  - membros registrados (`ClassMembersOf`): strings de STRINGIFY contidas
+    POR ÍNDICE (nascem com line 0) na função da classe (`FuncStmtSpans`) —
+    colisão do nome novo recusa; cadeia de ancestrais no projeto
+    (`ClassDeclApps`/`ClassParentsOf`): pais = markers posicionados NA LINHA
+    da declaração da classe nas apps declarantes (o fecho de derivação
+    arrasta apps de protótipo, cujos markers têm outras linhas; a palavra
+    `FROM` cai sob o MESMO marker do pai e é filtrada por não chegar ao
+    stream — `StreamHasIdent`). Pai fora do projeto = fato inexistente em
+    compilação ⇒ AVISO nomeando-o, nunca palpite.
+  - mensagem já ENVIADA em qualquer módulo (`sends`, incluindo o setter
+    `_X`) = recusa: o método novo sombrearia dispatch existente.
+  - assinatura: protótipo ≡ implementação, params na grafia dos tokens
+    (o hbclass casa a assinatura INTEIRA — P1a/W0001); método gerado exige
+    `RETURN` com valor (`RETURN NIL`; vazio = W0005, fatal sob -es2).
+  - verificação (`HrbMethodExtractCheck`): funções +1 (a gerada prevista),
+    símbolos novos ⊆ { símbolo gerado, símbolo da MENSAGEM (o send `::Nome`
+    o cria) }, e a string do nome (grafia escrita) presente no pcode da
+    FUNÇÃO DA CLASSE (fato de registro — sem ele o send falharia só em
+    runtime); demais módulos byte-idênticos + rollback. Range que usa Self
+    FORA de método (função com `LOCAL Self`, INLINE) = recusa limpa.
 - **find-dynamic-calls: ruído do `&` da expansão (B4e P3)** (`HasUserMacro`): a
   função gerada para o `CREATE CLASS` traz `usesMacro: true` por causa do `&`
   INTERNO do hbclass.ch, sem token `&` posicionado no fonte do usuário → falso
