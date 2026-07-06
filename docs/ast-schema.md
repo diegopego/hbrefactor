@@ -234,6 +234,24 @@ Semânticas importantes:
   string deve varrer **sem** filtro de linha quando a verificação do
   comando não é byte-idêntica (lição do inline-local; rename sobrevive
   porque o `.hrb` byte-exato pega a string mudada).
+- **Criadores de memvar (B4b)**: `PRIVATE x` gera declaration
+  `scope 'private'` (declLine exata); `PUBLIC x` NÃO gera declaration —
+  o fato é o call `__MVPUBLIC` na linha + occurrence memvar write/use na
+  mesma linha (assimetria do compilador). Criação via macro
+  (`PRIVATE &nome`): call `__MV*` SEM occurrence casada na linha = nome
+  invisível ao compilador (furo). Occurrence memvar com `filewide: true`
+  = referência resolvida pela declaração MEMVAR de nível de módulo.
+- **Alcance dinâmico (B4b)**: fecho transitivo dos callees a partir do
+  criador (`ReachFrom`), resolução de chamada STATIC-vence-no-módulo,
+  senão pública de qualquer módulo, senão core (`CoreFunction` = seguro)
+  ou FURO (função externa). Furos adicionais por função visitada:
+  `usesMacro`, `sends` não-vazio, token string com nome de função do
+  projeto no span (chamada dinâmica). Política do rename-memvar:
+  1 criador + usos ⊆ alcance + zero furos no alcance; macro FORA do
+  alcance nunca roda com o PRIVATE vivo → aviso + `--force`.
+- **M-> é memvar**: token do nome após `->` (type 59) cujo token anterior
+  ao alias é `M` = uso da própria memvar (editável); qualquer outro
+  `alias->` e `:msg` (type 58) ficam de fora (`MvLineHits`).
 - **Pureza p/ duplicar expressão** (`ExprPure()`): allowlist sobre os `et`
   da árvore — folhas NIL/NUMERIC/DATE/TIMESTAMP/STRING/LOGICAL/VARIABLE e
   combinadores IIF/LIST/OR/AND/NOT/EQUAL/EQ/NE/IN/LT/GT/LE/GE/PLUS/MINUS/

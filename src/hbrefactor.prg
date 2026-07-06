@@ -13,7 +13,7 @@
 //
 // A primeira encarnação (sobre .occ.json) está em smoketest/ como referência.
 
-#define APP_VERSION "0.4.0"
+#define APP_VERSION "0.5.0"
 
 #define EXIT_OK       0
 #define EXIT_REFUSED  1
@@ -46,6 +46,8 @@ PROCEDURE Main()
       nExit := FindDynamicCalls( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-dsl"
       nExit := RenameDsl( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-memvar"
+      nExit := RenameMemvar( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "dump"
@@ -72,6 +74,7 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor inline-local <projeto> <arq.prg> <função> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <projeto> <nome> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
    OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor unused-locals <projeto>" + hb_eol() )
    OutStd( "  hbrefactor call-graph <projeto> [<função>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <projeto>" + hb_eol() )
@@ -217,12 +220,24 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 
    RETURN hAst
 
+// scratch único por invocação (R1 da suíte paralela e de qualquer uso
+// concorrente real - o timestamp de 1 s colidia entre processos no mesmo
+// segundo): mkdir é atômico, então o nome é aleatório e a criação é
+// tentar-até-conseguir; hb_DirCreate devolve 0 só quando criou AGORA
 STATIC FUNCTION WorkDir()
 
-   LOCAL cTmp := hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor_" + ;
-                 StrTran( StrTran( hb_TSToStr( hb_DateTime() ), ":", "" ), " ", "_" )
+   LOCAL cTmp, nTry := 0
 
-   hb_DirCreate( cTmp )
+   DO WHILE .T.
+      cTmp := hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor_" + ;
+              hb_ntos( hb_RandomInt( 100000000, 999999999 ) )
+      IF hb_DirCreate( cTmp ) == 0
+         EXIT
+      ENDIF
+      IF ++nTry > 50      // erro persistente (permissão/disco): deixa o
+         EXIT             // consumidor falhar alto na primeira gravação
+      ENDIF
+   ENDDO
 
    RETURN cTmp
 
@@ -250,7 +265,7 @@ STATIC FUNCTION TokenCols( hAst, nLine, cSym )
 STATIC FUNCTION Usages( aArgs )
 
    LOCAL cSpec, cName, cFuncFilter := "", cJsonOut := "", lShowExp := .F.
-   LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem, nI, aLift
+   LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
 
    IF Len( aArgs ) < 3
@@ -287,6 +302,7 @@ STATIC FUNCTION Usages( aArgs )
          RETURN Refuse( "dump ast-1 ausente/inválido para '" + cPath + ;
                         "' (harbour com -x do branch feature/compiler-ast-dump)" )
       ENDIF
+      hAsts[ cPath ] := hAst
       cModFile := hb_FNameNameExt( cPath )
       aSrc := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
 
@@ -374,6 +390,10 @@ STATIC FUNCTION Usages( aArgs )
       // portanto invisível em tokens[]): diretivas e aplicações (ast-2)
       nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ) )
    NEXT
+
+   // memvar: mapa de visibilidade DINÂMICA (criadores, alcance, sombras,
+   // furos) - análise B4b sobre os fatos já listados acima
+   MvMapReport( hProj, hAsts, cUp )
 
    OutStd( hb_ntos( nHits ) + " result(s) for '" + cName + "'" + hb_eol() )
 
@@ -542,6 +562,16 @@ STATIC FUNCTION RenameLocal( aArgs )
       ENDIF
       IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "local"
          hDecl := hItem
+      ENDIF
+   NEXT
+   // nome novo já referenciado na função como memvar/field: a LOCAL nova
+   // sombrearia esses usos em silêncio (muda binding, não sintaxe - B4b)
+   FOR EACH hItem IN hFunc[ "occurrences" ]
+      IF Upper( hItem[ "sym" ] ) == cUpNew .AND. ;
+         ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" .OR. ;
+           hItem[ "scope" ] == "field" )
+         RETURN Refuse( "'" + cNew + "' já é " + hItem[ "scope" ] + " referenciada na função (linha " + ;
+                        hb_ntos( hItem[ "line" ] ) + ") - a LOCAL nova sombrearia esses usos" )
       ENDIF
    NEXT
    IF hDecl == NIL
@@ -3664,3 +3694,544 @@ STATIC FUNCTION PpoGen( hProj, cPath )
    ENDIF
 
    RETURN cPpo
+
+// ---------------------------------------------------------------------------
+// fase B4b - variáveis de escopo DINÂMICO (PRIVATE/PUBLIC/memvar). O
+// compilador já resolveu a sombra LÉXICA em cada occurrence (local vence
+// memvar na função); o que é análise NOVA da ferramenta é a visibilidade
+// dinâmica: um PRIVATE vive na extensão dinâmica do criador (o fecho
+// transitivo dos callees, pelo call graph do projeto), com furos onde o
+// grafo estático não enxerga (macro '&', sends, chamada dinâmica por nome,
+// função fora do projeto). Fatos usados (ver docs/ast-schema.md):
+//   criador PRIVATE  = declaration scope 'private' (declLine exata)
+//   criador PUBLIC   = call __MVPUBLIC na linha + occurrence write/use
+//   criação via '&'  = call __MV{PRIVATE|PUBLIC} SEM occurrence na linha
+//   uso              = occurrence scope memvar|memvar_implicit
+//   declarado MEMVAR = declaration scope 'memvar' (fileDecl = file-wide)
+// ---------------------------------------------------------------------------
+
+// fatos por nome, projeto inteiro
+STATIC FUNCTION MvFacts( hProj, hAsts, cUp )
+
+   LOCAL hF := { "creators" => {}, "decls" => {}, "uses" => {}, ;
+                 "lexshadow" => {}, "fields" => {}, "macrocreates" => {} }
+   LOCAL cPath, hAst, hFunc, hItem, cMod, lHit
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      cMod := hb_FNameNameExt( cPath )
+      FOR EACH hFunc IN hAst[ "functions" ]
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUp
+               DO CASE
+               CASE hItem[ "scope" ] == "private"
+                  AAdd( hF[ "creators" ], { cMod, hFunc[ "name" ], hItem[ "declLine" ], "PRIVATE", cPath } )
+               CASE hItem[ "scope" ] == "memvar"
+                  AAdd( hF[ "decls" ], { cMod, iif( hFunc[ "fileDecl" ], "(file-wide)", hFunc[ "name" ] ), ;
+                                         hItem[ "declLine" ], cPath } )
+               CASE hItem[ "scope" ] == "field"
+                  AAdd( hF[ "fields" ], { cMod, hFunc[ "name" ], hItem[ "declLine" ] } )
+               CASE hItem[ "scope" ] == "local" .OR. hItem[ "scope" ] == "static"
+                  AAdd( hF[ "lexshadow" ], { cMod, hFunc[ "name" ], hItem[ "scope" ], hItem[ "declLine" ] } )
+               ENDCASE
+            ENDIF
+         NEXT
+         FOR EACH hItem IN hFunc[ "occurrences" ]
+            IF Upper( hItem[ "sym" ] ) == cUp .AND. ;
+               ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" )
+               AAdd( hF[ "uses" ], { cMod, hFunc[ "name" ], hItem[ "line" ], hItem[ "access" ], ;
+                                     hItem[ "scope" ] == "memvar_implicit", hItem[ "block" ], cPath } )
+            ENDIF
+         NEXT
+         // criador PUBLIC: __MVPUBLIC na linha com occurrence write/use do
+         // nome (o PRIVATE tem declaration própria; o PUBLIC não)
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF hItem[ "sym" ] == "__MVPUBLIC"
+               lHit := MvOccAtLine( hFunc, cUp, hItem[ "line" ] )
+               IF lHit
+                  AAdd( hF[ "creators" ], { cMod, hFunc[ "name" ], hItem[ "line" ], "PUBLIC", cPath } )
+               ENDIF
+            ENDIF
+            // criação com nome invisível ao compilador (PRIVATE/PUBLIC &macro)
+            IF ( hItem[ "sym" ] == "__MVPRIVATE" .OR. hItem[ "sym" ] == "__MVPUBLIC" ) .AND. ;
+               ! MvAnyOccAtLine( hFunc, hItem[ "line" ] )
+               AAdd( hF[ "macrocreates" ], { cMod, hFunc[ "name" ], hItem[ "line" ] } )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN hF
+
+STATIC FUNCTION MvOccAtLine( hFunc, cUp, nLine )
+
+   LOCAL hItem
+
+   FOR EACH hItem IN hFunc[ "occurrences" ]
+      IF Upper( hItem[ "sym" ] ) == cUp .AND. hItem[ "line" ] == nLine .AND. ;
+         ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" ) .AND. ;
+         ( hItem[ "access" ] == "write" .OR. hItem[ "access" ] == "use" )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+STATIC FUNCTION MvAnyOccAtLine( hFunc, nLine )
+
+   LOCAL hItem
+
+   FOR EACH hItem IN hFunc[ "occurrences" ]
+      IF hItem[ "line" ] == nLine .AND. ;
+         ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" ) .AND. ;
+         ( hItem[ "access" ] == "write" .OR. hItem[ "access" ] == "use" )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// índice de funções do projeto p/ resolução de chamada: STATIC vence no
+// próprio módulo, pública em qualquer um (mesma regra do linker/VM)
+STATIC FUNCTION FuncIndex( hProj, hAsts )
+
+   LOCAL hIdx := { "static" => { => }, "public" => { => }, "names" => { => } }
+   LOCAL cPath, hAst, hFunc, cKey
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         cKey := Upper( hFunc[ "name" ] )
+         hIdx[ "names" ][ cKey ] := .T.
+         IF hFunc[ "static" ]
+            hIdx[ "static" ][ cPath + "!" + cKey ] := { cPath, hFunc }
+         ELSE
+            hIdx[ "public" ][ cKey ] := { cPath, hFunc }
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN hIdx
+
+// fecho transitivo dos callees a partir de (módulo, função) com furos:
+// tudo que roda ENQUANTO um PRIVATE do ponto de partida vive. Furos =
+// arestas que o grafo estático não segue: macro '&', send, string com nome
+// de função do projeto (chamada dinâmica possível), função nem do projeto
+// nem do core Harbour.
+STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
+
+   LOCAL hSeen := { => }, aQueue := {}, aHoles := {}, aFuncs := {}
+   LOCAL aCur, cPath, hFunc, hAst, hItem, cKey, cTgt, aDef, hTok
+
+   AAdd( aQueue, { cStartPath, Upper( cStartFunc ) } )
+   DO WHILE ! Empty( aQueue )
+      aCur := aQueue[ 1 ]
+      hb_ADel( aQueue, 1, .T. )
+      cTgt := aCur[ 2 ]
+      // resolução: static do módulo chamador > pública de qualquer módulo
+      IF hb_HHasKey( hIdx[ "static" ], aCur[ 1 ] + "!" + cTgt )
+         aDef := hIdx[ "static" ][ aCur[ 1 ] + "!" + cTgt ]
+      ELSEIF hb_HHasKey( hIdx[ "public" ], cTgt )
+         aDef := hIdx[ "public" ][ cTgt ]
+      ELSE
+         IF ! CoreFunction( hProj, cTgt )
+            AAdd( aHoles, "função '" + cTgt + "' fora do projeto e do core Harbour" )
+         ENDIF
+         LOOP
+      ENDIF
+      cPath := aDef[ 1 ]
+      hFunc := aDef[ 2 ]
+      cKey := cPath + "!" + Upper( hFunc[ "name" ] )
+      IF hb_HHasKey( hSeen, cKey )
+         LOOP
+      ENDIF
+      hSeen[ cKey ] := .T.
+      AAdd( aFuncs, { cPath, hFunc } )
+
+      IF hFunc[ "usesMacro" ]
+         AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") usa macro '&'" )
+      ENDIF
+      IF ! Empty( hFunc[ "sends" ] )
+         AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") envia mensagens (método - alvo dinâmico)" )
+      ENDIF
+      // string com nome de função do projeto = chamada dinâmica possível
+      hAst := hAsts[ cPath ]
+      FOR EACH hTok IN hAst[ "tokens" ]
+         IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. ;
+            hb_HHasKey( hIdx[ "names" ], Upper( hTok[ "text" ] ) ) .AND. ;
+            InFuncSpan( hAst, hFunc, hTok[ "line" ] )
+            AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ":" + ;
+                  hb_ntos( hTok[ "line" ] ) + ") cita '" + hTok[ "text" ] + "' em string (chamada dinâmica possível)" )
+         ENDIF
+      NEXT
+      FOR EACH hItem IN hFunc[ "calls" ]
+         IF ! Left( hItem[ "sym" ], 4 ) == "__MV"
+            AAdd( aQueue, { cPath, hItem[ "sym" ] } )
+         ENDIF
+      NEXT
+   ENDDO
+
+   RETURN { "funcs" => aFuncs, "holes" => aHoles }
+
+// o mapa impresso pelo usages quando o nome tem vida de memvar
+STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
+
+   LOCAL hF := MvFacts( hProj, hAsts, cUp )
+   LOCAL hIdx, aC, aI, hReach, cLine, nPub := 0, nPriv := 0
+
+   IF Empty( hF[ "creators" ] ) .AND. Empty( hF[ "uses" ] )
+      RETURN
+   ENDIF
+
+   OutStd( "memvar map for '" + cUp + "':" + hb_eol() )
+   hIdx := FuncIndex( hProj, hAsts )
+
+   FOR EACH aC IN hF[ "creators" ]
+      OutStd( "  creator: " + aC[ 4 ] + " in " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + ;
+              hb_ntos( aC[ 3 ] ) + ")" + hb_eol() )
+      IF aC[ 4 ] == "PUBLIC"
+         nPub++
+      ELSE
+         nPriv++
+      ENDIF
+      hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
+      cLine := ""
+      FOR EACH aI IN hReach[ "funcs" ]
+         IF ! Upper( aI[ 2 ][ "name" ] ) == Upper( aC[ 2 ] )
+            cLine += iif( Empty( cLine ), "", ", " ) + aI[ 2 ][ "name" ]
+         ENDIF
+      NEXT
+      OutStd( "    dynamic reach: " + iif( Empty( cLine ), "(nenhum callee no projeto)", cLine ) + hb_eol() )
+      FOR EACH cLine IN hReach[ "holes" ]
+         OutStd( "    hole in reach: " + cLine + hb_eol() )
+      NEXT
+   NEXT
+   IF nPriv > 0 .AND. nPub > 0
+      OutStd( "  dynamic shadowing: PRIVATE sombreia o PUBLIC homônimo enquanto viver" + hb_eol() )
+   ENDIF
+   IF nPriv + nPub > 1
+      OutStd( "  more than one creator: bindings dependem do caminho de execução" + hb_eol() )
+   ENDIF
+
+   FOR EACH aC IN hF[ "decls" ]
+      OutStd( "  declared MEMVAR: " + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + " " + aC[ 2 ] + hb_eol() )
+   NEXT
+   FOR EACH aC IN hF[ "lexshadow" ]
+      OutStd( "  lexical shadow: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 4 ] ) + ") declara " + ;
+              aC[ 3 ] + " homônima - usos ali NÃO são esta memvar" + hb_eol() )
+   NEXT
+   FOR EACH aC IN hF[ "fields" ]
+      OutStd( "  FIELD homônimo: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ;
+              ") - dado externo (workarea), nunca editado" + hb_eol() )
+   NEXT
+   FOR EACH aC IN hF[ "macrocreates" ]
+      OutStd( "  macro creation: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ;
+              ") cria memvar via '&' - nome invisível ao compilador" + hb_eol() )
+   NEXT
+   FOR EACH aC IN hF[ "uses" ]
+      IF aC[ 5 ]      // implícita (sem declaração) - vale destaque no mapa
+         OutStd( "  implicit use: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ", " + ;
+                 aC[ 4 ] + ") - memvar não declarada" + hb_eol() )
+      ENDIF
+   NEXT
+
+   RETURN
+
+// ---------------------------------------------------------------------------
+// rename-memvar - só quando o fecho é FECHADO e LIMPO (território H por
+// natureza; a recusa explica o furo):
+//   1 criador exato; todos os usos do projeto dentro do alcance dinâmico
+//   do criador; nenhum furo no alcance (macro/send/dinâmica/externa);
+//   nome novo sem vida própria (memvar/criador/decl) e sem declaração
+//   léxica homônima nas funções que usam o velho (mudaria binding em
+//   silêncio - a recusa-chave da spec); strings com o nome velho =
+//   call-by-name possível (TYPE/__mvGet) - aviso + --force.
+// Verificação: HrbEquivalent (símbolo renomeado, pcode byte-idêntico) em
+// todos os módulos + rollback; execução idêntica é contrato da suíte.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION RenameMemvar( aArgs )
+
+   LOCAL cSpec, cOld, cNew, lForce := .F., lDryRun := .F., nI
+   LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
+   LOCAL cUpOld, cUpNew, hF, hFNew, hIdx, hReach, hInReach, aC, aU, aWarn := {}
+   LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
+   LOCAL cWhy := ""
+
+   IF Len( aArgs ) < 4
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cSpec := aArgs[ 2 ]
+   cOld  := aArgs[ 3 ]
+   cNew  := aArgs[ 4 ]
+   FOR nI := 5 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--force"
+         lForce := .T.
+      CASE Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      ENDCASE
+   NEXT
+   cUpOld := Upper( cOld )
+   cUpNew := Upper( cNew )
+
+   IF ! OneWord( cNew )
+      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+   ENDIF
+   IF cUpOld == cUpNew
+      RETURN Refuse( "nomes velho e novo são idênticos" )
+   ENDIF
+
+   hProj := LoadProject( cSpec )
+   IF hProj == NIL
+      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! NameAccepted( hProj, cNew, .F. )
+      RETURN Refuse( "o compilador do projeto rejeita '" + cNew + "' como nome de variável" )
+   ENDIF
+   IF ! AstDumps( hProj, cTmp )
+      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := ReadAst( cTmp, cPath )
+      IF hAst == NIL
+         RETURN Refuse( "dump ausente/inválido para '" + cPath + "'" )
+      ENDIF
+      hAsts[ cPath ] := hAst
+      IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
+         RETURN Refuse( "novo nome '" + cNew + "' colide com regra de pré-processador (" + ;
+                        RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
+      ENDIF
+   NEXT
+
+   hF := MvFacts( hProj, hAsts, cUpOld )
+
+   // o alvo existe como memvar?
+   IF Empty( hF[ "creators" ] ) .AND. Empty( hF[ "uses" ] ) .AND. Empty( hF[ "decls" ] )
+      RETURN Refuse( "'" + cOld + "' não é memvar do projeto (nenhum criador, uso ou MEMVAR)" )
+   ENDIF
+
+   // política de fecho: exatamente UM criador explícito
+   IF Empty( hF[ "creators" ] )
+      IF ! Empty( hF[ "uses" ] )
+         aU := hF[ "uses" ][ 1 ]
+         RETURN Refuse( "'" + cOld + "' não tem criador PRIVATE/PUBLIC no projeto (uso " + ;
+                        iif( aU[ 5 ], "implícito", "declarado" ) + " em " + aU[ 1 ] + ":" + ;
+                        hb_ntos( aU[ 3 ] ) + ") - criada fora do projeto ou só em runtime; recuso" )
+      ENDIF
+      RETURN Refuse( "'" + cOld + "' só existe como declaração MEMVAR (sem criador nem uso) - nada a renomear com segurança" )
+   ENDIF
+   IF Len( hF[ "creators" ] ) > 1
+      cWhy := ""
+      FOR EACH aC IN hF[ "creators" ]
+         cWhy += iif( Empty( cWhy ), "", "; " ) + aC[ 4 ] + " em " + aC[ 2 ] + " (" + ;
+                 aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ")"
+      NEXT
+      RETURN Refuse( "'" + cOld + "' tem mais de um criador - bindings dependem do caminho de execução: " + cWhy )
+   ENDIF
+   aC := hF[ "creators" ][ 1 ]
+
+   // alcance dinâmico do criador: fecho dos callees, sem furos
+   hIdx := FuncIndex( hProj, hAsts )
+   hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
+   IF ! Empty( hReach[ "holes" ] )
+      OutErr( "hbrefactor: o alcance dinâmico de " + aC[ 2 ] + " tem furos:" + hb_eol() )
+      FOR EACH cWhy IN hReach[ "holes" ]
+         OutErr( "  - " + cWhy + hb_eol() )
+      NEXT
+      RETURN Refuse( "alcance com furos - código fora do grafo estático pode ver '" + cOld + "'; recuso" )
+   ENDIF
+   hInReach := { => }
+   FOR EACH aU IN hReach[ "funcs" ]
+      hInReach[ aU[ 1 ] + "!" + Upper( aU[ 2 ][ "name" ] ) ] := .T.
+   NEXT
+
+   // todos os usos do projeto dentro do alcance
+   FOR EACH aU IN hF[ "uses" ]
+      IF ! hb_HHasKey( hInReach, aU[ 7 ] + "!" + Upper( aU[ 2 ] ) )
+         RETURN Refuse( "uso de '" + cOld + "' fora do alcance do criador: " + aU[ 2 ] + ;
+                        " (" + aU[ 1 ] + ":" + hb_ntos( aU[ 3 ] ) + ") nunca roda com esse " + ;
+                        aC[ 4 ] + " vivo - outra memvar homônima; recuso" )
+      ENDIF
+   NEXT
+   // criação via macro dentro do alcance = pode ser este nome
+   FOR EACH aU IN hF[ "macrocreates" ]
+      IF hb_HHasKey( hInReach, MvModPath( hProj, aU[ 1 ] ) + "!" + Upper( aU[ 2 ] ) )
+         RETURN Refuse( "criação de memvar via '&' no alcance (" + aU[ 2 ] + ", " + aU[ 1 ] + ":" + ;
+                        hb_ntos( aU[ 3 ] ) + ") - o nome criado é invisível ao compilador; recuso" )
+      ENDIF
+      AAdd( aWarn, "criação via '&' fora do alcance em " + aU[ 2 ] + " (" + aU[ 1 ] + ":" + ;
+            hb_ntos( aU[ 3 ] ) + ") - não roda com o " + aC[ 4 ] + " vivo, mas confira" )
+   NEXT
+
+   // nome novo: sem vida própria de memvar e sem sombra léxica onde o velho vive
+   hFNew := MvFacts( hProj, hAsts, cUpNew )
+   IF ! Empty( hFNew[ "creators" ] ) .OR. ! Empty( hFNew[ "uses" ] ) .OR. ! Empty( hFNew[ "decls" ] )
+      RETURN Refuse( "'" + cNew + "' já tem vida de memvar no projeto (criador/uso/MEMVAR) - o rename fundiria duas variáveis" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! MvFuncUsesOld( hFunc, cUpOld )
+            LOOP
+         ENDIF
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUpNew
+               RETURN Refuse( "'" + cNew + "' é " + hItem[ "scope" ] + " em " + hFunc[ "name" ] + " (" + ;
+                              hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "declLine" ] ) + ;
+                              ") que usa '" + cOld + "' - os usos renomeados mudariam de binding em silêncio" )
+            ENDIF
+         NEXT
+         FOR EACH hItem IN hFunc[ "occurrences" ]
+            IF Upper( hItem[ "sym" ] ) == cUpNew .AND. hItem[ "block" ] .AND. hItem[ "scope" ] == "local"
+               RETURN Refuse( "'" + cNew + "' é parâmetro de codeblock em " + hFunc[ "name" ] + ;
+                              " que usa '" + cOld + "' - usos dentro do bloco seriam sombreados" )
+            ENDIF
+         NEXT
+      NEXT
+      // strings com o nome velho: call-by-name possível (TYPE, __mvGet...)
+      FOR EACH hItem IN hAst[ "tokens" ]
+         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. Upper( hItem[ "text" ] ) == cUpOld
+            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                  ": string igual a '" + cOld + "' - possível acesso por nome (não será alterada)" )
+         ENDIF
+      NEXT
+   NEXT
+
+   FOR nI := 1 TO Len( aWarn )
+      OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
+   NEXT
+   IF ! Empty( aWarn ) .AND. ! lForce
+      RETURN Refuse( "avisos acima - repita com --force para prosseguir sem tocá-los" )
+   ENDIF
+
+   // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      hLines := { => }
+      FOR EACH hFunc IN hAst[ "functions" ]
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ;
+               ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "private" )
+               hLines[ hItem[ "declLine" ] ] := .T.
+            ENDIF
+         NEXT
+         FOR EACH hItem IN hFunc[ "occurrences" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ;
+               ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" )
+               hLines[ hItem[ "line" ] ] := .T.
+            ENDIF
+         NEXT
+      NEXT
+      aE := {}
+      FOR EACH nLine IN hb_HKeys( hLines )
+         FOR EACH hItem IN MvLineHits( hAst, nLine, cUpOld )
+            AAdd( aE, hItem )
+         NEXT
+      NEXT
+      IF ! Empty( aE )
+         DedupHits( aE )
+         hEdits[ cPath ] := aE
+         nTotal += Len( aE )
+      ENDIF
+   NEXT
+   IF nTotal == 0
+      RETURN Refuse( "nenhum site editável encontrado para '" + cOld + "'" )
+   ENDIF
+
+   OutStd( "rename-memvar: " + cOld + " -> " + cNew + " (criador " + aC[ 4 ] + " em " + ;
+           aC[ 2 ] + ", alcance fechado e limpo)" + hb_eol() )
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      FOR EACH aE IN hEdits[ cPath ]
+         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;
+                 hb_ntos( aE[ 2 ] ) + hb_eol() )
+      NEXT
+   NEXT
+   IF lDryRun
+      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   IF ! CompileHrbAll( hProj, cTmp, "before" )
+      RETURN Refuse( "falha ao compilar o estado de referência" )
+   ENDIF
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      cText := hb_MemoRead( cPath )
+      hOrig[ cPath ] := cText
+      hb_MemoWrit( cPath, ApplyTokenEdits( cText, hEdits[ cPath ], cOld, cNew, @nLine ) )
+      IF nLine > 0
+         RollbackAll( hOrig )
+         RETURN Refuse( "texto em " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                        " não confere - rollback" )
+      ENDIF
+   NEXT
+   IF ! CompileHrbAll( hProj, cTmp, "after" )
+      RollbackAll( hOrig )
+      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
+                          hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
+                          cUpOld, cUpNew, @cWhy )
+         RollbackAll( hOrig )
+         RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
+      ENDIF
+   NEXT
+
+   OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol renamed, pcode byte-identical" + hb_eol() )
+
+   RETURN EXIT_OK
+
+STATIC FUNCTION MvFuncUsesOld( hFunc, cUpOld )
+
+   LOCAL hItem
+
+   FOR EACH hItem IN hFunc[ "occurrences" ]
+      IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ;
+         ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+STATIC FUNCTION MvModPath( hProj, cMod )
+
+   LOCAL cPath
+
+   FOR EACH cPath IN hProj[ "files" ]
+      IF hb_FNameNameExt( cPath ) == cMod
+         RETURN cPath
+      ENDIF
+   NEXT
+
+   RETURN cMod
+
+// tokens editáveis do nome numa linha: exclui contexto :msg (type 58) e
+// alias->campo (type 59) - EXCETO o alias de memvar M->nome, que é uso da
+// própria memvar (o token antes do '->' é o identificador 'M')
+STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
+
+   LOCAL aHits := {}, hTok, aPrev := NIL, aPrev2 := NIL
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+         hTok[ "line" ] == nLine .AND. Upper( hTok[ "text" ] ) == cUpOld
+         DO CASE
+         CASE aPrev != NIL .AND. aPrev[ "type" ] == 58                       // :msg
+         CASE aPrev != NIL .AND. aPrev[ "type" ] == 59 .AND. ;
+              !( aPrev2 != NIL .AND. Upper( aPrev2[ "text" ] ) == "M" )      // alias-> que não é M->
+         OTHERWISE
+            AddHit( aHits, hTok )
+         ENDCASE
+      ENDIF
+      aPrev2 := aPrev
+      aPrev := hTok
+   NEXT
+
+   RETURN aHits

@@ -11,6 +11,8 @@
 # a ';'-continued statement). Cases 38-43 are phase B4 (pp DSLs over
 # ppRules/ppApplications, specs S1-S5 of the roadmap): fixtures fixdsl/
 # (user DSL, three rule families) and fixcls/ (hbclass.ch classes).
+# Cases 44-46 are phase B4b (dynamically scoped memvars): fixture fixmv/
+# armed with shadowing on both axes, '&' creation and an implicit memvar.
 
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -44,6 +46,13 @@ freshcls() { # freshcls <case-name> -> fixture with hbclass.ch classes (B4)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
    cp "$HERE"/fixcls/*.prg "$HERE"/fixcls/*.hbp "$d"/
+   echo "$d"
+}
+
+freshmv() { # freshmv <case-name> -> fixture with dynamically scoped memvars (B4b)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixmv/*.prg "$HERE"/fixmv/*.hbp "$d"/
    echo "$d"
 }
 
@@ -745,7 +754,7 @@ D=$(freshcls case39)
 ( cd "$D" && "$BIN" usages fixcls.hbp Paint > out.log 2>&1 )
 RC=$?
 check "usages Paint exit 0"           $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "w1.prg:10: method definition Paint (class UWMenu)" "$D/out.log"
+grep -q "w1.prg:11: method definition Paint (class UWMenu)" "$D/out.log"
 check "definition lifted to method/class vocabulary" $?
 ! grep -q "UWMENU_PAINT" "$D/out.log"
 check "generated name never leaks without --show-expansion" $?
@@ -757,7 +766,7 @@ check "--show-expansion reveals the generated function" $?
 ( cd "$D" && "$BIN" usages fixcls.hbp METHOD > mth.log 2>&1 )
 grep -q "hbclass.ch:" "$D/mth.log"
 check "hbclass.ch rules reported as the DSL they are" $?
-grep -q "w1.prg:10:1: application (#xcommand METHOD" "$D/mth.log"
+grep -q "w1.prg:11:1: application (#xcommand METHOD" "$D/mth.log"
 check "hbclass.ch application with span in USER source" $?
 
 echo "case 40: S3 - builtin rules (std.ch family): facts yes, rename no"
@@ -831,6 +840,94 @@ grep -q "abre while (linha 19) que fecha fora dela" "$D/ext.log"
 check "refusal is structural (block facts), line exact" $?
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg"
 check "a.prg untouched"               $?
+
+echo "case 44: B4b - memvar visibility map (creators, reach, shadows, holes)"
+# a fixture usa memvar implícita de propósito (W0001) - compila sem -es2
+for f in a.prg b.prg; do
+   "$HB_BIN/harbour" "$HERE/fixmv/$f" -n -q0 -w3 -s -I"$HERE/fixmv" > /dev/null 2>&1
+   check "fixmv/$f compiles under -w3"  $?
+done
+D=$(freshmv case44)
+( cd "$D" && "$BIN" usages fixmv.hbp xSaldo > map.log 2>&1 )
+RC=$?
+check "usages of a memvar exit 0"     $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "creator: PUBLIC in MAIN (a.prg:7)" "$D/map.log"
+check "PUBLIC creator with exact line" $?
+grep -q "creator: PRIVATE in COMSOMBRAPRIVADA (a.prg:23)" "$D/map.log"
+check "PRIVATE creator (dynamic shadow) found" $?
+grep -q "dynamic shadowing: PRIVATE sombreia o PUBLIC" "$D/map.log"
+check "dynamic-axis shadowing reported" $?
+grep -q "dynamic reach: DEPOSITA$" "$D/map.log"
+check "reach of the PRIVATE is its dynamic extension only" $?
+grep -q "hole in reach: VIAMACRO (b.prg) usa macro" "$D/map.log"
+check "macro hole in the PUBLIC's reach" $?
+grep -q "lexical shadow: COMLOCALHOMONIMO" "$D/map.log"
+check "lexical-axis shadow reported (uses there are NOT the memvar)" $?
+grep -q "macro creation: VIAMACRO (b.prg:31)" "$D/map.log"
+check "invisible '&' creation reported" $?
+( cd "$D" && "$BIN" usages fixmv.hbp xTaxa > imp.log 2>&1 )
+grep -q "implicit use: IMPLICITA" "$D/imp.log"
+check "implicit memvar highlighted in map" $?
+
+echo "case 45: B4b - rename-memvar on a closed clean reach (behaviour identical)"
+D=$(freshmv case45)
+( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+check "fixture runs before"           $?
+# a criação via '&' FORA do alcance é aviso (não roda com o PRIVATE vivo):
+# sem --force recusa e não escreve; com --force executa
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta xCaixa > ren0.log 2>&1 )
+RC=$?
+check "out-of-reach '&' creation gates without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
+cmp -s "$D/a.prg" "$HERE/fixmv/a.prg"
+check "nothing written without --force" $?
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta xCaixa --force > ren.log 2>&1 )
+RC=$?
+check "rename-memvar exit 0 (clean closure)" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "verified: 5 edit(s); symbol renamed, pcode byte-identical" "$D/ren.log"
+check "verification: symbol renamed, pcode byte-identical" $?
+grep -q "MEMVAR xSaldo, xCaixa" "$D/a.prg" && grep -q "PRIVATE xCaixa := 10" "$D/a.prg" \
+   && grep -q "xCaixa += nAux - 1" "$D/b.prg"
+check "declaration, creator and cross-module use renamed" $?
+( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after rename" $?
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xCaixa xConta --force > /dev/null 2>&1 )
+cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
+check "A->B->A round-trip byte-exact"  $?
+
+echo "case 46: B4b - rename-memvar refusals explain the hole"
+D=$(freshmv case46)
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xSaldo xGrana > r1.log 2>&1 )
+RC=$?
+check "more than one creator refused"  $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "mais de um criador" "$D/r1.log" && grep -q "PUBLIC em MAIN" "$D/r1.log"
+check "refusal lists the creators"     $?
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xTaxa xImposto > r2.log 2>&1 )
+RC=$?
+check "implicit memvar (no creator) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "não tem criador" "$D/r2.log"
+check "refusal explains missing creator" $?
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xOculta xVista > r3.log 2>&1 )
+RC=$?
+check "macro-created memvar refused"   $([ $RC -ne 0 ] && echo 0 || echo 1)
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta nAux > r4.log 2>&1 )
+RC=$?
+check "new name is LOCAL in a using function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "mudariam de binding em silêncio" "$D/r4.log"
+check "refusal names the silent binding change" $?
+( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta xSaldo > r5.log 2>&1 )
+RC=$?
+check "new name already a living memvar refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "fundiria duas variáveis" "$D/r5.log"
+check "refusal explains the merge"     $?
+# o inverso da recusa-chave: rename-local para nome de memvar usada na função
+( cd "$D" && "$BIN" rename-local fixmv.hbp b.prg SomaConta nAux xConta > r6.log 2>&1 )
+RC=$?
+check "rename-local to a memvar used in the function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "sombrearia esses usos" "$D/r6.log"
+check "reverse guard explains the shadowing" $?
+cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
+check "sources untouched by all refusals" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

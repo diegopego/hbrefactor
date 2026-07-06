@@ -483,7 +483,47 @@ verifica `.ppo`/`.hrb` byte-idênticos; seleção de extract cortando REPEAT é
 recusada; **`usages Paint` numa fixture com classe responde no vocabulário
 método/classe (lifting provado)**; specs S1-S5 na suíte; suíte verde.
 
-### Fase B4b — Variáveis de escopo dinâmico e afins (caso especial, análise registrada)
+### Fase B4b — Variáveis de escopo dinâmico e afins (caso especial, análise registrada) ✅
+
+> **Status FINAL 2026-07-06 — fase concluída** (v0.5.0; `make test` 47
+> casos / 232 checks verdes; casos 44–46 + fixture `tests/fixmv/` armada
+> com sombra nos DOIS eixos, criação via macro e memvar implícita).
+>
+> **Entregue (nenhum gancho novo no core, como previsto):**
+> - **Mapa de visibilidade absorvido pelo `usages`** (mesma decisão
+>   genérico>específico da B4: sem comando `usages-memvar` dedicado):
+>   criadores com linha exata (PRIVATE = declaration `scope private`;
+>   PUBLIC = call `__MVPUBLIC` + occurrence na linha — fato asymmetric do
+>   dump, documentado no ast-schema), alcance dinâmico por criador (fecho
+>   transitivo dos callees; resolução STATIC-vence-no-módulo como o
+>   linker), furos nomeados (macro `&`, sends, string com nome de função
+>   do projeto = chamada dinâmica possível, função nem-projeto-nem-core),
+>   sombra dinâmica (PRIVATE × PUBLIC homônimos), sombra léxica
+>   (declaração local/static homônima — "usos ali NÃO são esta memvar"),
+>   criação via `&` (call `__MV*` sem occurrence casada = nome invisível),
+>   usos implícitos destacados, FIELD homônimo = relato-nunca-edição.
+> - **`rename-memvar`** com a política fecho-FECHADO-e-limpo: exatamente
+>   1 criador; todos os usos do projeto dentro do alcance; zero furos no
+>   alcance (macro FORA do alcance = aviso + `--force`, pois nunca roda
+>   com o PRIVATE vivo); nome novo sem vida de memvar (fusão) e sem
+>   declaração léxica/param de codeblock homônima nas funções que usam o
+>   velho (**a recusa-chave: mudaria binding em silêncio**); strings com
+>   o nome = aviso + `--force` (TYPE/__mvGet); M->nome editado (alias de
+>   memvar), `alias->campo`/`:msg` excluídos por tipo de token.
+>   Verificação: HrbEquivalent (símbolo renomeado, pcode byte-idêntico)
+>   em todos os módulos + rollback; suíte prova **execução idêntica** e
+>   ida-e-volta A→B→A byte-exata (caso 45).
+> - **Recusa reversa no `rename-local`** (spec item 3): novo nome que é
+>   memvar/field referenciada na função → recusa ("a LOCAL nova
+>   sombrearia esses usos"); caso 46 cobre.
+> - **STATIC**: continua S via rename-static (nada mudou, como previsto).
+>
+> **R1 da B-infra adiantado (2026-07-06)**: `WorkDir()` agora é
+> mkdir-atômico com nome aleatório e retry — 3 invocações concorrentes
+> provadas com scratch distintos; pré-requisito da suíte paralela e de
+> qualquer uso concorrente real (editor/LSP).
+
+#### Análise original (mantida como registro)
 
 **O caso**: em Harbour uma variável pode ser LOCAL/parâmetro (léxica),
 STATIC (léxica ao módulo/função), PRIVATE/PUBLIC (memvar de escopo
