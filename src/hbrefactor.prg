@@ -78,7 +78,7 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor reorder-params <projeto> <função> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <projeto> <arq.prg> <ini>-<fim> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor inline-local <projeto> <arq.prg> <função> <nome> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor usages <projeto> <nome> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
+   OutStd( "  hbrefactor usages <projeto> <nome|Classe:Método> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
    OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-method <projeto> <Classe:Método> <novo> [--force] [--dry-run]" + hb_eol() )
@@ -276,6 +276,7 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL cSpec, cName, cFuncFilter := "", cJsonOut := "", lShowExp := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
+   LOCAL cClass := "", cMethTok, cUpMeth, nAt
 
    IF Len( aArgs ) < 3
       Usage()
@@ -294,6 +295,20 @@ STATIC FUNCTION Usages( aArgs )
       ENDCASE
    NEXT
    cUp := Upper( cName )
+
+   // forma Classe:Método (backlog 5): a DEFINIÇÃO filtra pela classe (mesma
+   // resolução por rastro do PickFunc); sends continuam por MENSAGEM - o
+   // dispatch é dinâmico e o receptor é desconhecido no ast-3
+   IF ( nAt := At( ":", cName ) ) > 0
+      cClass   := Upper( Left( cName, nAt - 1 ) )
+      cMethTok := SubStr( cName, nAt + 1 )
+      IF Empty( cClass ) .OR. Empty( cMethTok ) .OR. ":" $ cMethTok
+         RETURN Refuse( "forma Classe:Método malformada: '" + cName + "'" )
+      ENDIF
+   ELSE
+      cMethTok := cName
+   ENDIF
+   cUpMeth := Upper( cMethTok )
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
@@ -328,13 +343,15 @@ STATIC FUNCTION Usages( aArgs )
             LocAdd( aLoc, cPath, hFunc[ "line" ], TokenCols( hAst, hFunc[ "line" ], cName ), Len( cName ) )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
-         ELSEIF FromReady( hAst ) .AND. ( aLift := PpMarkerLift( hAst, hFunc, cUp ) ) != NIL
+         ELSEIF FromReady( hAst ) .AND. ;
+            ( aLift := PpMarkerLift( hAst, hFunc, cUpMeth ) ) != NIL .AND. ;
+            ( Empty( cClass ) .OR. Upper( aLift[ 2 ] ) == cClass )
             // lifting B4d: o programador escreveu METHOD Paint() CLASS
             // UWMenu (ou HANDLER Click de qualquer DSL); a função gerada é
             // detalhe da expansão - a resposta vem no vocabulário do fonte
             // (a cabeça da regra raiz), com a posição real do nome escrito
             nHits++
-            LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( cName ) )
+            LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
             OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
                aLift[ 1 ] + iif( Empty( aLift[ 2 ] ), "", " (class " + aLift[ 2 ] + ")" ) + ;
                iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
@@ -372,11 +389,15 @@ STATIC FUNCTION Usages( aArgs )
          NEXT
 
          FOR EACH hItem IN hFunc[ "sends" ]
-            IF Upper( hItem[ "sym" ] ) == cUp
+            // send é despacho dinâmico e o ast-3 não carrega a classe do
+            // receptor: TODO send é camada "possible" - nunca "uso" seco
+            // (backlog 5; o call-graph já diz o mesmo com '~>')
+            IF Upper( hItem[ "sym" ] ) == cUpMeth
                nHits++
-               LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cName ), Len( cName ) )
-               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": send" + ;
-                  iif( hItem[ "block" ], " (codeblock)", "" ) + " in " + ;
+               LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cMethTok ), Len( cMethTok ) )
+               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": possible send" + ;
+                  " (dynamic dispatch, receiver unknown" + ;
+                  iif( hItem[ "block" ], ", codeblock", "" ) + ") in " + ;
                   hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
             ENDIF
          NEXT
@@ -386,10 +407,10 @@ STATIC FUNCTION Usages( aArgs )
       // exatamente o nome (call-by-name) - do próprio stream do compilador
       FOR EACH hItem IN hAst[ "tokens" ]
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUp
+            Upper( hItem[ "text" ] ) == cUpMeth
             nHits++
             LocAdd( aLoc, cPath, hItem[ "line" ], ;
-                    iif( hItem[ "col" ] == NIL, {}, { hItem[ "col" ] + 1 } ), Len( cName ) )
+                    iif( hItem[ "col" ] == NIL, {}, { hItem[ "col" ] + 1 } ), Len( cMethTok ) )
             OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ;
                     ": possible reference in string" + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
          ENDIF

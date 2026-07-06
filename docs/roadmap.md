@@ -1144,3 +1144,14 @@ palpite.
    método (`usages proj Paint`); a forma `Classe:Método` devolve 0 result(s)
    — alinhar com a resolução `Classe:Método` que rename-method/reorder/
    call-graph já fazem entra no mesmo item.
+   **Fatia 0 ✅ ENTREGUE (2026-07-06, caso 61)**: `usages` aceita
+   `Classe:Método` (resolução pela mesma via do PickFunc — rastro B4d — com
+   a DEFINIÇÃO filtrada pela classe; homônimo em outra classe sai da lista)
+   e TODO send no `usages` passa à camada honesta
+   `possible send (dynamic dispatch, receiver unknown)` — o rótulo "send"
+   seco morreu; o `a:Paint()` do relato aparece como possível, nunca como
+   uso confirmado. Nota de escopo: na forma `Classe:Método` o protótipo
+   dentro do `CREATE CLASS` não é listado (o relator de marker não filtra
+   por classe) — a forma crua o cobre via "name through pp rule". Fatia 1
+   (core, ast-4: `type`/`class` em `declarations[]` + `rcls` no SEND)
+   segue no portão de desenho da spec.

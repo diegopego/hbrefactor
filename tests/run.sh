@@ -389,8 +389,8 @@ D=$(fresh case23)
 ( cd "$D" && "$BIN" usages fix01.hbp Eval > eval.log 2>&1 )
 RC=$?
 check "usages Eval exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "a.prg:10: send in MAIN" "$D/eval.log"
-check "Eval listed as send"        $?
+grep -q "a.prg:10: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/eval.log"
+check "Eval listed as possible send (B4f: receiver unknown)" $?
 ( cd "$D" && "$BIN" usages fix01.hbp xCfg > priv.log 2>&1 )
 RC=$?
 check "usages xCfg exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
@@ -797,8 +797,8 @@ grep -q "w1.prg:11: method definition Paint (class UWMenu)" "$D/out.log"
 check "definition lifted to method/class vocabulary" $?
 ! grep -q "UWMENU_PAINT" "$D/out.log"
 check "generated name never leaks without --show-expansion" $?
-grep -q "w2.prg:7: send in MAIN" "$D/out.log"
-check "send site found across modules" $?
+grep -q "w2.prg:7: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/out.log"
+check "send site found across modules (possible layer)" $?
 ( cd "$D" && "$BIN" usages fixcls.hbp Paint --show-expansion > exp.log 2>&1 )
 grep -q "method definition Paint (class UWMenu) -> UWMENU_PAINT" "$D/exp.log"
 check "--show-expansion reveals the generated function" $?
@@ -1396,6 +1396,48 @@ check "only the real parent is warned (FROM word filtered by stream fact)" $?
 extrun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after warned extract" $?
+
+echo "case 61: B4f fatia 0 - usages aceita Classe:Método + camada 'possible' nos sends"
+# Backlog 5 (dogfooding hbhttpd): send não carrega a classe do receptor no
+# ast-3, então TODO send é 'possible (dynamic dispatch, receiver unknown)' -
+# remove a mentira do rótulo 'uso' seco. A forma Classe:Método resolve pela
+# mesma via do PickFunc (rastro B4d) e filtra a DEFINIÇÃO pela classe; os
+# sends continuam listados por mensagem (o dispatch é dinâmico).
+D=$(freshcls case61)
+printf '\nPROCEDURE Solto()\n\n   LOCAL a := {}\n\n   a:Paint()\n\n   RETURN\n' >> "$D/w2.prg"
+"$HB_BIN/harbour" "$D/w2.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixture with Diego's a := {} case compiles clean" $?
+( cd "$D" && "$BIN" usages fixcls.hbp UWMenu:Paint > cm.log 2>&1 )
+RC=$?
+check "usages Classe:Método exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "w1.prg:11: method definition Paint (class UWMenu)" "$D/cm.log"
+check "definition resolved and filtered by class" $?
+grep -q "w2.prg:7: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/cm.log"
+check "legit send listed as possible, never as bare use" $?
+grep -q "w2.prg:15: possible send (dynamic dispatch, receiver unknown) in SOLTO" "$D/cm.log"
+check "a:Paint() with a := {} is possible, not a confirmed use" $?
+! grep -q "UWMENU_PAINT" "$D/cm.log"
+check "generated name never leaks without --show-expansion" $?
+# homônimos: a definição é da classe pedida; sends (dinâmicos) permanecem
+D=$(freshmth case61b)
+( cd "$D" && "$BIN" usages fixmth.hbp Caixa:Soma > ca.log 2>&1 )
+RC=$?
+check "usages Caixa:Soma exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "c1.prg:11: method definition Soma (class Caixa)" "$D/ca.log"
+check "only the asked class's definition listed" $?
+! grep -q "class Outra" "$D/ca.log"
+check "homonym method of the other class filtered out" $?
+grep -q "c2.prg:28: possible send" "$D/ca.log" && grep -q "c2.prg:30: possible send" "$D/ca.log"
+check "every send of the message stays possible (dispatch is dynamic)" $?
+( cd "$D" && "$BIN" usages fixmth.hbp Outra:Soma > ou.log 2>&1 )
+grep -q "c2.prg:10: method definition Soma (class Outra)" "$D/ou.log" && \
+   ! grep -q "class Caixa" "$D/ou.log"
+check "the mirror query resolves the other class" $?
+( cd "$D" && "$BIN" usages fixmth.hbp Caixa: > mf.log 2>&1 )
+RC=$?
+check "malformed Classe: refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "malformada" "$D/mf.log"
+check "refusal names the malformed form" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"
