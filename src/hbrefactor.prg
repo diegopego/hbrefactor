@@ -48,6 +48,8 @@ PROCEDURE Main()
       nExit := RenameDsl( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-memvar"
       nExit := RenameMemvar( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-method"
+      nExit := RenameMethod( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "dump"
@@ -75,6 +77,7 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor usages <projeto> <nome> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
    OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor rename-method <projeto> <Classe:Método> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor unused-locals <projeto>" + hb_eol() )
    OutStd( "  hbrefactor call-graph <projeto> [<função>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <projeto>" + hb_eol() )
@@ -4235,3 +4238,398 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
    NEXT
 
    RETURN aHits
+
+// ---------------------------------------------------------------------------
+// fase B4c - rename-method. Declaração e implementação viraram fatos com
+// posição na B4 (markers de ppApplications; MethodLift). O problema duro é
+// o SEND: despacho dinâmico ('o:Paint()' não declara a classe de o) - a
+// política exige UNICIDADE da mensagem no projeto antes de editar sends.
+//
+// ZERO vocabulário de hbclass na ferramenta (revisão do Diego, 2026-07-06):
+// os fatos de classe vêm do código EXPANDIDO que o compilador compilou -
+// a função de REGISTRO da classe (a que o hbclass.ch gera com o nome da
+// classe) empurra os nomes de TODOS os membros como STRINGs na árvore de
+// statements (HBClass():New( "UWMenu", ...), :AddMethod( "Soma", ... ),
+// :AddInline, :AddMultiData...). Âncoras por FORMA, não por palavra:
+//   função de classe  = função que empurra uma STRING igual ao próprio nome
+//   membros da classe = as STRINGs empurradas pela função de classe
+//   site de declaração = marker posicionado (ppApplications) com o nome do
+//                        membro DENTRO do span da função de classe
+//   implementação      = MethodLift (colagem <CLASSE>_<MEMBRO>)
+// Strings geradas pelo stringify da declaração são INSTÁVEIS em posição
+// (com parâmetro nascem line 0) - nunca são sites: a edição do
+// identificador as regenera.
+// ---------------------------------------------------------------------------
+
+// funções de registro de classe do módulo: { NOME_UPPER => hFunc }
+STATIC FUNCTION ClassRegs( hAst )
+
+   LOCAL hRegs := { => }, hFunc
+
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "line" ] > 0 .AND. ;
+         hb_HHasKey( StmtStrings( hFunc ), Upper( hFunc[ "name" ] ) )
+         hRegs[ Upper( hFunc[ "name" ] ) ] := hFunc
+      ENDIF
+   NEXT
+
+   RETURN hRegs
+
+// STRINGs empurradas pela função (walk genérico da árvore de statements) -
+// para a função de registro de classe, é o conjunto de nomes de membros
+STATIC FUNCTION StmtStrings( hFunc )
+
+   LOCAL hSet := { => }, hStmt
+
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      StmtStringsWalk( hStmt[ "expr" ], hSet )
+   NEXT
+
+   RETURN hSet
+
+STATIC PROCEDURE StmtStringsWalk( xNode, hSet )
+
+   LOCAL xVal
+
+   DO CASE
+   CASE HB_ISHASH( xNode )
+      IF hb_HGetDef( xNode, "et", "" ) == "STRING" .AND. ;
+         HB_ISSTRING( hb_HGetDef( xNode, "val", NIL ) )
+         hSet[ Upper( xNode[ "val" ] ) ] := .T.
+      ENDIF
+      FOR EACH xVal IN hb_HValues( xNode )
+         StmtStringsWalk( xVal, hSet )
+      NEXT
+   CASE HB_ISARRAY( xNode )
+      FOR EACH xVal IN xNode
+         StmtStringsWalk( xVal, hSet )
+      NEXT
+   ENDCASE
+
+   RETURN
+
+// sites de DECLARAÇÃO do membro: markers posicionados de aplicações de pp
+// dentro do span da função de classe (é onde o bloco CREATE..ENDCLASS vive)
+STATIC FUNCTION DeclHits( hAst, hClassFunc, cUp )
+
+   LOCAL aHits := {}, hApp, hTok
+
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "marker" ] > 0 .AND. hTok[ "type" ] == 21 .AND. ;
+            hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+            Upper( hTok[ "text" ] ) == cUp .AND. ;
+            InFuncSpan( hAst, hClassFunc, hTok[ "line" ] )
+            AddHit( aHits, hTok )
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN aHits
+
+// tokens do nome numa linha em contexto de SEND (token anterior type 58)
+STATIC FUNCTION SendLineHits( hAst, nLine, cUp )
+
+   LOCAL aHits := {}, hTok, aPrev := NIL
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+         hTok[ "line" ] == nLine .AND. Upper( hTok[ "text" ] ) == cUp .AND. ;
+         aPrev != NIL .AND. aPrev[ "type" ] == 58
+         AddHit( aHits, hTok )
+      ENDIF
+      aPrev := hTok
+   NEXT
+
+   RETURN aHits
+
+STATIC FUNCTION RenameMethod( aArgs )
+
+   LOCAL cSpec, cTarget, cNew, lForce := .F., lDryRun := .F., nI, nAt
+   LOCAL cClass := "", cMethod, cUpOld, cUpNew, cUpClass
+   LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
+   LOCAL hRegs, hMembers, aOwners := {}, aDeclSites := NIL, cClassPath := ""
+   LOCAL aLift, aWarn := {}, hEdits := { => }, aE, hDeclLines := { => }, nLine
+   LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
+
+   IF Len( aArgs ) < 4
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cSpec   := aArgs[ 2 ]
+   cTarget := aArgs[ 3 ]
+   cNew    := aArgs[ 4 ]
+   FOR nI := 5 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--force"
+         lForce := .T.
+      CASE Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      ENDCASE
+   NEXT
+   IF ( nAt := At( ":", cTarget ) ) > 0
+      cClass  := Left( cTarget, nAt - 1 )
+      cMethod := SubStr( cTarget, nAt + 1 )
+   ELSE
+      cMethod := cTarget
+   ENDIF
+   cUpClass := Upper( cClass )
+   cUpOld   := Upper( cMethod )
+   cUpNew   := Upper( cNew )
+
+   IF ! OneWord( cNew )
+      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+   ENDIF
+   IF cUpOld == cUpNew
+      RETURN Refuse( "nomes velho e novo são idênticos" )
+   ENDIF
+
+   hProj := LoadProject( cSpec )
+   IF hProj == NIL
+      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! AstDumps( hProj, cTmp )
+      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := ReadAst( cTmp, cPath )
+      IF hAst == NIL
+         RETURN Refuse( "dump ausente/inválido para '" + cPath + "'" )
+      ENDIF
+      IF ! PpReady( hAst )
+         RETURN Refuse( "dump sem ppRules/ppApplications (schema ast-2) - " + ;
+                        "recompile o harbour do branch feature/compiler-ast-dump" )
+      ENDIF
+      hAsts[ cPath ] := hAst
+      IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
+         RETURN Refuse( "novo nome '" + cNew + "' colide com regra de pré-processador (" + ;
+                        RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
+      ENDIF
+   NEXT
+
+   // donos do nome: funções de registro de classe que empurram o nome como
+   // STRING (código expandido que o compilador compilou) e implementações
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      hRegs := ClassRegs( hAst )
+      FOR EACH cWhy IN hb_HKeys( hRegs )                   // reuso: nome da classe
+         hFunc := hRegs[ cWhy ]
+         hMembers := StmtStrings( hFunc )
+         IF hb_HHasKey( hMembers, cUpOld )
+            lOurs := Empty( cUpClass ) .OR. cWhy == cUpClass
+            AAdd( aOwners, { cWhy, hb_FNameNameExt( cPath ), lOurs } )
+            IF lOurs
+               aDeclSites := DeclHits( hAst, hFunc, cUpOld )
+               cClassPath := cPath
+               cUpClass := cWhy                // resolve a forma sem classe
+            ENDIF
+         ENDIF
+         // nome novo já registrado por qualquer classe = mensagem viva
+         IF hb_HHasKey( hMembers, cUpNew )
+            RETURN Refuse( "'" + cNew + "' já é membro/mensagem registrada da classe " + cWhy + ;
+                           " (" + hb_FNameNameExt( cPath ) + ") - o rename fundiria mensagens" )
+         ENDIF
+      NEXT
+      // implementações: função que faz lifting p/ (outra classe, nome novo)
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. ( aLift := MethodLift( hAst, hFunc ) ) != NIL
+            IF Upper( aLift[ 2 ] ) == cUpNew
+               RETURN Refuse( "'" + cNew + "' já é método implementado da classe " + aLift[ 1 ] + ;
+                              " (" + hb_FNameNameExt( cPath ) + ") - sequestro reverso" )
+            ENDIF
+         ENDIF
+      NEXT
+   NEXT
+   cWhy := ""
+   IF aDeclSites == NIL
+      RETURN Refuse( "método '" + cMethod + "' não encontrado" + ;
+                     iif( Empty( cClass ), "", " na classe '" + cClass + "'" ) + " no projeto" )
+   ENDIF
+   IF Empty( aDeclSites )
+      RETURN Refuse( "declaração de '" + cMethod + "' sem posição no fonte (gerada por " + ;
+                     "expansão/include) - recuso" )
+   ENDIF
+
+   // unicidade da mensagem: sends não têm classe - só renomeamos quando o
+   // nome pertence a UMA classe do projeto
+   cWhy := ""
+   FOR EACH aE IN aOwners
+      IF ! aE[ 3 ]
+         cWhy += iif( Empty( cWhy ), "", "; " ) + aE[ 1 ] + " (" + aE[ 2 ] + ")"
+      ENDIF
+   NEXT
+   IF ! Empty( cWhy )
+      RETURN Refuse( "'" + cMethod + "' também é membro de: " + cWhy + ;
+                     " - send é despacho dinâmico, rename ambíguo; recuso" )
+   ENDIF
+   // membro de DADOS (VAR/DATA): atribuição vira send '_NOME' que este
+   // comando não cobre - fora do escopo v1
+   FOR EACH cPath IN hProj[ "files" ]
+      FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
+         FOR EACH hItem IN hFunc[ "sends" ]
+            IF Upper( hItem[ "sym" ] ) == "_" + cUpOld
+               RETURN Refuse( "'" + cMethod + "' recebe atribuição (send _" + cUpOld + " em " + ;
+                              hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                              ") - é VAR/DATA, não método; fora do escopo do rename-method" )
+            ENDIF
+            IF Upper( hItem[ "sym" ] ) == cUpNew
+               RETURN Refuse( "'" + cNew + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
+                              ":" + hb_ntos( hItem[ "line" ] ) + " - o rename passaria a respondê-la" )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+   IF ! NameAccepted( hProj, cUpClass + "_" + cNew, .T. )
+      RETURN Refuse( "o compilador do projeto rejeita '" + cUpClass + "_" + cNew + ;
+                     "' (nome da função gerada) - escolha outro nome" )
+   ENDIF
+
+   // sites: declaração (bloco) + implementação (função com lifting) + sends
+   FOR EACH aHit IN aDeclSites
+      hDeclLines[ aHit[ 1 ] ] := .T.
+   NEXT
+   hEdits[ cClassPath ] := AClone( aDeclSites )
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      aE := iif( hb_HHasKey( hEdits, cPath ), hEdits[ cPath ], {} )
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. ( aLift := MethodLift( hAst, hFunc ) ) != NIL .AND. ;
+            Upper( aLift[ 1 ] ) == cUpClass .AND. Upper( aLift[ 2 ] ) == cUpOld
+            IF ! cPath == cClassPath
+               RETURN Refuse( "implementação de " + cUpClass + ":" + cMethod + " em módulo distinto (" + ;
+                              hb_FNameNameExt( cPath ) + ") do bloco da classe - caso não coberto; recuso" )
+            ENDIF
+            AddHit( aE, { "line" => aLift[ 3 ], "col" => aLift[ 4 ] - 1 } )
+            hDeclLines[ aLift[ 3 ] ] := .T.
+         ENDIF
+         FOR EACH hItem IN hFunc[ "sends" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld
+               FOR EACH aHit IN SendLineHits( hAst, hItem[ "line" ], cUpOld )
+                  AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
+               NEXT
+            ENDIF
+         NEXT
+      NEXT
+      IF ! Empty( aE )
+         hEdits[ cPath ] := aE
+      ENDIF
+      // strings com o nome FORA das linhas de declaração/implementação =
+      // possível acesso por nome (__objSendMsg, :&) - aviso, nunca edição.
+      // (as strings GERADAS pelo stringify da declaração se regeneram da
+      // edição do identificador; com parâmetro nascem line 0 e nem aparecem)
+      FOR EACH hItem IN hAst[ "tokens" ]
+         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
+            Upper( hItem[ "text" ] ) == cUpOld .AND. ;
+            !( cPath == cClassPath .AND. hb_HHasKey( hDeclLines, hItem[ "line" ] ) )
+            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                  ": string igual a '" + cMethod + "' - possível acesso por nome (não será alterada)" )
+         ENDIF
+      NEXT
+   NEXT
+
+   FOR nI := 1 TO Len( aWarn )
+      OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
+   NEXT
+   IF ! Empty( aWarn ) .AND. ! lForce
+      RETURN Refuse( "referências textuais encontradas (ver warnings) - repita com --force" )
+   ENDIF
+
+   // AddHit já normalizou tudo para pares { linha, coluna 1-based }
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      aE := hEdits[ cPath ]
+      DedupHits( aE )
+      nTotal += Len( aE )
+   NEXT
+
+   OutStd( "rename-method: " + cUpClass + ":" + cMethod + " -> " + cNew + hb_eol() )
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      FOR EACH aE IN hEdits[ cPath ]
+         OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;
+                 hb_ntos( aE[ 2 ] ) + hb_eol() )
+      NEXT
+   NEXT
+   IF lDryRun
+      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   IF ! CompileHrbAll( hProj, cTmp, "before" )
+      RETURN Refuse( "falha ao compilar o estado de referência" )
+   ENDIF
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      cText := hb_MemoRead( cPath )
+      hOrig[ cPath ] := cText
+      hb_MemoWrit( cPath, ApplyTokenEdits( cText, hEdits[ cPath ], cMethod, cNew, @nLine ) )
+      IF nLine > 0
+         RollbackAll( hOrig )
+         RETURN Refuse( "texto em " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
+                        " não confere - rollback" )
+      ENDIF
+   NEXT
+   IF ! CompileHrbAll( hProj, cTmp, "after" )
+      RollbackAll( hOrig )
+      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+   ENDIF
+   // módulo da classe: o pcode muda DE VERDADE (strings de __clsAddMsg e
+   // nome da função gerada) - símbolos conferidos módulo-a-módulo com os
+   // DOIS mapeamentos esperados; demais módulos: byte-idêntico com o
+   // símbolo do send renomeado (HrbEquivalent). Execução idêntica é
+   // contrato da suíte.
+   FOR EACH cPath IN hProj[ "files" ]
+      cText := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" )
+      cWhy := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" )
+      IF cPath == cClassPath
+         IF ! HrbSymbolsRenamed( cText, cWhy, { cUpOld => cUpNew, ;
+                 cUpClass + "_" + cUpOld => cUpClass + "_" + cUpNew }, @cSpec )
+            RollbackAll( hOrig )
+            RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+         ENDIF
+      ELSE
+         IF ! HrbEquivalent( cText, cWhy, cUpOld, cUpNew, @cSpec )
+            RollbackAll( hOrig )
+            RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+         ENDIF
+      ENDIF
+   NEXT
+
+   OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
+           "other modules byte-identical" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// símbolos/funções iguais módulo um conjunto de renomes esperados; o
+// PCODE do módulo pode divergir (strings de registro de mensagem mudam
+// de conteúdo e tamanho) - quem fecha o contrato é a execução idêntica
+STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, cWhy )
+
+   LOCAL hA := HrbParse( cBefore ), hB := HrbParse( cAfter )
+   LOCAL nI, cName
+
+   cWhy := ""
+   IF hA == NIL .OR. hB == NIL
+      cWhy := "formato .hrb inesperado"
+      RETURN .F.
+   ENDIF
+   IF Len( hA[ "syms" ] ) != Len( hB[ "syms" ] ) .OR. Len( hA[ "funcs" ] ) != Len( hB[ "funcs" ] )
+      cWhy := "contagem de símbolos/funções mudou"
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( hA[ "syms" ] )
+      cName := hA[ "syms" ][ nI ][ 1 ]
+      cName := hb_HGetDef( hMap, cName, cName )
+      IF !( cName == hB[ "syms" ][ nI ][ 1 ] )
+         cWhy := "símbolo " + hA[ "syms" ][ nI ][ 1 ] + " -> " + hB[ "syms" ][ nI ][ 1 ] + " inesperado"
+         RETURN .F.
+      ENDIF
+   NEXT
+   FOR nI := 1 TO Len( hA[ "funcs" ] )
+      cName := hA[ "funcs" ][ nI ][ 1 ]
+      cName := hb_HGetDef( hMap, cName, cName )
+      IF !( cName == hB[ "funcs" ][ nI ][ 1 ] )
+         cWhy := "função " + hA[ "funcs" ][ nI ][ 1 ] + " -> " + hB[ "funcs" ][ nI ][ 1 ] + " inesperada"
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.

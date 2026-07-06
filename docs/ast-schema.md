@@ -252,6 +252,23 @@ Semânticas importantes:
 - **M-> é memvar**: token do nome após `->` (type 59) cujo token anterior
   ao alias é `M` = uso da própria memvar (editável); qualquer outro
   `alias->` e `:msg` (type 58) ficam de fora (`MvLineHits`).
+- **Fatos de classe SEM palavra-chave (B4c)**: o compilador é cego a
+  classes (construto de runtime), mas COMPILOU o código expandido do
+  hbclass.ch - a função de REGISTRO da classe empurra o nome da classe e
+  de todos os membros como STRINGs na árvore de statements. Âncoras por
+  forma: função de classe = empurra STRING igual ao próprio nome
+  (`ClassRegs`); membros = STRINGs dos statements dela (`StmtStrings`,
+  walk genérico); site de declaração = marker posicionado de
+  `ppApplications` dentro do span da função de classe (`DeclHits`);
+  implementação = `MethodLift`. Send site editável = token type 21 cujo
+  anterior é type 58 (`SendLineHits`). Atribuição a membro vira send
+  `_NOME` - é o detector de VAR/DATA (rename-method recusa).
+- **Verificação quando o pcode muda de verdade** (rename-method): o
+  módulo da classe embute os nomes de mensagem em strings de registro -
+  não há byte-idêntico; `HrbSymbolsRenamed` confere símbolos/funções
+  módulo um MAPA de renomes esperados ({MSG→NOVA, CLS_MSG→CLS_NOVA}) e
+  os demais módulos seguem `HrbEquivalent` byte-idênticos; execução
+  idêntica fecha o contrato na suíte.
 - **Pureza p/ duplicar expressão** (`ExprPure()`): allowlist sobre os `et`
   da árvore — folhas NIL/NUMERIC/DATE/TIMESTAMP/STRING/LOGICAL/VARIABLE e
   combinadores IIF/LIST/OR/AND/NOT/EQUAL/EQ/NE/IN/LT/GT/LE/GE/PLUS/MINUS/

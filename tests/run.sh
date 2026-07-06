@@ -13,6 +13,9 @@
 # (user DSL, three rule families) and fixcls/ (hbclass.ch classes).
 # Cases 44-46 are phase B4b (dynamically scoped memvars): fixture fixmv/
 # armed with shadowing on both axes, '&' creation and an implicit memvar.
+# Cases 47-49 are phase B4c (rename-method): fixture fixmth/ with two
+# classes - class facts read keyword-free from the EXPANDED registration
+# code the compiler saw (strings in the class function's statements).
 
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -53,6 +56,13 @@ freshmv() { # freshmv <case-name> -> fixture with dynamically scoped memvars (B4
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
    cp "$HERE"/fixmv/*.prg "$HERE"/fixmv/*.hbp "$d"/
+   echo "$d"
+}
+
+freshmth() { # freshmth <case-name> -> fixture with two classes (B4c)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixmth/*.prg "$HERE"/fixmth/*.hbp "$d"/
    echo "$d"
 }
 
@@ -928,6 +938,76 @@ grep -q "sombrearia esses usos" "$D/r6.log"
 check "reverse guard explains the shadowing" $?
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
 check "sources untouched by all refusals" $?
+
+echo "case 47: B4c - rename-method (decl + impl + sends; INLINE; string gate)"
+for f in c1.prg c2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixmth/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+   check "fixmth/$f clean under -w3 -es2"  $?
+done
+D=$(freshmth case47)
+( cd "$D" && $HB_BIN/hbmk2 c1.prg c2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Mostra > ren.log 2>&1 )
+RC=$?
+check "clean method rename exit 0"    $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "c1.prg:8:11" "$D/ren.log" && grep -q "c1.prg:17:8" "$D/ren.log" \
+   && grep -q "c2.prg:29:7" "$D/ren.log"
+check "declaration, implementation and cross-module send sites" $?
+grep -q "message and generated function renamed, other modules byte-identical" "$D/ren.log"
+check "verification with the two expected symbol renames" $?
+( cd "$D" && $HB_BIN/hbmk2 c1.prg c2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after rename" $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Mostra Info > /dev/null 2>&1 )
+cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
+check "A->B->A round-trip byte-exact"  $?
+# INLINE: o nome também vive numa string do usuário -> --force obrigatório
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Dobro Duplo > inl0.log 2>&1 )
+RC=$?
+check "user string with the name gates without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
+cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg"
+check "nothing written without --force" $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Dobro Duplo --force > inl.log 2>&1 && \
+             "$BIN" rename-method fixmth.hbp Caixa:Duplo Dobro --force > /dev/null 2>&1 )
+check "INLINE method renames with --force and returns" $?
+cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
+check "INLINE round-trip byte-exact"   $?
+
+echo "case 48: B4c - send is dynamic dispatch: refusals explain the ambiguity"
+D=$(freshmth case48)
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Soma Junta > r1.log 2>&1 )
+RC=$?
+check "method owned by two classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "também é membro de: OUTRA" "$D/r1.log" && grep -q "despacho dinâmico" "$D/r1.log"
+check "refusal names the other class and the dispatch problem" $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Soma > r2.log 2>&1 )
+RC=$?
+check "new name already a registered message refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "fundiria mensagens" "$D/r2.log"
+check "refusal explains the message merge" $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Fantasma > r3.log 2>&1 )
+RC=$?
+check "new name already sent somewhere refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "passaria a respondê-la" "$D/r3.log"
+check "refusal explains the hijack"    $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:nTot nTotal > r4.log 2>&1 )
+RC=$?
+check "VAR/DATA member (setter send _NTOT) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "send _NTOT" "$D/r4.log"
+check "refusal shows the assignment send" $?
+cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
+check "sources untouched by all refusals" $?
+
+echo "case 49: B4c - bare method name resolves when unique in the project"
+D=$(freshmth case49)
+( cd "$D" && "$BIN" rename-method fixmth.hbp Zera Limpa > z.log 2>&1 && \
+             "$BIN" rename-method fixmth.hbp Limpa Zera > /dev/null 2>&1 )
+check "unique bare name renames and returns" $?
+cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
+check "bare-name round-trip byte-exact" $?
+( cd "$D" && "$BIN" rename-method fixmth.hbp Soma Junta > amb.log 2>&1 )
+RC=$?
+check "ambiguous bare name refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
 
 echo
 echo "passed: $PASS  failed: $FAIL"

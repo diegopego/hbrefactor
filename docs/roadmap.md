@@ -580,6 +580,102 @@ furos); `rename-memvar` recusa nos casos sujos com mensagem explicando o
 furo, executa no caso limpo com **comportamento idêntico por execução**
 (padrão da Fase 2 do smoke test) e ida-e-volta byte-exata dos fontes.
 
+### Fase B4c — rename-method (spec 2026-07-06, escrita antes de codar) ✅
+
+> **Status FINAL 2026-07-06 — fase concluída** (`make test` 50 casos /
+> 256 checks verdes; casos 47–49 + fixture `tests/fixmth/`; dogfooding
+> hbhttpd: `UHttpdLog:IsOpen` A→B→A byte-exato; recusa de ambiguidade
+> listando as 9 classes donas de `Paint` no corpus real).
+>
+> **REVISÃO DE ARQUITETURA (questionamento do Diego, 2026-07-06,
+> incorporada antes de fechar)**: a primeira versão delimitava blocos de
+> classe ligando por CABEÇAS de regra (`CREATE`/`CLASS`/`ENDCLASS`) —
+> vocabulário do hbclass.ch DENTRO da ferramenta, a mesma família de
+> réplica que a auditoria matou. Redesenhada para ZERO palavra-chave:
+> os fatos de classe vêm do código EXPANDIDO que o compilador compilou —
+> a função de REGISTRO da classe empurra o nome da classe e de TODOS os
+> membros como STRINGs na árvore de statements (`HBClass():New("UWMenu",
+> ...)`, `:AddMethod("Soma", ...)`, `:AddInline`, `:AddMultiData`).
+> Âncoras por FORMA: função de classe = função que empurra STRING igual
+> ao próprio nome; membros = as STRINGs dos statements dela
+> (`ClassRegs`/`StmtStrings`); site de declaração = marker posicionado de
+> `ppApplications` dentro do SPAN da função de classe (`DeclHits`);
+> implementação = `MethodLift` (colagem). Sobre onde o fato DEVERIA
+> morar: o compilador é cego a classes POR DESENHO (classe é construto
+> de runtime montado por `__clsAddMsg`) — gancho no core ensinaria
+> hbclass ao compilador (hostil ao upstream); instrumentar hbclass.ch =
+> fork de include de sistema (candidato honesto: propor um hook opcional
+> upstream, B6+); reflection em runtime executaria código do usuário.
+> A leitura do expandido é a única fonte que já É fato do compilador.
+>
+> **Entregue**: `rename-method <proj> <Classe:Método>|<Método> <novo>`
+> edita declaração (bloco) + implementação + sends (self `::` e
+> externos); INLINE coberto (site = marker da declaração; corpo vira
+> codeblock e o self-send interno converge com a edição de sends);
+> forma sem classe resolve quando o nome é único no projeto. Política:
+> unicidade da mensagem (send é despacho dinâmico — dono duplo recusa
+> listando as classes); VAR/DATA fora do escopo (detectado pelo send de
+> atribuição `_NOME`); nome novo sem vida de mensagem (membro registrado,
+> implementação, send existente); strings do usuário com o nome = aviso
+> + `--force` (as strings GERADAS pelo stringify se regeneram da edição
+> do identificador; instáveis em posição, nunca são sites). Verificação:
+> `HrbSymbolsRenamed` (símbolos/funções módulo os DOIS mapeamentos
+> {MÉTODO→NOVO, CLASSE_MÉTODO→CLASSE_NOVO}; o pcode do módulo da classe
+> muda DE VERDADE — strings de registro) + demais módulos `HrbEquivalent`
+> byte-idênticos + rollback; execução idêntica é contrato da suíte.
+>
+> Limite documentado: classe SÓ com INLINE (sem nenhuma implementação
+> separada) ainda é reconhecida (âncora é a STRING do próprio nome, não
+> a colagem); classe construída fora do padrão função-de-registro (ex.:
+> `__clsNew` manual) não é reconhecida — relato honesto de "não
+> encontrado", nunca edição errada.
+
+#### Spec original (mantida como registro)
+
+**O caso**: renomear um método de classe (`UWMenu:Paint` → `Draw`) exige
+editar (a) a DECLARAÇÃO no bloco da classe, (b) a IMPLEMENTAÇÃO
+(`METHOD Paint() CLASS UWMenu`), e (c) os SENDS (`o:Paint()`, `::Paint()`).
+A B4 tornou (a) e (b) fatos com posição (markers de `ppApplications`;
+`MethodLift` já liga função gerada ⇄ classe/método). O problema duro é
+(c): **send é despacho DINÂMICO** — `o:Paint()` não declara a classe de
+`o`; renomear sends às cegas sequestraria métodos homônimos de outras
+classes.
+
+**Política (o coração da fase)**:
+1. **Unicidade de mensagem no projeto**: o rename só edita sends quando o
+   nome do método é definido por UMA ÚNICA classe do projeto — detectado
+   por (i) implementações: funções cujo `MethodLift` devolve
+   `(outraClasse, nome)`; (ii) declarações sem implementação separada
+   (INLINE/VAR/DATA): aplicações de regra cujos markers casam o nome em
+   contexto de classe + strings type 41 geradas na linha da declaração.
+   Nome não-único → recusa listando as classes.
+2. **Nome novo sem vida de mensagem**: nenhum send/implementação/string
+   com o nome novo no projeto (sequestro reverso); `NameAccepted` p/ a
+   função gerada `CLASSE_NOVO`; `RuleHeadCollision`.
+3. **Strings**: token type 41 == nome na MESMA linha de declaração/
+   implementação é a string GERADA pelo stringify do marker — atualiza
+   sozinha com a edição do identificador (não é site). Em qualquer outra
+   linha = possível acesso por nome (`__objSendMsg`, `:&(...)`) — aviso +
+   `--force`, nunca editada.
+4. **Herança/override**: subclasse que redeclara o nome cai na recusa de
+   unicidade por construção (duas classes definem) — sem análise extra.
+
+**Verificação (nova, porque o pcode MUDA de verdade)**: o módulo da
+classe embute o nome da mensagem em STRINGS de `__clsAddMsg` e o nome da
+função gerada muda (`UWMENU_PAINT`→`UWMENU_DRAW`) — não há byte-idêntico
+ali. Desenho: comparador de símbolos com MÚLTIPLOS mapeamentos esperados
+({MÉTODO→NOVO, CLASSE_MÉTODO→CLASSE_NOVO}); módulos que só têm sends =
+`HrbEquivalent` byte-idêntico como sempre; módulo da classe = símbolos
+modulo mapeamentos + **execução idêntica** (contrato da suíte) +
+rollback em qualquer não-conferência.
+
+**Critério de pronto**: fixture com classe + sends externos (`o:Paint()`)
++ self-send (`::Paint()`) + método INLINE + segunda classe SEM colisão;
+`rename-method` executa com execução idêntica e ida-e-volta A→B→A
+byte-exata; fixture de recusa com duas classes homônimas no método;
+recusa de string fora da linha de declaração sem `--force`; suíte verde;
+dogfooding no hbhttpd (1 rename real A→B→A).
+
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
 > **Fatia da B4 entregue (2026-07-06)**: a extensão ganhou o comando
@@ -730,9 +826,10 @@ recusa na dúvida — é o padrão de edição, não decisão sintática própri
    hbcompat.ch legado que sequestra `!&(...)`): o dump a registra, mas
    rename de regra sem cabeça não existe (não há palavra a renomear) —
    candidata a fixture de RELATO se um projeto real trouxer o caso.
-2. **rename-method**: exige nomes de mensagem de `__clsAddMsg` (declaração
-   METHOD é invisível — nome viaja como string); avaliar se entra no ast-1
-   ou num ast-2. hbhttpd (CREATE CLASS) é o alvo de teste.
+2. **rename-method**: PROMOVIDO a Fase B4c (2026-07-06) — a B4 destravou
+   o bloqueio original (declaração METHOD visível via `ppApplications`).
+   Spec executável na fase; hbhttpd (CREATE CLASS) segue como alvo de
+   dogfooding.
 3. Dedup de duplicatas de pré/pós-decremento: não-fazer mantido (v2).
 4. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
    final e conversões de projeto — só depois de suíte + hbhttpd verdes.
