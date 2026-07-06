@@ -251,11 +251,73 @@ inline-local (árvore de expressão + análise de pureza).
 **Critério**: fixtures de comportamento (execução idêntica) + recusas; checks
 novos na suíte.
 
-### Fase B4 — DSLs customizadas de pré-processador (caso especial, análise registrada)
+### Fase B4 — DSLs customizadas de pré-processador (caso especial, análise registrada) ✅
 
-> **Status 2026-07-05 — mecanismo no core PRONTO e VERIFICADO (item 1 da
-> lista abaixo); comandos da ferramenta (item 2) e fixtures da suíte
-> pendentes.** Implementado em `src/pp/ppcore.c` (mesmo padrão da posTbl
+> **Status FINAL 2026-07-06 — fase concluída** (v0.4.0, 12 comandos;
+> `make test` 44 casos / 200 checks verdes; specs S1–S5 = casos 38–42,
+> guarda estrutural REPEAT = caso 43).
+>
+> **Decisões de desenho (questionamentos do Diego, 2026-07-05,
+> incorporados):**
+> 1. **Sem comando de busca dedicado**: `usages` responde TAMBÉM para
+>    palavra de DSL (definição da diretiva + aplicações + palavras
+>    secundárias, via `DslHits`) — o programador não precisa saber em que
+>    "mundo" a palavra vive antes de perguntar. Ficou específico só o
+>    `rename-dsl`, porque a EDIÇÃO tem semântica própria (edita diretiva
+>    + sites; verificação `.ppo`+`.hrb` byte-idênticos, diferente das
+>    verificações dos outros renames) — consistente com a família
+>    rename-<espécie> existente. O `usages-dsl` planejado morreu antes de
+>    nascer como comando; virou seção do `usages`.
+> 2. **Genericidade é requisito**: a ferramenta opera SÓ sobre os fatos
+>    genéricos do funil único (`hb_pp_patternReplace`): cabeça, kind,
+>    arquivo/linha da diretiva, atribuição token→marker (marker 0 =
+>    palavra literal da regra). Nada no código é por-família ou
+>    por-DSL-conhecida — vale para `#command`/`#xcommand`/`#translate`/
+>    `#xtranslate`/`#define` E para qualquer comando novo que o usuário
+>    crie por diretiva (provado com DSL inventada na fixture, regras
+>    DINÂMICAS que o hbclass.ch registra por método, e regras builtin).
+>    Única peça por-PADRÃO (não por-DSL): o lifting `MethodLift` casa
+>    função gerada com aplicação na mesma linha cujos markers concatenam
+>    `<A>_<B>` — cobre qualquer DSL que cole nomes assim (hbclass.ch é o
+>    caso canônico), e falha para colagens diferentes (aí é relato normal
+>    de função, nunca resposta errada).
+>
+> **Entregue na ferramenta:**
+> - `usages <palavra-de-DSL>`: diretiva (`menu.ch:8: directive (#command
+>   MENUITEM, 4 marker(s))` — linha na convenção do pp: última linha
+>   física de diretiva continuada), aplicações com coluna byte-exata
+>   (inclusive uso continuado por `;`: cada token na sua linha física),
+>   palavras secundárias (`ACTION`, `SAY`...) como `keyword` da regra,
+>   builtin com `(builtin)`, multi-passe visível ("sem posição no fonte").
+> - `rename-dsl <velha> <nova>`: edita os sites (tokens marker 0
+>   posicionados) + a cabeça no lado do MATCH da diretiva (reancorada no
+>   início físico `#<kind>`; `#define` = caso degenerado, 1ª ocorrência).
+>   Recusas: builtin; diretiva fora do projeto; nome novo já cabeça de
+>   regra OU colisão por abreviação dBase (4 letras, famílias sem `x`,
+>   checada nos DOIS sentidos); nome novo já identificador no projeto
+>   (captura); aplicação sem posição (multi-passe/include); uso abreviado
+>   da cabeça. Verificação padrão-ouro: `.ppo` E `.hrb` de TODOS os
+>   módulos byte-idênticos, senão rollback; ida-e-volta A→B→A byte-exata
+>   provada nas três famílias (casos 38/41).
+> - **Lifting**: `usages Paint` → `method definition Paint (class
+>   UWMenu)` com posição real; `UWMENU_PAINT` só com `--show-expansion`;
+>   `PickFunc` aceita `Classe:Metodo`/método puro via `MethodLift` — a
+>   convenção textual `<CLASSE>_<MÉTODO>` morreu (caso 29 atualizado).
+> - **Réplica textual morta** (item B.1 da auditoria): `DefineCollision`/
+>   `PpHeadIn` apagadas → `RuleHeadCollision` sobre `ppRules` em
+>   rename-local/rename-static/extract-function (cobre includes
+>   aninhados, builtin aplicadas e abreviação dBase — o textual não via
+>   nenhum dos três).
+> - **S5**: `ppApplications` casa 1:1 com o `.ppt` (`-p+`) em contagem,
+>   ordem, linhas e kinds (caso 42, comparador no runner).
+>
+> **Armadilha nova documentada (CLAUDE.md do core + ast-schema)**: o
+> hbmk2 compila com o compilador EMBUTIDO — hbmk2 velho emite dump ast-1
+> sem `ppRules` mesmo com `harbour` novo; conferir
+> `strings $HB_BIN/hbmk2 | grep ast-`.
+>
+> Status anterior (2026-07-05): mecanismo no core pronto e verificado
+> (item 1 da lista abaixo). Implementado em `src/pp/ppcore.c` (mesmo padrão da posTbl
 > B0: lógica no pp, ganchos de 1 linha gated por `fTrackPos`): registro
 > de regra nos pontos de `#define` (defineNew→defineAdd) e
 > `#[x]translate`/`#[x]command` (directiveNew), aplicação no funil único
@@ -478,10 +540,24 @@ furos); `rename-memvar` recusa nos casos sujos com mensagem explicando o
 furo, executa no caso limpo com **comportamento idêntico por execução**
 (padrão da Fase 2 do smoke test) e ida-e-volta byte-exata dos fontes.
 
-### Fase B5 — Extensão VSCode re-apontada
+### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
-**Escopo**: a extensão é fina (CLI faz tudo) — ajustar specs/saídas ao novo
-CLI; manter os 9 comandos; preview `--dry-run --json` se a fricção pedir.
+> **Fatia da B4 entregue (2026-07-06)**: a extensão ganhou o comando
+> `hbrefactor: Rename directive/command word (pp DSL)`
+> (`hbrefactor.renameDsl`, chama `rename-dsl` com a palavra sob o cursor,
+> projeto inteiro), e o `usages` já enxerga palavra de DSL de graça (a
+> busca foi fundida no `usages` do CLI na B4). extension.js v0.3.0, 10
+> comandos. **Bug pré-existente corrigido no caminho**: `usages --json`
+> com spec ABSOLUTO — exatamente o que a extensão passa — DUPLICAVA o
+> prefixo do cwd no URI (`hb_FNameMerge` concatenando caminho já
+> absoluto), quebrando o painel de referências; trocado por `hb_PathJoin`;
+> regressão no caso 18 (spec absoluto). Provado end-to-end simulando a
+> invocação da extensão (rename-dsl round-trip byte-exato; usages
+> devolvendo os 3 sites com URI limpo).
+
+**Escopo restante**: revisar as saídas dos demais comandos ao novo CLI
+(lifting método/classe no `usages`, `--show-expansion` como opção);
+preview `--dry-run --json` se a fricção pedir.
 **Critério**: Diego usa no dia a dia; sem regressão nos fluxos atuais.
 
 ### Fase B6 — PR upstream (bloqueada: só quando o Diego mandar)
@@ -578,11 +654,10 @@ gramática — flatten em lista é que era o erro.
    limitação de linkage do hb_IsFunction, dispensados.
 
 **B. Réplicas conservadoras REMANESCENTES, com plano (não urgente):**
-1. `DefineCollision`/`PpHeadIn` (parse textual de cabeças de diretiva +
-   includes diretos) — MANTIDA de propósito: é o único guarda antecipado no
-   caso extract-function × #command (a verificação estrutural tem fresta
-   teórica ali); para renames a rede byte-exata cobre 100%. Morre na B4,
-   quando `ppRules`/`ppApplications` derem os fatos reais de diretivas.
+1. `DefineCollision`/`PpHeadIn` — **MORTA na B4 (2026-07-06)**: substituída
+   por `RuleHeadCollision` sobre os fatos `ppRules` do dump (cobre includes
+   aninhados, regras builtin aplicadas e abreviação dBase, que o parse
+   textual não via).
 2. `StrDelimsOk`/`TokStartCol`/`TokEndCol` (delimitadores de string `"` `'`
    `[..]`) — validação byte-exata conservadora, recusa o que não prova
    (e"..." etc.). Ideal futuro: dump `ast-2` carregar o span ORIGINAL da
@@ -590,8 +665,10 @@ gramática — flatten em lista é que era o erro.
 3. Cheque textual de continuação (`Right(RTrim(linha),1) == ";"`) em 2
    pontos — falso positivo só RECUSA (conservador); fatos de statement
    multi-linha podem substituir depois.
-4. Convenção `<CLASSE>_<MÉTODO>` (usages/PickFunc) — já marcada para morrer
-   com o lifting da B4.
+4. Convenção `<CLASSE>_<MÉTODO>` (usages/PickFunc) — **MORTA na B4
+   (2026-07-06)**: `MethodLift` sobre `ppApplications` (par de markers que
+   concatena no nome gerado) responde com a posição real e o vocabulário
+   do fonte.
 
 **C. Não-réplicas (auditadas e mantidas):** `HrbParse`+comparadores (formato
 de ARQUIVO .hrb, não gramática; a alternativa `hb_hrbLoad` carregaria o
@@ -606,10 +683,13 @@ recusa na dúvida — é o padrão de edição, não decisão sintática própri
 0. **Velocidade em projetos grandes**: `-inc` do hbmk2 já dá dumps
    incrementais na Fase B1; verificação proporcional à edição (compilar só o
    alvo) fica para quando o uso real doer.
-1. **rename-define**: ABSORVIDO pela Fase B4 (DSLs de pré-processador) — o
-   `#define` constante é o caso degenerado de regra sem markers. Caso de
-   estudo herdado: regra `( x & y ) => HB_BITAND` de um hbcompat.ch legado
-   que sequestra `!&(...)` — vira fixture de recusa/aviso da B4.
+1. **rename-define**: ✅ ENTREGUE na B4 (2026-07-06) — o `#define`
+   constante é o caso degenerado de regra sem markers e o `rename-dsl` o
+   cobre (caso 38, round-trip byte-exato). Resta como estudo futuro a
+   regra SEM cabeça (`head null`, ex. `( x & y ) => HB_BITAND` de
+   hbcompat.ch legado que sequestra `!&(...)`): o dump a registra, mas
+   rename de regra sem cabeça não existe (não há palavra a renomear) —
+   candidata a fixture de RELATO se um projeto real trouxer o caso.
 2. **rename-method**: exige nomes de mensagem de `__clsAddMsg` (declaração
    METHOD é invisível — nome viaja como string); avaliar se entra no ast-1
    ou num ast-2. hbhttpd (CREATE CLASS) é o alvo de teste.

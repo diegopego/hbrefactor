@@ -39,9 +39,10 @@ Harbour é a árvore de fontes (não uma instalação com os headers copiados).
 
 | Comando | O que faz |
 |---|---|
-| `hbrefactor: Usages` | Todas as referências do símbolo sob o cursor (variável, função ou método) no painel de referências + canal |
+| `hbrefactor: Usages` | Todas as referências do símbolo sob o cursor (variável, função, método **ou palavra de diretiva de pp**) no painel de referências + canal |
 | `hbrefactor: Rename local/param under cursor` | Rename verificado de LOCAL/parâmetro (funciona dentro de `METHOD ... CLASS` — a extensão passa `Classe:Método` ao CLI) |
 | `hbrefactor: Rename function under cursor` | Rename de função no projeto inteiro; se houver referências textuais, mostra os avisos e oferece prosseguir com `--force` |
+| `hbrefactor: Rename directive/command word (pp DSL)` | Renomeia a palavra-cabeça de uma diretiva `#command`/`#xcommand`/`#[x]translate`/`#define` na definição (o `.ch`) **e** em todos os usos; o CLI verifica `.ppo`/`.hrb` byte-idênticos e faz rollback |
 | `hbrefactor: Rename STATIC variable under cursor` | Rename de STATIC (de função ou file-wide) no módulo atual |
 | `hbrefactor: Reorder parameters` | Nova ordem por nomes separados por vírgula |
 | `hbrefactor: Extract selection to new function` | Extrai as linhas selecionadas para STATIC FUNCTION/PROCEDURE nova (locais exclusivas da seleção migram junto) |

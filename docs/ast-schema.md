@@ -14,6 +14,12 @@ hbmk2 <alvos-do-projeto> -hbcmp -rebuild -q '-prgflag=-x<dir>/'
 # geração de saída: -gh/-gc; NÃO salva com -s)
 ```
 
+**ARMADILHA de relink (custou um diagnóstico)**: o hbmk2 compila .prg com
+o compilador EMBUTIDO (linka `libhbcplr`/`libhbpp`) — um hbmk2 velho emite
+dumps do schema ANTIGO mesmo com o `bin/.../harbour` novo (visto: ast-1
+sem `ppRules` via hbmk2, ast-2 pelo harbour direto). Conferência:
+`strings $HB_BIN/hbmk2 | grep ast-`; cura: `rm $HB_BIN/hbmk2 && make`.
+
 ## Topo
 
 ```jsonc
@@ -119,7 +125,13 @@ Garantias e limites (provados no smoke test da B4):
 - Aplicações dentro de includes vêm com tokens `prov 'i'` — filtrar
   como em `tokens[]`.
 - Diretiva processada em linha lógica: `line` da regra/aplicação segue a
-  convenção do pp (linha de input corrente).
+  convenção do pp (linha de input corrente). Para diretiva CONTINUADA por
+  `;`, isso é a ÚLTIMA linha física — quem for editar a diretiva precisa
+  reancorar no início físico (a linha `#<kind>` mais próxima, para trás;
+  o pp aceita o nome da diretiva abreviado em >= 4 letras, ex. `#xtrans`).
+  O mesmo vale para `ppApplications[].line` de USO continuado por `;`
+  (aponta a última linha física do uso) — mas cada token consumido carrega
+  a SUA linha/coluna físicas reais, então a edição por token não sofre.
 - **Validação cruzada disponível**: `harbour -p+` gera `.ppt` com uma
   linha por aplicação — sai do MESMO funil (`hb_pp_patternReplace`);
   `ppApplications` deve casar 1:1 com o `.ppt` do módulo.
@@ -231,11 +243,38 @@ Semânticas importantes:
   VARIABLE x, line = declLine) E occurrence `write` na declLine; um init
   por #define expande para tokens SEM posição — recorte do texto falha por
   construção (conservador).
+- **Palavra de DSL** (`usages`/`DslHits`): definição = `ppRules` com
+  `Upper(head) == alvo` (dedupe entre módulos por arquivo+linha+kind — o
+  mesmo .ch registra a regra em cada módulo que o inclui); usos = tokens
+  de `ppApplications` com `marker == 0` e o texto — cobre a cabeça E as
+  palavras secundárias (ACTION, AT, SAY...), builtin incluso. Genérico
+  por construção: só cabeça/kind/atribuição de marker, nada por família.
+- **rename-dsl**: edita (a) os tokens `marker 0` posicionados das
+  aplicações da regra e (b) a palavra no lado do MATCH da diretiva (antes
+  do `=>`; reancorada no início físico — ver convenção de `line` acima;
+  `#define` = só a 1ª ocorrência). Recusas fato-based: builtin
+  (`file null`), diretiva fora do projeto, cabeça nova já regra/abreviação
+  dBase (4 letras, famílias sem `x`), nome novo já identificador no stream
+  (captura), aplicação sem posição (multi-passe/include), uso abreviado.
+  Verificação padrão-ouro: rename consistente não muda a expansão →
+  `.ppo` e `.hrb -gh -l` de TODOS os módulos byte-idênticos, senão
+  rollback. O `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de
+  `-o`/cwd) — preservar um `.ppo` pré-existente do usuário.
+- **Lifting método/classe** (`MethodLift`): função gerada por DSL casa com
+  a aplicação NA MESMA LINHA cujos recheios de marker (identificadores
+  posicionados) concatenam `A_B == nome da função` — devolve classe,
+  método e a posição REAL do nome no fonte. Vale para qualquer DSL que
+  cole `<A>_<B>` (hbclass.ch é o caso canônico); preferir o par cujo
+  token está na linha da função (a aplicação DECLARED repete o nome com a
+  posição da declaração). A convenção textual de sufixo da era smoke test
+  morreu junto com `DefineCollision`/`PpHeadIn` (hoje `RuleHeadCollision`
+  sobre `ppRules`, com abreviação dBase incluída).
 
 ## Evolução
 
 O schema é livre para evoluir (liberação de 2026-07-05: sem compromisso de
-compatibilidade com a era occ). Próximas seções planejadas: `ppRules` +
-`ppApplications` (fase B4 — DSLs e lifting p/ vocabulário do fonte);
-avaliar `sends` de `__clsAddMsg` (rename-method, B4/backlog). Ao mudar,
-versionar `"schema"` e atualizar este documento NO MESMO commit.
+compatibilidade com a era occ). `ppRules` + `ppApplications` entregues no
+ast-2 (fase B4, consumidos por usages/rename-dsl/lifting). Próximo a
+avaliar: `sends` de `__clsAddMsg` (rename-method, backlog); span original
+de string no posTrack (mataria `StrDelimsOk`). Ao mudar, versionar
+`"schema"` e atualizar este documento NO MESMO commit.

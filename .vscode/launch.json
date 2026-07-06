@@ -39,6 +39,16 @@
         "--extensionDevelopmentPath=${workspaceFolder}/vscode",
         "${workspaceFolder}/tests/fix01"
       ]
+    },
+    {
+      // portável — usa só ${workspaceFolder}; ok para commit.
+      "name": "Run ext (tests)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode",
+        "${workspaceFolder}/tests"
+      ]
     }
   ]
 }

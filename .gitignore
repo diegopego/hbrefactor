@@ -2,6 +2,7 @@ bin/
 tests/tmp/
 *.hrb
 *.ppo
+*.ppt
 *.occ.json
 *.ast.json
 

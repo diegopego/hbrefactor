@@ -159,6 +159,23 @@ async function cmdRenameFunction() {
   report(`rename-function ${word} -> ${novo}`, res);
 }
 
+// renomeia a palavra-cabeça de uma diretiva de pp (#command/#xcommand/
+// #[x]translate/#define) na definição E em todos os sites de aplicação.
+// Projeto inteiro (a diretiva pode viver num .ch compartilhado); o CLI
+// verifica .ppo/.hrb byte-idênticos e faz rollback em qualquer divergência.
+async function cmdRenameDsl() {
+  const c = await ctx();
+  if (!c) return;
+  const word = wordAt(c.editor);
+  if (!word) return;
+  const novo = await vscode.window.showInputBox({
+    prompt: `Novo nome para a palavra de DSL/diretiva ${word} (definição + todos os usos)` });
+  if (!novo) return;
+  await saveAll();
+  const res = await run(['rename-dsl', c.spec, word, novo], c.cwd);
+  report(`rename-dsl ${word} -> ${novo}`, res);
+}
+
 async function cmdRenameStatic() {
   const c = await ctx();
   if (!c) return;
@@ -230,6 +247,7 @@ function activate(context) {
     vscode.commands.registerCommand('hbrefactor.usages', cmdUsages),
     vscode.commands.registerCommand('hbrefactor.renameLocal', cmdRenameLocal),
     vscode.commands.registerCommand('hbrefactor.renameFunction', cmdRenameFunction),
+    vscode.commands.registerCommand('hbrefactor.renameDsl', cmdRenameDsl),
     vscode.commands.registerCommand('hbrefactor.renameStatic', cmdRenameStatic),
     vscode.commands.registerCommand('hbrefactor.reorderParams', cmdReorderParams),
     vscode.commands.registerCommand('hbrefactor.extractFunction', cmdExtractFunction),

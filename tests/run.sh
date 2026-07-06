@@ -1,5 +1,5 @@
 #!/bin/bash
-# hbrefactor test runner - second incarnation (compiler AST, schema ast-1)
+# hbrefactor test runner - second incarnation (compiler AST, schema ast-1/2)
 # Every fixture is a PROJECT (>= 2 .prg + shared .ch + .hbp): the tool must
 # prove it operates at project level, never on a lone file.
 #
@@ -8,7 +8,9 @@
 # itself - partial coverage returns when a real broken project re-enters
 # the scope. New powers of the AST era: case 31 (multi-line reorder call
 # site + ','/')' inside string arguments), case 32 (rename-function inside
-# a ';'-continued statement).
+# a ';'-continued statement). Cases 38-43 are phase B4 (pp DSLs over
+# ppRules/ppApplications, specs S1-S5 of the roadmap): fixtures fixdsl/
+# (user DSL, three rule families) and fixcls/ (hbclass.ch classes).
 
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -28,6 +30,20 @@ fresh() { # fresh <case-name> -> echoes work dir
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
    cp "$HERE"/fix01/*.prg "$HERE"/fix01/*.ch "$HERE"/fix01/*.hbp "$d"/
+   echo "$d"
+}
+
+freshdsl() { # freshdsl <case-name> -> fixture with a user pp DSL (B4)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixdsl/*.prg "$HERE"/fixdsl/*.ch "$HERE"/fixdsl/*.hbp "$d"/
+   echo "$d"
+}
+
+freshcls() { # freshcls <case-name> -> fixture with hbclass.ch classes (B4)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixcls/*.prg "$HERE"/fixcls/*.hbp "$d"/
    echo "$d"
 }
 
@@ -254,6 +270,20 @@ assert any(l["uri"].endswith("b.prg") and l["range"]["start"]["line"] == 4 for l
 assert any(l["uri"].endswith("a.prg") for l in locs), "call loc"
 PYEOF
 check "Location[] valid with def+call" $?
+# spec ABSOLUTO (o caminho que a extensão VSCode sempre passa): o URI não
+# pode duplicar o prefixo do cwd - regressão do LocationsJson (hb_PathJoin,
+# não hb_FNameMerge, para não concatenar caminho já absoluto)
+( cd "$D" && "$BIN" usages "$D/fix01.hbp" Dupla --json absl.json > /dev/null 2>&1 )
+python3 - "$D/absl.json" <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+for l in locs:
+    p = l["uri"][len("file://"):]
+    assert p.count("/absl") == 0, "path prefix doubled: " + l["uri"]
+    assert "/case18/case18" not in p, "cwd doubled in uri: " + l["uri"]
+assert any(l["uri"].endswith("b.prg") for l in locs), "def loc present"
+PYEOF
+check "absolute spec: URI not doubled (extension path)" $?
 
 echo "case 19: unused-locals reports never-used and assigned-never-read"
 D=$(fresh case19)
@@ -408,8 +438,8 @@ printf 'DYNAMIC Dupla\n' > "$D/case29.hbx"
 ( cd "$D" && "$BIN" usages case29.hbp Deposita > out.log 2>&1 )
 RC=$?
 check "usages exit 0 (project compiles)" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "possible method definition (CONTA_DEPOSITA, name convention)" "$D/out.log"
-check "method definition via name convention" $?
+grep -q "method definition Deposita (class Conta)" "$D/out.log"
+check "method definition lifted to source vocabulary (B4)" $?
 ( cd "$D" && "$BIN" rename-local case29.hbp c.prg Deposita nNovo nCalc > ren.log 2>&1 )
 RC=$?
 check "rename-local by method name"  $([ $RC -eq 0 ] && echo 0 || echo 1)
@@ -649,6 +679,158 @@ RC=$?
 check "name already called in project refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "sequestraria" "$D/hij.log"
 check "refusal explains the hijack" $?
+
+echo "case 38: S1 - user pp DSL (three families): usages + rename-dsl round-trip"
+# fixtures compile clean first (working rule: never test with a broken fixture)
+for f in a.prg b.prg; do
+   "$HB_BIN/harbour" "$HERE/fixdsl/$f" -n -q0 -w3 -es2 -s -I"$HERE/fixdsl" > /dev/null 2>&1
+   check "fixdsl/$f clean under -w3 -es2" $?
+done
+D=$(freshdsl case38)
+( cd "$D" && "$BIN" usages fixdsl.hbp MENUITEM > dsl.log 2>&1 )
+RC=$?
+check "usages of a DSL word exit 0"  $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "menu.ch:8: directive (#command MENUITEM, 4 marker(s))" "$D/dsl.log"
+check "directive found (pp convention: line = last physical line)" $?
+grep -q "a.prg:11:4: application (#command MENUITEM, menu.ch:8)" "$D/dsl.log"
+check "application with exact column"  $?
+grep -q "b.prg:6:4: application" "$D/dsl.log"
+check "application in second module"   $?
+( cd "$D" && "$BIN" usages fixdsl.hbp ACTION > act.log 2>&1 )
+grep -q "a.prg:11:21: keyword (#command MENUITEM" "$D/act.log"
+check "secondary DSL word reported as keyword of the rule" $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU_ITEM > ren.log 2>&1 )
+RC=$?
+check "rename-dsl exit 0"            $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "3 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical" "$D/ren.log"
+check "verification: .ppo/.hrb byte-identical" $?
+grep -q "MENU_ITEM <label>" "$D/menu.ch"
+check "directive head renamed in menu.ch" $?
+grep -q 'MENU_ITEM "Abrir"' "$D/a.prg" && grep -q 'MENU_ITEM "Sub"' "$D/b.prg"
+check "application sites renamed in both modules" $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENU_ITEM MENUITEM > /dev/null 2>&1 )
+cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/b.prg" "$HERE/fixdsl/b.prg" && \
+   cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
+check "A->B->A round-trip byte-exact (sources + .ch)" $?
+# o #define constante é o caso degenerado (regra sem markers)
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp LIMITE_TETO LIMITE_TOPO > def.log 2>&1 && \
+             "$BIN" rename-dsl fixdsl.hbp LIMITE_TOPO LIMITE_TETO > /dev/null 2>&1 )
+check "#define rename (degenerate rule) round-trips" $?
+cmp -s "$D/b.prg" "$HERE/fixdsl/b.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
+check "#define round-trip byte-exact"  $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU_X --dry-run > dry.log 2>&1 )
+cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
+check "dry run writes nothing"        $?
+# recusas: sequestro de identificador, abreviação dBase, palavra inexistente
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MenuAdd > hij.log 2>&1 )
+RC=$?
+check "new word already an identifier refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "capturaria" "$D/hij.log"
+check "refusal explains the capture"  $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU > abr.log 2>&1 )
+RC=$?
+check "dBase 4-letter abbreviation clash refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "abreviação" "$D/abr.log"
+check "refusal cites the abbreviation rule" $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp NAOEXISTE Outra > nex.log 2>&1 )
+RC=$?
+check "word that is not a rule head refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+
+echo "case 39: S2 - hbclass.ch classes: usages answers in method/class vocabulary"
+for f in w1.prg w2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixcls/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+   check "fixcls/$f clean under -w3 -es2" $?
+done
+D=$(freshcls case39)
+( cd "$D" && "$BIN" usages fixcls.hbp Paint > out.log 2>&1 )
+RC=$?
+check "usages Paint exit 0"           $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "w1.prg:10: method definition Paint (class UWMenu)" "$D/out.log"
+check "definition lifted to method/class vocabulary" $?
+! grep -q "UWMENU_PAINT" "$D/out.log"
+check "generated name never leaks without --show-expansion" $?
+grep -q "w2.prg:7: send in MAIN" "$D/out.log"
+check "send site found across modules" $?
+( cd "$D" && "$BIN" usages fixcls.hbp Paint --show-expansion > exp.log 2>&1 )
+grep -q "method definition Paint (class UWMenu) -> UWMENU_PAINT" "$D/exp.log"
+check "--show-expansion reveals the generated function" $?
+( cd "$D" && "$BIN" usages fixcls.hbp METHOD > mth.log 2>&1 )
+grep -q "hbclass.ch:" "$D/mth.log"
+check "hbclass.ch rules reported as the DSL they are" $?
+grep -q "w1.prg:10:1: application (#xcommand METHOD" "$D/mth.log"
+check "hbclass.ch application with span in USER source" $?
+
+echo "case 40: S3 - builtin rules (std.ch family): facts yes, rename no"
+D=$(freshdsl case40)
+( cd "$D" && "$BIN" usages fixdsl.hbp SAY > say.log 2>&1 )
+RC=$?
+check "usages of builtin rule word exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "a.prg:23:11: keyword (#command @, builtin)" "$D/say.log"
+check "builtin @..SAY application with exact column" $?
+grep -q "sem posição no fonte" "$D/say.log"
+check "multi-pass reapplication visible (no source position)" $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp "@" ARROBA > bi.log 2>&1 )
+RC=$?
+check "rename-dsl of builtin rule refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "builtin" "$D/bi.log"
+check "refusal explains there is no directive file" $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp SAY XSAY > say2.log 2>&1 )
+RC=$?
+check "rename of secondary word refused (not a head)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+
+echo "case 41: S4 - the two families: #[x]command statement-wide, #[x]translate mid-statement"
+D=$(freshdsl case41)
+# xcommand: uso continuado por ';' - cada token na sua linha física real
+( cd "$D" && "$BIN" usages fixdsl.hbp MENUITEM > cont.log 2>&1 )
+grep -q "a.prg:12:4: application (#command MENUITEM" "$D/cont.log"
+check "';'-continued command use: word at its physical line" $?
+( cd "$D" && "$BIN" usages fixdsl.hbp ACTION > act.log 2>&1 )
+grep -q "a.prg:13:7: keyword" "$D/act.log"
+check "keyword on the continuation line has its own position" $?
+# xtranslate: substituição no meio da statement, duas na MESMA linha
+( cd "$D" && "$BIN" usages fixdsl.hbp SQUARED > sq.log 2>&1 )
+grep -q "a.prg:17:6: application (#xtranslate SQUARED" "$D/sq.log" && \
+   grep -q "a.prg:17:20: application (#xtranslate SQUARED" "$D/sq.log"
+check "two mid-statement applications on one line, distinct columns" $?
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp REPEAT LACO > rep.log 2>&1 && \
+             "$BIN" rename-dsl fixdsl.hbp LACO REPEAT > /dev/null 2>&1 )
+check "xcommand rename round-trips"   $?
+cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
+check "xcommand round-trip byte-exact" $?
+
+echo "case 42: S5 - ppApplications matches the pp trace (.ppt) 1:1"
+D=$(freshdsl case42)
+( cd "$D" && "$BIN" dump fixdsl.hbp > dump.log 2>&1 )
+RC=$?
+check "dump exit 0"                   $([ $RC -eq 0 ] && echo 0 || echo 1)
+DIR=$(sed -n 's/^dumps em: //p' "$D/dump.log")
+( cd "$D" && "$HB_BIN/harbour" a.prg -n -q0 -i. -s '-p+' > /dev/null 2>&1 )
+python3 - "$D/a.ppt" "$DIR/a.ast.json" <<'PYEOF'
+import json, re, sys
+traces = []
+pend = None
+for line in open(sys.argv[1]):
+    m = re.match(r'^\S+\((\d+)\) >', line)
+    if m:
+        pend = int(m.group(1))
+    elif line.startswith('#') and pend is not None:
+        traces.append((pend, line[1:].split('>')[0].strip()))
+        pend = None
+d = json.load(open(sys.argv[2]))
+apps = [(a['line'], d['ppRules'][a['rule']]['kind']) for a in d['ppApplications']]
+sys.exit(0 if traces == apps and len(apps) > 0 else 1)
+PYEOF
+check "count, order, lines and kinds match the .ppt trace" $?
+
+echo "case 43: DSL-created block structure guards extract-function"
+D=$(freshdsl case43)
+( cd "$D" && "$BIN" extract-function fixdsl.hbp a.prg 19-20 Pedaco > ext.log 2>&1 )
+RC=$?
+check "selection cutting REPEAT without UNTIL refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "abre while (linha 19) que fecha fora dela" "$D/ext.log"
+check "refusal is structural (block facts), line exact" $?
+cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg"
+check "a.prg untouched"               $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

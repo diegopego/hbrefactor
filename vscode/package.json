@@ -1,8 +1,8 @@
 {
   "name": "hbrefactor",
   "displayName": "hbrefactor - Harbour refactoring",
-  "description": "Refatoração verificada para Harbour: rename, reorder, extract, usages e relatórios via CLI hbrefactor (oráculo do compilador -x, projetos resolvidos pelo hbmk2).",
-  "version": "0.2.0",
+  "description": "Refatoração verificada para Harbour: rename, reorder, extract, usages, diretivas de pp (DSL) e relatórios via CLI hbrefactor (oráculo do compilador -x, projetos resolvidos pelo hbmk2).",
+  "version": "0.3.0",
   "publisher": "diegopego",
   "license": "MIT",
   "engines": { "vscode": "^1.80.0" },
@@ -14,6 +14,7 @@
       { "command": "hbrefactor.usages", "title": "hbrefactor: Usages (all references)" },
       { "command": "hbrefactor.renameLocal", "title": "hbrefactor: Rename local/param under cursor" },
       { "command": "hbrefactor.renameFunction", "title": "hbrefactor: Rename function under cursor" },
+      { "command": "hbrefactor.renameDsl", "title": "hbrefactor: Rename directive/command word under cursor (pp DSL)" },
       { "command": "hbrefactor.renameStatic", "title": "hbrefactor: Rename STATIC variable under cursor" },
       { "command": "hbrefactor.reorderParams", "title": "hbrefactor: Reorder parameters of function under cursor" },
       { "command": "hbrefactor.extractFunction", "title": "hbrefactor: Extract selection to new function" },
