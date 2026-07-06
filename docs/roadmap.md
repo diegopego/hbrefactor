@@ -986,6 +986,106 @@ W0003/W0032 ao compilador); `GapOnlySpace/GapOneComma/MatchBack/MatchFwd`
 (validação de vãos entre tokens CONHECIDOS do stream, byte a byte, com
 recusa na dúvida — é o padrão de edição, não decisão sintática própria).
 
+## Limites da análise e alavancas de core (análise honesta, 2026-07-06)
+
+Registro pedido pelo Diego após a pergunta "isso é verdade mesmo alterando o
+fonte do Harbour?". Vale como mapa permanente do que a REGRA MAIOR (fatos de
+compilação, nunca heurística) pode e não pode alcançar — e corrige uma
+imprecisão de análise anterior.
+
+### O teto (vale para QUALQUER core)
+
+A impossibilidade de completar o "amarelo" (tipo de receptor de send, alcance
+de memvar, modelo de classe dinâmico) é da SEMÂNTICA da linguagem, não da
+arquitetura do compilador: a classe de um receptor é propriedade de runtime
+que pode depender da entrada do programa (`iif` sobre config,
+`hb_Deserialize`, `&cVar`, `hb_hrbLoad`) — território do teorema de Rice.
+Análise sound responde três coisas: "definitivamente sim", "definitivamente
+não", "talvez" — e o "talvez" é irredutível no caso geral. Segundo teto:
+programa Harbour pode SE OBSERVAR (`ProcName()`/`ProcLine()`) — extract
+"perfeito" muda `ProcName(0)` no trecho extraído; equivalência estrita sob
+auto-observação é violada por definição, o contrato prático a exclui.
+
+Três noções de "completo", da impossível à alcançável:
+1. **para a linguagem** — impossível com qualquer core (teto acima);
+2. **para um programa disciplinado** (fluxos estáticos, sem macro em
+   receptor) — alcançável com análise de programa inteiro no core; cada
+   "talvez" restante aponta a linha dinâmica culpada (relato acionável);
+3. **para as execuções observadas** — alcançável por instrumentação de
+   runtime; prova presença, nunca ausência.
+
+**Correção registrada**: a afirmação anterior "nunca cobrirá parâmetro/
+retorno/elemento de array" estava ERRADA como princípio — é limitação da
+compilação separada (arquitetura, mudável), não da linguagem. Análise de
+programa inteiro propaga tipos interprocedural quando os fluxos são
+estaticamente conhecidos.
+
+### Alavancas verificadas no fonte (2026-07-06, evidência arquivo:linha)
+
+- **A. Tipagem declarada — a joia adormecida.** O compilador PARSEIA e
+  ARMAZENA tipo declarado por variável: `AS CLASS <nome>` →
+  `hb_compVarTypeNew(…,'S',…)` (harbour.y:356), campos `cType`/`pClass` em
+  `HB_HVAR` (hbcompdf.h:96-106), gravação em hbmain.c:463-478. E o
+  hbclass.ch JÁ DECLARA `local Self AS CLASS <ClassName> := QSelf()` em TODO
+  método (hbclass.ch:263-265, via `DECLARED METHOD`). Hoje é código
+  analiticamente MORTO: os warnings de tipo (ASSIGN_TYPE/OPERAND_TYPE/…,
+  hberrors.h:143-152) não têm NENHUM call-site; o nome da classe só resolve
+  `pClass` se houver `DECLARE CLASS` prévio (senão W25 + degrada p/ 'O'),
+  mas o NOME declarado trafega em `HB_VARTYPE.szFromClass` no instante da
+  declaração — capturável por gancho de dump. **Alavanca ast-4**:
+  `declarations[]` ganha tipo/classe declarados; nó SEND ganha a classe
+  declarada do receptor quando o receptor é variável tipada — `Self` a tem
+  POR CONSTRUÇÃO em todo método. Caveat honesto: declaração é promessa do
+  programador, o compilador não a verifica — consumir isso exige política
+  explícita ("confio na declaração"), distinta de fato verificado.
+- **B. Programa inteiro no core.** Compilação separada é arquitetura;
+  o compilador (ou um passo de link-time sobre os dumps) pode propagar
+  tipos interprocedural — parâmetro com todos os call sites conhecidos,
+  retorno com todos os RETURNs de classe conhecida. Cresce o subconjunto
+  "verde por fato" arbitrariamente para código disciplinado.
+- **C. WITH OBJECT.** O objeto é empilhado em RUNTIME
+  (`HB_P_WITHOBJECTSTART`, harbour.y:2001-2007; compilador só guarda
+  contador de aninhamento) — mas a ASSOCIAÇÃO sintática send↔expressão do
+  WITH é fato de parse, exportável no dump; se a expressão é variável
+  tipada/construtor conhecido, o receptor herda o fato.
+- **D. Introspecção de runtime (achados do Diego, todos confirmados).**
+  `__dynsCount`/`__dynsGetName`/`__dynsGetIndex`/`__dynsIsFun`/
+  `hb_IsFunction`/`__dynsGetPrf` (dynsym.c:677-727, exportados;
+  padrão canônico no profiler, src/rtl/profiler.prg:238-249) enumeram o
+  mundo REALMENTE linkado. Lado de classe é ainda mais rico: `__classSel()`
+  (todas as mensagens de uma classe carregada, classes.c:4215),
+  `__clsGetAncestors` (5383), `__clsMsgType` (5412), `__clsParent` (4253),
+  `__objGetMsgList`/`__objGetMethodList`/`__objDerivedFrom`
+  (objfunc.prg:72/104/222). Handle por nome: C-API `hb_clsFindClass`
+  (classes.c:1519; sem HB_FUNC .prg direto — obtém-se chamando a
+  class-function, validada por `hb_IsFunction`). **Usos**: membros de pai
+  FORA do projeto viram enumeráveis (harness linkado ao projeto) — upgrade
+  do aviso D5 do P2a; strings call-by-name validáveis contra o mundo real;
+  `.hbx` de libs externas (`-hbx=`) reduz furos do alcance de memvar
+  estaticamente. Caveats: prova presença, nunca ausência; `hb_hrbLoad()`
+  .prg RODA os INIT PROCEDUREs (runner.c; flags `HB_HRB_BIND_*` só governam
+  binding, nenhuma pula INITs) — harness tem efeitos colaterais possíveis.
+- **E. Compilador como oráculo de strings.** `hb_CompileFromBuf()`
+  (hbcmplib.c:230) compila string-fonte → pcode/.hrb; não há API "símbolos
+  referenciados", mas o `HrbParse` DA FERRAMENTA já lê tabela de símbolos
+  de .hrb → expressão-string vira lista de símbolos por FATO. Combinado com
+  `ordKey()`/`DBOI_EXPRESSION` (devolvem a expressão-fonte gravada na tag,
+  dbfcdx1.c:8217/dbfntx1.c:6962), UDF referenciada em índice `.cdx`/`.ntx`
+  REAL vira verificável — parte do "vermelho" (nomes em dados externos)
+  passa a checável PARA OS DADOS QUE SE TEM (nunca para dados futuros).
+- **F. Validação de tradução.** Para transformações que mudam pcode
+  legitimamente (extract/reorder), o core pode ganhar um verificador de
+  equivalência POR TRANSFORMAÇÃO (corpo extraído = mesmas instruções
+  realocadas + cola de chamada) — quase-prova específica, sem resolver
+  equivalência geral (indecidível). Engenharia real, não pesquisa.
+
+### O que nenhuma alavanca entrega
+
+Decidir o caso geral dependente de entrada; enumerar nomes que nascem de
+dados em runtime; equivalência estrita sob auto-observação (`ProcName`).
+Para esses, o piso permanente é o da REGRA: recusa/relato honesto — nunca
+palpite.
+
 ## Backlog (herdado + novo, por valor)
 
 0. **Velocidade em projetos grandes**: `-inc` do hbmk2 já dá dumps
@@ -1031,7 +1131,15 @@ recusa na dúvida — é o padrão de edição, não decisão sintática própri
    o Harbour já tem (debugger, pp, i18n, hbrun). Heurística de inferência de
    tipo NA FERRAMENTA (flow analysis frágil sobre os `statements` do dump) é
    justamente o ajeito a evitar: o piso é o relato honesto de (2), o teto é o
-   fato do core de (1).
+   fato do core de (1). **Ver a seção
+   [Limites da análise e alavancas de core](#limites-da-análise-e-alavancas-de-core-análise-honesta-2026-07-06)**:
+   a alavanca A (tipagem declarada `AS CLASS`, que o hbclass.ch já emite
+   para `Self` e o compilador já armazena) é o caminho ast-4 natural para
+   este item; a alavanca D (introspecção runtime) cobre o mundo linkado.
+   **Spec executável escrita (2026-07-06):
+   [spec-b4f-receiver-type.md](spec-b4f-receiver-type.md)** — fatia 0 (só
+   ferramenta: `Classe:Método` + relato em camadas) e fatia 1 (core, ast-4:
+   `rcls` no nó SEND), com portão de desenho antes do volume.
    Observação secundária do mesmo teste: `usages` só aceita o nome CRU do
    método (`usages proj Paint`); a forma `Classe:Método` devolve 0 result(s)
    — alinhar com a resolução `Classe:Método` que rename-method/reorder/

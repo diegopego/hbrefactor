@@ -10,6 +10,10 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   qualquer teste** — `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto
   via hbmk2. Fixture que não compila gera diagnóstico enganoso.
 - Fluxos definidos vivem no Makefile; hbmk2 direto é só experimentação.
+- **Exportar `HB_BIN` ao invocar a ferramenta fora do Makefile**: sem ele o
+  `HbMk2Bin()` cai no hbmk2 do SISTEMA (`/usr/local/bin`, sem `-x`) e o
+  sintoma é o enganoso "o projeto não compila" (custou um diagnóstico na
+  P2a; a suíte exporta, invocação manual esquece).
 - Nenhuma réplica de gramática na ferramenta: fatos vêm do compilador
   (dump ast, hb_compileFromBuf, harbour.hbx).
 - Reutilizar o **hbmk2** (builder oficial) para projeto/flags/build: entende
