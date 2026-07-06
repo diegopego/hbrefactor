@@ -629,6 +629,14 @@ furo, executa no caso limpo com **comportamento idêntico por execução**
 > a colagem); classe construída fora do padrão função-de-registro (ex.:
 > `__clsNew` manual) não é reconhecida — relato honesto de "não
 > encontrado", nunca edição errada.
+>
+> **MORTE ANUNCIADA (ordem do Diego, 2026-07-06)**: as âncoras por forma
+> desta fase (`MethodLift`/`ClassRegs`/`StmtStrings`/`DeclHits`) são
+> INTERINAS — heurísticas sobre o RESULTADO da expansão, que cobrem a
+> colagem/stringify do hbclass mas não qualquer diretiva futura. A
+> solução definitiva e genérica é o rastro de derivação no pp (ast-3):
+> spec completa em [spec-b4d-derivacao.md](spec-b4d-derivacao.md)
+> (Fase B4d).
 
 #### Spec original (mantida como registro)
 
@@ -675,6 +683,20 @@ rollback em qualquer não-conferência.
 byte-exata; fixture de recusa com duas classes homônimas no método;
 recusa de string fora da linha de declaração sem `--force`; suíte verde;
 dogfooding no hbhttpd (1 rename real A→B→A).
+
+### Fase B4d — Refatoração genérica por rastro de derivação (planejada)
+
+**Ordem do Diego (2026-07-06)**: funcionar com QUALQUER diretiva —
+classes, as cinco famílias, e o que vier a ser criado — sem nada
+por-DSL na ferramenta. **Spec-driven**: escopo, formato (`from` nos
+tokens sintetizados, schema ast-3), specs executáveis G1–G7 e critérios
+mecânicos em **[spec-b4d-derivacao.md](spec-b4d-derivacao.md)** —
+escritos ANTES de qualquer código, para execução em sessão nova.
+Resumo: o pp registra, no instante da expansão, de QUAL marker cada
+token sintetizado deriva (clone/colagem/stringify); lifting e renames
+passam a computar artefatos pelo fecho de derivação; as âncoras por
+forma da B4c morrem; a verificação passa a PREVER o mapa de símbolos e
+strings esperado.
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
