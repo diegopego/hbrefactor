@@ -378,6 +378,23 @@ Semânticas importantes:
   para qualquer diretiva existente ou inventada; não há mais colagem
   `<A>_<B>` tentada. (`RuleHeadCollision` sobre `ppRules`, com abreviação
   dBase incluída, segue cobrindo a colisão de cabeça de regra.)
+- **Assinatura de param de método (B4e P1a)** (`SigParamHits` +
+  `GenNameParts`): renomear o param de um método precisa mover a DECLARAÇÃO
+  fora do corpo — o protótipo no `CREATE CLASS` e a linha `METHOD ... CLASS`.
+  Em `tokens[]` a posição dessas duas assinaturas COLAPSA para a do protótipo
+  (clone multi-passe → mesma linha/col), então o span da função (que usa
+  `tokens[]`) só alcança os usos do CORPO. Os sites da assinatura só têm
+  posição byte-exata em `ppApplications` (markers posicionados, `prov 's'`,
+  `marker >= 1`). Coleta: os apptokens cujo texto é o param, em aplicações que
+  carregam TODA a IDENTIDADE do nome gerado — as partes de colagem do composto
+  `<Classe>_<Metodo>` que `GenNameParts` extrai do `from` (`{ CLASSE, METODO }`)
+  — presentes como markers posicionados na MESMA aplicação. Isso escopa ao
+  método certo sem colher param homônimo de outro método/classe (fato provado:
+  nenhuma aplicação de expansão mistura dois métodos). Dedup por posição-fonte
+  (`AddHit`): a assinatura reaparece em várias aplicações. O hbclass casa
+  protótipo↔implementação pela assinatura INTEIRA (nomes de param inclusos), então
+  os três sites TÊM que mover juntos, senão `W0001 declaration mismatch`; nome de
+  param não entra no pcode, então a verificação byte-idêntica dos `.hrb` vale.
 
 ## Evolução
 

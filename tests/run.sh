@@ -77,6 +77,13 @@ freshppm() { # freshppm <case-name> -> fixture with an INVENTED pp DSL (B4d)
    echo "$d"
 }
 
+freshsig() { # freshsig <case-name> -> fixture with 2+ param methods (B4e P1a/P1b)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixsig/*.prg "$HERE"/fixsig/*.hbp "$d"/
+   echo "$d"
+}
+
 echo "case 0: base fixtures compile clean under the flags the .hbp declares"
 # the fixture project declares -w3 -es2; the fixtures themselves must be
 # warning-clean idiomatic Harbour (a warning that slips through here is a
@@ -1133,6 +1140,45 @@ check "the shared-origin site is listed only once" $?
 ( cd "$D" && "$BIN" rename-param fixppm.hbp e1.prg pf_Dobra nXX nX > /dev/null 2>&1 )
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg"
 check "A->B->A round-trip byte-exact"  $?
+
+echo "case 55: B4e P1a - rename-param aware of the METHOD signature (2+ params)"
+# renomear o param de um método tem que mover a DECLARAÇÃO fora do corpo: o
+# protótipo no CREATE CLASS e a linha METHOD ... CLASS. Em tokens[] a posição
+# da assinatura COLAPSA para a do protótipo (clone multi-passe), então o span
+# da função só via o uso no corpo - o rename esquecia a assinatura e o build
+# recusava (hbclass casa protótipo<->impl pela assinatura inteira, nomes de
+# param inclusos). Os sites da assinatura vêm dos markers posicionados de
+# ppApplications, escopados pela identidade do nome gerado (classe+método).
+for f in w1.prg w2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixsig/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+   check "fixsig/$f clean under -w3 -es2"  $?
+done
+D=$(freshsig case55)
+( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" rename-param fixsig.hbp w1.prg Widget:Resize nW nLargura > ren.log 2>&1 )
+RC=$?
+check "rename-param on a 2-param method exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "w1.prg:7:19" "$D/ren.log" && grep -q "w1.prg:11:16" "$D/ren.log" \
+   && grep -q "w1.prg:13:29" "$D/ren.log"
+check "prototype, implementation signature AND body edited" $?
+grep -q "METHOD Resize( nLargura, nH )" "$D/w1.prg" \
+   && test "$(grep -c "METHOD Resize( nLargura, nH )" "$D/w1.prg")" = "2"
+check "both signature lines carry the new param, neighbour nH intact" $?
+grep -q "verified: all 2 module(s) byte-identical" "$D/ren.log"
+check "verification byte-identical (param name not in pcode)" $?
+( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execution identical after rename" $?
+( cd "$D" && "$BIN" rename-param fixsig.hbp w1.prg Widget:Resize nLargura nW > /dev/null 2>&1 )
+cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg"
+check "A->B->A round-trip byte-exact"  $?
+# a assinatura de OUTRO método (Grow) não é tocada ao renomear Resize
+( cd "$D" && "$BIN" rename-param fixsig.hbp w1.prg Widget:Grow nDy nDelta > g.log 2>&1 )
+RC=$?
+check "second method's param renames independently" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "METHOD Grow( nDx, nDelta )" "$D/w1.prg" && grep -q "METHOD Resize( nW, nH )" "$D/w1.prg"
+check "Grow signature moved, Resize signature untouched" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

@@ -32,7 +32,7 @@ markers posicionados de `ppApplications`.
 | reorder-params | recusa limpa (não resolve método) | funciona |
 | extract-function | falha controlada (não modela `Self`; rollback) | recusa limpa (N/A) |
 | inline-local | funciona | N/A |
-| rename-param/local | falha controlada (esquece a assinatura) | **corrompia** (double-apply) |
+| rename-param/local | ~~falha controlada (esquece a assinatura)~~ **P1a: OK** | ~~**corrompia** (double-apply)~~ **P0: OK** |
 | rename-static | N/A (recusa limpa) | N/A (recusa limpa) |
 | unused-locals | funciona | funciona |
 | call-graph | parcial (só símbolo manglado; sem consulta por nome) | funciona |
@@ -77,13 +77,19 @@ módulos + rollback. **Pronto**: reordenar `UWMenu:Resize` "nH,nW" edita
 assinatura + todos os sends, execução idêntica, round-trip byte-exato;
 fixture de recusa com método homônimo em duas classes.
 
-### P2a — extract-function em corpo de método: recusa limpa (suporte pleno depois)
+### P2a — extract-function em corpo de método
 
-**Escopo (v1)**: detectar `::`/`Self` no range e RECUSAR com mensagem clara
+> **DECISÃO DO DIEGO (2026-07-06)**: suporte **PLENO** já nesta fase, NÃO a
+> recusa-limpa recomendada abaixo. Extrair para um novo `METHOD` da classe
+> (ou passar `Self` a uma FUNCTION), com `::`/`Self` e os sends internos
+> convergindo. Sub-fase maior — encarada quando P1b fechar. A recusa-limpa
+> fica como piso de segurança se um sub-caso do range for intratável.
+
+**Escopo recomendado na spec (superado pela decisão acima — piso de
+segurança)**: detectar `::`/`Self` no range e RECUSAR com mensagem clara
 ("o intervalo usa Self — extração de corpo de método ainda não suportada")
 ANTES de editar, em vez de depender do rollback pós-recompilação (que hoje
-salva mas confunde). **Pronto**: extract de range com `::` recusa limpa,
-fonte intacto, mensagem aponta o motivo. **Futuro (anotado, não nesta fase)**:
+salva mas confunde). **Futuro (agora é ESTA fase, por decisão do Diego)**:
 suporte pleno = extrair para um novo `METHOD` da classe (ou passar `Self` a
 uma FUNCTION), com os sends internos convergindo.
 

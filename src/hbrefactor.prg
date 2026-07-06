@@ -514,7 +514,7 @@ STATIC FUNCTION RenameLocal( aArgs )
    LOCAL cSpec, cFile, cFunc, cOld, cNew, lParamOnly, lDryRun := .F.
    LOCAL hProj, cTmp, cSrcPath, hAst, hFunc, hItem, hTok, hRule
    LOCAL hDecl := NIL, aEdits := {}, nSpanEnd := 0, nI
-   LOCAL cText, cUpOld, cUpNew, aPrev, cPrevType, nLine
+   LOCAL cText, cUpOld, cUpNew, aPrev, cPrevType, nLine, aIdent
 
    IF Len( aArgs ) < 6
       Usage()
@@ -638,6 +638,21 @@ STATIC FUNCTION RenameLocal( aArgs )
       ENDIF
       aPrev := hTok
    NEXT
+   // assinatura de método (P1a): o protótipo no CREATE CLASS e a linha
+   // METHOD ... CLASS declaram o param FORA do corpo. Em tokens[] a posição da
+   // assinatura COLAPSA para a do protótipo (clone multi-passe), então o span
+   // da função não a alcança - o hbclass casa protótipo<->implementação pela
+   // assinatura INTEIRA (nomes de param inclusos), logo renomear só o corpo
+   // deixa a declaração órfã e o build recusa. Colher os sites da assinatura
+   // dos markers posicionados de ppApplications, escopados pela IDENTIDADE do
+   // nome gerado (classe+método) p/ não pegar param homônimo de outro método.
+   // Para LOCAL puro (não param) o nome não aparece na assinatura -> {} de graça
+   aIdent := GenNameParts( hAst, hFunc )
+   IF ! Empty( aIdent )
+      FOR EACH hItem IN SigParamHits( hAst, aIdent, cUpOld )
+         AAdd( aEdits, hItem )
+      NEXT
+   ENDIF
    // vários tokens do stream podem compartilhar a MESMA (linha,col) de
    // origem - clones de um único token-fonte que uma diretiva de pp
    // multiplicou na expansão (ex.: o parâmetro de uma FUNCTION gerada,
@@ -813,6 +828,82 @@ STATIC FUNCTION MethodImplOf( hAst, hFunc, cUpClass, cUpMethod )
    NEXT
 
    RETURN NIL
+
+// nomes constituintes (UPPER) do nome GERADO de uma função de expansão: as
+// faixas de colagem do composto (<Classe>_<Metodo> -> { CLASSE, METODO }).
+// {} quando a função não nasceu de expansão. Fato do rastro (B4d): o token do
+// nome traz "from" com um item por faixa derivada; o composto decompõe em
+// >= 2 partes (o clone do composto inteiro, len == nome, não é constituinte)
+STATIC FUNCTION GenNameParts( hAst, hFunc )
+
+   LOCAL cUpName := Upper( hFunc[ "name" ] ), hTok, hFrom, aParts, cPart
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 21 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+         Upper( hTok[ "text" ] ) == cUpName
+         aParts := {}
+         FOR EACH hFrom IN hTok[ "from" ]
+            cPart := SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] )
+            IF Len( cPart ) < Len( hTok[ "text" ] )
+               AAdd( aParts, Upper( cPart ) )
+            ENDIF
+         NEXT
+         IF Len( aParts ) >= 2
+            RETURN aParts
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN {}
+
+// os nomes de aIdentUp estão TODOS presentes no conjunto hNames (chaves)?
+STATIC FUNCTION IdentSubset( aIdentUp, hNames )
+
+   LOCAL cUp
+
+   FOR EACH cUp IN aIdentUp
+      IF ! hb_HHasKey( hNames, cUp )
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
+// sites escritos { linha, col 1-based } do PARÂMETRO na ASSINATURA de um
+// construto gerado (o protótipo no CREATE CLASS + a linha METHOD ... CLASS):
+// markers posicionados de ppApplications cujo app carrega TODA a identidade
+// do nome gerado (classe+método). O corpo do método usa o param normalmente
+// em tokens[], mas a ASSINATURA colapsa em tokens[] para a posição do
+// protótipo (clone) - só ppApplications a enxerga com posição byte-exata. O
+// escopo por identidade evita colher param homônimo de OUTRO método/classe
+// (nenhuma aplicação mistura dois métodos - provado no dump). Dedup por
+// posição-fonte: a mesma assinatura reaparece em várias aplicações de expansão
+STATIC FUNCTION SigParamHits( hAst, aIdentUp, cUpParam )
+
+   LOCAL aHits := {}, hApp, hTok, hNames, aParm, cUp
+
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      hNames := { => }
+      aParm  := {}
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+            hTok[ "col" ] != NIL .AND. hTok[ "marker" ] >= 1
+            cUp := Upper( hTok[ "text" ] )
+            hNames[ cUp ] := .T.
+            IF cUp == cUpParam
+               AAdd( aParm, hTok )
+            ENDIF
+         ENDIF
+      NEXT
+      IF Empty( aParm ) .OR. ! IdentSubset( aIdentUp, hNames )
+         LOOP
+      ENDIF
+      FOR EACH hTok IN aParm
+         AddHit( aHits, hTok )
+      NEXT
+   NEXT
+
+   RETURN aHits
 
 STATIC FUNCTION ProjectMember( hProj, cFile )
 

@@ -771,13 +771,30 @@ corrompe nem falha de forma confusa.
 > (regressão): parâmetro de função gerada por DSL, nome novo que estende o
 > antigo, edição única + round-trip byte-exato. Suíte 291/0.
 
-**Pendente (P1–P3, ver spec)**: P1a rename-param/local ciente da assinatura
-de método (editar a declaração no `METHOD`/`CREATE CLASS`, não só o corpo);
-P1b reorder-params ciente de método (resolução + call sites de send +
-política de unicidade de mensagem); P2a extract-function em corpo de método
-= recusa limpa por `Self` (suporte pleno depois); P2b call-graph resolvendo
-nome de método + arestas de send dinâmicas; P3 find-dynamic-calls filtrando
-o ruído do `&` da expansão do hbclass.
+> **P1a entregue (2026-07-06)**: `rename-param`/`rename-local` ciente da
+> ASSINATURA de método. Renomear o param de um método precisa mover a
+> DECLARAÇÃO fora do corpo — o protótipo no `CREATE CLASS` e a linha
+> `METHOD ... CLASS` — não só os usos do corpo. Em `tokens[]` a posição da
+> assinatura COLAPSA para a do protótipo (clone multi-passe), então o span da
+> função só enxergava o corpo; renomear só ele deixava a declaração órfã e o
+> hbclass recusava o build (casa protótipo↔implementação pela assinatura
+> INTEIRA, nomes de param inclusos → `W0001 declaration mismatch`). Os sites
+> da assinatura vêm agora dos markers posicionados de `ppApplications`
+> (`SigParamHits`), escopados pela IDENTIDADE do nome gerado — classe+método,
+> decompostos do rastro `from` por `GenNameParts` — para não colher param
+> homônimo de outro método/classe (nenhuma aplicação mistura dois métodos).
+> Nome de param não entra no pcode → a verificação byte-idêntica dos `.hrb`
+> segue valendo. Fixture nova `fixsig/` (métodos de 2+ params, classe homônima
+> — pronta p/ P1b). Caso 55 (proto+impl+corpo editados, nH intacto, execução
+> idêntica, round-trip byte-exato, 2º método independente). Suíte 302/0.
+
+**Pendente (P1b–P3, ver spec)**: P1b reorder-params ciente de método
+(resolução + call sites de send + política de unicidade de mensagem); P2a
+extract-function em corpo de método — **decisão do Diego (2026-07-06): suporte
+PLENO** (extrair para um novo `METHOD` da classe, com `Self`/`::` convergindo),
+não a recusa-limpa que a spec recomendava (sub-fase maior); P2b call-graph
+resolvendo nome de método + arestas de send dinâmicas; P3 find-dynamic-calls
+filtrando o ruído do `&` da expansão do hbclass.
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
