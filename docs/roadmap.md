@@ -805,12 +805,23 @@ corrompe nem falha de forma confusa.
 > `Widget:Resize` (homônimo em Widget+Panel) recusa nomeando as classes. Suíte
 > 313/0.
 
-**Pendente (P2a–P3, ver spec)**: P2a extract-function em corpo de método —
+> **P2b + P3 entregues (2026-07-06)**: P2b — `call-graph <método>` resolve o
+> nome de método (bare/`Classe:Método`) para o símbolo GERADO e imprime a
+> definição; os `sends` da mensagem viram arestas DINÂMICAS (`~>`, nunca
+> estáticas), com o(s) alvo(s) `[dynamic: NOME_GERADO]` — mensagem homônima em
+> várias classes lista todos (dispatch ambíguo visível). Índice de mensagens
+> montado do rastro (`GenNameParts`: `<Classe>_<Metodo>` → método). P3 —
+> `find-dynamic-calls` suprime o falso positivo do `&` INTERNO da expansão do
+> hbclass.ch: só reporta `usesMacro` quando há macro REAL do usuário no span da
+> função (token type 22 posicionado, `prov 's'` — `HasUserMacro`); um `&` de
+> verdade continua flagado. Casos 57/58 na fixture `fixsig/`. Suíte 323/0.
+
+**Pendente (P2a, ver spec)**: extract-function em corpo de método —
 **decisão do Diego (2026-07-06): suporte PLENO** (extrair para um novo `METHOD`
 da classe, com `Self`/`::` convergindo), não a recusa-limpa que a spec
-recomendava (sub-fase maior; confirmar o desenho antes de codar o volume); P2b
-call-graph resolvendo nome de método + arestas de send dinâmicas; P3
-find-dynamic-calls filtrando o ruído do `&` da expansão do hbclass.
+recomendava. Sub-fase maior: modelar `Self`/`::`, gerar a assinatura do novo
+método + protótipo no `CREATE CLASS`, convergir os sends internos. **Confirmar
+o desenho com o Diego antes de codar o volume.** Fecha a Fase B4e.
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 

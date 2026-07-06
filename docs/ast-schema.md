@@ -410,6 +410,22 @@ Semânticas importantes:
   (mesma política do rename-method). O pcode muda de verdade (ordem de push);
   a verificação é `HrbSymbolsEqual` (símbolos/funções intactos) + rollback, não
   byte-idêntico.
+- **call-graph ciente de método (B4e P2b)**: um índice de MENSAGENS de método é
+  montado do rastro — cada função gerada `<Classe>_<Metodo>` decompõe por
+  `GenNameParts`, a última parte é a mensagem. `call-graph <método>`
+  (bare/`Classe:Método`) resolve para o símbolo gerado e imprime a definição;
+  os `sends` da mensagem viram arestas DINÂMICAS (`~>`, distintas das estáticas
+  `->` de `calls`) com alvo `[dynamic: NOME_GERADO]`. Send é despacho dinâmico:
+  não há aresta estática para inventar; mensagem homônima em N classes lista os
+  N alvos (ambiguidade visível). Só sends cuja mensagem É método do projeto
+  entram (filtra `:New`, acesso a VAR/DATA etc.).
+- **find-dynamic-calls: ruído do `&` da expansão (B4e P3)** (`HasUserMacro`): a
+  função gerada para o `CREATE CLASS` traz `usesMacro: true` por causa do `&`
+  INTERNO do hbclass.ch, sem token `&` posicionado no fonte do usuário → falso
+  positivo. Um macro REAL é token **type 22** posicionado (`prov 's'`, ex.:
+  `&cVar.`); a flag só é reportada quando existe um desses no span de linhas da
+  função. Strings que nomeiam função do projeto seguem relatadas (stringify da
+  expansão tem `line 0`, já excluído por `line > 0`).
 
 ## Evolução
 

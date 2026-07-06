@@ -35,8 +35,8 @@ markers posicionados de `ppApplications`.
 | rename-param/local | ~~falha controlada (esquece a assinatura)~~ **P1a: OK** | ~~**corrompia** (double-apply)~~ **P0: OK** |
 | rename-static | N/A (recusa limpa) | N/A (recusa limpa) |
 | unused-locals | funciona | funciona |
-| call-graph | parcial (só símbolo manglado; sem consulta por nome) | funciona |
-| find-dynamic-calls | ruído (flag do `&` da expansão hbclass) | correto |
+| call-graph | ~~parcial (só símbolo manglado; sem consulta por nome)~~ **P2b: OK** | funciona |
+| find-dynamic-calls | ~~ruído (flag do `&` da expansão hbclass)~~ **P3: OK** | correto |
 
 ## Itens da fase (prioridade)
 

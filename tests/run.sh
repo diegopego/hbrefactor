@@ -1216,6 +1216,43 @@ check "refusal names the classes and the dynamic dispatch" $?
 cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg" && cmp -s "$D/w2.prg" "$HERE/fixsig/w2.prg"
 check "sources untouched by the refusal" $?
 
+echo "case 57: B4e P2b - call-graph resolve método -> símbolo; sends = arestas dinâmicas"
+# call-graph <método> responde a DEFINIÇÃO (nome gerado) e lista os SENDS que
+# o invocam como arestas DINÂMICAS (~>), nunca estáticas. Mensagem homônima em
+# duas classes = alvo de dispatch ambíguo (todos listados).
+D=$(freshsig case57)
+( cd "$D" && "$BIN" call-graph fixsig.hbp Widget:Grow > cg.log 2>&1 )
+check "call-graph on a method exit 0" $?
+grep -q "definition WIDGET:GROW -> WIDGET_GROW" "$D/cg.log"
+check "method resolved to its generated symbol (definition)" $?
+grep -q "MAIN ~> GROW  \[dynamic: WIDGET_GROW\]" "$D/cg.log"
+check "send site listed as a dynamic edge to the method" $?
+! grep -q "MAIN -> GROW" "$D/cg.log"
+check "no invented STATIC edge for the dispatched method" $?
+( cd "$D" && "$BIN" call-graph fixsig.hbp Resize > cgr.log 2>&1 )
+grep -q "definition WIDGET:RESIZE -> WIDGET_RESIZE" "$D/cgr.log" && \
+   grep -q "definition PANEL:RESIZE -> PANEL_RESIZE" "$D/cgr.log"
+check "homonym message shows both classes' definitions" $?
+grep -q "dynamic: WIDGET_RESIZE | PANEL_RESIZE" "$D/cgr.log"
+check "dynamic edge shows the ambiguous dispatch targets" $?
+
+echo "case 58: B4e P3 - find-dynamic-calls filtra o ruído do & da expansão hbclass"
+# a função da classe (CREATE CLASS) tem usesMacro=T por causa do & INTERNO da
+# expansão do hbclass.ch - falso positivo. Só macro REAL do usuário (token '&'
+# posicionado, prov 's') deve ser reportada.
+D=$(freshsig case58)
+( cd "$D" && "$BIN" find-dynamic-calls fixsig.hbp > fd.log 2>&1 )
+grep -q "^0 finding" "$D/fd.log"
+check "clean class project reports 0 (hbclass & noise suppressed)" $?
+! grep -qi "WIDGET uses & macros" "$D/fd.log" && ! grep -qi "PANEL uses & macros" "$D/fd.log"
+check "the class functions are not flagged" $?
+printf '\nFUNCTION Dyn( cMsg )\n   RETURN &cMsg.()\n' >> "$D/w2.prg"
+( cd "$D" && "$BIN" find-dynamic-calls fixsig.hbp > fd2.log 2>&1 )
+grep -q "function DYN uses & macros" "$D/fd2.log"
+check "a real user macro is still flagged" $?
+grep -q "^1 finding" "$D/fd2.log"
+check "exactly the user macro, none of the class noise" $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

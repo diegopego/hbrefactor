@@ -2610,8 +2610,10 @@ STATIC FUNCTION UnusedLocals( aArgs )
 
 STATIC FUNCTION CallGraph( aArgs )
 
-   LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem
+   LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem, hAsts := { => }
    LOCAL cFilter := "", hDefined := { => }, hSeen, cKey, cCallee
+   LOCAL hMethods := { => }, aParts, cMsg, cUpMsgFilter := "", cUpClassFilter := ""
+   LOCAL nAt, aOwn, cGen
 
    IF Len( aArgs ) < 2
       Usage()
@@ -2628,20 +2630,51 @@ STATIC FUNCTION CallGraph( aArgs )
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "o projeto não compila" )
    ENDIF
+   // funções definidas + índice de MENSAGENS de método: nome gerado
+   // <Classe>_<Metodo> decomposto pelo rastro (GenNameParts) -> a mensagem
+   // (método) mapeia para { classe, nome gerado, arquivo }
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
          RETURN Refuse( "dump ausente para '" + cPath + "'" )
       ENDIF
+      hAsts[ cPath ] := hAst
       FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ]
-            hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
+         aParts := GenNameParts( hAst, hFunc )
+         IF Len( aParts ) >= 2
+            cMsg := ATail( aParts )
+            IF ! hb_HHasKey( hMethods, cMsg )
+               hMethods[ cMsg ] := {}
+            ENDIF
+            AAdd( hMethods[ cMsg ], { aParts[ 1 ], hFunc[ "name" ], hb_FNameNameExt( cPath ) } )
          ENDIF
       NEXT
    NEXT
+   // o filtro é um MÉTODO? (Classe:Metodo, ou mensagem conhecida crua)
+   IF ! Empty( cFilter )
+      IF ( nAt := At( ":", cFilter ) ) > 0
+         cUpClassFilter := Left( cFilter, nAt - 1 )
+         cUpMsgFilter   := SubStr( cFilter, nAt + 1 )
+      ELSEIF hb_HHasKey( hMethods, cFilter )
+         cUpMsgFilter := cFilter
+      ENDIF
+   ENDIF
+   // definição do(s) método(s) sob o filtro (classe estreita quando dada)
+   IF ! Empty( cUpMsgFilter ) .AND. hb_HHasKey( hMethods, cUpMsgFilter )
+      FOR EACH aOwn IN hMethods[ cUpMsgFilter ]
+         IF Empty( cUpClassFilter ) .OR. aOwn[ 1 ] == cUpClassFilter
+            OutStd( aOwn[ 3 ] + ": definition " + aOwn[ 1 ] + ":" + cUpMsgFilter + ;
+                    " -> " + aOwn[ 2 ] + hb_eol() )
+         ENDIF
+      NEXT
+   ENDIF
+   // arestas ESTÁTICAS (calls)
    FOR EACH cPath IN hProj[ "files" ]
-      hAst := ReadAst( cTmp, cPath )
-      FOR EACH hFunc IN hAst[ "functions" ]
+      FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
          IF hFunc[ "fileDecl" ]
             LOOP
          ENDIF
@@ -2660,8 +2693,57 @@ STATIC FUNCTION CallGraph( aArgs )
          NEXT
       NEXT
    NEXT
+   // arestas DINÂMICAS: send para MENSAGEM de método do projeto é despacho
+   // dinâmico - NUNCA aresta estática. Alvo = nome(s) gerado(s); homônimo em
+   // várias classes = alvo ambíguo (todos listados, unicidade visível)
+   FOR EACH cPath IN hProj[ "files" ]
+      FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         FOR EACH hItem IN hFunc[ "sends" ]
+            cMsg := Upper( hItem[ "sym" ] )
+            IF ! hb_HHasKey( hMethods, cMsg )
+               LOOP
+            ENDIF
+            IF ! Empty( cFilter ) .AND. ;
+               !( cMsg == cUpMsgFilter .OR. Upper( hFunc[ "name" ] ) == cFilter )
+               LOOP
+            ENDIF
+            cGen := ""
+            FOR EACH aOwn IN hMethods[ cMsg ]
+               cGen += iif( Empty( cGen ), "", " | " ) + aOwn[ 2 ]
+            NEXT
+            OutStd( hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ": " + ;
+               hFunc[ "name" ] + " ~> " + hItem[ "sym" ] + "  [dynamic: " + cGen + "]" + hb_eol() )
+         NEXT
+      NEXT
+   NEXT
 
    RETURN EXIT_OK
+
+// a função tem macro '&' ESCRITO PELO USUÁRIO? Um macro real é token type 22
+// posicionado (prov 's', ex.: '&cVar.'); o '&' interno da expansão do
+// hbclass.ch (usesMacro na função da classe) não gera token posicionado, então
+// é falso positivo. Varre o span de linhas da função por um type 22 prov 's'.
+STATIC FUNCTION HasUserMacro( hAst, hFunc )
+
+   LOCAL nEnd := 0, hItem, hTok
+
+   FOR EACH hItem IN hAst[ "functions" ]
+      IF ! hItem[ "fileDecl" ] .AND. hItem[ "line" ] > hFunc[ "line" ] .AND. ;
+         ( nEnd == 0 .OR. hItem[ "line" ] < nEnd )
+         nEnd := hItem[ "line" ]
+      ENDIF
+   NEXT
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 22 .AND. hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+         hTok[ "line" ] >= hFunc[ "line" ] .AND. ( nEnd == 0 .OR. hTok[ "line" ] < nEnd )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
 
 STATIC FUNCTION FindDynamicCalls( aArgs )
 
@@ -2708,7 +2790,10 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
          ENDIF
       NEXT
       FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "usesMacro" ]
+         // só macro REAL do usuário: usesMacro provindo da expansão do
+         // hbclass.ch (função da classe) não tem '&' posicionado - falso
+         // positivo suprimido (P3)
+         IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "usesMacro" ] .AND. HasUserMacro( hAst, hFunc )
             nFound++
             OutStd( hb_FNameNameExt( cPath ) + ":" + hb_ntos( hFunc[ "line" ] ) + ;
                ": function " + hFunc[ "name" ] + " uses & macros (dynamic names possible)" + hb_eol() )
