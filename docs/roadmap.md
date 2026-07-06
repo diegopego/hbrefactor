@@ -983,3 +983,34 @@ recusa na dúvida — é o padrão de edição, não decisão sintática própri
 3. Dedup de duplicatas de pré/pós-decremento: não-fazer mantido (v2).
 4. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
    final e conversões de projeto — só depois de suíte + hbhttpd verdes.
+5. **`usages` de método: falso positivo em send de receptor de outro tipo**
+   (relatado pelo Diego, 2026-07-06, dogfooding hbhttpd). `usages <método>`
+   lista TODO `:<método>(` como uso, sem saber o tipo do receptor — é despacho
+   dinâmico, o tipo só existe em runtime. Reproduzido: com
+   `METHOD Paint() CLASS UWLayoutGrid`, uma `LOCAL a := {}` seguida de
+   `a:Paint()` aparece como uso ("send in MAIN | a:Paint()") mesmo `a` sendo
+   array, ao lado do `g:Paint()` legítimo (g é UWLayoutGrid). Mesma raiz da
+   política de unicidade de mensagem de [B4e](#fase-b4e--comandos-de-refatoração-cientes-de-construtos-de-pp-em-andamento)
+   (P1b/P2b) e do `[dynamic: …]` do call-graph: send não carrega classe.
+   O fato faltante é o TIPO/classe do RECEPTOR do send.
+   **Direção de correção — AJEITOS SÃO INACEITÁVEIS (princípio do Diego,
+   2026-07-06).** Hierarquia obrigatória para suprir o fato faltante:
+   (1) **PREFERIDO — análise em tempo de compilação no CORE do Harbour**
+   (lexer/parser/pré-processador/dump AST), mesmo que custe MAIS código no
+   core: o dump AST passa a carregar a classe RESOLVIDA no nó SEND quando o
+   compilador a determina (ex.: `a := UWLayoutGrid():New()` — receptor com
+   tipo estático); aí `usages` confirma cada uso por FATO do compilador, não
+   por adivinhação — no mesmo espírito de `-x`/ppRules/rastro `from`, que já
+   são análise de compilação no core. (2) **Receptor genuinamente dinâmico**
+   (sem tipo estático): NÃO fingir — relato honesto "definição + sends
+   POSSÍVEIS (despacho dinâmico, receptor de tipo desconhecido)", como o
+   call-graph marca `[dynamic: …]`; recusar/relatar > inventar. (3) **Só se a
+   análise de core for impossível**: introspecção CONFIÁVEL, no espírito do que
+   o Harbour já tem (debugger, pp, i18n, hbrun). Heurística de inferência de
+   tipo NA FERRAMENTA (flow analysis frágil sobre os `statements` do dump) é
+   justamente o ajeito a evitar: o piso é o relato honesto de (2), o teto é o
+   fato do core de (1).
+   Observação secundária do mesmo teste: `usages` só aceita o nome CRU do
+   método (`usages proj Paint`); a forma `Classe:Método` devolve 0 result(s)
+   — alinhar com a resolução `Classe:Método` que rename-method/reorder/
+   call-graph já fazem entra no mesmo item.
