@@ -638,6 +638,13 @@ STATIC FUNCTION RenameLocal( aArgs )
       ENDIF
       aPrev := hTok
    NEXT
+   // vários tokens do stream podem compartilhar a MESMA (linha,col) de
+   // origem - clones de um único token-fonte que uma diretiva de pp
+   // multiplicou na expansão (ex.: o parâmetro de uma FUNCTION gerada,
+   // declarado e usado no corpo, deriva do mesmo marker). Sem deduplicar,
+   // ApplyTokenEdits escreveria na mesma span mais de uma vez (nA->nAlfa
+   // vira nAlfalfa). Um site = uma posição-fonte.
+   DedupHits( aEdits )
    IF Empty( aEdits )
       RETURN Refuse( "nenhum site editável encontrado" )
    ENDIF
@@ -1116,6 +1123,10 @@ STATIC FUNCTION RenameStatic( aArgs )
       ENDIF
       aPrev := hTok
    NEXT
+   // dedup por (linha,col): clones de um mesmo token-fonte multiplicado por
+   // expansão de pp não podem gerar edição dupla na mesma span (ver
+   // RenameLocal) - um site = uma posição-fonte
+   DedupHits( aEdits )
    IF Empty( aEdits )
       RETURN Refuse( "nenhum site editável encontrado" )
    ENDIF

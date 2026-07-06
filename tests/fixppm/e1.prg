@@ -14,3 +14,5 @@ FUNCTION Freio_Roda()
 
 FUNCTION Anota( cTag )
    RETURN "[" + cTag + "]"
+
+PARAMFN Dobra( nX )

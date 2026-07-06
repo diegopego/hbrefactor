@@ -1114,6 +1114,26 @@ check "refusal points at the spelled generated name" $?
 cmp -s "$D/e1.prg" "$D/e1.saved" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "sources untouched by all refusals" $?
 
+echo "case 54: B4e regression - shared-origin sites must not double-apply an edit"
+# a função gerada pf_Dobra tem o parâmetro nX declarado E usado no corpo -
+# ambos são clones do MESMO token-fonte (o marker em PARAMFN Dobra( nX )),
+# então nascem com a mesma (linha,col). Sem dedup por posição-fonte, o
+# rename escrevia na span duas vezes; com nome novo que ESTENDE o antigo
+# (nX->nXX) o guard textual era enganado e o resultado era nXXXX - e como
+# nome de parâmetro não entra no pcode, o verify byte-idêntico deixava
+# passar (corrupção silenciosa, exit 0). Regressão do fix de dedup.
+D=$(freshppm case54)
+( cd "$D" && "$BIN" rename-param fixppm.hbp e1.prg pf_Dobra nX nXX > ren.log 2>&1 )
+RC=$?
+check "rename-param on a DSL-generated function param exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "PARAMFN Dobra( nXX )" "$D/e1.prg" && ! grep -q "nXXXX" "$D/e1.prg"
+check "edit applied exactly once (no nXXXX corruption)" $?
+test "$(grep -c 'e1.prg:18:' "$D/ren.log")" = "1"
+check "the shared-origin site is listed only once" $?
+( cd "$D" && "$BIN" rename-param fixppm.hbp e1.prg pf_Dobra nXX nX > /dev/null 2>&1 )
+cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg"
+check "A->B->A round-trip byte-exact"  $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

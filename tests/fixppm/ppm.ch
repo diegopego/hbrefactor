@@ -18,3 +18,7 @@
 
 // G3 - stringify puro no meio de statement
 #xtranslate EVENTO <n> => Anota( <"n"> )
+
+// B4e - função gerada com PARÂMETRO: parâmetro declarado E usado no corpo
+// derivam do MESMO token-fonte (o marker); regressão do double-apply
+#xcommand PARAMFN <n>( <p> ) => FUNCTION pf_<n>( <p> ) ;; RETURN <p>
