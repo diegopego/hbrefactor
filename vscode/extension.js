@@ -33,6 +33,18 @@ async function projectSpec() {
   return await vscode.window.showQuickPick(files.map(f => f.fsPath), { placeHolder: 'Projeto (.hbp/.hbc)' }) || null;
 }
 
+// resolve o executável: caminho explícito na config vence; senão o binário
+// construído ao lado da extensão (../bin/hbrefactor - layout do repo, faz o
+// dev mode funcionar sem PATH e sempre com o build recente); senão conta com
+// o PATH. Sem isto, dev mode dava "spawn hbrefactor ENOENT".
+function resolveBin() {
+  const configured = (cfg().get('binPath') || '').replace(/^~/, os.homedir());
+  if (configured && configured !== 'hbrefactor') return configured;
+  const local = path.join(__dirname, '..', 'bin', 'hbrefactor');
+  if (fs.existsSync(local)) return local;
+  return configured || 'hbrefactor';
+}
+
 function run(args, cwd) {
   return new Promise(resolve => {
     const env = Object.assign({}, process.env);
@@ -40,9 +52,19 @@ function run(args, cwd) {
     if (hb) env.HB_BIN = hb.replace(/^~/, os.homedir());
     const inc = cfg().get('includePaths');
     if (inc) env.INCLUDE = inc.replace(/~/g, os.homedir());
-    const bin = (cfg().get('binPath') || 'hbrefactor').replace(/^~/, os.homedir());
-    cp.execFile(bin, args, { cwd, env }, (err, stdout, stderr) => {
-      resolve({ code: err ? (typeof err.code === 'number' ? err.code : 1) : 0, stdout, stderr });
+    const bin = resolveBin();
+    // maxBuffer alto: call-graph/usages num projeto grande passa do default de
+    // 1 MB do execFile e o erro (ERR_CHILD_PROCESS_STDOUT_MAXBUFFER) chegava
+    // sem stdout/stderr - aparecia como "falhou" sem explicação
+    cp.execFile(bin, args, { cwd, env, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
+      // err.code é numérico só num exit != 0 do processo; para falha de spawn
+      // (ENOENT: binário não encontrado) ou estouro de buffer é string/undef -
+      // preserva err.message para o report NÃO cair no genérico "falhou"
+      resolve({
+        code: err ? (typeof err.code === 'number' ? err.code : 1) : 0,
+        stdout: stdout || '', stderr: stderr || '',
+        error: err ? (err.message || String(err)) : ''
+      });
     });
   });
 }
@@ -52,9 +74,13 @@ function report(title, res) {
   ch.appendLine('--- ' + title);
   if (res.stdout) ch.append(res.stdout);
   if (res.stderr) ch.append(res.stderr);
+  if (res.error && !res.stdout && !res.stderr) ch.appendLine('[erro] ' + res.error);
   ch.show(true);
   if (res.code !== 0) {
-    const first = (res.stderr || res.stdout || 'falhou').split('\n').find(l => l.trim()) || 'falhou';
+    // a mensagem do CLI (stderr/stdout) explica; sem ela, o erro do execFile
+    // (ex.: "spawn hbrefactor ENOENT" = binário não encontrado) é o que ajuda
+    const first = (res.stderr || res.stdout || res.error || 'falhou')
+      .split('\n').find(l => l.trim()) || res.error || 'falhou';
     vscode.window.showWarningMessage('hbrefactor: ' + first.trim());
   }
 }
