@@ -73,13 +73,16 @@ cheque textual de continuação `;` em 2 pontos (falso positivo só recusa).
 conserto `DispatchVia` — vínculo escrito nunca confirma/exclui, acerto
 próprio decide; 7 asserts de herança flipam para possible nomeado
 (**mudança de contrato, aguarda portão do Diego**); suíte 474/0.
+**Q8 ✅ FECHADA (2026-07-07)**: auditoria commit a commit REFUTOU a
+suspeita — nenhuma lógica keyed a biblioteca no core do branch, só
+transporte 1:1 de canal da linguagem (gates fAst = tabelas vivas com
+warnings nível-3 gated na emissão; schema espelha a gramática; canal de
+tipos é write-only no core; evidência arquivo:linha no doc da revisão).
+Pendência cosmética opcional: comentário de compast.c:106 (→ B6).
 Restantes: Q1-Q3/Q7 (prova adversarial dos comandos B4e em DSL inventada
 NÃO-espelho, ou conserto, ou recusa honesta); Q5 (matar o regex da
 extensão: `resolve-at` por fato no CLI); Q6 (rótulo do dono no
-vocabulário da regra raiz); **Q8 (ordem do Diego, 2026-07-07): auditar os
-commits do CORE do branch atrás de tratamento específico de classes**
-(evidência preliminar no doc: aponta transporte de canal da linguagem,
-não convenção — a auditoria confirma ou refuta commit a commit).
+vocabulário da regra raiz).
 **Critério**: todas as Q fechadas com caso na suíte; régua do caso 64
 assertada; `make test` verde; ast-schema atualizado onde a resposta for
 teto honesto.
