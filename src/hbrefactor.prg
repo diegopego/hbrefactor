@@ -280,6 +280,8 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
    LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd
+   LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
+   LOCAL aDecl, aSite, cCur, nState
 
    IF Len( aArgs ) < 3
       Usage()
@@ -337,6 +339,12 @@ STATIC FUNCTION Usages( aArgs )
    // grafo de classes do projeto (B4f-2): consumido pela resolução de
    // dispatch dos sends; NIL degrada para as camadas B4f
    hGraph := iif( hDecl == NIL, NIL, ClassGraph( hAsts, hDecl ) )
+   // resolução do dispatch da CLASSE CONSULTADA (B4f-2, sites de
+   // declaração): a dona que Classe:Método alcança - decide os sites de
+   // declaração/implementação homônimos; NIL = indecidível (classe fora
+   // do grafo, pai de fora antes de um hit - fato 9), nunca exclui
+   cOwnerQ := iif( Empty( cClass ) .OR. hGraph == NIL, NIL, ;
+                   ResolveDispatch( cClass, cUpMeth, hGraph ) )
 
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -357,18 +365,44 @@ STATIC FUNCTION Usages( aArgs )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
          ELSEIF FromReady( hAst ) .AND. ;
-            ( aLift := PpMarkerLift( hAst, hFunc, cUpMeth ) ) != NIL .AND. ;
-            ( Empty( cClass ) .OR. Upper( aLift[ 2 ] ) == cClass )
+            ( aLift := PpMarkerLift( hAst, hFunc, cUpMeth ) ) != NIL
             // lifting B4d: o programador escreveu METHOD Paint() CLASS
             // UWMenu (ou HANDLER Click de qualquer DSL); a função gerada é
             // detalhe da expansão - a resposta vem no vocabulário do fonte
             // (a cabeça da regra raiz), com a posição real do nome escrito
-            nHits++
-            LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
-            OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
-               aLift[ 1 ] + iif( Empty( aLift[ 2 ] ), "", " (class " + aLift[ 2 ] + ")" ) + ;
-               iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
-               SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
+            IF Empty( cClass ) .OR. Upper( aLift[ 2 ] ) == cClass
+               nHits++
+               LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
+               OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
+                  aLift[ 1 ] + iif( Empty( aLift[ 2 ] ), "", " (class " + aLift[ 2 ] + ")" ) + ;
+                  iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
+                  SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
+            ELSEIF ! Empty( aLift[ 2 ] )
+               // homônimo de IMPLEMENTAÇÃO (B4f-2, fatia dos sites de
+               // declaração): o site implementa o método de OUTRA dona.
+               // Se o dispatch da CONSULTADA resolve NESTA dona (herança,
+               // caso 67), o site é o alvo - confirmado; resolução
+               // decidível em OUTRA dona provada no grafo (fato 5) ->
+               // excluded (no relato, fora das Location[] - política
+               // B4f-2); indecidível (fato 9) -> possible honesto
+               nHits++
+               IF cOwnerQ != NIL .AND. cOwnerQ == Upper( aLift[ 2 ] )
+                  LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
+                  OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
+                     aLift[ 1 ] + " (class " + aLift[ 2 ] + ", dispatch target of " + ;
+                     cClass + ":" + cUpMeth + ")" + iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
+                     SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
+               ELSEIF cOwnerQ != NIL .AND. DeclOwnerProven( hGraph, Upper( aLift[ 2 ] ), cUpMeth )
+                  OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": excluded " + aLift[ 5 ] + ;
+                     " definition (implements " + Upper( aLift[ 2 ] ) + ":" + cUpMeth + ")" + ;
+                     SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
+               ELSE
+                  LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
+                  OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": possible " + aLift[ 5 ] + ;
+                     " definition (registered under " + Upper( aLift[ 2 ] ) + ", relation to " + ;
+                     cClass + " unknown)" + SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
+               ENDIF
+            ENDIF
          ENDIF
 
          FOR EACH hItem IN hFunc[ "declarations" ]
@@ -406,11 +440,15 @@ STATIC FUNCTION Usages( aArgs )
             // tipos da linguagem (ast-4): tipo declarado do receptor,
             // propagado pela árvore (TypeOf), e da resolução de dispatch
             // pela regra da linguagem sobre o grafo do projeto (B4f-2).
-            // Sem fato, a camada honesta é "possible" - nunca "uso" seco
-            IF Upper( hItem[ "sym" ] ) == cUpMeth
+            // Sem fato, a camada honesta é "possible" - nunca "uso" seco.
+            // A ESCRITA `o:x := v` envia a mensagem `_X` (fato 11) - o
+            // site escrito é do MESMO nome; casa e resolve pelo par
+            IF Upper( hItem[ "sym" ] ) == cUpMeth .OR. ;
+               Upper( hItem[ "sym" ] ) == "_" + cUpMeth
                nHits++
                aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl ), ;
-                                     cClass, cUpMeth, hGraph, hItem[ "block" ] )
+                                     cClass, cUpMeth, Upper( hItem[ "sym" ] ), ;
+                                     hGraph, hItem[ "block" ] )
                // excluded é não-referência PROVADA: fica no relato (com o
                // rótulo) mas fora das Location[] do --json - o editor
                // (find all references via extensão) não deve listá-lo
@@ -423,11 +461,107 @@ STATIC FUNCTION Usages( aArgs )
          NEXT
       NEXT
 
+      // sites de DECLARAÇÃO para a forma Classe:Método (B4f-2 fatia dos
+      // homônimos de declaração; generalizada na B4f-3). Duas fontes de
+      // FATO, ambas genéricas:
+      //   1. canal declared NO STREAM: `_HB_CLASS <nome>` muda a classe
+      //      corrente (semântica SEQUENCIAL do compilador - harbour.y,
+      //      não convenção) e `_HB_MEMBER <nome>` declara nela; o nome
+      //      vem POSICIONADO no site escrito. Cobre hbclass, DSL espelho
+      //      e DSL declarativa pura pelo MESMO canal da linguagem.
+      //   2. registro por STRING contido (por índice) na função GERADA -
+      //      posse por containment (PpMarkerOwners, site a site). Cobre
+      //      builds do hbclass sem declarações e DSLs que só registram.
+      // Dedup por posição; veredito pela resolução da CONSULTADA
+      hDone := { => }
+      IF ! Empty( cClass ) .AND. FromReady( hAst )
+         aDecl  := {}
+         cCur   := NIL
+         nState := 0
+         FOR EACH hItem IN hAst[ "tokens" ]
+            IF nState == 3
+               // grupo `{ a, b, ... }` do _HB_MEMBER (a lista de membros
+               // do canal - forma do VAR no hbclass): todo identificador
+               // posicionado dentro do grupo é nome de membro declarado
+               IF hItem[ "type" ] == 55
+                  nState := 0
+               ELSEIF hItem[ "type" ] == 21 .AND. Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
+                  cCur != NIL .AND. hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL
+                  AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], cCur } )
+               ENDIF
+            ELSEIF hItem[ "type" ] == 21
+               DO CASE
+               CASE Upper( hItem[ "text" ] ) == "_HB_CLASS"
+                  nState := 1
+               CASE Upper( hItem[ "text" ] ) == "_HB_MEMBER"
+                  nState := 2
+               CASE nState == 1
+                  cCur   := Upper( hItem[ "text" ] )
+                  nState := 0
+               CASE nState == 2
+                  IF Upper( hItem[ "text" ] ) == cUpMeth .AND. cCur != NIL .AND. ;
+                     hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL
+                     AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], cCur } )
+                  ENDIF
+                  nState := 0
+               ENDCASE
+            ELSEIF nState == 2 .AND. hItem[ "type" ] == 54
+               nState := 3
+            ELSE
+               nState := 0
+            ENDIF
+         NEXT
+         aSpans := FuncStmtSpans( hAst )
+         hEnt   := PpMarkerSeeds( hAst, cUpMeth )
+         FOR EACH aArt IN PpMarkerArtifacts( hAst, hEnt[ "pairs" ], cUpMeth )
+            hItem := aArt[ 2 ]
+            IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL .AND. ;
+               ( hFn := FuncOfTokIdx( aSpans, aArt[ 1 ] ) ) != NIL .AND. ! hFn[ "fileDecl" ] .AND. ;
+               FuncDerived( hAst, hFn ) .AND. MethodImplOf( hAst, hFn, "", cUpMeth ) == NIL
+               AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], Upper( hFn[ "name" ] ) } )
+            ENDIF
+         NEXT
+         FOR EACH aSite IN aDecl
+            cKey := hb_ntos( aSite[ 1 ] ) + "|" + hb_ntos( aSite[ 2 ] )
+            IF hb_HHasKey( hDone, cKey )
+               LOOP
+            ENDIF
+            hDone[ cKey ] := .T.
+            nHits++
+            cOwn   := aSite[ 3 ]
+            hRule  := SeedRootRule( hAst, aSite[ 1 ], aSite[ 2 ] )
+            cVocab := iif( hRule == NIL .OR. hRule[ "head" ] == NIL, "dsl", Lower( hRule[ "head" ] ) )
+            IF cOwn == cClass
+               LocAdd( aLoc, cPath, aSite[ 1 ], { aSite[ 2 ] + 1 }, Len( cMethTok ) )
+               OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": " + cVocab + ;
+                  " declaration (class " + cOwn + ")" + SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
+            ELSEIF cOwnerQ != NIL .AND. cOwnerQ == cOwn
+               LocAdd( aLoc, cPath, aSite[ 1 ], { aSite[ 2 ] + 1 }, Len( cMethTok ) )
+               OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": " + cVocab + ;
+                  " declaration (class " + cOwn + ", dispatch target of " + cClass + ":" + ;
+                  cUpMeth + ")" + SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
+            ELSEIF cOwnerQ != NIL .AND. DeclOwnerProven( hGraph, cOwn, cUpMeth )
+               OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": excluded " + cVocab + ;
+                  " declaration (declares " + cOwn + ":" + cUpMeth + ")" + ;
+                  SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
+            ELSE
+               LocAdd( aLoc, cPath, aSite[ 1 ], { aSite[ 2 ] + 1 }, Len( cMethTok ) )
+               OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": possible " + cVocab + ;
+                  " declaration (registered under " + cOwn + ", relation to " + cClass + ;
+                  " unknown)" + SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
+            ENDIF
+         NEXT
+      ENDIF
+
       // referências possíveis em strings: tokens tipo 41 cujo conteúdo é
-      // exatamente o nome (call-by-name) - do próprio stream do compilador
+      // exatamente o nome (call-by-name) - do próprio stream do compilador.
+      // Posições já respondidas pelo passe de declaração acima (a string de
+      // registro É o artefato da declaração) não se repetem aqui
       FOR EACH hItem IN hAst[ "tokens" ]
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUpMeth
+            Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
+            ( hItem[ "col" ] == NIL .OR. ;
+              ! hb_HHasKey( hDone, hb_ntos( hItem[ "line" ] ) + "|" + hb_ntos( hItem[ "col" ] ) ) )
             nHits++
             LocAdd( aLoc, cPath, hItem[ "line" ], ;
                     iif( hItem[ "col" ] == NIL, {}, { hItem[ "col" ] + 1 } ), Len( cMethTok ) )
@@ -5294,6 +5428,15 @@ STATIC FUNCTION SendReceiverType( hFunc, hSend, hDecl )
       SendNodesWalk( hb_HGetDef( hStmt, "expr", NIL ), Upper( hSend[ "sym" ] ), ;
                      hSend[ "line" ], hStmt[ "block" ], aNodes )
    NEXT
+   // a ESCRITA `o:x := v` envia `_X` (fato 11) mas a ÁRVORE guarda o nó
+   // como ASSIGN cuja esquerda é SEND do nome BASE - sem nó para `_X`,
+   // procurar o nó base na mesma linha
+   IF Empty( aNodes ) .AND. hb_LeftEq( hSend[ "sym" ], "_" )
+      FOR EACH hStmt IN hFunc[ "statements" ]
+         SendNodesWalk( hb_HGetDef( hStmt, "expr", NIL ), SubStr( Upper( hSend[ "sym" ] ), 2 ), ;
+                        hSend[ "line" ], hStmt[ "block" ], aNodes )
+      NEXT
+   ENDIF
    FOR EACH aNode IN aNodes
       hOne := TypeOf( aNode[ 1 ], hFunc, hDecl, aNode[ 2 ], NIL )
       IF hOne == NIL
@@ -5367,6 +5510,22 @@ STATIC FUNCTION ClassGraph( hAsts, hDecl )
                          "members" => hMembers }
    NEXT
 
+   // classes SÓ do canal declared (B4f-3: DSL declarativa pura -
+   // _HB_CLASS/_HB_MEMBER por #xcommand próprio, sem função geradora): a
+   // interface declarada é a PROMESSA fechada do autor - o canal não
+   // carrega superclasse (fato 4), então pais vazios e membros = declared.
+   // Mesma natureza de promessa de todo tipo declarado (caveat no
+   // ast-schema)
+   FOR EACH cUp IN hb_HKeys( hDecl[ "c" ] )
+      IF ! hb_HHasKey( hGraph, cUp )
+         hMembers := { => }
+         FOR EACH cM IN hb_HKeys( hDecl[ "c" ][ cUp ] )
+            hMembers[ cM ] := .T.
+         NEXT
+         hGraph[ cUp ] := { "parents" => {}, "members" => hMembers }
+      ENDIF
+   NEXT
+
    RETURN hGraph
 
 // a classe DONA da implementação que o dispatch de cMsg sobre cUpClass
@@ -5409,6 +5568,14 @@ STATIC FUNCTION ResolveDispatch( cUpClass, cUpMsg, hGraph, hSeen )
 
    RETURN ""
 
+// a dona registrada de um site de declaração/implementação é CLASSE do
+// grafo do projeto com a mensagem PRÓPRIA (fato 5: stringify ∪ declared)?
+// É o que autoriza EXCLUIR um site homônimo na consulta Classe:Método -
+// dona fora do grafo (DSL sem classe, dump sem declared) nunca exclui
+STATIC FUNCTION DeclOwnerProven( hGraph, cUpOwn, cUpMsg )
+   RETURN hGraph != NIL .AND. hb_HHasKey( hGraph, cUpOwn ) .AND. ;
+      hb_HHasKey( hGraph[ cUpOwn ][ "members" ], cUpMsg )
+
 // descendentes TRANSITIVOS de uma classe no grafo, por arestas DO PROJETO
 // (descendência que atravessa pai de fora é invisível - limite honesto,
 // coberto pela indecidibilidade do próprio ResolveDispatch nesses ramos)
@@ -5440,18 +5607,34 @@ STATIC FUNCTION ClassDescendants( cUpClass, hGraph )
 // implementação consultada (ou cuja resolução é indecidível - também
 // impede exclusão): receptor DECLARADO é promessa e pode carregar
 // qualquer um deles em runtime
-STATIC FUNCTION DispatchHijackers( cRcls, cUpMsg, cOwnerQ, hGraph )
+STATIC FUNCTION DispatchHijackers( cRcls, cUpSym, cUpBase, cOwnerQ, hGraph )
 
    LOCAL aOut := {}, cD, xOwn
 
    FOR EACH cD IN ClassDescendants( cRcls, hGraph )
-      xOwn := ResolveDispatch( cD, cUpMsg, hGraph )
+      xOwn := ResolveDispatchMsg( cD, cUpSym, cUpBase, hGraph )
       IF xOwn == NIL .OR. xOwn == cOwnerQ
          AAdd( aOut, cD )
       ENDIF
    NEXT
 
    RETURN aOut
+
+// resolução da MENSAGEM EFETIVA de um send: a escrita `o:x := v` envia
+// `_X` (fato 11); VAR registra o PAR leitura/escrita em runtime (X e _X,
+// provado no probe vprobe) mas o registro por stringify/declared carrega
+// só X - quando a forma de escrita não acha dona própria (ASSIGN
+// explícito registra _NOME e resolve direto), resolve pelo nome BASE (a
+// regra do par de dados da linguagem)
+STATIC FUNCTION ResolveDispatchMsg( cUpClass, cUpSym, cUpBase, hGraph )
+
+   LOCAL xOwn := ResolveDispatch( cUpClass, cUpSym, hGraph )
+
+   IF HB_ISSTRING( xOwn ) .AND. Len( xOwn ) == 0 .AND. !( cUpSym == cUpBase )
+      xOwn := ResolveDispatch( cUpClass, cUpBase, hGraph )
+   ENDIF
+
+   RETURN xOwn
 
 // veredito em camadas de um send para a consulta [Classe:]Método. Camadas
 // B4f (canal de tipos) decididas ALÉM quando a B4f-2 resolve: receptor de
@@ -5463,7 +5646,7 @@ STATIC FUNCTION DispatchHijackers( cRcls, cUpMsg, cOwnerQ, hGraph )
 // (rótulo carrega a ressalva) e um descendente que sequestre o dispatch a
 // impede (possible nomeando-o). Indecidível => camadas B4f de sempre.
 // Devolve { rótulo, fora-do-json? } - excluded fica fora das Location[]
-STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, hGraph, lBlock )
+STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
 
    LOCAL cSuf := iif( lBlock, ", codeblock", "" )
    LOCAL cRcls, cOwnerQ, cOwnerR, aHij
@@ -5482,8 +5665,8 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, hGraph, lBlock )
                     "class " + cRcls + " via declared types" ) + cSuf + ")", .F. }
    ENDIF
    IF hGraph != NIL
-      cOwnerQ := ResolveDispatch( cClass, cUpMeth, hGraph )
-      cOwnerR := ResolveDispatch( cRcls, cUpMeth, hGraph )
+      cOwnerQ := ResolveDispatchMsg( cClass, cUpSym, cUpMeth, hGraph )
+      cOwnerR := ResolveDispatchMsg( cRcls, cUpSym, cUpMeth, hGraph )
       IF cOwnerQ != NIL .AND. cOwnerR != NIL .AND. ;
          Len( cOwnerQ ) > 0 .AND. Len( cOwnerR ) > 0
          IF cOwnerR == cOwnerQ
@@ -5495,7 +5678,7 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, hGraph, lBlock )
             RETURN { "excluded send (dispatches to " + cOwnerR + ":" + cUpMeth + ;
                      cSuf + ")", .T. }
          ENDIF
-         aHij := DispatchHijackers( cRcls, cUpMeth, cOwnerQ, hGraph )
+         aHij := DispatchHijackers( cRcls, cUpSym, cUpMeth, cOwnerQ, hGraph )
          IF Empty( aHij )
             RETURN { "excluded send within the project's class graph (dispatches to " + ;
                      cOwnerR + ":" + cUpMeth + cSuf + ")", .T. }

@@ -105,6 +105,21 @@ freshdis() { # freshdis <case-name> -> fixture for dispatch resolution (B4f-2)
    echo "$d"
 }
 
+freshhom() { # freshhom <case-name> -> fixture for DSL homonym generality (B4f-3)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixhom/*.prg "$HERE"/fixhom/*.hbp "$HERE"/fixhom/*.ch "$d"/
+   echo "$d"
+}
+
+freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixcst/*.prg "$HERE"/fixcst/*.hbp "$d"/
+   cp "$HB_BIN/../../../contrib/xhb/cstruct.ch" "$HB_BIN/../../../contrib/xhb/hbctypes.ch" "$d"/
+   echo "$d"
+}
+
 extrun() { # extrun <dir> <out-file> -> build fixext copy and run it
    ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
 }
@@ -1674,6 +1689,45 @@ check "hit do projeto ANTES do pai de fora: decidível (fato 9)" $?
 ! grep -q "excluded.*OPFIRST\|OPFIRST.*excluded" "$D/pm.log" "$D/ob.log"
 check "nenhuma consulta exclui send de receptor com cadeia indecidível" $?
 
+echo "case 70: B4f-2 - homônimos de DECLARAÇÃO: protótipo/impl de outra classe fora do find-references"
+# Relato do Diego pós-entrega: os SENDS homônimos saíram, mas os protótipos
+# 'METHOD Paint()' das outras classes continuavam nas Location[] via camada
+# de strings (a string de registro da expansão, sem vínculo de classe). O
+# passe de declaração vincula cada site à dona (containment por índice na
+# função gerada - mesmos fatos da PpMarkerOwners, site a site) e decide com
+# o ResolveDispatch da CONSULTADA: dona == consultada -> declaração; alvo do
+# dispatch da consultada (herança, caso 67) -> confirmado; outra dona provada
+# no grafo -> excluded (fora das Location[]); indecidível -> possible.
+D=$(freshdis case70)
+( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json pm.json > pm.log 2>&1 )
+check "usages UWMain:Paint exit 0" $?
+grep -q "d1.prg:13: method declaration (class UWMAIN)  | METHOD Paint()" "$D/pm.log"
+check "protótipo da consultada vira declaração (era 'possible reference in string')" $?
+grep -q "d1.prg:31: excluded method declaration (declares UWSECONDARY:PAINT)" "$D/pm.log"
+check "protótipo homônimo da outra classe excluído com a dona nomeada" $?
+grep -q "d1.prg:41: excluded method definition (implements UWSECONDARY:PAINT)" "$D/pm.log"
+check "implementação homônima excluída no relato (antes: omitida em silêncio)" $?
+! grep -q "possible reference in string" "$D/pm.log"
+check "nenhuma string de registro sobra na camada genérica de strings" $?
+python3 - "$D/pm.json" > "$D/pj.log" 2>&1 <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+d1 = sorted(l['range']['start']['line'] + 1 for l in locs if l['uri'].endswith('d1.prg'))
+assert 13 in d1 and 23 in d1, "declaração/definição da consultada sumiu do --json"
+for other in (31, 41, 47, 50, 56, 59):
+    assert other not in d1, "site homônimo %d vazou para o --json" % other
+print('json ok')
+PYEOF
+grep -q "^json ok$" "$D/pj.log"
+check "Location[] só com os sites da consultada (o furo da extensão fecha)" $?
+( cd "$D" && "$BIN" usages fixdis.hbp UWChild:Paint > ch.log 2>&1 )
+grep -q "d1.prg:23: method definition Paint (class UWMain, dispatch target of UWCHILD:PAINT)" "$D/ch.log" && \
+   grep -q "d1.prg:13: method declaration (class UWMAIN, dispatch target of UWCHILD:PAINT)" "$D/ch.log"
+check "consulta da herdeira confirma decl/impl do pai como alvo do dispatch" $?
+( cd "$D" && "$BIN" usages fixdis.hbp OPFirst:Paint > of.log 2>&1 )
+! grep -q "excluded" "$D/of.log"
+check "consultada com cadeia indecidível (fato 9) não exclui NENHUM site" $?
+
 echo "case 71: extensão VSCode - lifting de método no find-references (methodQuery real)"
 # a extensão promove a palavra sob o cursor a Classe:Método quando o cursor
 # está na implementação (METHOD x ... CLASS Y) ou num protótipo do bloco
@@ -1682,6 +1736,139 @@ echo "case 71: extensão VSCode - lifting de método no find-references (methodQ
 # fixtures da suíte + sintéticos (13 checks, inclusive os negativos).
 node "$HERE/../vscode/test-methodquery.js" > /dev/null 2>&1
 check "methodQuery: 13/13 contra fixtures reais e sintéticos" $?
+
+echo "case 72: B4f-3 - A PROVA DA GENERALIDADE: homônimos em DSLs customizadas (#xcommand)"
+# DSLs INVENTADAS (rig.ch: RIG/COG/FORGE, espelho estrutural do hbclass;
+# amuleto.ch: AMULETO/DOTE, declarativa PURA - só o canal, sem função
+# geradora) com donos homônimos ENTRE SI (Totem/Idolo com Brilho; Sol/Lua
+# com Fulgor) e CRUZADOS com classe hbclass (Farol:Brilho). A resolução
+# decide TUDO pelos fatos genéricos (canal declared no stream, registro
+# por string com containment, grafo) - zero ajuste por-caso: a régua do
+# caso 64 vale (nenhuma palavra das DSLs na ferramenta) e os rótulos saem
+# no VOCABULÁRIO de cada DSL (cabeça da regra raiz: cog, dote, forge).
+for f in m1.prg m2.prg m3.prg; do
+   "$HB_BIN/harbour" "$HERE/fixhom/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I"$HERE/fixhom" > /dev/null 2>&1
+   check "fixhom/$f clean under -w3 -es2" $?
+done
+D=$(freshhom case72)
+( cd "$D" && "$BIN" usages fixhom.hbp Totem:Brilho --json tb.json > tb.log 2>&1 )
+check "usages Totem:Brilho (dono de DSL) exit 0" $?
+grep -q "m1.prg:19: cog declaration (class TOTEM)  | COG Brilho GIVES Totem" "$D/tb.log"
+check "declaração do próprio DSL confirmada NO VOCABULÁRIO do DSL (cog)" $?
+grep -q "m1.prg:27: excluded cog declaration (declares IDOLO:BRILHO)" "$D/tb.log"
+check "homônimo ENTRE donos de DSL excluído" $?
+grep -q "m1.prg:9: excluded method declaration (declares FAROL:BRILHO)" "$D/tb.log" && \
+   grep -q "m1.prg:15: excluded method definition (implements FAROL:BRILHO)" "$D/tb.log"
+check "homônimo CRUZADO (classe hbclass) excluído da consulta do DSL" $?
+grep -q "m1.prg:23: forge definition Brilho (class Totem)" "$D/tb.log" && \
+   grep -q "m1.prg:30: excluded forge definition (implements IDOLO:BRILHO)" "$D/tb.log"
+check "implementação por colagem do DSL: própria confirmada, homônima excluída" $?
+grep -q "excluded send (dispatches to FAROL:BRILHO) in USARIG  | oF:Brilho()" "$D/tb.log" && \
+   grep -q "confirmed send (receiver class TOTEM via declared types) in USARIG  | oT:Brilho()" "$D/tb.log" && \
+   grep -q "excluded send (dispatches to IDOLO:BRILHO) in USARIG  | oI:Brilho()" "$D/tb.log"
+check "sends decididos nas três direções (DSL própria, DSL homônima, classe)" $?
+python3 - "$D/tb.json" > "$D/tj.log" 2>&1 <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+sites = sorted((l['uri'].rsplit('/', 1)[-1], l['range']['start']['line'] + 1) for l in locs)
+assert sites == [('m1.prg', 19), ('m1.prg', 23), ('m1.prg', 39)], sites
+print('json ok')
+PYEOF
+grep -q "^json ok$" "$D/tj.log"
+check "Location[] só com os 3 sites do Totem (COG, FORGE, send)" $?
+( cd "$D" && "$BIN" usages fixhom.hbp Sol:Fulgor > sf.log 2>&1 )
+grep -q "m2.prg:7: dote declaration (class SOL)  | DOTE Fulgor RENDE Sol" "$D/sf.log" && \
+   grep -q "m2.prg:11: excluded dote declaration (declares LUA:FULGOR)" "$D/sf.log"
+check "DSL declarativa PURA: declaração própria confirmada, homônima excluída" $?
+grep -q "excluded send (dispatches to LUA:FULGOR) in USAAMULETO  | l:Fulgor()" "$D/sf.log" && \
+   grep -q "confirmed send (receiver class SOL via declared types) in USAAMULETO  | s:Fulgor()" "$D/sf.log"
+check "donas SÓ do canal declared entram no grafo (interface = promessa fechada)" $?
+( cd "$D" && "$BIN" usages fixhom.hbp Farol:Brilho > fb.log 2>&1 )
+grep -q "m1.prg:9: method declaration (class FAROL)" "$D/fb.log" && \
+   grep -q "m1.prg:19: excluded cog declaration (declares TOTEM:BRILHO)" "$D/fb.log" && \
+   grep -q "excluded send (dispatches to TOTEM:BRILHO) in USARIG  | oT:Brilho()" "$D/fb.log"
+check "a consulta espelhada (classe hbclass) exclui os sites dos DSLs" $?
+# fatia 2 (alinhamento do Diego): a generalidade também é de COMANDOS
+# NOVOS embrulhando classes JÁ EXISTENTES (`#command mybrowse <a> <b> =>
+# tbrowse`) - a instância e o send existem só na EXPANSÃO; o escrito só
+# tem o comando. Nenhum ajuste: os fatos fluem da árvore expandida e o
+# site relatado é o ESCRITO.
+( cd "$D" && "$BIN" usages fixhom.hbp Grade:Pintar > gp.log 2>&1 )
+grep -q "confirmed send (receiver class GRADE via declared types) in USAB  | MYPAINT g" "$D/gp.log"
+check "send que SÓ existe na expansão: confirmado no site ESCRITO do comando" $?
+grep -q "excluded send (dispatches to LOUSA:PINTAR) in USAB  | MYPAINT l" "$D/gp.log"
+check "homônimo ATRAVÉS do comando embrulhador excluído" $?
+grep -q "confirmed send (receiver class GRADE via declared types) in USAB  | g:Pintar()" "$D/gp.log"
+check "instância criada NA EXPANSÃO classifica o send escrito depois" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in USAB  | MYPAINT t" "$D/gp.log"
+check "comando sobre classe de FORA do projeto (TBrowse): possible honesto" $?
+# fatia 3: a ESCRITA `o:x := v` envia a mensagem `_X` (fato 11) e a árvore
+# guarda ASSIGN->SEND do nome BASE; VAR registra o PAR leitura/escrita em
+# runtime (provado: __objHasMsg NT e _NT) e declara via `_HB_MEMBER { a, b }`
+# (a lista do canal). Consumo genérico: writes casam, resolvem pelo par e
+# o site do VAR aparece.
+( cd "$D" && "$BIN" usages fixhom.hbp Grade:nT --json gn.json > gn.log 2>&1 )
+grep -q "confirmed send (receiver declared AS CLASS GRADE) in GRADE_NEW  | ::nT := n" "$D/gn.log"
+check "ESCRITA ::nT := n casa e confirma (fato 11 + Self tipado)" $?
+grep -q "excluded send within the project's class graph (dispatches to LOUSA:NT) in LOUSA_NEW" "$D/gn.log"
+check "escrita homônima na outra classe excluída (resolução pelo par de dados)" $?
+grep -q "m3.prg:10: var declaration (class GRADE)  | VAR nT INIT 0" "$D/gn.log" && \
+   grep -q "m3.prg:23: excluded var declaration (declares LOUSA:NT)" "$D/gn.log"
+check "VAR: site de declaração via lista { } do canal, confirmado/excluído" $?
+! grep -qiwE "rig|cog|forge|totem|idolo|farol|brilho|amuleto|dote|fulgor|zenite|mybrowse|mylousa|mypaint|mytela|grade|lousa|pintar" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra das DSLs (régua do caso 64)" $?
+
+echo "case 73: B4f-3 - DSL REAL do contrib (xhb/cstruct.ch): classes de RUNTIME, relato honesto"
+# apontada pelo Diego como exemplo do que qualquer programador cria no seu
+# aplicativo: cstruct cria as classes em RUNTIME (hb_CStructure/__clsNew),
+# define regras de pp DE DENTRO da expansão de outras regras (#xtranslate
+# IS <stru> nasce do C STRUCTURE) e registra membros por stringify num
+# INIT PROCEDURE colado (__INIT_<stru>, sufixo $ do compilador). Nada
+# estático cruza classe de runtime: o teto é da linguagem - o contrato é
+# relato HONESTO (possible; sites escritos listados), NUNCA over-claim.
+D=$(freshcst case73)
+( cd "$D" && "$HB_BIN/harbour" c1.prg -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I. > /dev/null 2>&1 )
+check "fixcst/c1.prg (cstruct REAL) clean under -w3 -es2" $?
+( cd "$D" && "$BIN" usages c1.hbp Ponto:x --json px.json > px.log 2>&1 )
+check "usages Ponto:x sobre o DSL real exit 0" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in USACST  | p:x := 1" "$D/px.log"
+check "ESCRITA p:x := 1 listada (fato 11) como possible honesto" $?
+grep -q "possible reference in string  | MEMBER x IS CTYPE_INT" "$D/px.log"
+check "MEMBER x (registro por stringify) listado como possible honesto" $?
+! grep -qE "excluded|confirmed" "$D/px.log"
+check "classe de RUNTIME nunca gera excluded/confirmed (o teto é da linguagem)" $?
+( cd "$D" && "$BIN" usages c1.hbp x > x.log 2>&1 )
+check "consulta crua x também exit 0 (regras de pp criadas por expansão não quebram)" $?
+
+echo "case 74: B4f-3 - o princípio é CONSTRUTO-AGNÓSTICO: açúcar sobre FUNÇÕES e LOCAIS"
+# alinhamento do Diego: classes são SÓ UM CASO. O harbour inteiro se apoia
+# em diretivas para criar açúcar sintático; o hbrefactor refatora qualquer
+# construto através dele. fixsug: chamada de função que SÓ existe na
+# expansão (DOBRA k -> k := Dobro(k)) e local declarado por comando
+# (CONTA m -> LOCAL m := 0). Onde o fato não alcança (nome de função no
+# CORPO de uma regra), o oráculo RECUSA com rollback - nunca árvore quebrada.
+D="$HERE/tmp/case74"; rm -rf "$D"; mkdir -p "$D"
+cp "$HERE"/fixsug/* "$D"/
+( cd "$D" && "$HB_BIN/harbour" sf1.prg -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I. > /dev/null 2>&1 )
+check "fixsug/sf1.prg clean under -w3 -es2" $?
+( cd "$D" && "$BIN" usages sf1.hbp Dobro > fd.log 2>&1 )
+grep -q "sf1.prg:12: call in USAS  | DOBRA k" "$D/fd.log"
+check "chamada que SÓ existe na expansão listada no site ESCRITO do comando" $?
+( cd "$D" && "$BIN" usages sf1.hbp m --func UsaS > fm.log 2>&1 )
+grep -q "sf1.prg:8: declaration (local) in USAS  | CONTA m" "$D/fm.log"
+check "LOCAL declarado por comando: declaração no site escrito" $?
+( cd "$D" && "$BIN" rename-local sf1.hbp sf1.prg UsaS m mm > rl.log 2>&1 )
+RC=$?
+check "rename-local através do açúcar exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "CONTA mm" "$D/sf1.prg" && grep -q "mm := Dobro( mm )" "$D/sf1.prg" && \
+   grep -q "byte-identical" "$D/rl.log"
+check "rename editou o site do comando e verificou byte-idêntico" $?
+( cd "$D" && "$BIN" rename-function sf1.hbp Dobro Duplo > rf.log 2>&1 )
+RC=$?
+check "rename-function com o nome no CORPO da regra: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "rollback" "$D/rf.log" && grep -q "FUNCTION Dobro( n )" "$D/sf1.prg" && \
+   grep -q "Dobro( <v> )" "$D/suga.ch"
+check "oráculo pegou (símbolos mudaram) e o rollback preservou fonte e regra" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

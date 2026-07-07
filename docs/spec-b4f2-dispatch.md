@@ -129,6 +129,20 @@ Diego:** rótulo "excluded within the project's class graph" fora do
 flag in/out-projeto (fato 9) APROVADO; **volume AINDA NÃO autorizado** —
 não iniciar ClassGraph/ResolveDispatch/casos 66-69 sem novo ok.
 
+## Pós-entrega — fatia dos homônimos de DECLARAÇÃO (2026-07-07, caso 70)
+
+Relato do Diego após a entrega: a extensão ainda listava os protótipos
+homônimos (`METHOD Paint()`) das OUTRAS classes — a string de REGISTRO da
+expansão caía na camada genérica de strings, sem vínculo de dona. Fechado
+na ferramenta com fatos já existentes: dona por containment/co-derivação
+(os mesmos da posse do rename-method), veredito pelo `ResolveDispatch` da
+CONSULTADA (dona == consultada → declaração; alvo do dispatch da
+consultada, herança → confirmado nomeando `dispatch target`; outra dona
+provada no grafo → excluded, fora das `Location[]`; indecidível →
+possible, nunca excluded — fato 9). A implementação homônima (antes
+omitida em silêncio) agora sai `excluded` no relato. Casos 70 (CLI) e 71
+(methodQuery da extensão no contrato da suíte). Suíte 433/0.
+
 ## Regras operacionais
 
 Compilar fixture antes de usar (-w3 -es2); probes via hbmk2 no

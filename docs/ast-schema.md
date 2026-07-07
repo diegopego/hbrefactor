@@ -363,6 +363,56 @@ ACCESS/ASSIGN entram na mesma tabela de mensagens com a mesma regra
 (ASSIGN = mensagem `_NOME`). Todo `excluded` fica fora das `Location[]`
 do `--json`.
 
+Sites de DECLARAÇÃO e IMPLEMENTAÇÃO na forma `Classe:Método` (fatia dos
+homônimos de declaração, caso 70; generalizada na B4f-3, caso 72). A dona
+de cada site escrito vem de DUAS fontes de fato, ambas genéricas:
+
+1. **canal declared no stream**: `_HB_CLASS <nome>` muda a classe corrente
+   (semântica SEQUENCIAL do compilador — harbour.y, não convenção) e
+   `_HB_MEMBER <nome>` declara nela; o nome chega POSICIONADO no site
+   escrito. Cobre hbclass, DSL espelho e DSL declarativa pura pelo MESMO
+   canal da linguagem;
+2. **registro por string** contido (por índice) na função GERADA — posse
+   por containment (os fatos da PpMarkerOwners, site a site). Cobre builds
+   do hbclass sem declarações e DSLs que só registram.
+
+A implementação separada é o composto `DONA_MÉTODO` (co-derivação). O
+veredito consome a resolução da própria CONSULTADA:
+
+- dona == consultada → `declaration (class X)` (nas `Location[]`);
+- `ResolveDispatch( consultada ) == dona` → `... (class X, dispatch
+  target of C:M)` — herança: o site é o alvo que o dispatch alcança;
+- resolução da consultada decidível em OUTRA dona provada no grafo
+  (classe com a mensagem própria — fato 5) → `excluded ...
+  (declares/implements Y:M)`, fora das `Location[]`;
+- indecidível (fato 9) ou dona fora do grafo → `possible`, nunca excluded.
+
+A string de registro respondida por esse passe NÃO repete na camada
+genérica de strings (ela É o artefato da declaração); strings escritas
+pelo usuário (call-by-name) continuam `possible reference in string`.
+
+Fatos da linguagem consumidos por essas camadas (aprendidos nos probes
+da B4f-3 — evidência: dumps de fixhom/fixcst e probe vprobe executado):
+
+- **Escrita `o:x := v` envia a mensagem `_X`** (fato 11): em `sends[]` o
+  sym é `_X`, mas a ÁRVORE guarda `ASSIGN → SEND` do nome BASE (`X`) —
+  o casamento aceita as duas formas e o walk do receptor cai para o nome
+  base quando o sym começa com `_`.
+- **VAR registra o PAR leitura/escrita em runtime** (`__objHasMsg` devolve
+  .T. para `NT` E `_NT` — probe vprobe), mas stringify/declared carregam
+  só o nome base — a resolução da forma de escrita tenta `_X` (ASSIGN
+  explícito registra `_NOME`) e cai para `X` (par de dados).
+- **`_HB_MEMBER { a, b }`**: a forma de LISTA do canal declared (é como o
+  VAR do hbclass declara); os nomes vêm POSICIONADOS dentro do grupo.
+- **Strings de registro nem sempre têm posição**: a do hbclass é
+  posicionada no nome escrito; a de stringify de DSL própria (`<(x)>`)
+  nasce `line 0` — por isso a fonte 1 (canal no stream) existe.
+- **INIT PROCEDURE ganha sufixo `$`** no nome da função no dump
+  (`__INIT_PONTO$`) — afeta casamentos por nome de função gerada.
+- **Classes de RUNTIME** (ex.: xhb cstruct — `hb_CStructure`/`__clsNew`,
+  regras de pp definidas de dentro de expansões): nada estático cruza; o
+  relato é `possible` em tudo, sites escritos listados (caso 73).
+
 ### Contrato de extensão (para autores de comandos de pp)
 
 **Qualquer comando novo fica semanticamente refatorável DECLARANDO pelo
@@ -371,7 +421,17 @@ canal da linguagem na expansão** — `_HB_CLASS`, `_HB_MEMBER ... AS CLASS`,
 apenas o PRIMEIRO CLIENTE do canal. Sem declaração, o relato é honesto
 (`possible`): o fato não existe em compilação. **Nunca é preciso alterar
 harbour nem hbrefactor para um comando novo** (provado no caso 64 com um
-DSL inventado que a ferramenta e o core não mencionam).
+DSL inventado que a ferramenta e o core não mencionam). O contrato cobre
+também HOMÔNIMOS (B4f-3, caso 72): donos de DSL homônimos entre si e
+contra classes do hbclass são resolvidos — declaração, implementação e
+sends — pelos mesmos fatos genéricos, com os rótulos no VOCABULÁRIO da
+própria DSL (a cabeça da regra raiz: `cog declaration`, `dote
+declaration`, `forge definition`...). E cobre comandos que EMBRULHAM
+classes existentes (`#command mybrowse <a> <b> => ...Grade():New(...)`)
+sem declarar nada de novo: os fatos de classificação fluem da árvore
+EXPANDIDA — instância criada e send contido na expansão resolvem
+homônimos igualmente, relatados no site ESCRITO do comando (caso 72,
+fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
 
 ### Caveats honestos (moldam os rótulos do usages)
 
@@ -391,6 +451,12 @@ DSL inventado que a ferramenta e o core não mencionam).
   em `declarations[]` o nome sobrevive; nas tabelas `declared` o retorno
   degrada para 'O' (comportamento do subsistema) — declare a classe no
   módulo (idioma da linguagem) para a cadeia funcionar.
+- Dona SÓ do canal declared (DSL declarativa pura, sem função geradora —
+  B4f-3): entra no grafo com a interface declarada como PROMESSA FECHADA
+  do autor e pais vazios (o canal não carrega superclasse — fato 4). É a
+  mesma natureza de promessa de todo tipo declarado; um registro em
+  runtime fora da declaração (`__clsModify` etc.) é a fronteira já
+  nomeada.
 
 ## Receitas de consumo (as que a ferramenta usa)
 

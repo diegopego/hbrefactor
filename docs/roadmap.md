@@ -948,12 +948,128 @@ portão de 2026-07-06 aprovou camadas/rótulos e a lista ordenada de pais).
 Ficam anotados para fatias futuras (mesma base `ResolveDispatch`):
 call-graph estreitado; unicidade P1b/P2b relaxada; statics (agregação
 módulo-inteiro); `WITH OBJECT`; tipos de PARÂMETRO declarados (já
-transportados) em call sites.
+transportados) em call sites; find-references a partir de SEND SITE na
+extensão (a consulta crua não tem classe consultada — resolver o receptor
+na posição do cursor); `rename-function` quando o nome aparece no CORPO
+de uma regra de pp (hoje: recusa honesta com rollback, caso 74 — a
+melhoria é NOMEAR o site na diretiva na recusa e, com opt-in, editar a
+regra e re-verificar).
 
 Nota pós-entrega da fatia 1 (2026-07-06, commit f7b819f): `excluded`
 saiu das Location[] do `--json` — o find-references da extensão VSCode
 não lista não-referência provada (repro do Diego: `a := ""` ;
 `a:Paint()`).
+
+Nota pós-entrega 2 (2026-07-07, casos 70-71): o furo ESPELHO nas
+DECLARAÇÕES — relato do Diego: a extensão ainda listava os protótipos
+`METHOD Paint()` das OUTRAS classes (a string de registro da expansão
+caía na camada genérica de strings, sem vínculo de dona). O passe de
+declaração do `usages Classe:Método` vincula cada site à dona pelos
+MESMOS fatos da posse do rename-method (containment por índice na função
+gerada; co-derivação para a implementação separada) e decide com o
+`ResolveDispatch` da CONSULTADA: dona == consultada → declaração; alvo
+do dispatch da consultada (herança) → confirmado nomeando `dispatch
+target of C:M`; outra dona provada no grafo → excluded (fora das
+Location[]); indecidível → possible, nunca excluded (fato 9). A
+implementação homônima (antes omitida em silêncio) sai `excluded` no
+relato; a camada de strings não repete o que o passe respondeu. Caso 71:
+a heurística `methodQuery` da extensão entrou no CONTRATO da suíte
+(autorização do Diego para mudar o contrato; o harness node extrai a
+função REAL do extension.js). Suíte 433/0.
+
+### Fase B4f-3 — A PROVA DA GENERALIDADE: homônimos em DSLs customizadas ✅ (2026-07-07)
+
+> **Entregue — PROVA POSITIVA (caso 72, fixture fixhom/, suíte 446/0,
+> zero core)**: as duas DSLs inventadas (rig.ch: RIG/COG/FORGE, espelho
+> estrutural do hbclass; amuleto.ch: AMULETO/DOTE, declarativa PURA) com
+> donos homônimos entre si (Totem/Idolo:Brilho; Sol/Lua:Fulgor) e
+> cruzados com classe hbclass (Farol:Brilho) resolvem NAS TRÊS DIREÇÕES
+> — declaração, implementação por colagem e sends — com os rótulos no
+> VOCABULÁRIO de cada DSL (`cog declaration (class TOTEM)`, `dote
+> declaration (class SOL)`, `forge definition`). Dois consumos GENÉRICOS
+> (não por-caso) fecharam os furos que os probes revelaram: (a) o passe
+> de declaração ganhou a fonte do CANAL NO STREAM — `_HB_CLASS` muda a
+> classe corrente (semântica sequencial do compilador) e `_HB_MEMBER`
+> declara nela, nome POSICIONADO no site escrito (a string de registro de
+> DSL nasce sem posição; a do hbclass é o mesmo site, dedup por posição);
+> (b) donas SÓ do canal declared entram no ClassGraph com a interface
+> declarada como PROMESSA FECHADA e pais vazios (fato 4: o canal não
+> carrega superclasse) — o send homônimo da DSL declarativa saiu de
+> `possible` para `excluded (dispatches to LUA:FULGOR)`. Régua do caso
+> 64 mantida e ASSERTADA no caso 72: nenhuma palavra das DSLs em
+> `src/hbrefactor.prg` (grep -w na suíte) nem no core. Limites honestos
+> documentados no ast-schema (dona declarada = promessa; DSL que nem
+> declara nem registra = `possible`, idioma: declarar).
+
+> **Fatia 2 — alinhamento do Diego (2026-07-07)**: "generalidade" também
+> significa COMANDOS NOVOS embrulhando classes JÁ EXISTENTES
+> (pseudo-exemplo dele: `#command mybrowse <a> <b> => tbrowse`) — a
+> instância e o send passam a existir só na EXPANSÃO e o fonte escrito só
+> tem o comando. **Provado JÁ COBERTO, zero ajuste** (probe promovido a
+> fixture m3.prg/browse.ch, checks no caso 72): `MYBROWSE g AT 1` →
+> `g := Grade():New(1)` na expansão classifica `g` (cadeia de ctor);
+> `MYPAINT g` (send só na expansão) sai CONFIRMADO no site ESCRITO do
+> comando; `MYPAINT l` (homônimo através do comando) sai EXCLUÍDO
+> (`dispatches to LOUSA:PINTAR`); `MYTELA t` embrulhando TBrowse (classe
+> de FORA do projeto) fica `possible` honesto. Os fatos fluem da árvore
+> EXPANDIDA (é nela que a B4f/B4f-2 sempre operou) e a posição lifta para
+> o site escrito — nada era específico de forma escrita. Suíte 451/0.
+
+> **Fatia 3 — DSL REAL do contrib + escrita/VAR (2026-07-07)**: o Diego
+> apontou `contrib/xhb/cstruct.ch` como exemplo do que qualquer
+> programador cria: classes de RUNTIME (`hb_CStructure`/`__clsNew`),
+> regras de pp definidas DE DENTRO da expansão de outras regras e
+> registro por stringify em `INIT PROCEDURE __INIT_<stru>` (sufixo `$`
+> do compilador no nome). Caso 73: relato HONESTO em tudo — sites
+> escritos listados, tudo `possible`, NUNCA excluded/confirmed falso (o
+> teto é da linguagem). A sondagem revelou, e a fatia consumiu, DOIS
+> fatos gerais que o usages perdia ATÉ EM CÓDIGO SEM AÇÚCAR: (a) a
+> ESCRITA `o:x := v` envia a mensagem `_X` (fato 11) e a ÁRVORE guarda
+> `ASSIGN → SEND` do nome BASE — writes agora casam, classificam pelo
+> receptor/Self tipado e resolvem pelo PAR de dados da linguagem (VAR
+> registra X e _X em runtime — provado no probe vprobe; ASSIGN explícito
+> registra `_NOME` e resolve direto); (b) VAR declara via
+> `_HB_MEMBER { a, b }` (a forma de LISTA do canal) e a string de
+> registro nasce SEM posição — o site vem do canal no stream
+> (`var declaration (class GRADE)` no caso 72 fatia 3).
+
+> **Fatia 4 — construto-agnóstico (correção de rumo do Diego: "classes é
+> somente um caso")**: caso 74 (fixsug/) prova o princípio FORA de
+> classes: chamada de função que SÓ existe na expansão (`DOBRA k` →
+> `k := Dobro(k)`) listada no site escrito; LOCAL declarado por comando
+> (`CONTA m`) renomeado fim-a-fim editando o site do comando, verificado
+> byte-idêntico; nome de função no CORPO de uma regra → `rename-function`
+> RECUSA com rollback (o oráculo pega: quantidade de símbolos mudou) —
+> nunca árvore quebrada. Suíte 467/0. O princípio virou regra durável no
+> CLAUDE.md deste repo.
+
+**Objetivo (ordem do Diego, 2026-07-07)**: PROVAR que a resolução de
+homônimos (B4f-2 + fatia de declarações) vale para DSLs customizadas
+criadas por `#xcommand` — com donos homônimos ENTRE SI, homônimos
+CRUZADOS contra classes do hbclass e outros casos complexos — **sem
+nenhum ajuste por-caso** no hbrefactor (nem no core): DSLs novas podem
+ser escritas por qualquer programador a qualquer momento em seus
+aplicativos. Prova positiva OU refutação honesta (fato faltante nomeado,
+camada `possible`) — ajeito é inaceitável.
+
+**Método** — fixtures adversariais com DSLs INVENTADAS (que a ferramenta
+e o core não mencionam — a régua do caso 64):
+1. DSL "espelho estrutural do hbclass" (gera função-dona + registro por
+   strings + canal declared) com donos homônimos entre si;
+2. DSL declarativa PURA (gizmo-style: `_HB_CLASS`/`_HB_MEMBER`, sem
+   função geradora) com donos homônimos;
+3. homônimos cruzados: mensagem de DSL == método de classe hbclass no
+   mesmo projeto;
+4. complexos que os probes revelarem (registrados na execução).
+
+Se um fato EXISTIR mas não for consumido genericamente (ex.: classe do
+canal declared sem função geradora fora do ClassGraph), o consumo
+GENÉRICO é trabalho desta fase; fato AUSENTE = relato honesto documentado
+no ast-schema (teto da linguagem, não da ferramenta).
+
+**Critério de pronto**: casos na suíte cobrindo 1-3 verdes com a régua do
+caso 64 (nenhuma palavra das DSLs em `src/hbrefactor.prg` nem no core);
+limites honestos documentados; suíte inteira verde.
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
