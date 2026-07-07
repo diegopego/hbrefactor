@@ -845,6 +845,64 @@ corrompe nem falha de forma confusa.
 > Super + classe em include + pai core); casos 59 (pleno, execução
 > idêntica) e 60 (recusas + aviso). **Fase B4e completa.**
 
+### Fase B4f — classe do receptor de send (backlog 5) ✅ (2026-07-06)
+
+**Spec executável**: [spec-b4f-receiver-type.md](spec-b4f-receiver-type.md)
+(tabela fato→fonte com arquivo:linha, histórico dos DOIS portões, registro
+como construído). **Requisito final do Diego (portão v3)**: quando qualquer
+programador criar seus próprios comandos de pp, a refatoração deve lidar
+com eles **sem alterar harbour nem hbrefactor** — o que matou tanto a
+inferência na ferramenta quanto o veredito com convenção no core
+(`F():New()` reconhecido por nome). **O desenho entregue: o CANAL DE TIPOS
+DA LINGUAGEM** — `AS <tipo>`/`AS CLASS` e o subsistema `DECLARE`
+(`_HB_CLASS`≡`DECLARE_CLASS`, `_HB_MEMBER`≡`DECLARE_MEMBER`) são GRAMÁTICA
+do compilador (provado sem include algum, .ppo byte-idêntico), eram
+write-only (zero pcode) e o hbclass já declara TUDO por eles (função-classe
+auto-declarada; `CONSTRUCTOR` declara o retorno). O core transporta o canal
+1:1; a ferramenta propaga tipos declarados; convenção não existe em lugar
+nenhum.
+
+> **Fatia 0 entregue (caso 61, commit 02ed8db)**: `usages` aceita
+> `Classe:Método` (resolução PickFunc/rastro, definição filtrada pela
+> classe) e TODO send vira camada honesta
+> `possible send (dynamic dispatch, receiver unknown)`.
+
+> **Fatia 1 entregue (casos 62-65, suíte 402/0)**:
+> - **core (ast-4)**: gates `iWarnings < 3` do subsistema DECLARE abrem
+>   sob `fAst` (warnings continuam gated por nível; erro de `_HB_MEMBER`
+>   órfão preservado só em -w3); `declarations[]` recapturado no PARSE
+>   (gancho `hb_compAstDecl` — o `Self` de método aparece TIPADO, imune ao
+>   otimizador que o apagava; `class` = nome como escrito, sobrevive à
+>   classe não registrada; `used` morreu; escopo `public` novo); seção
+>   `declared` por módulo (tabelas HB_HCLASS/HB_HDECLARED 1:1). Zero
+>   impacto sem `-x`: 32 comparações `.hrb` em -w0 E -w3, byte-idênticas;
+>   relink duplo conferido. Bug latente de core corrigido no caminho:
+>   `HB_HDECLARED.pClass`/`pParamClasses[i]` sem init (lixo quando tipo
+>   não-'S' — segfault no primeiro writer; init NULL + guarda por cType).
+> - **ferramenta**: `TypeOf` (propagação FECHADA de tipos declarados sobre
+>   statements[]: declarada/binding único/FUNCALL/SEND encadeado/literais;
+>   sombra de cb-param via scope detached×local; memvar/field fora) +
+>   camadas no `usages`: confirmed (declarada direta OU cadeia declarada),
+>   excluded (valor), possible (resto, nomeando classe parcial). Projeto
+>   com dump antigo degrada para possible. Regressão de carona corrigida:
+>   extract-to-method não trata mais o Self (agora declarado) como local
+>   de data-flow.
+> - **A prova do requisito (caso 64)**: DSL inventado (`gizmo.ch`) que
+>   declara pelo canal na expansão → confirmed (inclusive send encadeado)
+>   sem tocar em nada; greps garantem que ferramenta e core não mencionam
+>   o DSL nem mensagem alguma por nome. Contrato de extensão documentado
+>   no ast-schema.md. Caso 65 = consistência (invariantes re-deriváveis
+>   dos fatos brutos).
+> - O caso do hbhttpd responde: `g:Paint()` confirmed quando a cadeia/
+>   declaração existe, `a:Paint()` com `a := {}` excluded, e o honesto
+>   possible onde o fato não existe (ex.: classe sem ctor declarado —
+>   idioma: declarar `CONSTRUCTOR`/`AS CLASS`).
+
+**Fatia 2 (anotada, não desta fase)**: call-graph estreitado pelo canal;
+unicidade P1b/P2b relaxada com receptor conhecido; statics (agregação
+módulo-inteiro); `WITH OBJECT`; tipos de PARÂMETRO declarados (já
+transportados) para checagem de assinatura em call sites.
+
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
 > **Fatia da B4 entregue (2026-07-06)**: a extensão ganhou o comando
@@ -1144,6 +1202,10 @@ palpite.
    método (`usages proj Paint`); a forma `Classe:Método` devolve 0 result(s)
    — alinhar com a resolução `Classe:Método` que rename-method/reorder/
    call-graph já fazem entra no mesmo item.
+   **PROMOVIDO a Fase B4f (2026-07-06) e ✅ ENTREGUE na fase** (fatias 0 e
+   1; ver a seção da fase para o registro final — o desenho MUDOU no
+   portão: canal de tipos da linguagem, sem `rcls` no SEND). O histórico
+   abaixo permanece como registro da evolução.
    **Fatia 0 ✅ ENTREGUE (2026-07-06, caso 61)**: `usages` aceita
    `Classe:Método` (resolução pela mesma via do PickFunc — rastro B4d — com
    a DEFINIÇÃO filtrada pela classe; homônimo em outra classe sai da lista)
@@ -1153,5 +1215,4 @@ palpite.
    uso confirmado. Nota de escopo: na forma `Classe:Método` o protótipo
    dentro do `CREATE CLASS` não é listado (o relator de marker não filtra
    por classe) — a forma crua o cobre via "name through pp rule". Fatia 1
-   (core, ast-4: `type`/`class` em `declarations[]` + `rcls` no SEND)
-   segue no portão de desenho da spec.
+   entregue na fase com o desenho v3 (canal de tipos da linguagem).

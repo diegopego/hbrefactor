@@ -83,10 +83,16 @@ Gancho(s) gated por `fAst`/`fTrackPos` (padrão do branch), zero impacto sem
 `a := {}` = excluded ou possible (conforme a fronteira aprovada); zero
 impacto sem `-x` provado; suíte verde.
 
-## Desenho da fatia 1 — PROPOSTO AO PORTÃO (sessão executora, 2026-07-06)
+## Fatia 1 — ENTREGUE (v3 "canal de tipos da linguagem", 2026-07-06)
 
-Fatia 0 entregue (caso 61). Tudo abaixo é sondagem NOVA desta sessão, com
-evidência arquivo:linha e probes no scratchpad via hbmk2/harbour -x.
+Fatia 0 entregue (caso 61, commit 02ed8db). O desenho passou por DOIS
+portões: a v2 ("receivers[] com veredito no core") foi aprovada e depois
+REVERTIDA pelo Diego com o requisito final — *quando qualquer programador
+criar seus próprios comandos de pp, a refatoração deve lidar com eles SEM
+alterar harbour nem hbrefactor* — que a v2 violava (`F():New()` é
+convenção do hbclass bakeada no compilador). A v3 abaixo foi aprovada e é
+o que está construído. Tudo com evidência arquivo:linha e probes no
+scratchpad via hbmk2/harbour -x.
 
 ### Tabela fato→fonte (sondados nesta sessão)
 
@@ -102,71 +108,105 @@ evidência arquivo:linha e probes no scratchpad via hbmk2/harbour -x.
 | 8 | Parâmetros de codeblock vivem em `value.asCodeblock.pLocals` (`HB_CBVAR`: nome + tipo, SEM nome de classe) — receptor que é param de cb NUNCA pode ganhar classe, e local externa homônima não pode ser confundida com ele. | hbcompdf.h:110-116, 403-409 |
 | 9 | A forma monomórfica do Diego JÁ está no ast-3: `LOCAL o := UWMenu():New()` dumpa `ASSIGN{left: VARIABLE O, right: SEND{msg NEW, obj: FUNCALL{fun: UWMENU}}}`; `LOCAL a := {}` dumpa `ASSIGN{right: ARRAY}`; `occurrences[]` já conta write/read/ref por variável. | probe hbmk2 w2.ast.json |
 | 10 | `QSelf()` lexa como token SELF (`HB_ET_SELF`). `-s` (syntax only) NÃO grava dump — armadilha de sondagem. | complex.c:147; harbour.y:603; probe |
+| 11 | `AS`/`DECLARE` são GRAMÁTICA DO COMPILADOR, não comando de biblioteca (desafio do Diego, provado): tokens no lexer, produções na gramática; probe sem NENHUM include compila `LOCAL o AS CLASS Foo` + `DECLARE F(x AS NUMERIC) AS CLASS Foo` com `.ppo` byte-idêntico ao fonte e W25 do COMPILADOR. A única relação do hbclass com `AS` é APAGÁ-LO sob `HB_CLS_NO_DECLARATIONS`. | complex.c:110/114/205-224; harbour.y:184-185/341-368/1226-1330; hbclass.ch:137-143; probe prova-as |
+| 12 | O subsistema DECLARE inteiro é write-only (zero pcode; warnings de tipo nível 3/4 na tabela nem têm site de emissão) e gated por `iWarnings < 3` em 5 funções (ClassFind/ClassAdd/MethodAdd/DeclaredAdd/DeclaredParameterAdd). `hb_compClassAdd` AUTO-DECLARA a função-classe devolvendo `AS CLASS <Classe>`; `METHOD ... CONSTRUCTOR` faz o hbclass emitir `_HB_MEMBER ... AS CLASS _CLASS_NAME_` — a cadeia `Classe():New()` é TODA declarada. | hbmain.c:1067-1355; hbclass.ch:283; inventário Explore; probe prova-ctor |
+| 13 | Tabelas DECLARE vivas no fim do módulo: `hb_compAstSave` roda ANTES do `hb_compDeclaredReset` do módulo seguinte. | hbmain.c:4599 vs 4300 |
+| 14 | `HB_HDECLARED.pClass`/`pParamClasses[i]` NÃO são inicializados quando o tipo não é 'S' — lixo de malloc/realloc (segfault real na primeira versão do writer; corrigido com init NULL + guarda por cType). | hbmain.c allocs; crash probe |
 
-### O que o ast-4 ganha (core, tudo gated por `-x`)
+### Requisito final do Diego (portão v3, 2026-07-06)
 
-1. **`declarations[]` + `"type"`/`"class"`**: campo novo `szClassName` no
-   `HB_HVAR` (1 linha no branch `'S'` de hbmain.c copiando
-   `pVarType->szFromClass` — sobrevive ao caso classe-não-registrada do
-   fato 2) + writer emite `"type"` quando `cType != ' '` e `"class"` quando
-   houver. Parâmetros (`ParamList`) entram pela mesma via. O `Self` de
-   método NÃO aparece aqui (fato 4 — trait mantido e documentado; a classe
-   do Self chega pelo item 2, que roda antes do otimizador).
-2. **SEND em `statements[]` + `"rcls"`**: na serialização (fato 5), quando
-   `pObject` é VARIABLE — incluindo `"SELF"` (fato 6) — resolver o nome em
-   `pLocals`/`pStatics`/estáticas file-wide do dono; se a variável tem
-   classe declarada, emitir `"rcls": "<CLASSE>"`. Pilha de nomes de
-   cb-params na descida (fato 8) impede rcls indevido em param de bloco
-   homônimo. WITH OBJECT / receptor-expressão / macro: sem `rcls`, honesto.
-   Cobertura imediata: TODO `::`/`Self:` + toda variável `AS CLASS`.
-   Mudança inteira dentro do serializer do compast.c (que só roda com
-   `-x`) — fora dele, só o campo do item 1.
-3. `sends[]` plano INALTERADO (compat); schema `ast-4`; `FromReady` da
-   ferramenta aceita ast-3 e ast-4, camada "confirmed" exige ast-4;
-   ast-schema.md no mesmo commit; prova `.hrb` byte-idêntico com/sem `-x`
-   na árvore inteira; relink duplo (harbour E hbmk2).
+"Quando qualquer outro programador criar seus próprios comandos, o sistema
+de refatoração deve ser capaz de lidar com eles também sem exigir
+alterações ou no harbour ou no hbrefactor." Consequência: NENHUMA convenção
+de biblioteca em lugar algum — nem `F():New()` reconhecido no core (v2),
+nem regras hbclass na ferramenta (v0/A). O que sobra é exatamente o que a
+linguagem oferece: **o canal de tipos da gramática** (fatos 11-12), que o
+hbclass JÁ usa por inteiro (é só o primeiro cliente) e que qualquer comando
+novo pode usar na expansão.
 
-### A fronteira da local monomórfica (decisão do portão)
+### O que foi construído no core (harbour, gated por `-x`)
 
-**Opção A (recomendada) — a ferramenta CRUZA três fatos já estampados**
-(nenhum código novo no core além do acima): para um send com
-`obj: VARIABLE V` (statements, ast-3 já tem):
-- fato 1: `occurrences[]` de V na função — exatamente 1 write, 0 `ref`;
-- fato 2: o statement desse write — `ASSIGN` cujo RHS é
-  `SEND NEW sobre FUNCALL F` (ou, para exclusão, literal nunca-objeto:
-  ARRAY/HASH/STRING/NUMERIC/LOGICAL/DATE);
-- fato 3: F é classe do projeto (rastro de derivação — registro que a
-  ferramenta já constrói desde a B4d).
-Por que isso NÃO é a flow analysis proibida: não há ordem, caminho nem
-fixpoint — é um join estático de fatos do compilador. Sustentação: com
-única atribuição, o único valor não-NIL que V pode carregar é instância de
-F (send em NIL é erro de runtime, nunca dispatch em outra classe); `@V`
-excluído pelo fato 1; macro `&` NÃO alcança LOCAL (fato de linguagem);
-write dentro de codeblock conta como write (block:true).
+1. **Gates do subsistema DECLARE abertos sob `fAst`**: os 5
+   `iWarnings < 3` viram `iWarnings < 3 && ! fAst` (hbmain.c) — as tabelas
+   passam a existir em QUALQUER nível de warning quando há dump; toda a
+   emissão de warning continua gated por nível (nada novo aparece sem
+   -w3), e o erro de `_HB_MEMBER` órfão só dispara em -w3 (comportamento
+   de hoje preservado — projeto que compila continua compilando com -x).
+   Higiene: `pClass = NULL` nos allocs de HB_HDECLARED (fato 14).
+2. **`declarations[]` recapturado no PARSE** (gancho de 1 linha
+   `hb_compAstDecl` em `hb_compVariableAdd`, compast.c): imune ao
+   otimizador (fato 4 — o Self de método aparece, tipado) e ao gate -w3;
+   `type` = caractere declarado, `class` = NOME COMO ESCRITO (fato 2:
+   sobrevive à classe não registrada). Campo `used` morreu (era
+   pós-otimizador; derivável de occurrences). Escopo novo `public`.
+3. **Seção `declared` por módulo**: transporte 1:1 das tabelas
+   HB_HCLASS/HB_HDECLARED no fim do módulo (fato 13) — classes com
+   assinaturas de métodos (retorno/params, classe quando 'S'), funções
+   declaradas (inclui a auto-declaração da função-classe, fato 12).
+   Nenhuma struct do compilador mudou; nenhum nome de mensagem/convenção
+   no writer (o caso 64 verifica por grep).
+4. Schema `ast-4`; `sends[]`/`statements[]`/`tokens[]`/pp intactos. Prova
+   de zero impacto: 32 comparações `.hrb` com/sem `-x`, em -w0 E -w3
+   (os gates mexem justamente abaixo de -w3), byte-idênticas; relink
+   duplo verificado por `strings`.
 
-**Opção B — o core estampa** (ex.: `declarations[]` ganha `"new": "F"`
-quando a única atribuição é `F():New()`): mais superfície de core
-(rastreamento incremental por variável em cada ASSIGN + estado por
-função), e a classe-idade de F é fato de PROJETO (multi-módulo) que o
-compilador de UM módulo não possui — a ferramenta faria o join final de
-qualquer jeito. Só compensa se contagem de writes for considerada
-"análise que deve morar no core".
+### O que foi construído na ferramenta (hbrefactor)
 
-### Camadas do relato `usages` no ast-4 (proposta)
+1. `ReadAst` aceita ast-2/3/4; `FromReady` = ast-3+; `Ast4Ready`/
+   `DeclTables` (agregado do projeto — as tabelas são por módulo) gateiam
+   a classificação: projeto com dump antigo degrada para `possible`.
+2. **`TypeOf`** — propagação determinística de tipos DECLARADOS sobre a
+   árvore de `statements[]`, regra FECHADA (sem ordem/caminhos/fixpoint):
+   VARIABLE (classe declarada; senão binding único = 1 write + 0 refs +
+   um só ASSIGN de topo → tipo do RHS; ciclos quebrados por conjunto
+   visitado), SELF, FUNCALL (retorno declarado), SEND (retorno declarado
+   do método na classe do obj — cobre send ENCADEADO de graça), literais
+   de valor, LIST (último item). Sombra de codeblock: `detached` =
+   local externa (classifica); `local`+block = parâmetro do bloco (não —
+   fato 8). memvar/field: nunca (escopo dinâmico).
+3. `usages`: cada send classificado via `SendReceiverType` (join
+   linha+mensagem entre `sends[]` e os nós SEND de `statements[]`;
+   candidatos múltiplos só classificam se concordarem; WITH OBJECT/macro
+   → desconhecido). Camadas impressas:
+   - `confirmed send (receiver declared AS CLASS X)` — declaração direta
+     (Self incluso);
+   - `confirmed send (receiver class X via declared types)` — cadeia
+     declarada (ctor, DECLARE à mão, DSL próprio);
+   - `excluded send (receiver holds a value of kind <k>)` — binding único
+     a literal de valor;
+   - `possible send (receiver class X, relation to Y unknown)` — classe
+     conhecida ≠ consultada (herança múltipla NÃO deixa excluir);
+   - `possible send (dynamic dispatch, receiver unknown)` — resto
+     (fatia 0).
+4. Regressão corrigida de carona: o extract-to-method migrava o `SELF`
+   (que agora aparece em declarations) como local — SELF é o RECEPTOR,
+   fora da partição de data-flow.
 
-- `confirmed send (receiver declared AS CLASS X)` — `rcls` == classe
-  consultada. Caveat mantido no rótulo/doc: tipo declarado é PROMESSA
-  (não verificado em runtime; polimorfismo pode despachar p/ override em
-  subclasse).
-- `confirmed send (single assignment V := X():New())` — se Opção A
-  aprovada.
-- `excluded (receiver can never be an object: V := {})` — SÓ pelo fato
-  nunca-objeto (única atribuição a literal não-objeto). Exclusão por
-  "classe declarada não relacionada" seria UNSOUND (herança múltipla do
-  Harbour: `FROM a, b` permite parentesco fora da cadeia direta) — classe
-  declarada não relacionada fica `possible`, com a classe NOMEADA no
-  rótulo.
-- `possible send (dynamic dispatch, receiver unknown)` — resto (fatia 0).
+### Casos entregues (suíte 402/0)
+
+- **61** (fatia 0): `Classe:Método` + camada possible; `a := {}` promovido
+  a excluded pela fatia 1.
+- **62**: canal completo — ctor-cadeia confirmed, `AS CLASS` confirmed,
+  `::`/Self confirmed, `a := {}` excluded, `@` possible, reatribuída
+  possible, `DECLARE` à mão confirmed, cross-módulo confirmed.
+- **63**: honestidade — classe SEM ctor declarado e função desconhecida
+  ficam possible; nome cru também classifica.
+- **64 (A PROVA DO REQUISITO)**: DSL INVENTADO (`gizmo.ch`: CONTRAPTION/
+  APTITUDE/GIZMO) que declara pelo canal na expansão → confirmed,
+  inclusive encadeado, SEM nenhuma mudança em harbour/hbrefactor — e
+  greps provam que ferramenta e core não mencionam o DSL nem mensagens
+  por nome.
+- **65**: consistência — invariantes do ast-4 sobre o dump real (Self
+  tipado em todo método, declared coerente, binding único re-derivado de
+  occurrences+statements, contraexemplo com 2 writes).
+
+### Caveats honestos (registrados no ast-schema.md)
+
+Tipo declarado é PROMESSA (não verificado em runtime; polimorfismo);
+`excluded` por valor não cobre classes ESCALARES associadas em runtime (o
+rótulo nomeia o fato); classe conhecida ≠ consultada fica possible
+(herança múltipla); classe não registrada no módulo degrada o retorno nas
+tabelas declared (idioma: declare a classe no módulo).
 
 ### Fatia 2 — consumidores extras (anotar, não fazer nesta fase)
 

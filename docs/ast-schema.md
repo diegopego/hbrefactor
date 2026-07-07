@@ -1,12 +1,15 @@
-# Schema `ast-3` — o dump AST do compilador (spec)
+# Schema `ast-4` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-3` (fase B4d) = `ast-2` (fase B4) + o campo `from` (rastro
-de derivação) nos tokens SINTETIZADOS; o `ast-2` = `ast-1`
-(commit `2cca58e4b8`) + seções `ppRules`/`ppApplications`. Todo o resto é
-idêntico byte a byte entre as versões.
+com `-x`. O `ast-4` (fase B4f) = `ast-3` + o CANAL DE TIPOS DA LINGUAGEM
+(seção `declared` + `declarations[]` parse-time tipadas — ver a seção
+própria); o `ast-3` (fase B4d) = `ast-2` (fase B4) + o campo `from`
+(rastro de derivação) nos tokens SINTETIZADOS; o `ast-2` = `ast-1`
+(commit `2cca58e4b8`) + seções `ppRules`/`ppApplications`. Fora as adições,
+tudo é idêntico byte a byte entre as versões — exceto `declarations[]`,
+cuja fonte MUDOU no ast-4 (ver lá).
 
 **Como gerar** (a ferramenta faz isso via `AstDumps()`):
 ```
@@ -26,7 +29,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-3",           // versão emitida hoje (ast-1→ast-2→ast-3)
+{ "schema": "ast-4",           // versão emitida hoje (ast-1→...→ast-4)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -207,9 +210,15 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
 ```jsonc
 { "name": "MAIN", "kind": "procedure"|"function", "static": false,
   "fileDecl": false, "line": 5, "usesMacro": false,   // & macro no pcode
-  "declarations": [   // variáveis declaradas, com escopo RESOLVIDO
-    { "sym": "NTOTAL", "scope": "local"|"static"|"field"|"memvar"|"private",
-      "declLine": 7, "used": 1, "param": false } ],
+  "declarations": [   // ast-4: capturadas no PARSE (ver nota abaixo)
+    { "sym": "NTOTAL", "scope": "local"|"static"|"field"|"memvar"|
+                        "private"|"public",
+      "declLine": 7, "param": false,
+      "type": "S",             // só quando declarado (AS <tipo>): caractere
+                               // do compilador - N C D L B A O S; minúscula
+                               // = ARRAY do tipo ('s' = AS CLASS ARRAY)
+      "class": "CAIXA" } ],    // só em AS CLASS: o NOME COMO ESCRITO
+                               // (sobrevive à classe não registrada)
   "occurrences": [    // cada referência de variável (parse-time)
     { "sym": "NTOTAL", "scope": "local"|"detached"|"static"|"memvar"|
                         "field"|"memvar_implicit",
@@ -248,6 +257,104 @@ Semânticas importantes:
   `block:true`; captura de local externa = `detached`).
 - PRIVATE/PUBLIC com init aparecem em occurrences como `memvar` `write`
   (hook RTVar) + call `__MVPRIVATE`/`__MVPUBLIC`.
+
+## Canal de tipos da linguagem (ast-4, fase B4f)
+
+A GRAMÁTICA do compilador aceita declarações de tipo opcionais — `AS
+<tipo>`/`AS CLASS <nome>` em TODA declaração de variável (lexer
+complex.c:110 `{"AS"}`, tabela complex.c:205-224; produções
+harbour.y:341-368) e o subsistema `DECLARE` (funções globais com assinatura
+e retorno; classes; métodos — `DECLARE`/`DECLARE_CLASS`≡`_HB_CLASS`/
+`DECLARE_MEMBER`≡`_HB_MEMBER`, complex.c:114/158/159, harbour.y:1226-1330).
+Harbour continua NÃO tipado em runtime: esses fatos eram write-only
+(warnings -w3, zero efeito em pcode) e o ast-4 os TRANSPORTA 1:1 — sem
+nenhuma convenção de biblioteca no core.
+
+### `declarations[]` mudou de fonte no ast-4
+
+Até o ast-3 a lista era escrita no FIM do módulo a partir das listas vivas
+do compilador — PÓS-otimizador de pcode, que APAGA locais ("Selfifying" +
+"Delete unused", hbopt.c): o `Self` de método e locais nunca usadas não
+apareciam. No ast-4 a captura é no PARSE (gancho em `hb_compVariableAdd`):
+
+- o `Self` de todo método aparece, com `"type": "S"` e `"class"` (o
+  hbclass expande `local Self AS CLASS <C>` — hbclass.ch:263-265);
+- locais deletadas pelo otimizador aparecem;
+- `PUBLIC` ganha escopo próprio; PRIVATEs aparecem em qualquer -w (antes
+  só com -w3);
+- o campo `used` MORREU (era do pós-otimizador; derive de `occurrences[]`);
+- `"class"` carrega o nome COMO ESCRITO, mesmo quando a classe não está
+  registrada no módulo (o compilador degradaria `cType` p/ 'O' e perderia
+  o nome — hbmain.c:463-478).
+
+### Seção `declared` (nível de módulo) — as tabelas DECLARE
+
+```jsonc
+"declared": {
+  "classes": [                    // DECLARE CLASS / _HB_CLASS (hbclass)
+    { "name": "CAIXA", "methods": [
+        { "name": "NEW", "type": "S", "class": "CAIXA",   // ctor declara
+          "params": [ { "type": "N", "byref": false, "optional": false } ] },
+        { "name": "SOMA", "params": [ ... ] } ] } ],      // sem AS: sem type
+  "functions": [                  // DECLARE f(...) AS ... + auto-declaração
+    { "name": "CAIXA", "type": "S", "class": "CAIXA", "params": [] } ] }
+```
+
+Fatos que alimentam a tabela, todos da linguagem:
+
+- `_HB_CLASS <Classe> [<Func>]` (o CREATE CLASS do hbclass emite) registra
+  a classe E auto-declara a FUNÇÃO-CLASSE devolvendo `AS CLASS <Classe>`
+  (hbmain.c hb_compClassAdd);
+- `_HB_MEMBER <M>(...) [AS ...]` declara o método; `METHOD <M> ...
+  CONSTRUCTOR` faz o hbclass emitir `AS CLASS _CLASS_NAME_` no retorno
+  (hbclass.ch:283) — a cadeia `Classe():New()` é TODA declarada;
+- `DECLARE F( x AS ... ) AS ...` escrito à mão funciona igual.
+
+As tabelas são POR MÓDULO (o consumidor agrega o projeto). O subsistema
+era gated por `-w3` (hb_compClassFind/Add etc.); com `-x` os gates abrem
+(`iWarnings < 3 && ! fAst`) mantendo TODOS os warnings gated por nível na
+emissão — zero impacto sem `-x` provado por `.hrb` byte-idênticos em -w0 E
+-w3. Tipos de parâmetro podem carregar offsets BYREF(+60)/OPTIONAL(+90) do
+subsistema; a decodificação no writer é best-effort (faixas se sobrepõem)
+— consumidores atuais só usam RETORNOS.
+
+### TypeOf — propagação na ferramenta (regra FECHADA)
+
+A ferramenta classifica o receptor de send propagando SÓ tipos declarados
+sobre `statements[]`: `VARIABLE` (classe declarada; senão binding único =
+exatamente 1 write + 0 refs + um só ASSIGN de topo → tipo do RHS),
+`FUNCALL` (retorno declarado), `SEND` (retorno declarado do método na
+classe do obj), literais de valor, `LIST` (último item), `SELF`. Sem
+ordem, sem caminhos, sem fixpoint; fora da regra → desconhecido
+(`possible`). Sombras de codeblock: uso de local externa dentro de bloco
+resolve como `detached` (classifica); `local`+`block` é PARÂMETRO do bloco
+(não classifica — o CBVAR não guarda classe). Estender a regra = novo
+portão.
+
+### Contrato de extensão (para autores de comandos de pp)
+
+**Qualquer comando novo fica semanticamente refatorável DECLARANDO pelo
+canal da linguagem na expansão** — `_HB_CLASS`, `_HB_MEMBER ... AS CLASS`,
+`LOCAL ... AS CLASS`, `DECLARE` — exatamente como o hbclass.ch, que é
+apenas o PRIMEIRO CLIENTE do canal. Sem declaração, o relato é honesto
+(`possible`): o fato não existe em compilação. **Nunca é preciso alterar
+harbour nem hbrefactor para um comando novo** (provado no caso 64 com um
+DSL inventado que a ferramenta e o core não mencionam).
+
+### Caveats honestos (moldam os rótulos do usages)
+
+- Tipo declarado é PROMESSA do programador — não verificado em runtime;
+  polimorfismo pode despachar para override em subclasse.
+- `excluded` por valor (ex.: `a := {}`) exclui dispatch em classe de
+  INSTÂNCIA; classes ESCALARES associadas em runtime (ex.: xhb) são
+  invisíveis à compilação — o rótulo nomeia o fato, não impossibilidade
+  absoluta.
+- Classe conhecida ≠ consultada NÃO exclui (herança múltipla `FROM a, b`
+  e promessa não verificada) — fica `possible` com a classe nomeada.
+- Classe referida por `DECLARE`/`AS CLASS` mas não registrada NO MÓDULO:
+  em `declarations[]` o nome sobrevive; nas tabelas `declared` o retorno
+  degrada para 'O' (comportamento do subsistema) — declare a classe no
+  módulo (idioma da linguagem) para a cadeia funcionar.
 
 ## Receitas de consumo (as que a ferramenta usa)
 
@@ -479,9 +586,13 @@ ast-2 (fase B4, consumidos por usages/rename-dsl/lifting). O campo `from`
 (rastro de derivação nos tokens sintetizados) entregue no **ast-3**
 (fase B4d, 2026-07-06), consumido pelo modelo de nome de marker — usages
 (lifting generalizado), rename-pp-marker e rename-method (açúcar). O schema
-versionou de ast-2 para ast-3. O leitor da ferramenta (`ReadAst`) aceita
-`ast-2` OU `ast-3`; comandos que EXIGEM o rastro (rename-method /
-rename-pp-marker) recusam dump antigo pedindo recompilar `harbour` E `hbmk2`
-do branch (`FromReady` = schema == `ast-3`). Próximo a avaliar: span
-original de string no posTrack (mataria `StrDelimsOk`). Ao mudar,
-versionar `"schema"` e atualizar este documento NO MESMO commit.
+versionou de ast-2 para ast-3. O canal de tipos da linguagem
+(`declarations[]` parse-time tipadas + seção `declared`) entregue no
+**ast-4** (fase B4f, 2026-07-06), consumido pelas camadas
+confirmed/excluded do usages (TypeOf). O leitor da ferramenta (`ReadAst`)
+aceita `ast-2`/`ast-3`/`ast-4`; comandos que EXIGEM o rastro usam
+`FromReady` (ast-3+) e a classificação de receptor exige projeto inteiro
+em ast-4 (`Ast4Ready`/`DeclTables`) — em dump antigo degrada para a camada
+`possible`, sem recusar. Próximo a avaliar: span original de string no
+posTrack (mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e
+atualizar este documento NO MESMO commit.

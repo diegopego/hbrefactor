@@ -220,10 +220,13 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    LOCAL hAst := hb_jsonDecode( hb_MemoRead( cPath ) )
 
    // ast-3 = ast-2 + rastro de derivação ("from" nos tokens sintetizados,
-   // fase B4d); o leitor usa só seções presentes em ambos - comandos que
-   // exigem o rastro recusam o dump antigo com mensagem clara (FromReady)
+   // fase B4d); ast-4 = ast-3 + canal de tipos da linguagem (declarations
+   // tipadas parse-time + tabelas DECLARE em "declared", fase B4f). O
+   // leitor usa só seções presentes em todos - comandos que exigem o
+   // rastro/o canal recusam ou degradam com mensagem clara (FromReady/
+   // Ast4Ready)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -276,7 +279,7 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL cSpec, cName, cFuncFilter := "", cJsonOut := "", lShowExp := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
-   LOCAL cClass := "", cMethTok, cUpMeth, nAt
+   LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hType, cVerdict
 
    IF Len( aArgs ) < 3
       Usage()
@@ -320,6 +323,8 @@ STATIC FUNCTION Usages( aArgs )
       RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
    ENDIF
 
+   // duas passadas: as tabelas DECLARE do dump são POR MÓDULO e a
+   // classificação de receptor precisa do agregado do projeto (B4f)
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
@@ -327,6 +332,11 @@ STATIC FUNCTION Usages( aArgs )
                         "' (harbour com -x do branch feature/compiler-ast-dump)" )
       ENDIF
       hAsts[ cPath ] := hAst
+   NEXT
+   hDecl := DeclTables( hAsts )
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
       cModFile := hb_FNameNameExt( cPath )
       aSrc := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
 
@@ -389,16 +399,36 @@ STATIC FUNCTION Usages( aArgs )
          NEXT
 
          FOR EACH hItem IN hFunc[ "sends" ]
-            // send é despacho dinâmico e o ast-3 não carrega a classe do
-            // receptor: TODO send é camada "possible" - nunca "uso" seco
-            // (backlog 5; o call-graph já diz o mesmo com '~>')
+            // send é despacho dinâmico; a classificação vem SÓ do canal de
+            // tipos da linguagem (ast-4): tipo declarado do receptor,
+            // propagado pela árvore (TypeOf). Sem fato do canal, a camada
+            // honesta é "possible" (backlog 5) - nunca "uso" seco
             IF Upper( hItem[ "sym" ] ) == cUpMeth
                nHits++
                LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cMethTok ), Len( cMethTok ) )
-               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": possible send" + ;
-                  " (dynamic dispatch, receiver unknown" + ;
-                  iif( hItem[ "block" ], ", codeblock", "" ) + ") in " + ;
-                  hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+               hType := SendReceiverType( hFunc, hItem, hDecl )
+               DO CASE
+               CASE hType == NIL
+                  cVerdict := "possible send (dynamic dispatch, receiver unknown" + ;
+                              iif( hItem[ "block" ], ", codeblock", "" ) + ")"
+               CASE hb_HHasKey( hType, "val" )
+                  cVerdict := "excluded send (receiver holds a value of kind " + ;
+                              hType[ "val" ] + iif( hItem[ "block" ], ", codeblock", "" ) + ")"
+               CASE Empty( cClass ) .OR. hType[ "cls" ] == cClass
+                  cVerdict := "confirmed send (receiver " + ;
+                              iif( hType[ "how" ] == "declared", ;
+                                   "declared AS CLASS " + hType[ "cls" ], ;
+                                   "class " + hType[ "cls" ] + " via declared types" ) + ;
+                              iif( hItem[ "block" ], ", codeblock", "" ) + ")"
+               OTHERWISE
+                  // classe conhecida != consultada NÃO exclui: promessa não
+                  // verificada + herança (múltipla) fora do módulo
+                  cVerdict := "possible send (receiver class " + hType[ "cls" ] + ;
+                              ", relation to " + cClass + " unknown" + ;
+                              iif( hItem[ "block" ], ", codeblock", "" ) + ")"
+               ENDCASE
+               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cVerdict + ;
+                  " in " + hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
             ENDIF
          NEXT
       NEXT
@@ -1921,9 +1951,13 @@ STATIC FUNCTION ExtractFunction( aArgs )
    NEXT
 
    // data flow: partição das occurrences de cada LOCAL da função em
-   // dentro/antes/depois da seleção (linhas físicas do fonte)
+   // dentro/antes/depois da seleção (linhas físicas do fonte). SELF fica
+   // fora: é o RECEPTOR (declarado pela expansão do hbclass e visível nas
+   // declarations desde o ast-4), não local de data-flow - o método novo
+   // ganha o dele próprio do QSelf(), e range com Self fora de método já
+   // tem recusa dedicada
    FOR EACH hItem IN hTarget[ "declarations" ]
-      IF !( hItem[ "scope" ] == "local" )
+      IF !( hItem[ "scope" ] == "local" ) .OR. Upper( hItem[ "sym" ] ) == "SELF"
          LOOP
       ENDIF
       hVar := { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
@@ -5033,7 +5067,268 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION FromReady( hAst )
-   RETURN hb_HGetDef( hAst, "schema", "" ) == "ast-3"
+   RETURN hb_AScan( { "ast-3", "ast-4" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+
+// ---------------------------------------------------------------------------
+// B4f - canal de tipos da linguagem (schema ast-4). O compilador PARSEIA e
+// transporta as declarações de tipo da gramática (AS CLASS/AS <tipo> nas
+// declarations[], tabelas DECLARE/_HB_CLASS/_HB_MEMBER em "declared") e a
+// ferramenta PROPAGA esses tipos declarados sobre a árvore de expressão que
+// o dump já carrega (TypeOf) - regra FECHADA, sem ordem, sem caminhos, sem
+// fixpoint. O hbclass é apenas o PRIMEIRO CLIENTE do canal: qualquer comando
+// de pp que declare pelo canal na expansão é coberto sem mudar nada aqui nem
+// no core (contrato de extensão no ast-schema.md). Caveat honesto: tipo
+// declarado é promessa do programador, não verificada em runtime.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION Ast4Ready( hAst )
+   RETURN hb_HGetDef( hAst, "schema", "" ) == "ast-4"
+
+// tabelas DECLARE agregadas do PROJETO (as do dump são por módulo):
+// { "f" => { FUNÇÃO => item }, "c" => { CLASSE => { MÉTODO => item } } }.
+// NIL quando qualquer módulo não é ast-4 - as camadas confirmed/excluded
+// degradam para "possible" (fatia 0) em dumps antigos
+STATIC FUNCTION DeclTables( hAsts )
+
+   LOCAL hDecl := { "f" => { => }, "c" => { => } }
+   LOCAL hAst, hItem, hCls, hMth, cCls
+
+   FOR EACH hAst IN hAsts
+      IF ! Ast4Ready( hAst )
+         RETURN NIL
+      ENDIF
+      FOR EACH hItem IN hAst[ "declared" ][ "functions" ]
+         hDecl[ "f" ][ Upper( hItem[ "name" ] ) ] := hItem
+      NEXT
+      FOR EACH hCls IN hAst[ "declared" ][ "classes" ]
+         cCls := Upper( hCls[ "name" ] )
+         IF ! hb_HHasKey( hDecl[ "c" ], cCls )
+            hDecl[ "c" ][ cCls ] := { => }
+         ENDIF
+         FOR EACH hMth IN hCls[ "methods" ]
+            hDecl[ "c" ][ cCls ][ Upper( hMth[ "name" ] ) ] := hMth
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN hDecl
+
+// tipo declarado de um item do canal (declaração de variável, função ou
+// método): { "cls" =>, "how" => } instância de classe ('S' exato); tipos
+// escalares/array declarados são VALORES (nunca instância - 's' minúsculo
+// é ARRAY de classe); 'B' fica fora (codeblock aceita send: :Eval()) e 'O'
+// é objeto de classe desconhecida - nem confirma nem exclui
+STATIC FUNCTION DeclType( hItem, cHow )
+
+   LOCAL cT
+
+   IF hItem == NIL
+      RETURN NIL
+   ENDIF
+   cT := hb_HGetDef( hItem, "type", "" )
+   DO CASE
+   CASE cT == "S" .AND. hb_HHasKey( hItem, "class" )
+      RETURN { "cls" => Upper( hItem[ "class" ] ), "how" => cHow }
+   CASE cT == "N"
+      RETURN { "val" => "numeric" }
+   CASE cT == "C"
+      RETURN { "val" => "string" }
+   CASE cT == "D"
+      RETURN { "val" => "date" }
+   CASE cT == "L"
+      RETURN { "val" => "logical" }
+   CASE cT == "A" .OR. ( ! Empty( cT ) .AND. cT == Lower( cT ) )
+      RETURN { "val" => "array" }
+   ENDCASE
+
+   RETURN NIL
+
+// TypeOf - propagação bottom-up de tipos DECLARADOS sobre um nó da árvore
+// de expressão do dump. Regra fechada: VARIABLE (declarada, ou binding
+// único), FUNCALL (retorno declarado), SEND (retorno declarado do método na
+// classe do obj), literais de valor, LIST (valor do último item), SELF.
+// Fora da regra => NIL (desconhecido, camada "possible"). hSeen quebra
+// ciclos de binding (a := b, b := a)
+STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
+
+   LOCAL cEt, cSym, cMsg, hItem, hExprA, hRes, hOcc, hFun
+   LOCAL nWrites := 0, nRefs := 0, nAssigns := 0, hAssign := NIL, lAsgBlock := .F.
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN NIL
+   ENDIF
+   cEt := hb_HGetDef( hExpr, "et", "" )
+
+   DO CASE
+   CASE cEt == "VARIABLE"
+      cSym := Upper( hb_HGetDef( hExpr, "val", "" ) )
+      // dentro de codeblock, uso de local EXTERNA resolve como 'detached';
+      // 'local'+block na mesma linha é PARÂMETRO do bloco - sombra sem
+      // classe possível (o CBVAR do compilador não guarda classe)
+      IF lBlock
+         FOR EACH hOcc IN hFunc[ "occurrences" ]
+            IF Upper( hOcc[ "sym" ] ) == cSym .AND. hOcc[ "block" ] .AND. ;
+               hOcc[ "line" ] == hb_HGetDef( hExpr, "line", -1 ) .AND. ;
+               hOcc[ "scope" ] == "local"
+               RETURN NIL
+            ENDIF
+         NEXT
+      ENDIF
+      FOR EACH hOcc IN hFunc[ "occurrences" ]
+         IF Upper( hOcc[ "sym" ] ) == cSym
+            // memvar/field: escopo dinâmico, fora do canal
+            IF hb_AScan( { "memvar", "memvar_implicit", "field" }, hOcc[ "scope" ] ) > 0
+               RETURN NIL
+            ENDIF
+            IF hOcc[ "access" ] == "write"
+               nWrites++
+            ELSEIF hOcc[ "access" ] == "ref"
+               nRefs++
+            ENDIF
+         ENDIF
+      NEXT
+      // 1) classe/tipo DECLARADO da própria variável (Self entra por aqui)
+      FOR EACH hItem IN hFunc[ "declarations" ]
+         IF Upper( hItem[ "sym" ] ) == cSym .AND. ;
+            ( hRes := DeclType( hItem, "declared" ) ) != NIL
+            RETURN hRes
+         ENDIF
+      NEXT
+      // 2) binding único: exatamente 1 write, 0 refs e UM ASSIGN de topo
+      //    para a variável - o tipo é o do RHS. Sem análise de ordem: com
+      //    binding único o único valor não-NIL possível é esse (send em
+      //    NIL é erro de runtime, nunca dispatch em outra classe); '@'
+      //    excluído pelos refs; '&' não alcança LOCAL (fato de linguagem)
+      IF hSeen == NIL
+         hSeen := { => }
+      ENDIF
+      IF hb_HHasKey( hSeen, cSym )
+         RETURN NIL
+      ENDIF
+      hSeen[ cSym ] := .T.
+      IF nWrites == 1 .AND. nRefs == 0
+         FOR EACH hItem IN hFunc[ "statements" ]
+            hExprA := hb_HGetDef( hItem, "expr", NIL )
+            IF HB_ISHASH( hExprA ) .AND. hb_HGetDef( hExprA, "et", "" ) == "ASSIGN" .AND. ;
+               HB_ISHASH( hb_HGetDef( hExprA, "left", NIL ) ) .AND. ;
+               hb_HGetDef( hExprA[ "left" ], "et", "" ) == "VARIABLE" .AND. ;
+               Upper( hb_HGetDef( hExprA[ "left" ], "val", "" ) ) == cSym
+               nAssigns++
+               hAssign  := hExprA
+               lAsgBlock := hItem[ "block" ]
+            ENDIF
+         NEXT
+         IF nAssigns == 1
+            RETURN TypeOf( hb_HGetDef( hAssign, "right", NIL ), hFunc, hDecl, ;
+                           lAsgBlock, hSeen )
+         ENDIF
+      ENDIF
+
+   CASE cEt == "SELF"
+      FOR EACH hItem IN hFunc[ "declarations" ]
+         IF Upper( hItem[ "sym" ] ) == "SELF" .AND. ;
+            ( hRes := DeclType( hItem, "declared" ) ) != NIL
+            RETURN hRes
+         ENDIF
+      NEXT
+
+   CASE cEt == "FUNCALL"
+      hFun := hb_HGetDef( hExpr, "fun", NIL )
+      IF HB_ISHASH( hFun ) .AND. hb_HGetDef( hFun, "et", "" ) == "FUNNAME"
+         RETURN DeclType( hb_HGetDef( hDecl[ "f" ], ;
+                          Upper( hb_HGetDef( hFun, "val", "" ) ), NIL ), "chain" )
+      ENDIF
+
+   CASE cEt == "SEND"
+      cMsg := Upper( hb_HGetDef( hExpr, "msg", "" ) )
+      IF ! Empty( cMsg )
+         hRes := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, lBlock, hSeen )
+         IF hRes != NIL .AND. hb_HHasKey( hRes, "cls" ) .AND. ;
+            hb_HHasKey( hDecl[ "c" ], hRes[ "cls" ] )
+            RETURN DeclType( hb_HGetDef( hDecl[ "c" ][ hRes[ "cls" ] ], cMsg, NIL ), "chain" )
+         ENDIF
+      ENDIF
+
+   CASE cEt == "ARRAY"
+      RETURN { "val" => "array" }
+   CASE cEt == "HASH"
+      RETURN { "val" => "hash" }
+   CASE cEt == "STRING"
+      RETURN { "val" => "string" }
+   CASE cEt == "NUMERIC"
+      RETURN { "val" => "numeric" }
+   CASE cEt == "LOGICAL"
+      RETURN { "val" => "logical" }
+   CASE cEt == "DATE"
+      RETURN { "val" => "date" }
+   CASE cEt == "TIMESTAMP"
+      RETURN { "val" => "timestamp" }
+   CASE cEt == "NIL"
+      RETURN { "val" => "nil" }
+
+   CASE cEt == "LIST"
+      // expressão parentetizada: o valor é o do ÚLTIMO item
+      IF ! Empty( hb_HGetDef( hExpr, "items", {} ) )
+         RETURN TypeOf( ATail( hExpr[ "items" ] ), hFunc, hDecl, lBlock, hSeen )
+      ENDIF
+   ENDCASE
+
+   RETURN NIL
+
+// classificação do receptor de um send PLANO: localiza o(s) nó(s) SEND da
+// mesma mensagem na mesma linha em statements[] e tipa o obj. Vários nós
+// candidatos só classificam se concordarem; nó sem obj (WITH OBJECT) ou
+// mensagem por macro => desconhecido
+STATIC FUNCTION SendReceiverType( hFunc, hSend, hDecl )
+
+   LOCAL aNodes := {}, aNode, hStmt, hType := NIL, hOne
+
+   IF hDecl == NIL
+      RETURN NIL
+   ENDIF
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      SendNodesWalk( hb_HGetDef( hStmt, "expr", NIL ), Upper( hSend[ "sym" ] ), ;
+                     hSend[ "line" ], hStmt[ "block" ], aNodes )
+   NEXT
+   FOR EACH aNode IN aNodes
+      hOne := TypeOf( aNode[ 1 ], hFunc, hDecl, aNode[ 2 ], NIL )
+      IF hOne == NIL
+         RETURN NIL
+      ENDIF
+      IF hType == NIL
+         hType := hOne
+      ELSEIF !( hb_HGetDef( hType, "cls", "*" ) == hb_HGetDef( hOne, "cls", "*" ) .AND. ;
+                hb_HGetDef( hType, "val", "*" ) == hb_HGetDef( hOne, "val", "*" ) )
+         RETURN NIL
+      ENDIF
+   NEXT
+
+   RETURN hType
+
+// coleta recursiva dos nós SEND de uma mensagem numa linha; desce a árvore
+// inteira marcando o contexto de codeblock (corpo de CODEBLOCK)
+STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, lBlock, aNodes )
+
+   LOCAL xVal, lChildBlock
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "SEND" .AND. ;
+      hb_HGetDef( hExpr, "line", -1 ) == nLine .AND. ;
+      Upper( hb_HGetDef( hExpr, "msg", "" ) ) == cUpMsg
+      AAdd( aNodes, { hb_HGetDef( hExpr, "obj", NIL ), lBlock } )
+   ENDIF
+   lChildBlock := lBlock .OR. hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK"
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal )
+         SendNodesWalk( xVal, cUpMsg, nLine, lChildBlock, aNodes )
+      ELSEIF HB_ISARRAY( xVal )
+         AEval( xVal, {| xItem | SendNodesWalk( xItem, cUpMsg, nLine, lChildBlock, aNodes ) } )
+      ENDIF
+   NEXT
+
+   RETURN
 
 STATIC FUNCTION PairKey( nApp, nMarker )
    RETURN hb_ntos( nApp ) + "|" + hb_ntos( nMarker )

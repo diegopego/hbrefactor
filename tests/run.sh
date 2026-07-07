@@ -91,6 +91,13 @@ freshext() { # freshext <case-name> -> fixture for extract-to-method (B4e P2a)
    echo "$d"
 }
 
+freshrcv() { # freshrcv <case-name> -> fixture for the language type channel (B4f)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixrcv/*.prg "$HERE"/fixrcv/*.hbp "$HERE"/fixrcv/*.ch "$d"/
+   echo "$d"
+}
+
 extrun() { # extrun <dir> <out-file> -> build fixext copy and run it
    ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
 }
@@ -1414,8 +1421,8 @@ grep -q "w1.prg:11: method definition Paint (class UWMenu)" "$D/cm.log"
 check "definition resolved and filtered by class" $?
 grep -q "w2.prg:7: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/cm.log"
 check "legit send listed as possible, never as bare use" $?
-grep -q "w2.prg:15: possible send (dynamic dispatch, receiver unknown) in SOLTO" "$D/cm.log"
-check "a:Paint() with a := {} is possible, not a confirmed use" $?
+grep -q "w2.prg:15: excluded send (receiver holds a value of kind array) in SOLTO" "$D/cm.log"
+check "a:Paint() with a := {} is excluded by the value fact (B4f fatia 1)" $?
 ! grep -q "UWMENU_PAINT" "$D/cm.log"
 check "generated name never leaks without --show-expansion" $?
 # homônimos: a definição é da classe pedida; sends (dinâmicos) permanecem
@@ -1438,6 +1445,126 @@ RC=$?
 check "malformed Classe: refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "malformada" "$D/mf.log"
 check "refusal names the malformed form" $?
+
+echo "case 62: B4f fatia 1 - canal de tipos: declarado, cadeia de ctor, valor, honestos"
+# ast-4 transporta o CANAL DE TIPOS DA LINGUAGEM (AS CLASS nas declarations,
+# tabelas DECLARE/_HB_CLASS/_HB_MEMBER em declared) e a ferramenta PROPAGA
+# tipos declarados (TypeOf, regra fechada). A cadeia Caixa():New() é toda
+# declarada pelo hbclass (_HB_CLASS auto-declara a função-classe; o ctor
+# declara o retorno) - nenhuma convenção reconhecida por nome.
+for f in r1.prg r2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixrcv/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I"$HERE/fixrcv" > /dev/null 2>&1
+   check "fixrcv/$f clean under -w3 -es2" $?
+done
+D=$(freshrcv case62)
+( cd "$D" && "$BIN" usages fixrcv.hbp Caixa:Soma > cs.log 2>&1 )
+check "usages Caixa:Soma exit 0" $?
+grep -q "confirmed send (receiver class CAIXA via declared types) in CENARIOS  | g:Soma( 2 )" "$D/cs.log"
+check "g := Caixa():New() confirmed pela cadeia declarada (ctor)" $?
+grep -q "excluded send (receiver holds a value of kind array) in CENARIOS  | a:Soma( 1 )" "$D/cs.log"
+check "a := {} excluded pelo fato de valor" $?
+grep -q "confirmed send (receiver declared AS CLASS CAIXA) in CENARIOS  | d:Soma( 3 )" "$D/cs.log"
+check "AS CLASS explícito confirmed por declaração direta" $?
+grep -q "confirmed send (receiver declared AS CLASS CAIXA) in CAIXA_DOBRA  | ::Soma( ::nTot )" "$D/cs.log"
+check "::/Self confirmed (Self AS CLASS da expansão hbclass)" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in CENARIOS  | r:Soma( 4 )" "$D/cs.log"
+check "variável passada por @ fica possible (ref quebra o binding único)" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in CENARIOS  | m:Soma( 5 )" "$D/cs.log" && \
+   grep -q "possible send (dynamic dispatch, receiver unknown) in CENARIOS  | m:Soma( 8 )" "$D/cs.log"
+check "variável reatribuída fica possible (2 writes)" $?
+grep -q "confirmed send (receiver class CAIXA via declared types) in CENARIOS  | f:Soma( 7 )" "$D/cs.log"
+check "DECLARE escrito à mão classifica o funcall (canal sem DSL)" $?
+grep -q "confirmed send (receiver class CAIXA via declared types) in USA  | x:Soma( 6 )" "$D/cs.log"
+check "cross-módulo: declared de r1 classifica send em r2" $?
+
+echo "case 63: B4f - honestidade preservada: sem declaração, camada possible"
+# classe SEM ctor declarado: Semctor():New() não tem retorno no canal ->
+# possible (o fato não existe em compilação); função desconhecida idem.
+# A consulta por nome cru também recebe as camadas.
+D=$(freshrcv case63)
+( cd "$D" && "$BIN" usages fixrcv.hbp Zap > zp.log 2>&1 )
+check "usages Zap exit 0" $?
+grep -q "method definition Zap (class Semctor)" "$D/zp.log"
+check "definição lifted no vocabulário de classe" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in USA  | s:Zap()" "$D/zp.log"
+check "classe sem ctor declarado: send fica possible (honesto)" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in USA  | t:Zap()" "$D/zp.log"
+check "função sem declaração: send fica possible (honesto)" $?
+( cd "$D" && "$BIN" usages fixrcv.hbp Soma > sm.log 2>&1 )
+grep -q "confirmed send (receiver class CAIXA via declared types) in CENARIOS  | g:Soma( 2 )" "$D/sm.log"
+check "consulta por nome cru também classifica em camadas" $?
+
+echo "case 64: B4f - A PROVA DO REQUISITO: DSL inventado refatorável sem tocar em nada"
+# gizmo.ch define comandos PRÓPRIOS (CONTRAPTION/APTITUDE/GIZMO) que
+# declaram pelo canal da linguagem na expansão. A classificação sai
+# confirmed SEM nenhuma mudança em harbour ou hbrefactor - e a ferramenta
+# não menciona nenhuma palavra do DSL (o hbclass é só o primeiro cliente
+# do mesmo canal).
+D=$(freshrcv case64)
+( cd "$D" && "$BIN" usages fixrcv.hbp Duplicador:Espelho > de.log 2>&1 )
+check "usages de método de DSL inventado exit 0" $?
+grep -q "confirmed send (receiver class DUPLICADOR via declared types) in USA  | w:Espelho()" "$D/de.log"
+check "w := MakeDup() confirmed pela declaração do PRÓPRIO DSL" $?
+test "$(grep -c "confirmed send (receiver class DUPLICADOR via declared types) in USA  | w:Espelho():Espelho()" "$D/de.log")" = "2"
+check "send ENCADEADO confirmed (retorno declarado do método do DSL)" $?
+! grep -qiE "contraption|aptitude|gizmo|duplicador" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra do DSL (genérico de fato)" $?
+# sem palavra do DSL e sem NENHUMA mensagem reconhecida por nome ("NEW"
+# etc.) - o writer transporta o canal 1:1, convenção não entra no core
+test -f "$HB_BIN/../../../src/compiler/compast.c" && \
+   ! grep -qiE "contraption|aptitude|gizmo" "$HB_BIN/../../../src/compiler/compast.c" && \
+   ! grep -q '"NEW"' "$HB_BIN/../../../src/compiler/compast.c"
+check "o core tampouco (transporte 1:1 do canal, sem convenções)" $?
+
+echo "case 65: B4f - consistência do dump: canal re-derivável dos fatos brutos"
+# invariantes do ast-4 verificados sobre o dump real: Self tipado em todo
+# método, declared coerente (classe/função/ctor), e o binding único usado
+# pelo TypeOf re-derivado de occurrences+statements (mesma resposta).
+D=$(freshrcv case65)
+DIR=$( cd "$D" && "$BIN" dump fixrcv.hbp 2>/dev/null | sed -n 's/^dumps em: //p' )
+test -n "$DIR" && test -f "$DIR/r1.ast.json"
+check "dump ast-4 gerado" $?
+python3 - "$DIR" > "$D/cons.log" 2>&1 <<'PYEOF'
+import json, sys, os
+d1 = json.load(open(os.path.join(sys.argv[1], 'r1.ast.json')))
+d2 = json.load(open(os.path.join(sys.argv[1], 'r2.ast.json')))
+assert d1['schema'] == 'ast-4' and d2['schema'] == 'ast-4'
+# Self tipado (S + classe) em toda função de método <CLASSE>_<MÉTODO>
+for d, cls in ((d1, 'CAIXA'), (d2, 'SEMCTOR')):
+    for f in d['functions']:
+        if f['name'].startswith(cls + '_'):
+            selfs = [x for x in f['declarations'] if x['sym'] == 'SELF']
+            assert selfs and selfs[0].get('type') == 'S' and selfs[0].get('class').upper() == cls, f['name']
+# declared de r1: função-classe auto-declarada + ctor com retorno declarado
+funcs1 = {x['name']: x for x in d1['declared']['functions']}
+assert funcs1['CAIXA'].get('type') == 'S' and funcs1['CAIXA'].get('class').upper() == 'CAIXA'
+assert funcs1['FABRICA'].get('type') == 'S' and funcs1['FABRICA'].get('class').upper() == 'CAIXA'
+cls1 = {c['name']: {m['name']: m for m in c['methods']} for c in d1['declared']['classes']}
+assert cls1['CAIXA']['NEW'].get('type') == 'S' and cls1['CAIXA']['NEW'].get('class').upper() == 'CAIXA'
+# declared de r2: o DSL inventado declarou classe, maker e método
+funcs2 = {x['name']: x for x in d2['declared']['functions']}
+assert funcs2['MAKEDUP'].get('class', '').upper() == 'DUPLICADOR'
+cls2 = {c['name']: {m['name']: m for m in c['methods']} for c in d2['declared']['classes']}
+assert cls2['DUPLICADOR']['ESPELHO'].get('class', '').upper() == 'DUPLICADOR'
+# re-derivação do binding único de G (o fato que o TypeOf consome):
+# exatamente 1 write em occurrences E exatamente 1 ASSIGN de topo
+cen = next(f for f in d1['functions'] if f['name'] == 'CENARIOS')
+writes = [o for o in cen['occurrences'] if o['sym'] == 'G' and o['access'] == 'write']
+refs = [o for o in cen['occurrences'] if o['sym'] == 'G' and o['access'] == 'ref']
+assigns = [s for s in cen['statements']
+           if isinstance(s.get('expr'), dict) and s['expr'].get('et') == 'ASSIGN'
+           and isinstance(s['expr'].get('left'), dict)
+           and s['expr']['left'].get('val') == 'G']
+assert len(writes) == 1 and len(refs) == 0 and len(assigns) == 1
+rhs = assigns[0]['expr']['right']
+assert rhs['et'] == 'SEND' and rhs['msg'] == 'NEW' and rhs['obj']['et'] == 'FUNCALL'
+# e o contraexemplo: M tem 2 writes (não classifica)
+mw = [o for o in cen['occurrences'] if o['sym'] == 'M' and o['access'] == 'write']
+assert len(mw) == 2
+print('consistente')
+PYEOF
+grep -q "^consistente$" "$D/cons.log"
+check "invariantes do canal verificados sobre o dump real" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"
