@@ -898,10 +898,26 @@ nenhum.
 >   possible onde o fato não existe (ex.: classe sem ctor declarado —
 >   idioma: declarar `CONSTRUCTOR`/`AS CLASS`).
 
-**Fatia 2 (anotada, não desta fase)**: call-graph estreitado pelo canal;
-unicidade P1b/P2b relaxada com receptor conhecido; statics (agregação
-módulo-inteiro); `WITH OBJECT`; tipos de PARÂMETRO declarados (já
-transportados) para checagem de assinatura em call sites.
+**Fase B4f-2 — resolução de dispatch (em spec, portão pendente)**: o furo
+dos HOMÔNIMOS reportado pelo Diego (2026-07-06: duas classes com os mesmos
+métodos → find-references lista o send da outra classe) expôs que a B4f
+parou na classificação do receptor sem resolver o DISPATCH — incompleta,
+não ajeito. Spec executável:
+[spec-b4f2-dispatch.md](spec-b4f2-dispatch.md) — regra de resolução
+PROVADA em runtime (próprio > pais na ordem do FROM; probe mi.prg),
+grafo de classes só com fatos já transportados (ClassParentsOf da B4e +
+declared/registro), camadas `excluded (dispatches to X:M)` e
+`excluded within the project's class graph`, fronteiras honestas
+(runtime-created classes etc.). Também herdam desta fase (mesma base
+`ResolveDispatch`): call-graph estreitado; unicidade P1b/P2b relaxada;
+statics (agregação módulo-inteiro); `WITH OBJECT`; tipos de PARÂMETRO
+declarados (já transportados) em call sites. Volume SÓ após o portão do
+Diego sobre a spec.
+
+Nota pós-entrega da fatia 1 (2026-07-06, commit f7b819f): `excluded`
+saiu das Location[] do `--json` — o find-references da extensão VSCode
+não lista não-referência provada (repro do Diego: `a := ""` ;
+`a:Paint()`).
 
 ### Fase B5 — Extensão VSCode re-apontada (em andamento)
 
