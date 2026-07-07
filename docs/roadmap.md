@@ -79,10 +79,21 @@ transporte 1:1 de canal da linguagem (gates fAst = tabelas vivas com
 warnings nível-3 gated na emissão; schema espelha a gramática; canal de
 tipos é write-only no core; evidência arquivo:linha no doc da revisão).
 Pendência cosmética opcional: comentário de compast.c:106 (→ B6).
-Restantes: Q1-Q3/Q7 (prova adversarial dos comandos B4e em DSL inventada
-NÃO-espelho, ou conserto, ou recusa honesta); Q5 (matar o regex da
-extensão: `resolve-at` por fato no CLI); Q6 (rótulo do dono no
-vocabulário da regra raiz).
+**Q1-Q3/Q7 ✅ FECHADAS (2026-07-07, casos 76-79, fixture fixofi)**: DSL
+inventada NÃO-espelho (colagem MENSAGEM-primeiro `Talha_na_Banca`,
+assinatura única sem par protótipo/impl, dispatch REAL
+`__clsNew`/`__clsAddMsg`). Q2 = prova pura (o açúcar é só política de
+unicidade sobre o motor genérico). Q1/Q3 = conserto `GenMsgPart`: a
+mensagem do composto é a parte que NÃO nomeia função-de-classe (fato da
+co-derivação) — eleger a última parte era forma-de-hbclass (call-graph
+respondia VAZIO; o reorder cru elegia a dona). Q7 = a síntese
+`METHOD ... CLASS` fica exclusiva da forma hbclass (portão = vocábulo da
+regra raiz via `PpMarkerLift`; DSL própria degrada para FUNÇÃO verificada
+com o fato relatado) + veneno novo morto: range com `QSelf()` extraído
+para função mudava comportamento EM SILÊNCIO (receptor não viaja) — nó
+`SELF` na árvore agora recusa limpo nomeando a exceção. Suíte 517/0.
+Restantes: Q5 (matar o regex da extensão: `resolve-at` por fato no CLI);
+Q6 (rótulo do dono no vocabulário da regra raiz).
 **Critério**: todas as Q fechadas com caso na suíte; régua do caso 64
 assertada; `make test` verde; ast-schema atualizado onde a resposta for
 teto honesto.

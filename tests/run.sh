@@ -120,8 +120,19 @@ freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    echo "$d"
 }
 
+freshofi() { # freshofi <case-name> -> fixture with a NON-mirror user DSL (revisão Q1-Q3/Q7)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixofi/*.prg "$HERE"/fixofi/*.ch "$HERE"/fixofi/*.hbp "$d"/
+   echo "$d"
+}
+
 extrun() { # extrun <dir> <out-file> -> build fixext copy and run it
    ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
+}
+
+ofirun() { # ofirun <dir> <out-file> -> build fixofi copy and run it
+   ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" o1.prg o2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
 }
 
 echo "case 0: base fixtures compile clean under the flags the .hbp declares"
@@ -1899,6 +1910,149 @@ grep -q "possible send (receiver class FACA, relation to LOUSA unknown) in USAAR
 check "vínculo para função comum degrada honesto (nunca decide)" $?
 ! grep -qiwE "arma|tempera|gume|endarma|afia|faca|lamina|pedrabase|afiapedra|armamake|arsenal" "$HERE/../src/hbrefactor.prg"
 check "a ferramenta não menciona NENHUMA palavra da DSL fixq4 (régua do caso 64)" $?
+
+echo "case 76: Q1 (revisao-generalidade) - reorder-params em 'método' de DSL própria NÃO-espelho"
+# fixofi: a DSL cola a MENSAGEM primeiro e a dona por último
+# (Talha_na_Banca), assinatura numa única linha (sem par protótipo/impl) e
+# dispatch REAL de runtime (__clsNew/__clsAddMsg). A assinatura vem de
+# SigParamHits (markers posicionados escopados pela identidade inteira),
+# os sends de SendSitesArgs, a unicidade de PpMarkerOwners - tudo do
+# rastro. CONSERTO Q1: a MENSAGEM do composto é a parte que NÃO nomeia
+# função-de-classe (fato da co-derivação) - eleger a última parte (ATail)
+# era forma-de-hbclass e elegia a DONA na forma crua do comando.
+for f in o1.prg o2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixofi/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I"$HERE/fixofi" > /dev/null 2>&1
+   check "fixofi/$f clean under -w3 -es2"  $?
+done
+D=$(freshofi case76)
+ofirun "$D" saida_antes.txt
+check "fixture runs before (dispatch real)" $?
+( cd "$D" && "$BIN" reorder-params fixofi.hbp Banca:Talha "nFundo,nLado" > ren.log 2>&1 )
+RC=$?
+check "reorder Dona:Membro de DSL própria exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "OFICIO Talha DA Banca PEDE nFundo, nLado" "$D/o1.prg"
+check "assinatura única (sem protótipo espelho) reordenada" $?
+grep -q "nLado \* 10 - nFundo" "$D/o1.prg"
+check "corpo do ofício intacto (params mantêm os nomes)" $?
+grep -q "OFICIO Verniz DA Banca PEDE nLado, nBrilho" "$D/o1.prg"
+check "param homônimo (nLado) de OUTRO ofício intacto (escopo por identidade)" $?
+grep -q "b:Talha( 5, 2 )" "$D/o2.prg"
+check "send call site com argumentos reordenados" $?
+grep -q "símbolos intactos" "$D/ren.log"
+check "verificação: símbolos/funções intactos" $?
+ofirun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execução idêntica após o reorder" $?
+# volta pela forma CRUA: a mensagem é achada pelo FATO (antes do conserto
+# a última parte da colagem - a DONA - era eleita e o comando derrapava)
+( cd "$D" && "$BIN" reorder-params fixofi.hbp Talha "nLado,nFundo" > /dev/null 2>&1 )
+RC=$?
+check "forma crua (mensagem única) resolve pelo fato" $([ $RC -eq 0 ] && echo 0 || echo 1)
+cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
+check "A->B->A round-trip byte-exact"  $?
+# Lustro é de duas donas (Banca e Tear) - send é despacho dinâmico
+( cd "$D" && "$BIN" reorder-params fixofi.hbp Banca:Lustro "nPano,nCera" > amb.log 2>&1 )
+RC=$?
+check "mensagem de duas donas de DSL recusada" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "mais de uma classe" "$D/amb.log" && grep -q "TEAR" "$D/amb.log"
+check "recusa nomeia as donas e o despacho dinâmico" $?
+cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
+check "fontes intactos após a recusa" $?
+
+echo "case 77: Q2 (revisao-generalidade) - rename-method Dona:Membro resolve dona de DSL própria"
+# o açúcar Dona:Membro é SÓ política de unicidade sobre o motor genérico
+# (PpMarkerSeeds/Artifacts/Owners): a dona vem da co-derivação, a previsão
+# do artefato (PredictText) opera por faixas - a colagem invertida
+# (CINZELA_NA_BANCA) sai prevista sem nenhum separador assumido.
+D=$(freshofi case77)
+ofirun "$D" saida_antes.txt
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" rename-method fixofi.hbp Banca:Talha Cinzela > ren.log 2>&1 )
+RC=$?
+check "rename Dona:Membro de DSL própria exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "LAVRA Cinzela" "$D/o1.prg" && grep -q "OFICIO Cinzela DA Banca PEDE" "$D/o1.prg"
+check "declaração e implementação editadas no site escrito" $?
+grep -q "b:Cinzela( 2, 5 )" "$D/o2.prg"
+check "send editado no módulo consumidor" $?
+grep -q "predicted: TALHA_NA_BANCA -> CINZELA_NA_BANCA" "$D/ren.log"
+check "artefato da colagem INVERTIDA previsto do rastro" $?
+grep -q 'predicted string: "Talha" -> "Cinzela"' "$D/ren.log"
+check "string de registro prevista e conferida" $?
+ofirun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execução idêntica após o rename" $?
+( cd "$D" && "$BIN" rename-method fixofi.hbp Banca:Cinzela Talha > /dev/null 2>&1 )
+cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
+check "A->B->A round-trip byte-exact"  $?
+( cd "$D" && "$BIN" rename-method fixofi.hbp Talha Cinzela --dry-run > bare.log 2>&1 )
+grep -q "rename-method: BANCA:Talha -> Cinzela" "$D/bare.log"
+check "forma crua resolve a dona única pelo fato (dry-run)" $?
+( cd "$D" && "$BIN" rename-method fixofi.hbp Banca:Lustro Polir > amb.log 2>&1 )
+RC=$?
+check "membro homônimo em duas donas recusado" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "também é membro de: TEAR (o2.prg)" "$D/amb.log"
+check "recusa nomeia a outra dona (política de unicidade)" $?
+cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
+check "fontes intactos após a recusa" $?
+
+echo "case 78: Q3 (revisao-generalidade) - call-graph resolve membro de DSL própria"
+# CONSERTO Q3: o índice de mensagens elegia a última parte da colagem
+# (forma-de-hbclass) - numa DSL mensagem-primeiro a DONA virava chave e o
+# comando respondia VAZIO em silêncio. Agora a mensagem é a parte que não
+# nomeia função-de-classe (mesmo fato do extract/reorder).
+D=$(freshofi case78)
+( cd "$D" && "$BIN" call-graph fixofi.hbp Banca:Talha > cg.log 2>&1 )
+check "call-graph Dona:Membro exit 0" $?
+grep -q "o1.prg: definition BANCA:TALHA -> TALHA_NA_BANCA" "$D/cg.log"
+check "definição resolvida para o símbolo da colagem invertida" $?
+grep -q "MAIN ~> TALHA  \[dynamic: TALHA_NA_BANCA\]" "$D/cg.log"
+check "send listado como aresta DINÂMICA para o método da DSL" $?
+! grep -q "MAIN -> TALHA" "$D/cg.log"
+check "nenhuma aresta estática inventada para o dispatch" $?
+( cd "$D" && "$BIN" call-graph fixofi.hbp Talha > cgb.log 2>&1 )
+grep -q "definition BANCA:TALHA -> TALHA_NA_BANCA" "$D/cgb.log"
+check "mensagem crua resolve (índice pelo fato, não pela posição)" $?
+( cd "$D" && "$BIN" call-graph fixofi.hbp Lustro > cgh.log 2>&1 )
+grep -q "definition BANCA:LUSTRO -> LUSTRO_NA_BANCA" "$D/cgh.log" && \
+   grep -q "definition TEAR:LUSTRO -> LUSTRO_NA_TEAR" "$D/cgh.log"
+check "mensagem homônima mostra as definições das duas donas" $?
+grep -q "dynamic: LUSTRO_NA_BANCA | LUSTRO_NA_TEAR" "$D/cgh.log"
+check "aresta dinâmica mostra o alvo ambíguo (unicidade visível)" $?
+
+echo "case 79: Q7 (revisao-generalidade) - extract em corpo de ofício: função verificada OU recusa limpa"
+# a síntese de método (METHOD ... CLASS + protótipo) é a exceção
+# DOCUMENTADA do hbclass (V4: o pp não roda ao contrário) - o portão é o
+# vocábulo da regra raiz que consumiu o nome no site escrito. Contêiner de
+# DSL própria degrada para FUNÇÃO verificada com o fato relatado; range
+# com o Self-análogo (QSelf vira nó SELF na árvore - fato do dump) RECUSA
+# LIMPO nomeando a exceção: numa função extraída o receptor não viaja e o
+# comportamento mudaria em silêncio (provado no probe da revisão).
+D=$(freshofi case79)
+ofirun "$D" saida_antes.txt
+check "fixture runs before"           $?
+( cd "$D" && "$BIN" extract-function fixofi.hbp o1.prg 23-23 Ajusta > ex.log 2>&1 )
+RC=$?
+check "range SEM Self-análogo em corpo de ofício extrai" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "contêiner de DSL própria (regra 'oficio')" "$D/ex.log" && \
+   grep -q "exceção do hbclass" "$D/ex.log"
+check "relato nomeia a regra da DSL e a exceção de síntese" $?
+grep -q "nTom := Ajusta( nLado, nBrilho )" "$D/o1.prg" && \
+   grep -q "STATIC FUNCTION Ajusta( nLado, nBrilho )" "$D/o1.prg"
+check "alvo é FUNÇÃO (nunca síntese de METHOD em projeto alheio)" $?
+ofirun "$D" saida_depois.txt
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execução idêntica após o extract-para-função" $?
+D=$(freshofi case79b)
+( cd "$D" && "$BIN" extract-function fixofi.hbp o1.prg 22-22 Rotula > rec.log 2>&1 )
+RC=$?
+check "range COM QSelf em corpo de ofício recusado" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "QSelf()/Self" "$D/rec.log" && grep -q "receptor não viajaria" "$D/rec.log" && \
+   grep -q "exceção do hbclass" "$D/rec.log"
+check "recusa nomeia o fato (nó SELF) e a exceção de síntese" $?
+cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
+check "fontes intactos após a recusa" $?
+! grep -qiwE "tenda|lavra|oficio|endtenda|banca|tear|talha|verniz|lustro|cinzela|polir|ajusta|rotula|pede|nlado|nfundo|nbrilho|ncera|npano|nfio|ntrama|nmiolo|ntom|cmarca" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixofi (régua do caso 64)" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

@@ -1038,6 +1038,29 @@ STATIC FUNCTION GenNameParts( hAst, hFunc )
 
    RETURN {}
 
+// a parte-MENSAGEM de um nome gerado composto: entre as partes
+// constituintes (GenNameParts), a mensagem é a ÚNICA que NÃO nomeia
+// função-de-classe do projeto - a outra parte é a dona (co-derivação).
+// FATO, não posição: o hbclass cola <Classe>_<Metodo>, mas uma DSL
+// própria pode colar a mensagem primeiro e a dona por último - eleger a
+// última parte (ATail) era leitura por forma e elegia a DONA como
+// mensagem (revisão de generalidade Q1/Q3). "" quando o fato não decide
+// (nenhuma ou mais de uma candidata) - quem chama recusa/degrada honesto.
+STATIC FUNCTION GenMsgPart( aIdentUp, hClassMap )
+
+   LOCAL cPart, cMsg := ""
+
+   FOR EACH cPart IN aIdentUp
+      IF ! hb_HHasKey( hClassMap, cPart )
+         IF ! Empty( cMsg )
+            RETURN ""
+         ENDIF
+         cMsg := cPart
+      ENDIF
+   NEXT
+
+   RETURN cMsg
+
 // os nomes de aIdentUp estão TODOS presentes no conjunto hNames (chaves)?
 STATIC FUNCTION IdentSubset( aIdentUp, hNames )
 
@@ -1798,6 +1821,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    LOCAL cOut := "", lOutParam := .F., aParams := {}, aMoved := {}
    LOCAL cEol, cIndent, cCall, cNewFunc, cTextNew, cWhy, cUpNew, hRule
    LOCAL lUsesSelf := .F., lMethod, aGenParts, aImplInfo, cClassReal
+   LOCAL cMsgPart, aLift, cDslRule := ""
    LOCAL cGenNew := "", cUpGenNew := "", nAnchor := 0, aParentsUnk := {}
    LOCAL hClassMap, aChainQ, hChainSeen, aPP, cUpCur, hMembers, aCF, cPar
    LOCAL hOcc, hFrom, aRangeM, hAst2, hFn2, hIt2, cProtoLine
@@ -1900,14 +1924,30 @@ STATIC FUNCTION ExtractFunction( aArgs )
       OutStd( "warning: a função usa macros & - revise com cuidado" + hb_eol() )
    ENDIF
 
-   // P2a: o CONTÊINER é método? Nome composto pelo rastro (classe+mensagem)
-   // cuja primeira parte nomeia uma FUNÇÃO DE CLASSE do projeto (composto de
-   // DSL sem classe cai no caminho de função). Contêiner método => o alvo é
-   // um novo MÉTODO mesmo com range sem Self (dogfooding do Diego: extrair
-   // função de dentro de método surpreende; e método funciona sempre)
+   // P2a: o CONTÊINER é método? Nome composto pelo rastro (dona+mensagem);
+   // a MENSAGEM é a parte que não nomeia função-de-classe do projeto e a
+   // dona a que nomeia - fato da co-derivação, não posição (Q1/Q3 da
+   // revisão; composto de DSL sem classe cai no caminho de função).
+   // Contêiner método => o alvo é um novo MÉTODO mesmo com range sem Self
+   // (dogfooding do Diego: extrair função de dentro de método surpreende).
+   // PORÉM a síntese do alvo (METHOD ... CLASS + protótipo) é a exceção
+   // documentada de biblioteca (V4: o pp não roda ao contrário; a forma do
+   // hbclass é a ÚNICA que a ferramenta sabe emitir - decisão do Diego,
+   // 2026-07-06). O portão é FATO do rastro: o vocábulo da regra raiz que
+   // consumiu o nome no site escrito (PpMarkerLift). Contêiner de DSL
+   // própria => alvo degrada para FUNÇÃO verificada, com o fato relatado -
+   // nunca síntese de hbclass em projeto alheio (Q7).
    aGenParts := GenNameParts( hAst, hTarget )
    hClassMap := ClassFuncMap( hAsts )
-   lMethod := Len( aGenParts ) >= 2 .AND. hb_HHasKey( hClassMap, aGenParts[ 1 ] )
+   cMsgPart  := GenMsgPart( aGenParts, hClassMap )
+   lMethod   := Len( aGenParts ) >= 2 .AND. ! Empty( cMsgPart )
+   IF lMethod
+      aLift := PpMarkerLift( hAst, hTarget, cMsgPart )
+      IF aLift == NIL .OR. !( aLift[ 5 ] == "method" )
+         cDslRule := iif( aLift == NIL, "?", aLift[ 5 ] )
+         lMethod  := .F.
+      ENDIF
+   ENDIF
    // occurrences de SELF no range (a atribuição sintética do preâmbulo do
    // hbclass fica na linha do METHOD, fora de qualquer range válido).
    // Reatribuir/referenciar Self extraído mudaria o alvo (o Self do método
@@ -1930,7 +1970,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    IF lMethod
       // extração PARA MÉTODO da mesma classe: o corpo move verbatim (::/sends
       // continuam válidos; Super preserva o binding - mesma classe).
-      aImplInfo := MethodImplOf( hAst, hTarget, "", ATail( aGenParts ) )
+      aImplInfo := MethodImplOf( hAst, hTarget, "", cMsgPart )
       IF aImplInfo == NIL
          RETURN Refuse( "não consegui decompor o nome gerado de " + hTarget[ "name" ] )
       ENDIF
@@ -1942,7 +1982,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
             Upper( hTok[ "text" ] ) == Upper( hTarget[ "name" ] )
             aRangeM := NIL
             FOR EACH hFrom IN hTok[ "from" ]
-               IF Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) ) == ATail( aGenParts )
+               IF Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) ) == cMsgPart
                   aRangeM := { hFrom[ "at" ], hFrom[ "len" ] }
                ENDIF
             NEXT
@@ -1960,7 +2000,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
       // (P1a) cujos tokens posicionados ficam ANTES da implementação
       nAnchor := MethodProtoAnchor( hAst, aGenParts, hTarget[ "line" ] )
       IF nAnchor == 0
-         RETURN Refuse( "não localizei o protótipo de " + cClassReal + ":" + ATail( aGenParts ) + ;
+         RETURN Refuse( "não localizei o protótipo de " + cClassReal + ":" + cMsgPart + ;
                         " no módulo (classe declarada em include?) - recusando" )
       ENDIF
       // colisões nos módulos: símbolo gerado já existente/referenciado e
@@ -2028,6 +2068,25 @@ STATIC FUNCTION ExtractFunction( aArgs )
          RETURN Refuse( "a seleção usa macro (&) na linha " + hb_ntos( hItem[ "line" ] ) + " - recusando" )
       ENDIF
    NEXT
+
+   // Self-análogo na seleção com alvo FUNÇÃO: QSelf() vira nó SELF na
+   // árvore (fato do dump) e o receptor não viaja numa chamada comum (o
+   // vínculo é do dispatch) - extrair mudaria o comportamento EM SILÊNCIO
+   // (a verificação de símbolos passa). Em alvo MÉTODO (hbclass) o
+   // dispatch continua e o nó move válido; em contêiner de DSL própria a
+   // recusa nomeia a exceção de síntese (Q7 da revisão).
+   IF ! lMethod
+      FOR EACH hItem IN hTarget[ "statements" ]
+         IF hItem[ "line" ] >= nFirst .AND. hItem[ "line" ] <= nLast .AND. ;
+            ExprHasEt( hb_HGetDef( hItem, "expr", NIL ), "SELF" )
+            RETURN Refuse( "a seleção usa QSelf()/Self (linha " + hb_ntos( hItem[ "line" ] ) + ;
+                           ") e o alvo é uma FUNÇÃO - o receptor não viajaria" + ;
+                           iif( Empty( cDslRule ), "", ": o contêiner nasce de regra de DSL própria ('" + ;
+                                cDslRule + "') e a síntese de método é a exceção do hbclass (não sei " + ;
+                                "sintetizar o construto desta DSL)" ) + "; recusando" )
+         ENDIF
+      NEXT
+   ENDIF
 
    // criação de memvar/field na seleção: escopo dinâmico não sobrevive à
    // extração (PRIVATE morre no RETURN da função nova)
@@ -2216,6 +2275,10 @@ STATIC FUNCTION ExtractFunction( aArgs )
            iif( lMethod, "novo método " + cClassReal + ":" + cNewName, cNewName ) + ;
            "( " + ArrJoin( aParams, ", " ) + " )" + ;
            iif( Empty( cOut ), "", " retornando " + cOut ) + hb_eol() )
+   IF ! Empty( cDslRule )
+      OutStd( "  contêiner de DSL própria (regra '" + cDslRule + "'): a síntese de método é a " + ;
+              "exceção do hbclass - o alvo é FUNÇÃO verificada" + hb_eol() )
+   ENDIF
    IF lMethod
       OutStd( "  protótipo METHOD " + cNewName + " inserido após a linha " + hb_ntos( nAnchor ) + ;
               " (junto ao protótipo do método de origem)" + hb_eol() )
@@ -3247,7 +3310,7 @@ STATIC FUNCTION CallGraph( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem, hAsts := { => }
    LOCAL cFilter := "", hDefined := { => }, hSeen, cKey, cCallee
    LOCAL hMethods := { => }, aParts, cMsg, cUpMsgFilter := "", cUpClassFilter := ""
-   LOCAL nAt, aOwn, cGen
+   LOCAL nAt, aOwn, cGen, hClassMap, cOwn, cPart
 
    IF Len( aArgs ) < 2
       Usage()
@@ -3264,9 +3327,13 @@ STATIC FUNCTION CallGraph( aArgs )
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "o projeto não compila" )
    ENDIF
-   // funções definidas + índice de MENSAGENS de método: nome gerado
-   // <Classe>_<Metodo> decomposto pelo rastro (GenNameParts) -> a mensagem
-   // (método) mapeia para { classe, nome gerado, arquivo }
+   // funções definidas + índice de MENSAGENS de construto gerado: o nome
+   // composto decompõe pelo rastro (GenNameParts); a MENSAGEM é a parte
+   // que NÃO nomeia função-de-classe e a DONA a que nomeia (fato da
+   // co-derivação, não posição - Q3 da revisão: eleger a última parte
+   // era forma-de-hbclass e elegia a DONA em DSL que cola a mensagem
+   // primeiro, respondendo vazio). Composto sem dona identificável
+   // (DSL sem classe) fica fora do índice de mensagens - honesto.
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
@@ -3274,17 +3341,32 @@ STATIC FUNCTION CallGraph( aArgs )
       ENDIF
       hAsts[ cPath ] := hAst
       FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ]
+            hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
+         ENDIF
+      NEXT
+   NEXT
+   hClassMap := ClassFuncMap( hAsts )
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
          IF hFunc[ "fileDecl" ]
             LOOP
          ENDIF
-         hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
          aParts := GenNameParts( hAst, hFunc )
-         IF Len( aParts ) >= 2
-            cMsg := ATail( aParts )
+         cMsg   := GenMsgPart( aParts, hClassMap )
+         IF Len( aParts ) >= 2 .AND. ! Empty( cMsg )
+            cOwn := ""
+            FOR EACH cPart IN aParts
+               IF hb_HHasKey( hClassMap, cPart )
+                  cOwn := cPart
+                  EXIT
+               ENDIF
+            NEXT
             IF ! hb_HHasKey( hMethods, cMsg )
                hMethods[ cMsg ] := {}
             ENDIF
-            AAdd( hMethods[ cMsg ], { aParts[ 1 ], hFunc[ "name" ], hb_FNameNameExt( cPath ) } )
+            AAdd( hMethods[ cMsg ], { cOwn, hFunc[ "name" ], hb_FNameNameExt( cPath ) } )
          ENDIF
       NEXT
    NEXT
@@ -3532,7 +3614,13 @@ STATIC FUNCTION ReorderParams( aArgs )
       IF ( nAt := At( ":", cFunc ) ) > 0
          cUpMsg := Upper( AllTrim( SubStr( cFunc, nAt + 1 ) ) )
       ELSE
-         cUpMsg := ATail( aIdent )              // convenção <Classe>_<Metodo>
+         // a mensagem é a parte que NÃO nomeia função-de-classe (fato da
+         // co-derivação) - a posição no composto é forma, não fato (Q1)
+         cUpMsg := GenMsgPart( aIdent, ClassFuncMap( hAsts ) )
+         IF Empty( cUpMsg )
+            RETURN Refuse( "não consegui identificar a mensagem no composto '" + ;
+                           hDef[ "name" ] + "' - use a forma Classe:Metodo" )
+         ENDIF
       ENDIF
    ENDIF
    cCallName := iif( lIsMethod, cUpMsg, cUpFunc )

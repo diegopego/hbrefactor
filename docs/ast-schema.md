@@ -627,12 +627,21 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   DINÂMICO: os sends não carregam classe, então só é seguro reordenar quando a
   mensagem pertence a UMA classe do projeto — `PpMarkerOwners` (donos por
   co-derivação) sobre o nome do método; > 1 classe ⇒ recusa NOMEANDO as classes
-  (mesma política do rename-method). O pcode muda de verdade (ordem de push);
-  a verificação é `HrbSymbolsEqual` (símbolos/funções intactos) + rollback, não
-  byte-idêntico.
+  (mesma política do rename-method). Na forma CRUA do comando a MENSAGEM do
+  composto vem do FATO (`GenMsgPart`: a parte que NÃO nomeia função-de-classe
+  do projeto; indecidível ⇒ recusa pedindo `Classe:Metodo`) — a última parte
+  da colagem é forma-de-hbclass e elegia a DONA numa DSL que cola a mensagem
+  primeiro (revisão Q1, caso 76 — fixture fixofi). O pcode muda de verdade
+  (ordem de push); a verificação é `HrbSymbolsEqual` (símbolos/funções
+  intactos) + rollback, não byte-idêntico.
 - **call-graph ciente de método (B4e P2b)**: um índice de MENSAGENS de método é
-  montado do rastro — cada função gerada `<Classe>_<Metodo>` decompõe por
-  `GenNameParts`, a última parte é a mensagem. `call-graph <método>`
+  montado do rastro — cada função gerada composta decompõe por
+  `GenNameParts`; a MENSAGEM é a parte que NÃO nomeia função-de-classe e a
+  DONA a que nomeia (`GenMsgPart`, fato da co-derivação — revisão Q3, caso
+  78: eleger a última parte era forma-de-hbclass, elegia a DONA em DSL
+  mensagem-primeiro e o comando respondia VAZIO em silêncio). Composto sem
+  dona identificável (DSL sem classe) fica FORA do índice de mensagens —
+  honesto, sem dona fantasma por posição. `call-graph <método>`
   (bare/`Classe:Método`) resolve para o símbolo gerado e imprime a definição;
   os `sends` da mensagem viram arestas DINÂMICAS (`~>`, distintas das estáticas
   `->` de `calls`) com alvo `[dynamic: NOME_GERADO]`. Send é despacho dinâmico:
@@ -643,9 +652,23 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   NOVO `METHOD` da MESMA classe — o alvo é decidido pelo **CONTÊINER**, não
   pelo range (dogfooding do Diego no hbhttpd: range sem `::` dentro de
   método virava função e surpreendia; método funciona sempre). Contêiner é
-  método = nome composto pelo rastro CUJA PRIMEIRA PARTE nomeia uma função
-  de CLASSE do projeto (`ClassFuncMap` — composto de DSL sem classe segue
-  no caminho de função). O corpo move VERBATIM (`::`/sends/`Super`
+  método = nome composto pelo rastro cuja parte-DONA nomeia uma função de
+  CLASSE do projeto (`GenMsgPart`/`ClassFuncMap` — a dona é a parte que
+  nomeia, em QUALQUER posição da colagem; composto de DSL sem classe segue
+  no caminho de função). **A síntese do alvo (`METHOD ... CLASS` +
+  protótipo) é a exceção DOCUMENTADA de biblioteca (V4 da revisão: o pp
+  não roda ao contrário)** — o portão é FATO do rastro: o vocábulo da
+  regra raiz que consumiu o nome no site escrito (`PpMarkerLift`); só a
+  forma `method` (hbclass) recebe síntese. Contêiner de "método" de DSL
+  própria DEGRADA para FUNÇÃO verificada com o fato relatado no output
+  (revisão Q7, caso 79) — nunca síntese de hbclass em projeto alheio.
+  **Self-análogo (Q7)**: `QSelf()` escrito no fonte vira nó `SELF` na
+  árvore de statements (fato do dump; NÃO gera occurrence — o cheque de
+  occurrences de SELF não o vê). Range com nó `SELF` e alvo FUNÇÃO recusa
+  LIMPO nomeando a exceção: numa chamada comum o receptor não viaja e o
+  comportamento mudaria EM SILÊNCIO (a verificação de símbolos passa —
+  provado no probe da revisão: o nome da classe sumiu da saída com o
+  comando dizendo "verified"). O corpo move VERBATIM (`::`/sends/`Super`
   continuam válidos: mesma classe ⇒ mesmo binding, provado por execução).
   Fatos consumidos:
   - `Self` é local comum SEM declaration no dump do método (só occurrences;
