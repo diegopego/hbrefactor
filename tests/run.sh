@@ -1767,14 +1767,14 @@ done
 D=$(freshhom case72)
 ( cd "$D" && "$BIN" usages fixhom.hbp Totem:Brilho --json tb.json > tb.log 2>&1 )
 check "usages Totem:Brilho (dono de DSL) exit 0" $?
-grep -q "m1.prg:19: cog declaration (class TOTEM)  | COG Brilho GIVES Totem" "$D/tb.log"
-check "declaração do próprio DSL confirmada NO VOCABULÁRIO do DSL (cog)" $?
+grep -q "m1.prg:19: cog declaration (rig TOTEM)  | COG Brilho GIVES Totem" "$D/tb.log"
+check "declaração do próprio DSL confirmada NO VOCABULÁRIO do DSL (cog + dono rig, Q6)" $?
 grep -q "m1.prg:27: excluded cog declaration (declares IDOLO:BRILHO)" "$D/tb.log"
 check "homônimo ENTRE donos de DSL excluído" $?
 grep -q "m1.prg:9: excluded method declaration (declares FAROL:BRILHO)" "$D/tb.log" && \
    grep -q "m1.prg:15: excluded method definition (implements FAROL:BRILHO)" "$D/tb.log"
 check "homônimo CRUZADO (classe hbclass) excluído da consulta do DSL" $?
-grep -q "m1.prg:23: forge definition Brilho (class Totem)" "$D/tb.log" && \
+grep -q "m1.prg:23: forge definition Brilho (rig Totem)" "$D/tb.log" && \
    grep -q "m1.prg:30: excluded forge definition (implements IDOLO:BRILHO)" "$D/tb.log"
 check "implementação por colagem do DSL: própria confirmada, homônima excluída" $?
 grep -q "excluded send (dispatches to FAROL:BRILHO) in USARIG  | oF:Brilho()" "$D/tb.log" && \
@@ -1791,7 +1791,7 @@ PYEOF
 grep -q "^json ok$" "$D/tj.log"
 check "Location[] só com os 3 sites do Totem (COG, FORGE, send)" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp Sol:Fulgor > sf.log 2>&1 )
-grep -q "m2.prg:7: dote declaration (class SOL)  | DOTE Fulgor RENDE Sol" "$D/sf.log" && \
+grep -q "m2.prg:7: dote declaration (amuleto SOL)  | DOTE Fulgor RENDE Sol" "$D/sf.log" && \
    grep -q "m2.prg:11: excluded dote declaration (declares LUA:FULGOR)" "$D/sf.log"
 check "DSL declarativa PURA: declaração própria confirmada, homônima excluída" $?
 grep -q "excluded send (dispatches to LUA:FULGOR) in USAAMULETO  | l:Fulgor()" "$D/sf.log" && \
@@ -2053,6 +2053,25 @@ cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.
 check "fontes intactos após a recusa" $?
 ! grep -qiwE "tenda|lavra|oficio|endtenda|banca|tear|talha|verniz|lustro|cinzela|polir|ajusta|rotula|pede|nlado|nfundo|nbrilho|ncera|npano|nfio|ntrama|nmiolo|ntom|cmarca" "$HERE/../src/hbrefactor.prg"
 check "a ferramenta não menciona NENHUMA palavra da DSL fixofi (régua do caso 64)" $?
+
+echo "case 80: Q6 (revisao-generalidade) - rótulo do DONO no vocabulário da DSL que o declarou"
+# O TIPO do membro já liftava para a cabeça da regra raiz (cog/dote/
+# oficio); o do DONO dizia "class" para qualquer DSL (V5). O vocábulo do
+# dono agora é a cabeça da regra cuja expansão LIGOU o nome ao canal de
+# classe - o `from` do próprio nome (fato do ast-3), no _HB_CLASS do
+# stream e no nome da função-dona gerada. NÃO é a regra raiz do site do
+# dono: `CREATE CLASS X` tem raiz CREATE (açúcar sobre açúcar), mas quem
+# declara é a regra CLASS - hbclass segue "(class ...)" (asserts FAROL/
+# GRADE do caso 72). Prova na DSL NÃO-espelho: TENDA gera a dona por
+# registro runtime PURO (sem canal declared). Dona sem derivação cai para
+# "class" (o nome do canal da linguagem), nunca palpite.
+D=$(freshofi case80)
+( cd "$D" && "$BIN" usages fixofi.hbp Banca:Talha > bt.log 2>&1 )
+check "usages Banca:Talha exit 0" $?
+grep -q "o1.prg:12: oficio definition Talha (tenda Banca)  | OFICIO Talha DA Banca PEDE" "$D/bt.log"
+check "dono no vocabulário da DSL não-espelho (tenda Banca), membro no da regra raiz (oficio)" $?
+! grep -qi "(class banca" "$D/bt.log"
+check "nenhum rótulo 'class' para dona de DSL própria" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

@@ -281,7 +281,7 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
    LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd
    LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
-   LOCAL aDecl, aSite, cCur, nState
+   LOCAL aDecl, aSite, cCur, nState, hOwnV
 
    IF Len( aArgs ) < 3
       Usage()
@@ -352,6 +352,10 @@ STATIC FUNCTION Usages( aArgs )
    IF DispatchVia( cClass, cOwnerQ )
       cOwnerQ := NIL
    ENDIF
+   // vocabulário dos DONOS (revisão Q6): o rótulo de tipo do dono sai na
+   // palavra da DSL que o declarou; hbclass segue "class" (a regra CLASS
+   // é quem liga o nome ao canal)
+   hOwnV := OwnerVocabMap( hAsts )
 
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -381,7 +385,8 @@ STATIC FUNCTION Usages( aArgs )
                nHits++
                LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
                OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
-                  aLift[ 1 ] + iif( Empty( aLift[ 2 ] ), "", " (class " + aLift[ 2 ] + ")" ) + ;
+                  aLift[ 1 ] + iif( Empty( aLift[ 2 ] ), "", ;
+                     " (" + OwnerWord( hOwnV, aLift[ 2 ] ) + " " + aLift[ 2 ] + ")" ) + ;
                   iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
                   SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
             ELSEIF ! Empty( aLift[ 2 ] )
@@ -396,7 +401,8 @@ STATIC FUNCTION Usages( aArgs )
                IF cOwnerQ != NIL .AND. cOwnerQ == Upper( aLift[ 2 ] )
                   LocAdd( aLoc, cPath, aLift[ 3 ], { aLift[ 4 ] }, Len( aLift[ 1 ] ) )
                   OutStd( cModFile + ":" + hb_ntos( aLift[ 3 ] ) + ": " + aLift[ 5 ] + " definition " + ;
-                     aLift[ 1 ] + " (class " + aLift[ 2 ] + ", dispatch target of " + ;
+                     aLift[ 1 ] + " (" + OwnerWord( hOwnV, aLift[ 2 ] ) + " " + ;
+                     aLift[ 2 ] + ", dispatch target of " + ;
                      cClass + ":" + cUpMeth + ")" + iif( lShowExp, " -> " + hFunc[ "name" ], "" ) + ;
                      SrcLine( aSrc, aLift[ 3 ] ) + hb_eol() )
                ELSEIF cOwnerQ != NIL .AND. DeclOwnerProven( hGraph, Upper( aLift[ 2 ] ), cUpMeth )
@@ -541,11 +547,13 @@ STATIC FUNCTION Usages( aArgs )
             IF cOwn == cClass
                LocAdd( aLoc, cPath, aSite[ 1 ], { aSite[ 2 ] + 1 }, Len( cMethTok ) )
                OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": " + cVocab + ;
-                  " declaration (class " + cOwn + ")" + SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
+                  " declaration (" + OwnerWord( hOwnV, cOwn ) + " " + cOwn + ")" + ;
+                  SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
             ELSEIF cOwnerQ != NIL .AND. cOwnerQ == cOwn
                LocAdd( aLoc, cPath, aSite[ 1 ], { aSite[ 2 ] + 1 }, Len( cMethTok ) )
                OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": " + cVocab + ;
-                  " declaration (class " + cOwn + ", dispatch target of " + cClass + ":" + ;
+                  " declaration (" + OwnerWord( hOwnV, cOwn ) + " " + cOwn + ;
+                  ", dispatch target of " + cClass + ":" + ;
                   cUpMeth + ")" + SrcLine( aSrc, aSite[ 1 ] ) + hb_eol() )
             ELSEIF cOwnerQ != NIL .AND. DeclOwnerProven( hGraph, cOwn, cUpMeth )
                OutStd( cModFile + ":" + hb_ntos( aSite[ 1 ] ) + ": excluded " + cVocab + ;
@@ -6059,6 +6067,72 @@ STATIC FUNCTION SeedRootRule( hAst, nLine, nCol0 )
    NEXT
 
    RETURN NIL
+
+// vocabulário do DONO (revisão Q6): a cabeça (minúscula) da regra cuja
+// expansão LIGOU o nome ao canal de classe - o `from` (ast-3) do próprio
+// nome, colhido no `_HB_CLASS` do stream e no nome da função-de-classe
+// gerada. NÃO é a regra raiz do site: `CREATE CLASS Conta` tem raiz
+// CREATE (açúcar sobre açúcar), mas quem declara é a regra CLASS - o
+// rótulo diz o que o dono É, não como a linha dele começa. Nome sem
+// derivação (canal escrito à mão) fica fora do mapa e o chamador cai para
+// "class", o nome do próprio canal da linguagem - nunca palpite
+STATIC FUNCTION OwnerVocabMap( hAsts )
+
+   LOCAL hMap := { => }, cPath, hAst, hTok, hFunc, lNext
+
+   FOR EACH cPath IN hb_HKeys( hAsts )
+      hAst := hAsts[ cPath ]
+      IF ! FromReady( hAst )
+         LOOP
+      ENDIF
+      // fonte 1: canal declared no stream (cobre dona SEM função geradora)
+      lNext := .F.
+      FOR EACH hTok IN hAst[ "tokens" ]
+         IF hTok[ "type" ] == 21
+            IF lNext
+               OwnerVocabAdd( hMap, hAst, hTok )
+            ENDIF
+            lNext := Upper( hTok[ "text" ] ) == "_HB_CLASS"
+         ELSE
+            lNext := .F.
+         ENDIF
+      NEXT
+      // fonte 2: função-de-classe gerada (cobre registro runtime puro,
+      // sem canal declared) - mesmo recorte do ClassFuncMap/ClassDeclApps
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. Empty( GenNameParts( hAst, hFunc ) ) .AND. ;
+            FuncDerived( hAst, hFunc )
+            FOR EACH hTok IN hAst[ "tokens" ]
+               IF hTok[ "type" ] == 21 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+                  Upper( hTok[ "text" ] ) == Upper( hFunc[ "name" ] ) .AND. ;
+                  hTok[ "line" ] == hFunc[ "line" ]
+                  OwnerVocabAdd( hMap, hAst, hTok )
+               ENDIF
+            NEXT
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN hMap
+
+STATIC PROCEDURE OwnerVocabAdd( hMap, hAst, hTok )
+
+   LOCAL hRule, cUp := Upper( hTok[ "text" ] )
+
+   IF ! hb_HHasKey( hMap, cUp ) .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+      ! Empty( hTok[ "from" ] )
+      hRule := hAst[ "ppRules" ][ hAst[ "ppApplications" ][ ;
+               hTok[ "from" ][ 1 ][ "app" ] + 1 ][ "rule" ] + 1 ]
+      IF hRule[ "head" ] != NIL
+         hMap[ cUp ] := Lower( hRule[ "head" ] )
+      ENDIF
+   ENDIF
+
+   RETURN
+
+STATIC FUNCTION OwnerWord( hOwnV, cOwn )
+   RETURN iif( hOwnV != NIL .AND. hb_HHasKey( hOwnV, Upper( cOwn ) ), ;
+               hOwnV[ Upper( cOwn ) ], "class" )
 
 // lifting genérico de definição: a função cujo NOME é artefato composto da
 // nome de marker. Devolve { método (grafia real), classe/co-derivação (grafia

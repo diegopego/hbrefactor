@@ -589,6 +589,20 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   `.ppo` e `.hrb -gh -l` de TODOS os módulos byte-idênticos, senão
   rollback. O `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de
   `-o`/cwd) — preservar um `.ppo` pré-existente do usuário.
+- **Vocabulário do DONO (revisão Q6)** (`OwnerVocabMap`/`OwnerWord`): o
+  rótulo de TIPO do dono (`cog declaration (rig TOTEM)`, `oficio
+  definition Talha (tenda Banca)`) usa a cabeça da regra cuja expansão
+  LIGOU o nome ao canal de classe — o `from` do próprio nome, colhido no
+  `_HB_CLASS` do stream (cobre dona declarativa pura, sem função) e no
+  nome da função-de-classe gerada (cobre registro runtime puro, sem canal
+  declared). NÃO é a regra raiz do site do dono: `CREATE CLASS X` tem
+  raiz `CREATE` (açúcar sobre açúcar) e quem declara é a regra `CLASS` —
+  o rótulo diz o que o dono É, não como a linha dele começa; hbclass
+  segue `(class ...)`. Dona sem derivação (canal escrito à mão) cai para
+  "class", o nome do próprio canal da linguagem — nunca palpite. Os
+  rótulos EPISTÊMICOS de send ("receiver class X via declared types")
+  ficam como estão: ali "class" é o conceito da linguagem
+  (`AS CLASS`/`_HB_CLASS`), não vocabulário do hbclass.
 - **Lifting generalizado** (`PpMarkerLift` + `SeedRootRule`, substitui
   `MethodLift`): `usages <nome>` responde no VOCABULÁRIO DO FONTE usando a
   CABEÇA DA REGRA RAIZ que consumiu o nome — `method definition` no

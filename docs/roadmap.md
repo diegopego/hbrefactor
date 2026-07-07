@@ -92,8 +92,15 @@ regra raiz via `PpMarkerLift`; DSL própria degrada para FUNÇÃO verificada
 com o fato relatado) + veneno novo morto: range com `QSelf()` extraído
 para função mudava comportamento EM SILÊNCIO (receptor não viaja) — nó
 `SELF` na árvore agora recusa limpo nomeando a exceção. Suíte 517/0.
-Restantes: Q5 (matar o regex da extensão: `resolve-at` por fato no CLI);
-Q6 (rótulo do dono no vocabulário da regra raiz).
+**Q6 ✅ FECHADA (2026-07-07, caso 72 atualizado + caso 80 novo)**: rótulo
+do DONO no vocabulário da DSL que o declarou (`cog declaration
+(rig TOTEM)`, `oficio definition Talha (tenda Banca)` — prova na DSL
+não-espelho). Semântica decidida por probe: a cabeça da regra cuja
+expansão LIGOU o nome ao canal de classe (o `from` do próprio nome), NÃO
+a regra raiz do site — `CREATE CLASS` tem raiz `create` e o hbclass segue
+`(class ...)` porque a regra `CLASS` é quem declara; dona sem derivação
+cai para "class" (o nome do canal da linguagem). Suíte 520/0.
+Restante: Q5 (matar o regex da extensão: `resolve-at` por fato no CLI).
 **Critério**: todas as Q fechadas com caso na suíte; régua do caso 64
 assertada; `make test` verde; ast-schema atualizado onde a resposta for
 teto honesto.
