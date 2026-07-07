@@ -342,9 +342,16 @@ STATIC FUNCTION Usages( aArgs )
    // resolução do dispatch da CLASSE CONSULTADA (B4f-2, sites de
    // declaração): a dona que Classe:Método alcança - decide os sites de
    // declaração/implementação homônimos; NIL = indecidível (classe fora
-   // do grafo, pai de fora antes de um hit - fato 9), nunca exclui
+   // do grafo, pai de fora antes de um hit - fato 9), nunca exclui.
+   // Q4 (revisao-generalidade): dono alcançado ATRAVÉS de vínculo escrito
+   // não decide - a leitura "identificador na linha da declaração = pai" é
+   // por FORMA e uma DSL qualquer põe ali argumento que não é pai (probe
+   // da revisão: o forjador viaja na linha por @ref); rebaixa a indecidível
    cOwnerQ := iif( Empty( cClass ) .OR. hGraph == NIL, NIL, ;
                    ResolveDispatch( cClass, cUpMeth, hGraph ) )
+   IF DispatchVia( cClass, cOwnerQ )
+      cOwnerQ := NIL
+   ENDIF
 
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -5488,11 +5495,20 @@ STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, lBlock, aNodes )
 // ---------------------------------------------------------------------------
 
 // grafo de classes do projeto: CLASSE => { "parents" => sequência de
-// { PAI, noProjeto? } na ordem textual (ClassParentsSeq), "members" =>
+// { NOME, noProjeto? } na ordem textual (ClassParentsSeq), "members" =>
 // mensagens PRÓPRIAS (união do registro por stringify e do canal declared
 // - fato 5) }. As entradas vêm de ClassFuncMap (funções derivadas de
 // expansão); entrada que não é classe fica com pais/membros vazios e
-// nunca decide nada
+// nunca decide nada.
+// Q4 (revisao-generalidade, 2026-07-07): "parents" são VÍNCULOS ESCRITOS
+// na linha da declaração - leitura por FORMA, não fato. No hbclass a
+// palavra depois do FROM é pai; numa DSL qualquer pode ser argumento
+// (probe da revisão, caso 75: a DSL passa um forjador por @ref na linha
+// da declaração - a MESMA forma do pai do hbclass). A linguagem não tem
+// canal de herança (fato 4: DECLARE não carrega superclasse) - portanto
+// resolução que ATRAVESSA um vínculo é indecidível para confirmar/excluir
+// (o consumidor gateia com DispatchVia); acerto PRÓPRIO segue decidindo
+// (regra do VM, independe de pais)
 STATIC FUNCTION ClassGraph( hAsts, hDecl )
 
    LOCAL hGraph := { => }, hClassMap := ClassFuncMap( hAsts )
@@ -5529,12 +5545,14 @@ STATIC FUNCTION ClassGraph( hAsts, hDecl )
    RETURN hGraph
 
 // a classe DONA da implementação que o dispatch de cMsg sobre cUpClass
-// alcança: própria > pais na ordem do FROM, em profundidade, primeiro hit
-// vence (fatos 1+7). Devolve "" quando a mensagem comprovadamente não
-// existe na cadeia visível do projeto, NIL quando indecidível - classe
-// fora do grafo ou pai FORA do projeto encontrado ANTES de um hit (fato
-// 9: hit do projeto antes do pai de fora É decidível). hSeen guarda
-// contra ciclo de declaração (impossível em runtime; conservador aqui)
+// alcança NO GRAFO COMO-ESCRITO: própria > vínculos na ordem escrita, em
+// profundidade, primeiro hit vence (fatos 1+7 - a regra do VM). Devolve
+// "" quando a mensagem não existe na cadeia escrita visível do projeto,
+// NIL quando indecidível - classe fora do grafo ou vínculo de FORA do
+// projeto encontrado ANTES de um hit. hSeen guarda contra ciclo.
+// Q4: dono != cUpClass significa que o alcance ATRAVESSOU vínculo
+// escrito (não-provado como pai) - o consumidor É OBRIGADO a gatear com
+// DispatchVia antes de confirmar/excluir; só o acerto próprio decide
 STATIC FUNCTION ResolveDispatch( cUpClass, cUpMsg, hGraph, hSeen )
 
    LOCAL hNode, aPar, xOwn
@@ -5567,6 +5585,16 @@ STATIC FUNCTION ResolveDispatch( cUpClass, cUpMsg, hGraph, hSeen )
    NEXT
 
    RETURN ""
+
+// o resultado de ResolveDispatch atravessou VÍNCULO ESCRITO? Acerto
+// PRÓPRIO devolve a própria classe (regra do VM - fato); dono DIFERENTE
+// só se alcança pelos "parents" do grafo, que são leitura POR FORMA da
+// linha da declaração (Q4 da revisão de generalidade: numa DSL qualquer o
+// identificador escrito ali pode ser argumento, não pai - provado no
+// probe da revisão, caso 75). Nenhum consumidor confirma/exclui sobre
+// resultado que atravessou vínculo - possible NOMEANDO o candidato
+STATIC FUNCTION DispatchVia( cUpClass, xOwn )
+   RETURN HB_ISSTRING( xOwn ) .AND. Len( xOwn ) > 0 .AND. !( xOwn == cUpClass )
 
 // a dona registrada de um site de declaração/implementação é CLASSE do
 // grafo do projeto com a mensagem PRÓPRIA (fato 5: stringify ∪ declared)?
@@ -5613,7 +5641,9 @@ STATIC FUNCTION DispatchHijackers( cRcls, cUpSym, cUpBase, cOwnerQ, hGraph )
 
    FOR EACH cD IN ClassDescendants( cRcls, hGraph )
       xOwn := ResolveDispatchMsg( cD, cUpSym, cUpBase, hGraph )
-      IF xOwn == NIL .OR. xOwn == cOwnerQ
+      // Q4: resolução do descendente que atravessa vínculo escrito é
+      // não-provada - também impede a exclusão (conservador)
+      IF xOwn == NIL .OR. xOwn == cOwnerQ .OR. DispatchVia( cD, xOwn )
          AAdd( aOut, cD )
       ENDIF
    NEXT
@@ -5669,6 +5699,20 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
       cOwnerR := ResolveDispatchMsg( cRcls, cUpSym, cUpMeth, hGraph )
       IF cOwnerQ != NIL .AND. cOwnerR != NIL .AND. ;
          Len( cOwnerQ ) > 0 .AND. Len( cOwnerR ) > 0
+         // Q4 (revisao-generalidade): alcance que ATRAVESSA vínculo
+         // escrito (leitura por forma da linha de declaração) não é fato
+         // de parentesco - nunca confirma nem exclui; camada possible
+         // NOMEANDO o candidato e o vínculo não-provado
+         IF DispatchVia( cRcls, cOwnerR )
+            RETURN { "possible send (receiver class " + cRcls + " may dispatch to " + ;
+                     cOwnerR + ":" + cUpMeth + " through written parents, unproven" + ;
+                     cSuf + ")", .F. }
+         ENDIF
+         IF DispatchVia( cClass, cOwnerQ )
+            RETURN { "possible send (" + cClass + ":" + cUpMeth + ;
+                     " resolves through written parents, unproven; receiver class " + ;
+                     cRcls + cSuf + ")", .F. }
+         ENDIF
          IF cOwnerR == cOwnerQ
             RETURN { "confirmed send (receiver class " + cRcls + " dispatches to " + ;
                      cOwnerQ + ":" + cUpMeth + cSuf + ")", .F. }

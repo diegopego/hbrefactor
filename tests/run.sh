@@ -1645,47 +1645,49 @@ PYEOF
 grep -q "^json ok$" "$D/pj.log"
 check "excluded (ambos os sabores) fora das Location[] do --json" $?
 
-echo "case 67: B4f-2 - herança simples: o dispatch alcança (ou não) o pai"
-# UWChild FROM UWMain sem override: send no filho CONFIRMA para UWMain:Paint
-# (dispatch resolvido, transitivo); UWOver sobrescreve: send excluído da
-# consulta do pai. Vale para receptor exato e para declarado (promessa sem
-# descendente que sequestre).
-grep -q "confirmed send (receiver class UWCHILD dispatches to UWMAIN:PAINT) in USA67  | oC:Paint()" "$D/pm.log"
-check "filho sem override: send confirmado para o pai (dispatch resolvido)" $?
+echo "case 67: B4f-2/Q4 - herança simples: alcance pelo vínculo escrito é POSSIBLE nomeado"
+# Q4 (revisao-generalidade): "FROM UWMain" na linha da declaração é leitura
+# por FORMA - numa DSL qualquer o identificador ali pode ser argumento, não
+# pai (probe arsenal: TEMPERA <forjador> por @ref, a MESMA forma). Alcance
+# que ATRAVESSA o vínculo nunca confirma nem exclui: possible NOMEANDO o
+# candidato. Acerto PRÓPRIO (override) segue decidindo - regra do VM.
+grep -q "possible send (receiver class UWCHILD may dispatch to UWMAIN:PAINT through written parents, unproven) in USA67  | oC:Paint()" "$D/pm.log"
+check "filho sem override: possible nomeando o alcance pelo vínculo escrito (Q4)" $?
 grep -q "excluded send (dispatches to UWOVER:PAINT) in USA67  | oO:Paint()" "$D/pm.log"
-check "filho com override: send excluído da consulta do pai" $?
-grep -q "confirmed send (receiver class UWCHILD dispatches to UWMAIN:PAINT) in USA67  | oD:Paint()" "$D/pm.log"
-check "receptor declarado do filho também resolve para o pai" $?
+check "filho com override: send excluído da consulta do pai (acerto próprio decide)" $?
+grep -q "possible send (receiver class UWCHILD may dispatch to UWMAIN:PAINT through written parents, unproven) in USA67  | oD:Paint()" "$D/pm.log"
+check "receptor declarado do filho: mesmo possible nomeado (vínculo não é fato)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp UWOver:Paint > po.log 2>&1 )
-grep -q "excluded send (dispatches to UWMAIN:PAINT) in USA67  | oC:Paint()" "$D/po.log" && \
+grep -q "possible send (receiver class UWCHILD may dispatch to UWMAIN:PAINT through written parents, unproven) in USA67  | oC:Paint()" "$D/po.log" && \
    grep -q "confirmed send (receiver class UWOVER via declared types) in USA67  | oO:Paint()" "$D/po.log"
-check "consulta do override: só o receptor do override confirma" $?
+check "consulta do override: só o receptor do override confirma; filho vira possible" $?
 
-echo "case 68: B4f-2 - herança múltipla: a ordem do FROM decide; descendente impede promessa"
-# HMBoth FROM HMAlpha, HMBeta: Paint sobre HMBoth resolve em HMAlpha (fatos
-# 1+7). E a EXISTÊNCIA de HMBoth impede o excluded-de-promessa do receptor
-# AS CLASS HMBeta na consulta de HMAlpha:Paint - o valor em runtime pode ser
-# um HMBoth (possible nomeando o descendente).
+echo "case 68: B4f-2/Q4 - herança múltipla: alcance pela ordem escrita é POSSIBLE nomeado"
+# Q4: a ordem escrita continua guiando o walk como-escrito (fatos 1+7 dão a
+# regra do VM SE os vínculos forem pais), mas o alcance que atravessa
+# vínculo é não-provado - possible nomeando o candidato do 1º vínculo. O
+# descendente-nomeado impede a promessa como antes (conservador nos dois
+# desenhos).
 ( cd "$D" && "$BIN" usages fixdis.hbp HMAlpha:Paint > ha.log 2>&1 )
-grep -q "confirmed send (receiver class HMBOTH dispatches to HMALPHA:PAINT) in USA68  | oB:Paint()" "$D/ha.log"
-check "ordem do FROM decide: HMBoth despacha para o 1º pai" $?
+grep -q "possible send (receiver class HMBOTH may dispatch to HMALPHA:PAINT through written parents, unproven) in USA68  | oB:Paint()" "$D/ha.log"
+check "ordem escrita guia o candidato nomeado; alcance vira possible (Q4)" $?
 grep -q "possible send (descendant HMBOTH of HMBETA may dispatch to HMALPHA:PAINT) in USA68  | oPb:Paint()" "$D/ha.log"
 check "descendente no projeto impede o excluded-de-promessa (nomeado)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp HMBeta:Paint > hb.log 2>&1 )
-grep -q "excluded send (dispatches to HMALPHA:PAINT) in USA68  | oB:Paint()" "$D/hb.log" && \
+grep -q "possible send (receiver class HMBOTH may dispatch to HMALPHA:PAINT through written parents, unproven) in USA68  | oB:Paint()" "$D/hb.log" && \
    grep -q "confirmed send (receiver declared AS CLASS HMBETA) in USA68  | oPb:Paint()" "$D/hb.log"
-check "consulta do 2º pai: instância exata de HMBoth excluída (1º pai vence)" $?
+check "consulta do 2º pai: instância de HMBoth vira possible nomeando o 1º vínculo" $?
 
-echo "case 69: B4f-2 - pai fora do projeto: indecidível é possible honesto (fato 9)"
-# OPFirst FROM TBrowse, OPBase: o pai de FORA vem antes de qualquer hit -
-# resolução indecidível, possible honesto (nunca excluded). OPLast FROM
-# OPBase, TBrowse: hit do projeto ANTES do pai de fora É decidível (primeiro
-# hit vence - o de fora nem é consultado).
+echo "case 69: B4f-2/Q4 - vínculo de fora do projeto: indecidível é possible honesto"
+# OPFirst: vínculo de FORA antes de qualquer hit - indecidível sem candidato
+# (possible genérico). OPLast: o walk como-escrito acha o hit no projeto
+# antes do vínculo de fora - Q4: o hit atravessou vínculo escrito, possible
+# NOMEANDO o candidato (antes confirmava; vínculo não é fato).
 ( cd "$D" && "$BIN" usages fixdis.hbp OPBase:Paint > ob.log 2>&1 )
 grep -q "possible send (receiver class OPFIRST, relation to OPBASE unknown) in USA69  | oF:Paint()" "$D/ob.log"
-check "pai de fora ANTES do hit: possible honesto, nunca excluded" $?
-grep -q "confirmed send (receiver class OPLAST dispatches to OPBASE:PAINT) in USA69  | oL:Paint()" "$D/ob.log"
-check "hit do projeto ANTES do pai de fora: decidível (fato 9)" $?
+check "vínculo de fora ANTES do hit: possible honesto, nunca excluded" $?
+grep -q "possible send (receiver class OPLAST may dispatch to OPBASE:PAINT through written parents, unproven) in USA69  | oL:Paint()" "$D/ob.log"
+check "hit no projeto pelo vínculo escrito: possible nomeando o candidato (Q4)" $?
 ! grep -q "excluded.*OPFIRST\|OPFIRST.*excluded" "$D/pm.log" "$D/ob.log"
 check "nenhuma consulta exclui send de receptor com cadeia indecidível" $?
 
@@ -1695,9 +1697,10 @@ echo "case 70: B4f-2 - homônimos de DECLARAÇÃO: protótipo/impl de outra clas
 # de strings (a string de registro da expansão, sem vínculo de classe). O
 # passe de declaração vincula cada site à dona (containment por índice na
 # função gerada - mesmos fatos da PpMarkerOwners, site a site) e decide com
-# o ResolveDispatch da CONSULTADA: dona == consultada -> declaração; alvo do
-# dispatch da consultada (herança, caso 67) -> confirmado; outra dona provada
-# no grafo -> excluded (fora das Location[]); indecidível -> possible.
+# o ResolveDispatch da CONSULTADA: dona == consultada -> declaração; outra
+# dona provada no grafo -> excluded (fora das Location[]); indecidível ->
+# possible. Q4: resolução da consultada que atravessa vínculo escrito é
+# rebaixada a indecidível (o "alvo do dispatch por herança" virou possible).
 D=$(freshdis case70)
 ( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json pm.json > pm.log 2>&1 )
 check "usages UWMain:Paint exit 0" $?
@@ -1721,9 +1724,9 @@ PYEOF
 grep -q "^json ok$" "$D/pj.log"
 check "Location[] só com os sites da consultada (o furo da extensão fecha)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp UWChild:Paint > ch.log 2>&1 )
-grep -q "d1.prg:23: method definition Paint (class UWMain, dispatch target of UWCHILD:PAINT)" "$D/ch.log" && \
-   grep -q "d1.prg:13: method declaration (class UWMAIN, dispatch target of UWCHILD:PAINT)" "$D/ch.log"
-check "consulta da herdeira confirma decl/impl do pai como alvo do dispatch" $?
+grep -q "d1.prg:23: possible method definition (registered under UWMAIN, relation to UWCHILD unknown)" "$D/ch.log" && \
+   grep -q "d1.prg:13: possible method declaration (registered under UWMAIN, relation to UWCHILD unknown)" "$D/ch.log"
+check "consulta da herdeira: decl/impl do pai vira possible (Q4 - vínculo não prova o alvo)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp OPFirst:Paint > of.log 2>&1 )
 ! grep -q "excluded" "$D/of.log"
 check "consultada com cadeia indecidível (fato 9) não exclui NENHUM site" $?
@@ -1869,6 +1872,33 @@ check "rename-function com o nome no CORPO da regra: recusa (exit != 0)" $([ $RC
 grep -q "rollback" "$D/rf.log" && grep -q "FUNCTION Dobro( n )" "$D/sf1.prg" && \
    grep -q "Dobro( <v> )" "$D/suga.ch"
 check "oráculo pegou (símbolos mudaram) e o rollback preservou fonte e regra" $?
+
+echo "case 75: Q4 (revisao-generalidade) - vínculo escrito NÃO é pai: sem confirmed/excluded falso"
+# O probe da revisão provou o veneno (2026-07-07): a DSL fixq4 põe o
+# FORJADOR na linha da declaração, passado por @ref - a MESMA forma do pai
+# do hbclass (nenhuma forma distingue; a linguagem não tem canal de
+# herança). Antes do conserto, t:Pintar() saía "confirmed ... dispatches
+# to LOUSA:PINTAR" - MENTIRA: a dona do forjador não é pai e em runtime o
+# send seria erro. Conserto (DispatchVia): alcance que atravessa vínculo
+# escrito nunca confirma/exclui - possible nomeando o candidato; acerto
+# PRÓPRIO segue decidindo (regra do VM).
+D="$HERE/tmp/case75"; rm -rf "$D"; mkdir -p "$D"
+cp "$HERE"/fixq4/* "$D"/
+( cd "$D" && "$HB_BIN/harbour" m1.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 && \
+  "$HB_BIN/harbour" m2.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+check "fixq4 (DSL com forjador na linha) clean under -w3 -es2" $?
+( cd "$D" && "$BIN" usages fixq4.hbp Lousa:Pintar > lp.log 2>&1 )
+check "usages Lousa:Pintar exit 0" $?
+grep -q "confirmed send (receiver class LOUSA via declared types) in USAARMAS  | l:Pintar()" "$D/lp.log"
+check "receptor da própria classe: confirmado (acerto próprio decide)" $?
+grep -q "possible send (receiver class TOTEM may dispatch to LOUSA:PINTAR through written parents, unproven) in USAARMAS  | t:Pintar()" "$D/lp.log"
+check "forjador na linha NÃO vira pai: possible nomeando o vínculo (era confirmed falso)" $?
+! grep -qE "(confirmed|excluded)[^|]*\| *(t:Pintar|f:Pintar)" "$D/lp.log"
+check "nenhum confirmed/excluded falso sobre os sends da classe forjada" $?
+grep -q "possible send (receiver class FACA, relation to LOUSA unknown) in USAARMAS  | f:Pintar()" "$D/lp.log"
+check "vínculo para função comum degrada honesto (nunca decide)" $?
+! grep -qiwE "arma|tempera|gume|endarma|afia|faca|lamina|pedrabase|afiapedra|armamake|arsenal" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixq4 (régua do caso 64)" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

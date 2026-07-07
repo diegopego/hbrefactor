@@ -67,11 +67,19 @@ cheque textual de continuação `;` em 2 pontos (falso positivo só recusa).
 ### R — Revisão de generalidade (A FRENTE PRIORITÁRIA)
 
 **Escopo e checklist**: [revisao-generalidade.md](revisao-generalidade.md).
-Q4 primeiro (pai falso no ClassGraph é o único candidato a resposta
-ERRADA); depois Q1-Q3/Q7 (prova adversarial dos comandos B4e em DSL
-inventada NÃO-espelho, ou conserto, ou recusa honesta); Q5 (matar o
-regex da extensão: `resolve-at` por fato no CLI) e Q6 (rótulo do dono no
-vocabulário da regra raiz).
+**Q4 ✅ FECHADA (2026-07-07, caso 75)**: o veneno do pai falso era real
+(probe fixq4: forjador por `@ref` na linha da declaração virava pai e
+`t:Pintar()` saía confirmed para um send que seria ERRO em runtime);
+conserto `DispatchVia` — vínculo escrito nunca confirma/exclui, acerto
+próprio decide; 7 asserts de herança flipam para possible nomeado
+(**mudança de contrato, aguarda portão do Diego**); suíte 474/0.
+Restantes: Q1-Q3/Q7 (prova adversarial dos comandos B4e em DSL inventada
+NÃO-espelho, ou conserto, ou recusa honesta); Q5 (matar o regex da
+extensão: `resolve-at` por fato no CLI); Q6 (rótulo do dono no
+vocabulário da regra raiz); **Q8 (ordem do Diego, 2026-07-07): auditar os
+commits do CORE do branch atrás de tratamento específico de classes**
+(evidência preliminar no doc: aponta transporte de canal da linguagem,
+não convenção — a auditoria confirma ou refuta commit a commit).
 **Critério**: todas as Q fechadas com caso na suíte; régua do caso 64
 assertada; `make test` verde; ast-schema atualizado onde a resposta for
 teto honesto.

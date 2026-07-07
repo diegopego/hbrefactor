@@ -336,27 +336,38 @@ portão.
 Sobre o tipo do receptor, o `usages Classe:Método` DECIDE o dispatch com a
 regra da LINGUAGEM (classes.c, provada em runtime pelos probes da spec):
 método PRÓPRIO vence herdado; em conflito entre pais vence o PRIMEIRO da
-cláusula `FROM`, em PROFUNDIDADE (o 1º pai leva junto tudo que herdou —
-flattening do `__clsNew`). Os FATOS vêm dos canais genéricos: pais na
-ordem TEXTUAL do FROM com flag dentro/fora do projeto (markers das
-aplicações declarantes — o interleaving importa: pai de FORA antes de um
-hit torna a resolução indecidível; hit do projeto antes do pai de fora é
-decidível); mensagens próprias = união do registro por stringify e do
-canal `declared`. Camadas resultantes:
+cláusula, em PROFUNDIDADE (flattening do `__clsNew`). Mensagens próprias =
+união do registro por stringify e do canal `declared`.
 
-- `confirmed send (receiver class X dispatches to C:M)` — dispatch
-  resolvido na implementação consultada (herança alcançada, transitiva);
-- `excluded send (dispatches to Y:M)` — receptor de classe EXATA (cadeia
-  declarada): a resolução é absoluta, o send alcança OUTRA implementação;
+**Q4 (revisão de generalidade, 2026-07-07 — caso 75): os "pais" do grafo
+são VÍNCULOS ESCRITOS, não fato.** Os identificadores posicionados na
+linha da declaração (markers das aplicações declarantes) são leitura por
+FORMA: no hbclass a palavra após o FROM é pai, mas numa DSL qualquer o
+mesmo lugar carrega argumento que NÃO é pai — provado com forjador passado
+por `@ref`, a MESMA forma do pai do hbclass. A linguagem NÃO tem canal de
+herança (o `DECLARE` não carrega superclasse — fato 4 da B4f-2), então o
+teto é da linguagem: **acerto PRÓPRIO decide (regra do VM, independe de
+pais); resolução que ATRAVESSA vínculo escrito é indecidível para
+confirmar/excluir** (`DispatchVia` gateia todo consumidor). Camadas:
+
+- `confirmed send (receiver class X via declared types / declared AS
+  CLASS X)` — receptor da PRÓPRIA classe consultada (sem resolução de
+  vínculos envolvida);
+- `excluded send (dispatches to Y:M)` — acerto PRÓPRIO de outra dona,
+  receptor de classe EXATA (cadeia declarada);
 - `excluded send within the project's class graph (dispatches to Y:M)` —
-  receptor DECLARADO (promessa: pode carregar descendente em runtime): a
-  exclusão vale no MUNDO FECHADO do grafo do projeto, sem descendente que
-  sequestre o dispatch — o rótulo carrega a ressalva;
+  idem com receptor DECLARADO (promessa): mundo fechado do grafo, sem
+  descendente que sequestre — o rótulo carrega a ressalva;
+- `possible send (receiver class X may dispatch to C:M through written
+  parents, unproven)` — o walk como-escrito alcança C:M ATRAVÉS de
+  vínculo(s); o candidato é nomeado, mas vínculo não é fato de parentesco
+  (antes do Q4 isto saía confirmed/excluded — era o único ponto do
+  sistema capaz de resposta ERRADA);
 - `possible send (descendant D of X may dispatch to C:M)` — descendente no
   projeto que sequestraria o dispatch impede a exclusão (nomeado);
-- indecidível (pai fora do projeto antes de um hit, classe desconhecida,
-  classes criadas/alteradas em runtime) — camadas B4f de sempre, nunca
-  excluded.
+- indecidível (vínculo de fora do projeto antes de um hit, classe
+  desconhecida, classes criadas/alteradas em runtime) — camadas B4f de
+  sempre, nunca excluded.
 
 Escopo (HIDDEN/PROTECTED) NÃO muda a resolução, só o acesso (probe);
 ACCESS/ASSIGN entram na mesma tabela de mensagens com a mesma regra
@@ -380,12 +391,12 @@ A implementação separada é o composto `DONA_MÉTODO` (co-derivação). O
 veredito consome a resolução da própria CONSULTADA:
 
 - dona == consultada → `declaration (class X)` (nas `Location[]`);
-- `ResolveDispatch( consultada ) == dona` → `... (class X, dispatch
-  target of C:M)` — herança: o site é o alvo que o dispatch alcança;
-- resolução da consultada decidível em OUTRA dona provada no grafo
-  (classe com a mensagem própria — fato 5) → `excluded ...
-  (declares/implements Y:M)`, fora das `Location[]`;
-- indecidível (fato 9) ou dona fora do grafo → `possible`, nunca excluded.
+- resolução da consultada decidível (acerto PRÓPRIO — Q4: resolução que
+  atravessa vínculo escrito é rebaixada a indecidível) em OUTRA dona
+  provada no grafo (fato 5) → `excluded ... (declares/implements Y:M)`,
+  fora das `Location[]`;
+- indecidível (fato 9, vínculo escrito no caminho) ou dona fora do grafo →
+  `possible (registered under X, relation to C unknown)`, nunca excluded.
 
 A string de registro respondida por esse passe NÃO repete na camada
 genérica de strings (ela É o artefato da declaração); strings escritas
