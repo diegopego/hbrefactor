@@ -405,8 +405,13 @@ STATIC FUNCTION Usages( aArgs )
             // honesta é "possible" (backlog 5) - nunca "uso" seco
             IF Upper( hItem[ "sym" ] ) == cUpMeth
                nHits++
-               LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cMethTok ), Len( cMethTok ) )
                hType := SendReceiverType( hFunc, hItem, hDecl )
+               // excluded é não-referência PROVADA: fica no relato (com o
+               // rótulo) mas fora das Location[] do --json - o editor
+               // (find all references via extensão) não deve listá-lo
+               IF !( hType != NIL .AND. hb_HHasKey( hType, "val" ) )
+                  LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cMethTok ), Len( cMethTok ) )
+               ENDIF
                DO CASE
                CASE hType == NIL
                   cVerdict := "possible send (dynamic dispatch, receiver unknown" + ;

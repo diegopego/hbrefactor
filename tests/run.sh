@@ -1476,6 +1476,18 @@ grep -q "confirmed send (receiver class CAIXA via declared types) in CENARIOS  |
 check "DECLARE escrito à mão classifica o funcall (canal sem DSL)" $?
 grep -q "confirmed send (receiver class CAIXA via declared types) in USA  | x:Soma( 6 )" "$D/cs.log"
 check "cross-módulo: declared de r1 classifica send em r2" $?
+# --json (o que a extensão VSCode consome no find-references): excluded é
+# não-referência PROVADA e NÃO pode virar Location; confirmed/possible sim
+( cd "$D" && "$BIN" usages fixrcv.hbp Caixa:Soma --json locs.json > /dev/null 2>&1 )
+python3 - "$D/locs.json" <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+r1 = [l['range']['start']['line'] for l in locs if l['uri'].endswith('r1.prg')]
+assert 38 in r1, 'confirmed g:Soma fora do json'   # r1.prg:39 (0-based 38)
+assert 43 in r1, 'possible r:Soma fora do json'    # r1.prg:44
+assert 39 not in r1, 'excluded a:Soma vazou para o json'  # r1.prg:40
+PYEOF
+check "--json: excluded fora das Locations, confirmed/possible dentro" $?
 
 echo "case 63: B4f - honestidade preservada: sem declaração, camada possible"
 # classe SEM ctor declarado: Semctor():New() não tem retorno no canal ->
