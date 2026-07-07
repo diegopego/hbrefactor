@@ -845,6 +845,19 @@ corrompe nem falha de forma confusa.
 > Super + classe em include + pai core); casos 59 (pleno, execução
 > idêntica) e 60 (recusas + aviso). **Fase B4e completa.**
 
+> **Decisão registrada (Diego, 2026-07-06) — a ÚNICA exceção de biblioteca
+> na ferramenta é a SÍNTESE do extract-function-para-método** (o texto
+> `METHOD <nome>(...) CLASS <classe>` + protótipo, hard-coded). Motivo
+> aceito: síntese é por-DSL por natureza — o pp não roda ao contrário; dos
+> fatos de expansão dá para LER qualquer DSL, não para deduzir como
+> ESCREVER um comando novo de DSL desconhecido. Toda a ANÁLISE permanece
+> genérica (guarda automatizada: caso 64 falha se ferramenta/core
+> mencionarem palavra de DSL). Opções avaliadas: manter (escolhida),
+> método-só-com-flag `--as-method` (recusaria toda seleção com Self sem a
+> flag), remover síntese (extract quase inútil em classes). Rede de
+> segurança em qualquer caso: recompile-verify + rollback — DSL estranho
+> gera recusa honesta, nunca edição errada.
+
 ### Fase B4f — classe do receptor de send (backlog 5) ✅ (2026-07-06)
 
 **Spec executável**: [spec-b4f-receiver-type.md](spec-b4f-receiver-type.md)

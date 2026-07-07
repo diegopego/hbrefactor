@@ -36,18 +36,23 @@ como codificar o que `::` significa: dentro do princípio da B4f.
 | 5 | Posse de método por classe: já temos por DUAS vias — `declared.classes` (ast-4) e o registro/rastro (`GenNameParts`/`MethodImplOf`, funções `<CLASSE>_<MÉTODO>`). | B4d/B4f entregues |
 | 6 | Cadeia de ctor (`X():New()` com `RETURN Self`) produz instância EXATA de X — para esses receptores a resolução de dispatch é decidível sem ressalva de subclasse. Receptor `AS CLASS` é PROMESSA: pode carregar DESCENDENTE em runtime. | hbclass.ch (oInstance := oClass:Instance()); semântica provada na B4f |
 
-## Fatos a sondar ANTES do volume (executor)
+## Fatos a sondar ANTES do volume (executor) — SONDADOS 2026-07-06
 
-- **Ordem transitiva da resolução**: conflito avô × segundo pai
-  (`C FROM A, B` onde só o pai de A tem o método, e B também tem) —
-  estender o probe mi.prg (diamante incluso). A regra do fato 1 cobre o
-  caso direto; a transitiva precisa de prova própria.
-- `ClassParentsOf` preserva a ORDEM textual dos pais? (a resolução
-  depende dela — fato 1). Sondar com `FROM B, A` e conferir `aIn`.
-- ACCESS/ASSIGN (`_Nome`) e HIDDEN/PROTECTED no dispatch: escopo muda a
-  resolução? (provavelmente não para o find-references; registrar).
-- Classe de pai FORA do projeto no meio da cadeia: a resolução é
-  indecidível a partir dali — camada honesta (fato 3 já nomeia o pai).
+Probes executados (scratchpad/probes: mi2.prg, scopes.prg, parfix.prg +
+harness probe-parents sobre a ClassParentsOf REAL; todos compilados
+-w3 -es2 e rodados via hbmk2 com HB_BIN do fork):
+
+| # | Fato provado | Evidência |
+|---|--------------|-----------|
+| 7 | **Resolução transitiva é em PROFUNDIDADE na ordem do FROM**: o 1º pai leva junto TUDO que herdou (flattening, fato 2) — método do avô/bisavô do 1º pai vence método PRÓPRIO do 2º pai. `C FROM AFromGA, BOwn` → Ping de GA (não de B); bisavô idem (EGG); diamante `D FROM DiaL, DiaR` com override nos 2 braços → L. Algoritmo: resolve(C,msg) = próprio, senão resolve(pai) na ordem do FROM, recursivo, primeiro hit vence. | mi2.prg T1/T1r/T2/T3/T4, executado |
+| 8 | **`ClassParentsOf` preserva a ordem TEXTUAL do FROM** em `aIn` (não alfabética, não ordem de declaração — `FROM KGamma, ZAlpha, MBeta` discrimina as três) e em `aOut`. | probe-parents sobre parfix.prg (KIDBA/KIDAB/KIDTRI), executado |
+| 9 | **PORÉM o par `{aIn, aOut}` perde o INTERLEAVING**: `KidMix FROM TBrowse, MBeta` → `aIn={MBETA}, aOut={TBROWSE}` — a posição do pai de fora RELATIVA aos do projeto não é recuperável. A resolução precisa dela: pai-de-fora ANTES do pai que teria o método → indecidível; DEPOIS de um hit do projeto → decidível (fato 7: primeiro hit vence, o de fora nem é consultado). O ClassGraph precisa da lista ORDENADA com flag in/out (mesmo walk de tokens, ferramenta apenas). | probe-parents sobre parfix.prg (KIDMIX), executado |
+| 10 | **Escopo NÃO muda a resolução, só o acesso**: HIDDEN/PROTECTED no 1º pai continuam vencendo o exported homônimo do 2º — chamada de fora dá `Scope violation` (não cai no 2º pai); de dentro resolve no 1º. Para o find-references, resolução ignora escopo. | scopes.prg S3/S4, executado |
+| 11 | **ACCESS/ASSIGN entram na MESMA tabela de mensagens com a MESMA regra**: ACCESS do 1º pai vence METHOD do 2º (com e sem parênteses); ASSIGN registra a mensagem `_NOME` (`__objHasMsg(o,"_PING")` = .T.). | scopes.prg S1/S2, executado |
+
+- Classe de pai FORA do projeto no meio da cadeia: indecidível a partir
+  dali SALVO hit do projeto ANTES dele na ordem (fato 9) — camada honesta
+  (fato 3 já nomeia o pai).
 
 ## Desenho proposto (para o portão do Diego)
 
@@ -55,12 +60,16 @@ Tudo na FERRAMENTA — nenhuma mudança de core/schema (os fatos já estão no
 ast-4 + rastro):
 
 1. **Grafo de classes do projeto**: agregado por módulo — classe →
-   { pais na ordem (ClassParentsOf), métodos próprios (declared/registro),
-   pais fora do projeto }. Função nova `ClassGraph( hAsts, hDecl )`.
+   { pais na ordem TEXTUAL do FROM com flag in/out-projeto (fatos 8-9:
+   mesma extração da ClassParentsOf, guardando o interleaving), métodos
+   próprios (declared/registro) }. Função nova `ClassGraph( hAsts, hDecl )`.
 2. **`ResolveDispatch( cClasse, cMsg, hGraph )`** → a CLASSE dona da
-   implementação que o dispatch alcança, pela regra do fato 1 (próprio >
-   pais na ordem, transitivo conforme probe), ou NIL quando a cadeia
-   atravessa pai fora do projeto/desconhecido (indecidível → honesto).
+   implementação que o dispatch alcança, pela regra dos fatos 1+7
+   (próprio > pais na ordem do FROM, em PROFUNDIDADE, primeiro hit
+   vence), ou NIL quando a busca ENCONTRA pai fora do projeto/desconhecido
+   antes de um hit (fato 9: indecidível → honesto; hit do projeto antes
+   do pai de fora É decidível). Escopo não participa (fato 10); ACCESS/
+   ASSIGN participam como mensagens normais, ASSIGN = `_NOME` (fato 11).
 3. **Camadas novas no `usages Classe:Método`** (e no --json):
    - receptor de classe EXATA (cadeia de ctor): `ResolveDispatch` ≠
      classe consultada → **`excluded (dispatches to UWSECONDARY:PAINT)`**
@@ -106,6 +115,12 @@ Apresentar ao Diego ANTES do volume: resultados dos probes pendentes
 (ordem transitiva, ordem em ClassParentsOf) + confirmação das camadas e
 rótulos acima — em particular a semântica do "excluded within the
 project's class graph" para receptor declarado (promessa × mundo fechado).
+
+**Portão apresentado em 2026-07-06 (probes 7-11 acima). Decisões do
+Diego:** rótulo "excluded within the project's class graph" fora do
+--json CONFIRMADO como na spec; ClassGraph com lista de pais ORDENADA e
+flag in/out-projeto (fato 9) APROVADO; **volume AINDA NÃO autorizado** —
+não iniciar ClassGraph/ResolveDispatch/casos 66-69 sem novo ok.
 
 ## Regras operacionais
 
