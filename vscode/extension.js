@@ -125,15 +125,39 @@ async function projCtx() {
   return { spec, cwd: path.dirname(spec) };
 }
 
+// find-references de MÉTODO: com o cursor na implementação
+// (METHOD ... CLASS X) ou no protótipo dentro do bloco CLASS/ENDCLASS, a
+// consulta vira Classe:Método - a forma onde o CLI decide o dispatch
+// (B4f-2: sends de OUTRA classe saem do resultado). Consulta crua não tem
+// classe consultada e lista todos os sends da mensagem, por construção.
+// Heurística de argumento como as demais: se errar, o CLI recusa/valida
+function methodQuery(document, line, word) {
+  const impl = new RegExp('^\\s*method\\s+' + word + '\\b.*\\bclass\\s+([A-Za-z_]\\w*)', 'i');
+  let m = impl.exec(document.lineAt(line).text);
+  if (m) return m[1] + ':' + word;
+  const proto = new RegExp('^\\s*(?:method|access|assign)\\s+' + word + '\\b', 'i');
+  if (!proto.test(document.lineAt(line).text)) return null;
+  const reCreate = /^\s*(?:create\s+)?class\s+([A-Za-z_]\w*)/i;
+  const reStop = /^\s*(?:endclass\b|end\s+class\b|(?:static\s+)?(?:function|procedure)\s|method\s+\w+.*\bclass\s)/i;
+  for (let i = line - 1; i >= 0; i--) {
+    const t = document.lineAt(i).text;
+    m = reCreate.exec(t);
+    if (m) return m[1] + ':' + word;
+    if (reStop.test(t)) return null;
+  }
+  return null;
+}
+
 async function cmdUsages() {
   const c = await ctx();
   if (!c) return;
   const word = wordAt(c.editor);
   if (!word) return;
+  const query = methodQuery(c.editor.document, c.editor.selection.active.line, word) || word;
   await c.editor.document.save();
   const json = tmpJson();
-  const res = await run(['usages', c.spec, word, '--json', json], c.cwd);
-  report('usages ' + word, res);
+  const res = await run(['usages', c.spec, query, '--json', json], c.cwd);
+  report('usages ' + query, res);
   try {
     const locs = JSON.parse(fs.readFileSync(json, 'utf8')).map(l => new vscode.Location(
       vscode.Uri.parse(l.uri),

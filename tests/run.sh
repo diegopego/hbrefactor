@@ -1674,6 +1674,15 @@ check "hit do projeto ANTES do pai de fora: decidível (fato 9)" $?
 ! grep -q "excluded.*OPFIRST\|OPFIRST.*excluded" "$D/pm.log" "$D/ob.log"
 check "nenhuma consulta exclui send de receptor com cadeia indecidível" $?
 
+echo "case 71: extensão VSCode - lifting de método no find-references (methodQuery real)"
+# a extensão promove a palavra sob o cursor a Classe:Método quando o cursor
+# está na implementação (METHOD x ... CLASS Y) ou num protótipo do bloco
+# CLASS/ENDCLASS - a forma onde o CLI decide o dispatch. O harness extrai a
+# methodQuery REAL do extension.js (não uma cópia) e a exercita contra
+# fixtures da suíte + sintéticos (13 checks, inclusive os negativos).
+node "$HERE/../vscode/test-methodquery.js" > /dev/null 2>&1
+check "methodQuery: 13/13 contra fixtures reais e sintéticos" $?
+
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

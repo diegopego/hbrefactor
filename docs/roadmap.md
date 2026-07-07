@@ -970,9 +970,23 @@ não lista não-referência provada (repro do Diego: `a := ""` ;
 > invocação da extensão (rename-dsl round-trip byte-exato; usages
 > devolvendo os 3 sites com URI limpo).
 
+> **Fatia B4f-2 entregue (2026-07-07): lifting de método no `usages`**
+> (extension.js v0.5.0): com o cursor na IMPLEMENTAÇÃO
+> (`METHOD x ... CLASS Y`) ou no protótipo dentro do bloco
+> CLASS/ENDCLASS (METHOD/ACCESS/ASSIGN, `CREATE CLASS` ou `CLASS`), o
+> find-references consulta `Classe:Método` — a forma onde o CLI decide o
+> dispatch (excluded fora das Location[]). Fora desses sites a consulta
+> segue crua (send site não presume a classe; heurística de argumento
+> como as demais — se errar, o CLI valida). Verificada com a
+> `methodQuery` REAL extraída do extension.js contra os fixtures
+> (13 checks: homônimos d1, CONSTRUCTOR, INLINE, ACCESS/ASSIGN,
+> CLASS sem CREATE, negativos) + invocação fim-a-fim como a extensão
+> (spec + `--json`; Location[] sem excluded). O harness entrou no
+> contrato da suíte como caso 71 (autorização do Diego, 2026-07-07).
+
 **Escopo restante**: revisar as saídas dos demais comandos ao novo CLI
-(lifting método/classe no `usages`, `--show-expansion` como opção);
-preview `--dry-run --json` se a fricção pedir.
+(`--show-expansion` como opção); preview `--dry-run --json` se a
+fricção pedir.
 **Critério**: Diego usa no dia a dia; sem regressão nos fluxos atuais.
 
 ### Fase B6 — PR upstream (bloqueada: só quando o Diego mandar)
