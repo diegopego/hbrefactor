@@ -279,7 +279,7 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL cSpec, cName, cFuncFilter := "", cJsonOut := "", lShowExp := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
-   LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hType, cVerdict
+   LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd
 
    IF Len( aArgs ) < 3
       Usage()
@@ -334,6 +334,9 @@ STATIC FUNCTION Usages( aArgs )
       hAsts[ cPath ] := hAst
    NEXT
    hDecl := DeclTables( hAsts )
+   // grafo de classes do projeto (B4f-2): consumido pela resolução de
+   // dispatch dos sends; NIL degrada para as camadas B4f
+   hGraph := iif( hDecl == NIL, NIL, ClassGraph( hAsts, hDecl ) )
 
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -401,38 +404,20 @@ STATIC FUNCTION Usages( aArgs )
          FOR EACH hItem IN hFunc[ "sends" ]
             // send é despacho dinâmico; a classificação vem SÓ do canal de
             // tipos da linguagem (ast-4): tipo declarado do receptor,
-            // propagado pela árvore (TypeOf). Sem fato do canal, a camada
-            // honesta é "possible" (backlog 5) - nunca "uso" seco
+            // propagado pela árvore (TypeOf), e da resolução de dispatch
+            // pela regra da linguagem sobre o grafo do projeto (B4f-2).
+            // Sem fato, a camada honesta é "possible" - nunca "uso" seco
             IF Upper( hItem[ "sym" ] ) == cUpMeth
                nHits++
-               hType := SendReceiverType( hFunc, hItem, hDecl )
+               aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl ), ;
+                                     cClass, cUpMeth, hGraph, hItem[ "block" ] )
                // excluded é não-referência PROVADA: fica no relato (com o
                // rótulo) mas fora das Location[] do --json - o editor
                // (find all references via extensão) não deve listá-lo
-               IF !( hType != NIL .AND. hb_HHasKey( hType, "val" ) )
+               IF ! aVerd[ 2 ]
                   LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cMethTok ), Len( cMethTok ) )
                ENDIF
-               DO CASE
-               CASE hType == NIL
-                  cVerdict := "possible send (dynamic dispatch, receiver unknown" + ;
-                              iif( hItem[ "block" ], ", codeblock", "" ) + ")"
-               CASE hb_HHasKey( hType, "val" )
-                  cVerdict := "excluded send (receiver holds a value of kind " + ;
-                              hType[ "val" ] + iif( hItem[ "block" ], ", codeblock", "" ) + ")"
-               CASE Empty( cClass ) .OR. hType[ "cls" ] == cClass
-                  cVerdict := "confirmed send (receiver " + ;
-                              iif( hType[ "how" ] == "declared", ;
-                                   "declared AS CLASS " + hType[ "cls" ], ;
-                                   "class " + hType[ "cls" ] + " via declared types" ) + ;
-                              iif( hItem[ "block" ], ", codeblock", "" ) + ")"
-               OTHERWISE
-                  // classe conhecida != consultada NÃO exclui: promessa não
-                  // verificada + herança (múltipla) fora do módulo
-                  cVerdict := "possible send (receiver class " + hType[ "cls" ] + ;
-                              ", relation to " + cClass + " unknown" + ;
-                              iif( hItem[ "block" ], ", codeblock", "" ) + ")"
-               ENDCASE
-               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cVerdict + ;
+               OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + aVerd[ 1 ] + ;
                   " in " + hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
             ENDIF
          NEXT
@@ -2666,19 +2651,21 @@ STATIC PROCEDURE DeclAppWalk( hAst, hTok, hApps )
 
    RETURN
 
-// pais da classe: os OUTROS identificadores POSICIONADOS (escritos pelo
-// usuário: FROM <pai>) nas aplicações declarantes, NA LINHA da declaração
-// da classe (= linha da função da classe; o fecho de derivação arrasta apps
-// de protótipo de método, cujos markers ficam em OUTRAS linhas - o pai de
+// pais da classe NA ORDEM TEXTUAL da cláusula (fatos 8-9 da B4f-2 - a
+// resolução de dispatch depende da ordem E do interleaving projeto×fora):
+// os OUTROS identificadores POSICIONADOS (escritos pelo usuário:
+// FROM <pai>) nas aplicações declarantes, NA LINHA da declaração da classe
+// (= linha da função da classe; o fecho de derivação arrasta apps de
+// protótipo de método, cujos markers ficam em OUTRAS linhas - o pai de
 // verdade está escrito na própria linha do CREATE CLASS). Palavra de regra
 // tem marker 0 e token sintetizado não tem posição - ficam de fora.
-// Devolve { noProjeto[], foraDoProjeto[] }; declaração CONTINUADA por ';'
-// deixa o pai em outra linha física - fica de fora dos dois (não-detecção
+// Devolve { { PAI, noProjeto? }, ... }; declaração CONTINUADA por ';'
+// deixa o pai em outra linha física - fica de fora (não-detecção
 // conservadora, nunca palpite)
-STATIC FUNCTION ClassParentsOf( hAst, cUpClass, hClassFunc, hClassMap )
+STATIC FUNCTION ClassParentsSeq( hAst, cUpClass, hClassFunc, hClassMap )
 
    LOCAL hApps := ClassDeclApps( hAst, hClassFunc )
-   LOCAL aIn := {}, aOut := {}, hSeen := { => }
+   LOCAL aSeq := {}, hSeen := { => }
    LOCAL nApp, hApp, hTok, cUp
 
    FOR EACH nApp IN hb_HKeys( hApps )
@@ -2695,13 +2682,25 @@ STATIC FUNCTION ClassParentsOf( hAst, cUpClass, hClassFunc, hClassMap )
                // referencia), a palavra da cláusula o pp consome - só é
                // candidato quem existe no stream
                IF hb_HHasKey( hClassMap, cUp )
-                  AAdd( aIn, cUp )
+                  AAdd( aSeq, { cUp, .T. } )
                ELSEIF StreamHasIdent( hAst, cUp )
-                  AAdd( aOut, cUp )
+                  AAdd( aSeq, { cUp, .F. } )
                ENDIF
             ENDIF
          ENDIF
       NEXT
+   NEXT
+
+   RETURN aSeq
+
+// visão { noProjeto[], foraDoProjeto[] } da sequência (consumidores que
+// não dependem do interleaving - membros herdados do extract-function)
+STATIC FUNCTION ClassParentsOf( hAst, cUpClass, hClassFunc, hClassMap )
+
+   LOCAL aIn := {}, aOut := {}, aPar
+
+   FOR EACH aPar IN ClassParentsSeq( hAst, cUpClass, hClassFunc, hClassMap )
+      AAdd( iif( aPar[ 2 ], aIn, aOut ), aPar[ 1 ] )
    NEXT
 
    RETURN { aIn, aOut }
@@ -5334,6 +5333,183 @@ STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, lBlock, aNodes )
    NEXT
 
    RETURN
+
+// ---------------------------------------------------------------------------
+// B4f-2 - resolução de dispatch (spec-b4f2-dispatch.md). A REGRA é da
+// LINGUAGEM (classes.c, provada em runtime pelos probes - fatos 1+7):
+// método PRÓPRIO vence herdado; em conflito entre pais vence o PRIMEIRO da
+// cláusula, em PROFUNDIDADE (o 1º pai leva junto tudo que herdou, pelo
+// flattening do __clsNew). Os FATOS (pais na ordem, mensagens próprias)
+// vêm dos canais genéricos - rastro de expansão e declared do ast-4 -
+// nenhuma convenção de biblioteca (caso 64 vigia)
+// ---------------------------------------------------------------------------
+
+// grafo de classes do projeto: CLASSE => { "parents" => sequência de
+// { PAI, noProjeto? } na ordem textual (ClassParentsSeq), "members" =>
+// mensagens PRÓPRIAS (união do registro por stringify e do canal declared
+// - fato 5) }. As entradas vêm de ClassFuncMap (funções derivadas de
+// expansão); entrada que não é classe fica com pais/membros vazios e
+// nunca decide nada
+STATIC FUNCTION ClassGraph( hAsts, hDecl )
+
+   LOCAL hGraph := { => }, hClassMap := ClassFuncMap( hAsts )
+   LOCAL cUp, aCF, hMembers, cM
+
+   FOR EACH cUp IN hb_HKeys( hClassMap )
+      aCF := hClassMap[ cUp ]
+      hMembers := ClassMembersOf( aCF[ 2 ], aCF[ 3 ] )
+      IF hb_HHasKey( hDecl[ "c" ], cUp )
+         FOR EACH cM IN hb_HKeys( hDecl[ "c" ][ cUp ] )
+            hMembers[ cM ] := .T.
+         NEXT
+      ENDIF
+      hGraph[ cUp ] := { "parents" => ClassParentsSeq( aCF[ 2 ], cUp, aCF[ 3 ], hClassMap ), ;
+                         "members" => hMembers }
+   NEXT
+
+   RETURN hGraph
+
+// a classe DONA da implementação que o dispatch de cMsg sobre cUpClass
+// alcança: própria > pais na ordem do FROM, em profundidade, primeiro hit
+// vence (fatos 1+7). Devolve "" quando a mensagem comprovadamente não
+// existe na cadeia visível do projeto, NIL quando indecidível - classe
+// fora do grafo ou pai FORA do projeto encontrado ANTES de um hit (fato
+// 9: hit do projeto antes do pai de fora É decidível). hSeen guarda
+// contra ciclo de declaração (impossível em runtime; conservador aqui)
+STATIC FUNCTION ResolveDispatch( cUpClass, cUpMsg, hGraph, hSeen )
+
+   LOCAL hNode, aPar, xOwn
+
+   IF ! hb_HHasKey( hGraph, cUpClass )
+      RETURN NIL
+   ENDIF
+   IF hSeen == NIL
+      hSeen := { => }
+   ENDIF
+   IF hb_HHasKey( hSeen, cUpClass )
+      RETURN ""
+   ENDIF
+   hSeen[ cUpClass ] := .T.
+   hNode := hGraph[ cUpClass ]
+   IF hb_HHasKey( hNode[ "members" ], cUpMsg )
+      RETURN cUpClass
+   ENDIF
+   FOR EACH aPar IN hNode[ "parents" ]
+      IF ! aPar[ 2 ]
+         RETURN NIL
+      ENDIF
+      xOwn := ResolveDispatch( aPar[ 1 ], cUpMsg, hGraph, hSeen )
+      IF xOwn == NIL
+         RETURN NIL
+      ENDIF
+      IF Len( xOwn ) > 0
+         RETURN xOwn
+      ENDIF
+   NEXT
+
+   RETURN ""
+
+// descendentes TRANSITIVOS de uma classe no grafo, por arestas DO PROJETO
+// (descendência que atravessa pai de fora é invisível - limite honesto,
+// coberto pela indecidibilidade do próprio ResolveDispatch nesses ramos)
+STATIC FUNCTION ClassDescendants( cUpClass, hGraph )
+
+   LOCAL aOut := {}, hSeen := { cUpClass => .T. }, aQueue := { cUpClass }
+   LOCAL cCur, cK, aPar
+
+   DO WHILE ! Empty( aQueue )
+      cCur := ATail( aQueue )
+      ASize( aQueue, Len( aQueue ) - 1 )
+      FOR EACH cK IN hb_HKeys( hGraph )
+         IF ! hb_HHasKey( hSeen, cK )
+            FOR EACH aPar IN hGraph[ cK ][ "parents" ]
+               IF aPar[ 2 ] .AND. aPar[ 1 ] == cCur
+                  hSeen[ cK ] := .T.
+                  AAdd( aOut, cK )
+                  AAdd( aQueue, cK )
+                  EXIT
+               ENDIF
+            NEXT
+         ENDIF
+      NEXT
+   ENDDO
+
+   RETURN aOut
+
+// descendentes do receptor que SEQUESTRARIAM o dispatch para a
+// implementação consultada (ou cuja resolução é indecidível - também
+// impede exclusão): receptor DECLARADO é promessa e pode carregar
+// qualquer um deles em runtime
+STATIC FUNCTION DispatchHijackers( cRcls, cUpMsg, cOwnerQ, hGraph )
+
+   LOCAL aOut := {}, cD, xOwn
+
+   FOR EACH cD IN ClassDescendants( cRcls, hGraph )
+      xOwn := ResolveDispatch( cD, cUpMsg, hGraph )
+      IF xOwn == NIL .OR. xOwn == cOwnerQ
+         AAdd( aOut, cD )
+      ENDIF
+   NEXT
+
+   RETURN aOut
+
+// veredito em camadas de um send para a consulta [Classe:]Método. Camadas
+// B4f (canal de tipos) decididas ALÉM quando a B4f-2 resolve: receptor de
+// classe conhecida DIFERENTE da consultada, com a implementação consultada
+// E o dispatch do receptor resolvíveis no grafo => mesmo dono = confirmed;
+// dono diferente com receptor de classe EXATA (cadeia declarada) =
+// excluded; com receptor DECLARADO (promessa - pode carregar descendente
+// em runtime) a exclusão só vale no MUNDO FECHADO do grafo do projeto
+// (rótulo carrega a ressalva) e um descendente que sequestre o dispatch a
+// impede (possible nomeando-o). Indecidível => camadas B4f de sempre.
+// Devolve { rótulo, fora-do-json? } - excluded fica fora das Location[]
+STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, hGraph, lBlock )
+
+   LOCAL cSuf := iif( lBlock, ", codeblock", "" )
+   LOCAL cRcls, cOwnerQ, cOwnerR, aHij
+
+   IF hType == NIL
+      RETURN { "possible send (dynamic dispatch, receiver unknown" + cSuf + ")", .F. }
+   ENDIF
+   IF hb_HHasKey( hType, "val" )
+      RETURN { "excluded send (receiver holds a value of kind " + ;
+               hType[ "val" ] + cSuf + ")", .T. }
+   ENDIF
+   cRcls := hType[ "cls" ]
+   IF Empty( cClass ) .OR. cRcls == cClass
+      RETURN { "confirmed send (receiver " + ;
+               iif( hType[ "how" ] == "declared", "declared AS CLASS " + cRcls, ;
+                    "class " + cRcls + " via declared types" ) + cSuf + ")", .F. }
+   ENDIF
+   IF hGraph != NIL
+      cOwnerQ := ResolveDispatch( cClass, cUpMeth, hGraph )
+      cOwnerR := ResolveDispatch( cRcls, cUpMeth, hGraph )
+      IF cOwnerQ != NIL .AND. cOwnerR != NIL .AND. ;
+         Len( cOwnerQ ) > 0 .AND. Len( cOwnerR ) > 0
+         IF cOwnerR == cOwnerQ
+            RETURN { "confirmed send (receiver class " + cRcls + " dispatches to " + ;
+                     cOwnerQ + ":" + cUpMeth + cSuf + ")", .F. }
+         ENDIF
+         IF !( hType[ "how" ] == "declared" )
+            // instância EXATA (cadeia declarada): a resolução é absoluta
+            RETURN { "excluded send (dispatches to " + cOwnerR + ":" + cUpMeth + ;
+                     cSuf + ")", .T. }
+         ENDIF
+         aHij := DispatchHijackers( cRcls, cUpMeth, cOwnerQ, hGraph )
+         IF Empty( aHij )
+            RETURN { "excluded send within the project's class graph (dispatches to " + ;
+                     cOwnerR + ":" + cUpMeth + cSuf + ")", .T. }
+         ENDIF
+         RETURN { "possible send (descendant " + aHij[ 1 ] + " of " + cRcls + ;
+                  " may dispatch to " + cOwnerQ + ":" + cUpMeth + cSuf + ")", .F. }
+      ENDIF
+   ENDIF
+
+   // classe conhecida != consultada sem resolução NÃO exclui: promessa
+   // não verificada + cadeia indecidível (pai fora do projeto, classe
+   // desconhecida, runtime)
+   RETURN { "possible send (receiver class " + cRcls + ", relation to " + cClass + ;
+            " unknown" + cSuf + ")", .F. }
 
 STATIC FUNCTION PairKey( nApp, nMarker )
    RETURN hb_ntos( nApp ) + "|" + hb_ntos( nMarker )

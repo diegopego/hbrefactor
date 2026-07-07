@@ -1,5 +1,12 @@
 # Spec B4f-2 — resolução de DISPATCH (backlog 5, parte 2: o furo dos homônimos)
 
+**ENTREGUE em 2026-07-07** (casos 66-69, fixture fixdis/, suíte 424/0,
+zero core) — registro da entrega no [roadmap.md](roadmap.md). Desvio
+consciente do desenho, a favor do zero-churn: os rótulos confirmed da B4f
+ficaram INALTERADOS quando a classe do receptor É a consultada; os rótulos
+novos aparecem onde a resolução decide ALÉM da igualdade (confirmed com
+"dispatches to", os dois excluded, o possible nomeando descendente).
+
 Spec-driven: ORDEM DE SERVIÇO escrita ANTES do código. Aberta em
 2026-07-06 por autorização do Diego, na sessão que entregou a B4f.
 Ler antes: [spec-b4f-receiver-type.md](spec-b4f-receiver-type.md) (o canal

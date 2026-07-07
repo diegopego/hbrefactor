@@ -331,6 +331,38 @@ resolve como `detached` (classifica); `local`+`block` é PARÂMETRO do bloco
 (não classifica — o CBVAR não guarda classe). Estender a regra = novo
 portão.
 
+### Resolução de dispatch (B4f-2, ferramenta — spec-b4f2-dispatch.md)
+
+Sobre o tipo do receptor, o `usages Classe:Método` DECIDE o dispatch com a
+regra da LINGUAGEM (classes.c, provada em runtime pelos probes da spec):
+método PRÓPRIO vence herdado; em conflito entre pais vence o PRIMEIRO da
+cláusula `FROM`, em PROFUNDIDADE (o 1º pai leva junto tudo que herdou —
+flattening do `__clsNew`). Os FATOS vêm dos canais genéricos: pais na
+ordem TEXTUAL do FROM com flag dentro/fora do projeto (markers das
+aplicações declarantes — o interleaving importa: pai de FORA antes de um
+hit torna a resolução indecidível; hit do projeto antes do pai de fora é
+decidível); mensagens próprias = união do registro por stringify e do
+canal `declared`. Camadas resultantes:
+
+- `confirmed send (receiver class X dispatches to C:M)` — dispatch
+  resolvido na implementação consultada (herança alcançada, transitiva);
+- `excluded send (dispatches to Y:M)` — receptor de classe EXATA (cadeia
+  declarada): a resolução é absoluta, o send alcança OUTRA implementação;
+- `excluded send within the project's class graph (dispatches to Y:M)` —
+  receptor DECLARADO (promessa: pode carregar descendente em runtime): a
+  exclusão vale no MUNDO FECHADO do grafo do projeto, sem descendente que
+  sequestre o dispatch — o rótulo carrega a ressalva;
+- `possible send (descendant D of X may dispatch to C:M)` — descendente no
+  projeto que sequestraria o dispatch impede a exclusão (nomeado);
+- indecidível (pai fora do projeto antes de um hit, classe desconhecida,
+  classes criadas/alteradas em runtime) — camadas B4f de sempre, nunca
+  excluded.
+
+Escopo (HIDDEN/PROTECTED) NÃO muda a resolução, só o acesso (probe);
+ACCESS/ASSIGN entram na mesma tabela de mensagens com a mesma regra
+(ASSIGN = mensagem `_NOME`). Todo `excluded` fica fora das `Location[]`
+do `--json`.
+
 ### Contrato de extensão (para autores de comandos de pp)
 
 **Qualquer comando novo fica semanticamente refatorável DECLARANDO pelo
@@ -349,8 +381,12 @@ DSL inventado que a ferramenta e o core não mencionam).
   INSTÂNCIA; classes ESCALARES associadas em runtime (ex.: xhb) são
   invisíveis à compilação — o rótulo nomeia o fato, não impossibilidade
   absoluta.
-- Classe conhecida ≠ consultada NÃO exclui (herança múltipla `FROM a, b`
-  e promessa não verificada) — fica `possible` com a classe nomeada.
+- Classe conhecida ≠ consultada só exclui quando a resolução de dispatch
+  DECIDE (B4f-2); indecidível fica `possible` com a classe nomeada. A
+  exclusão de receptor DECLARADO é de mundo fechado (rótulo com a
+  ressalva); a de instância EXATA herda a natureza de promessa do retorno
+  declarado da cadeia (um ctor que devolvesse OUTRA classe quebraria a
+  própria declaração).
 - Classe referida por `DECLARE`/`AS CLASS` mas não registrada NO MÓDULO:
   em `declarations[]` o nome sobrevive; nas tabelas `declared` o retorno
   degrada para 'O' (comportamento do subsistema) — declare a classe no

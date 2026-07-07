@@ -911,21 +911,44 @@ nenhum.
 >   possible onde o fato não existe (ex.: classe sem ctor declarado —
 >   idioma: declarar `CONSTRUCTOR`/`AS CLASS`).
 
-**Fase B4f-2 — resolução de dispatch (em spec, portão pendente)**: o furo
-dos HOMÔNIMOS reportado pelo Diego (2026-07-06: duas classes com os mesmos
-métodos → find-references lista o send da outra classe) expôs que a B4f
-parou na classificação do receptor sem resolver o DISPATCH — incompleta,
-não ajeito. Spec executável:
-[spec-b4f2-dispatch.md](spec-b4f2-dispatch.md) — regra de resolução
-PROVADA em runtime (próprio > pais na ordem do FROM; probe mi.prg),
-grafo de classes só com fatos já transportados (ClassParentsOf da B4e +
-declared/registro), camadas `excluded (dispatches to X:M)` e
-`excluded within the project's class graph`, fronteiras honestas
-(runtime-created classes etc.). Também herdam desta fase (mesma base
-`ResolveDispatch`): call-graph estreitado; unicidade P1b/P2b relaxada;
-statics (agregação módulo-inteiro); `WITH OBJECT`; tipos de PARÂMETRO
-declarados (já transportados) em call sites. Volume SÓ após o portão do
-Diego sobre a spec.
+### Fase B4f-2 — resolução de dispatch ✅ (2026-07-07)
+
+O furo dos HOMÔNIMOS reportado pelo Diego (2026-07-06: duas classes com os
+mesmos métodos → find-references lista o send da outra classe) expôs que a
+B4f parou na classificação do receptor sem resolver o DISPATCH —
+incompleta, não ajeito. Spec executável:
+[spec-b4f2-dispatch.md](spec-b4f2-dispatch.md) (fatos 1-11 com evidência;
+portão de 2026-07-06 aprovou camadas/rótulos e a lista ordenada de pais).
+
+> **Entregue (casos 66-69, fixture fixdis/, suíte 424/0)**: tudo na
+> FERRAMENTA, zero mudança de core/schema. `ClassParentsSeq` (pais na
+> ordem TEXTUAL do FROM com flag dentro/fora do projeto — o par
+> `{aIn,aOut}` perdia o interleaving, fato 9; `ClassParentsOf` virou
+> visão dela), `ClassGraph` (classe → pais ordenados + mensagens próprias
+> por stringify∪declared — fato 5), `ResolveDispatch` (regra da linguagem
+> provada em runtime: próprio > pais na ordem, em PROFUNDIDADE; devolve
+> dono, ausente-comprovado ou indecidível — pai de fora antes de um hit),
+> `DispatchHijackers` (descendentes que sequestrariam a promessa) e
+> `SendVerdict` (as camadas, extraídas do Usages). Camadas novas:
+> confirmed com dispatch resolvido (herança alcançada, transitiva),
+> `excluded (dispatches to X:M)` para instância exata,
+> `excluded within the project's class graph` para receptor declarado
+> (mundo fechado, ressalva no rótulo), `possible (descendant D ... may
+> dispatch to C:M)` quando um descendente impede a exclusão. Todo
+> excluded fora das Location[] do `--json`. Rótulos confirmed da B4f
+> INALTERADOS quando a classe do receptor É a consultada (zero churn nos
+> casos 61-65); indecidível continua nas camadas B4f de sempre. O caso 66
+> é o cenário do Diego (UWMain/UWSecondary com e sem ctor declarado); 67
+> herança simples (alcança/não alcança o pai); 68 herança múltipla (ordem
+> do FROM decide; descendente nomeado impede promessa); 69 pai fora do
+> projeto (indecidível = possible honesto; hit antes do pai de fora É
+> decidível). Escopo não muda resolução; ACCESS/ASSIGN mesma tabela
+> (fatos 10-11, registrados no ast-schema).
+
+Ficam anotados para fatias futuras (mesma base `ResolveDispatch`):
+call-graph estreitado; unicidade P1b/P2b relaxada; statics (agregação
+módulo-inteiro); `WITH OBJECT`; tipos de PARÂMETRO declarados (já
+transportados) em call sites.
 
 Nota pós-entrega da fatia 1 (2026-07-06, commit f7b819f): `excluded`
 saiu das Location[] do `--json` — o find-references da extensão VSCode

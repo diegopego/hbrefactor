@@ -98,6 +98,13 @@ freshrcv() { # freshrcv <case-name> -> fixture for the language type channel (B4
    echo "$d"
 }
 
+freshdis() { # freshdis <case-name> -> fixture for dispatch resolution (B4f-2)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixdis/*.prg "$HERE"/fixdis/*.hbp "$d"/
+   echo "$d"
+}
+
 extrun() { # extrun <dir> <out-file> -> build fixext copy and run it
    ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
 }
@@ -1577,6 +1584,95 @@ print('consistente')
 PYEOF
 grep -q "^consistente$" "$D/cons.log"
 check "invariantes do canal verificados sobre o dump real" $?
+
+echo "case 66: B4f-2 - o furo dos homônimos (caso do Diego): dispatch decide"
+# duas classes com métodos homônimos (UWMain/UWSecondary, ambas Add/Paint).
+# A B4f parava em 'possible (relation unknown)'; a B4f-2 consome os fatos já
+# transportados (classe do receptor, grafo de herança, posse de método) com
+# a regra de resolução da LINGUAGEM (classes.c, provada em runtime): próprio
+# > pais na ordem do FROM, em profundidade. Receptor de classe EXATA (cadeia
+# de ctor declarada) exclui absoluto; receptor DECLARADO é promessa (pode
+# carregar descendente em runtime) e só exclui no MUNDO FECHADO do grafo do
+# projeto - o rótulo carrega a ressalva. Sem ctor declarado nada classifica
+# (possible) - o caso documenta o idioma: declarar.
+for f in d1.prg d2.prg d3.prg d4.prg; do
+   "$HB_BIN/harbour" "$HERE/fixdis/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+   check "fixdis/$f clean under -w3 -es2" $?
+done
+D=$(freshdis case66)
+( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json pm.json > pm.log 2>&1 )
+check "usages UWMain:Paint exit 0" $?
+grep -q "confirmed send (receiver class UWMAIN via declared types) in USA66  | oM:Paint()" "$D/pm.log"
+check "oM (instância exata de UWMain) segue confirmed" $?
+grep -q "excluded send (dispatches to UWSECONDARY:PAINT) in USA66  | oS:Paint()" "$D/pm.log"
+check "oS (instância exata de UWSecondary) EXCLUÍDO com o alvo nomeado - o furo fecha" $?
+grep -q "excluded send within the project's class graph (dispatches to UWSECONDARY:PAINT) in USA66PROM  | oP:Paint()" "$D/pm.log"
+check "receptor DECLARADO exclui só no mundo fechado (ressalva no rótulo)" $?
+grep -q "possible send (dynamic dispatch, receiver unknown) in USA66NC  | oNm:Paint()" "$D/pm.log" && \
+   grep -q "possible send (dynamic dispatch, receiver unknown) in USA66NC  | oNs:Paint()" "$D/pm.log"
+check "sem ctor declarado ambos ficam possible (idioma: declarar)" $?
+( cd "$D" && "$BIN" usages fixdis.hbp UWSecondary:Paint > ps.log 2>&1 )
+grep -q "excluded send (dispatches to UWMAIN:PAINT) in USA66  | oM:Paint()" "$D/ps.log" && \
+   grep -q "confirmed send (receiver class UWSECONDARY via declared types) in USA66  | oS:Paint()" "$D/ps.log"
+check "a consulta espelhada inverte os vereditos" $?
+python3 - "$D/pm.json" "$D/d1.prg" > "$D/pj.log" 2>&1 <<'PYEOF'
+import json, sys
+locs = json.load(open(sys.argv[1]))
+src = open(sys.argv[2]).read().splitlines()
+conf = src.index("   oM:Paint()") + 1
+excl = src.index("   oS:Paint()") + 1
+prom = src.index("   oP:Paint()") + 1
+lines = [l['range']['start']['line'] + 1 for l in locs if l['uri'].endswith('d1.prg')]
+assert conf in lines, "confirmed sumiu do --json"
+assert excl not in lines and prom not in lines, "excluded vazou para o --json"
+print('json ok')
+PYEOF
+grep -q "^json ok$" "$D/pj.log"
+check "excluded (ambos os sabores) fora das Location[] do --json" $?
+
+echo "case 67: B4f-2 - herança simples: o dispatch alcança (ou não) o pai"
+# UWChild FROM UWMain sem override: send no filho CONFIRMA para UWMain:Paint
+# (dispatch resolvido, transitivo); UWOver sobrescreve: send excluído da
+# consulta do pai. Vale para receptor exato e para declarado (promessa sem
+# descendente que sequestre).
+grep -q "confirmed send (receiver class UWCHILD dispatches to UWMAIN:PAINT) in USA67  | oC:Paint()" "$D/pm.log"
+check "filho sem override: send confirmado para o pai (dispatch resolvido)" $?
+grep -q "excluded send (dispatches to UWOVER:PAINT) in USA67  | oO:Paint()" "$D/pm.log"
+check "filho com override: send excluído da consulta do pai" $?
+grep -q "confirmed send (receiver class UWCHILD dispatches to UWMAIN:PAINT) in USA67  | oD:Paint()" "$D/pm.log"
+check "receptor declarado do filho também resolve para o pai" $?
+( cd "$D" && "$BIN" usages fixdis.hbp UWOver:Paint > po.log 2>&1 )
+grep -q "excluded send (dispatches to UWMAIN:PAINT) in USA67  | oC:Paint()" "$D/po.log" && \
+   grep -q "confirmed send (receiver class UWOVER via declared types) in USA67  | oO:Paint()" "$D/po.log"
+check "consulta do override: só o receptor do override confirma" $?
+
+echo "case 68: B4f-2 - herança múltipla: a ordem do FROM decide; descendente impede promessa"
+# HMBoth FROM HMAlpha, HMBeta: Paint sobre HMBoth resolve em HMAlpha (fatos
+# 1+7). E a EXISTÊNCIA de HMBoth impede o excluded-de-promessa do receptor
+# AS CLASS HMBeta na consulta de HMAlpha:Paint - o valor em runtime pode ser
+# um HMBoth (possible nomeando o descendente).
+( cd "$D" && "$BIN" usages fixdis.hbp HMAlpha:Paint > ha.log 2>&1 )
+grep -q "confirmed send (receiver class HMBOTH dispatches to HMALPHA:PAINT) in USA68  | oB:Paint()" "$D/ha.log"
+check "ordem do FROM decide: HMBoth despacha para o 1º pai" $?
+grep -q "possible send (descendant HMBOTH of HMBETA may dispatch to HMALPHA:PAINT) in USA68  | oPb:Paint()" "$D/ha.log"
+check "descendente no projeto impede o excluded-de-promessa (nomeado)" $?
+( cd "$D" && "$BIN" usages fixdis.hbp HMBeta:Paint > hb.log 2>&1 )
+grep -q "excluded send (dispatches to HMALPHA:PAINT) in USA68  | oB:Paint()" "$D/hb.log" && \
+   grep -q "confirmed send (receiver declared AS CLASS HMBETA) in USA68  | oPb:Paint()" "$D/hb.log"
+check "consulta do 2º pai: instância exata de HMBoth excluída (1º pai vence)" $?
+
+echo "case 69: B4f-2 - pai fora do projeto: indecidível é possible honesto (fato 9)"
+# OPFirst FROM TBrowse, OPBase: o pai de FORA vem antes de qualquer hit -
+# resolução indecidível, possible honesto (nunca excluded). OPLast FROM
+# OPBase, TBrowse: hit do projeto ANTES do pai de fora É decidível (primeiro
+# hit vence - o de fora nem é consultado).
+( cd "$D" && "$BIN" usages fixdis.hbp OPBase:Paint > ob.log 2>&1 )
+grep -q "possible send (receiver class OPFIRST, relation to OPBASE unknown) in USA69  | oF:Paint()" "$D/ob.log"
+check "pai de fora ANTES do hit: possible honesto, nunca excluded" $?
+grep -q "confirmed send (receiver class OPLAST dispatches to OPBASE:PAINT) in USA69  | oL:Paint()" "$D/ob.log"
+check "hit do projeto ANTES do pai de fora: decidível (fato 9)" $?
+! grep -q "excluded.*OPFIRST\|OPFIRST.*excluded" "$D/pm.log" "$D/ob.log"
+check "nenhuma consulta exclui send de receptor com cadeia indecidível" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"
