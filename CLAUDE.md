@@ -41,6 +41,11 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   consome estão no ast-schema.md (escrita `o:x := v` = mensagem `_NOME`;
   par de dados do VAR; `_HB_MEMBER { }`; strings de registro sem posição;
   sufixo `$` de INIT PROCEDURE; classes de runtime = teto da linguagem).
+  **REVISÃO EM CURSO (ordem do Diego, 2026-07-07)**: eras B4e/B4f-2/
+  extensão derraparam para enquadramento hbclass-cêntrico — achados e
+  checklist executável em docs/revisao-generalidade.md; capacidade
+  entregue sobre hbclass só conta como genérica com prova adversarial em
+  DSL inventada NÃO-espelho.
 - **Nunca editar o não-verificável**: a ferramenta só aplica o que o oráculo
   prova e a recompilação verifica; conteúdo sem verificação (strings, dados,
   comentários) recebe detecção e relato preciso, jamais edição automática (nem
