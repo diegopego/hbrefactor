@@ -28,6 +28,19 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 - **Genérico > específico**: comando dedicado só com razão forte (o
   `usages-dsl` foi absorvido pelo `usages`); ao consumir fatos de pp, operar
   sobre o genérico (cabeça/kind/marker), nunca por DSL/família conhecida.
+- **O PRINCÍPIO DA GENERALIDADE (Diego, 2026-07-07)**: o Harbour inteiro se
+  apoia em diretivas para criar açúcar sintático — DSLs e comandos novos,
+  já existentes no core ou criados pelo desenvolvedor no PRÓPRIO aplicativo.
+  O hbrefactor refatora QUALQUER código, com ou sem açúcar, SEM ajustes
+  quando diretivas criam açúcar novo. **Classes são SÓ UM CASO** — o
+  princípio vale para todo construto (função, local, var, método, marker,
+  palavra de DSL). Fato faltante → fato de compilação ou relato honesto
+  (`possible`/recusa com rollback); nunca ajeito, nunca árvore quebrada.
+  Provas executáveis na suíte: casos 64 e 72-74 (régua: nenhuma palavra de
+  DSL de fixture em `src/hbrefactor.prg`). Fatos da linguagem que a análise
+  consome estão no ast-schema.md (escrita `o:x := v` = mensagem `_NOME`;
+  par de dados do VAR; `_HB_MEMBER { }`; strings de registro sem posição;
+  sufixo `$` de INIT PROCEDURE; classes de runtime = teto da linguagem).
 - **Nunca editar o não-verificável**: a ferramenta só aplica o que o oráculo
   prova e a recompilação verifica; conteúdo sem verificação (strings, dados,
   comentários) recebe detecção e relato preciso, jamais edição automática (nem
@@ -40,11 +53,9 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 - Commits só com autorização explícita do Diego **para AQUELE commit**;
   concluir/aprovar o trabalho não autoriza o commit. Um pedido por commit —
   não encadear. Sem push salvo pedido.
-- Em sessão com o modelo Fable: delegar a subagentes **opus** para
-  economizar tokens do Fable quando realmente compensar (trabalho
-  mecânico bem especificado — varreduras, builds, baterias de teste);
-  raciocínio central e código delicado ficam no Fable, que revisa o
-  que os agentes entregam.
+- **Só Fable** (instrução do Diego, 2026-07-07, revoga a regra anterior de
+  delegação): não usar subagentes opus/sonnet — capacidade de solução vale
+  mais que economia de tokens; todo o trabalho fica no Fable.
 - Regra/preferência durável deste repo vai AQUI (versionado), não na memória
   privada do Claude (que não viaja com o repo); a memória fica para o que não
   pertence a um repo.
