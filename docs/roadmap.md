@@ -62,6 +62,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B-infra Etapa 1 (2026-07-07) | Suíte paralela: pool bash por-caso, saída byte-idêntica, 10/10 sem flake, 109 s → 11-14 s (~8×); `JOBS=1` p/ depurar |
 | B-infra Etapa 2 (2026-07-08) | Runner em Harbour: despacho+join `tests/parrun.prg` (`hb_processOpen`) + checker `tests/tcheck.prg` (`hb_jsonDecode`) — python fora do `make test`; paridade byte-idêntica nos dois modos, 10/10 sem flake, 14 s |
 | B7 (2026-07-08) | Tipos interprocedurais: cadeia de construção + oráculo QSelf (ast-6 `ret`); rito D4 (5 checks/6 sites aprovados caso a caso); homônimos separados por receptor; união de call sites/IIF; casos 84/85; suíte 582/0 |
+| B7b (2026-07-08) | Inferência fatia 3 (zero core): retorno de MÉTODO pelos pushes `ret` (send encadeado, identidade em cadeia); 1º param de bloco INLINE = receptor (fato classes.c:4554, provado em DSL não-espelho); param de bloco pela união dos Evals rastreáveis; venenos honestos; furos latentes fechados (B7AllRetsSelf envenenado, índice do B7ParamType); caso 86; suíte 600/0; delta M-cov 2 no mapa |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -250,20 +251,6 @@ dois modos (diff paralelo × `JOBS=1` limpo); 10/10 rodadas paralelas
 sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
 Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
 são dependências do alvo `test`).
-
-### B7b — Inferência fatia 3: retorno de método, Self em INLINE, blocos — **PORTÃO ABERTO (2026-07-08); PRÓXIMA FASE — 100% ferramenta, zero core**
-
-Decisão do Diego (2026-07-08, após reticência sobre implementar
-tipagem + **M-cov 2** em corpus de programas fechados — 76 tests do
-core, 5.686 sites: 25,7% confirmed; baldes dominantes = **lacunas de
-inferência**, não fatos ausentes): mais inferência sobre os fatos que
-JÁ temos antes de qualquer extensão de linguagem. Alvos medidos: send
-encadeado 697 (retorno de MÉTODO — os rótulos `ret` do ast-6 já
-existem), Self em corpo INLINE/OPERATOR (padrão money — o fato é a
-CO-DERIVAÇÃO da regra, nada keyed a hbclass), blocos (detached de
-binding único; parâmetro de bloco via sites de Eval, 320). Critério
-inclui re-rodar a M-cov 2 e registrar o delta no mapa. Spec:
-**[spec-b7b-inferencia.md](spec-b7b-inferencia.md)**.
 
 ### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **NA GAVETA (2026-07-08; especificada, decisões T1-T5 preservadas)**
 

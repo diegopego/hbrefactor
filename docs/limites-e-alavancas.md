@@ -187,3 +187,38 @@ não localizados); a régua final continua sendo o dogfooding no código
 do Diego. Consequência registrada (decisão do Diego, 2026-07-08):
 **escada revisada — inferência (fase B7b) > alavanca D > alavanca G/B9
 (gaveta, decisões T1-T5 preservadas)**.
+
+### Delta da B7b (2026-07-08, mesmo corpus — harness `tests/mcov2.sh`)
+
+Método: harness reconstruído e PERSISTIDO (`tests/mcov2.sh`, corpus git-ignorado em work/tests — por-
+programa, mensagens = syms distintos de `sends[]` do dump, consulta
+bare por mensagem, paralelo por programa); a enumeração mecânica dá
+**967 consultas / 6.249 sites** (a medição original reportou 817/5.686
+— enumeração mais inclusiva aqui, ex. formas `_X`; as PROPORÇÕES
+reproduzem 25,6/0,2/45,6/28,6 ≈ 25,7/0,2/45,8/28,3). Para o delta ser
+limpo, a BASELINE foi re-medida com o binário pré-B7b no MESMO
+harness; zero consultas falhadas; flips pareados site a site.
+
+| Camada | pré-B7b | pós-B7b |
+|---|---|---|
+| confirmed | 1.597 (25,6%) | **1.715 (27,4%)** |
+| excluded | 10 (0,2%) | 10 (0,2%) |
+| possible fora de codeblock | 2.852 (45,6%) | 2.835 (45,4%) |
+| possible dentro de codeblock | 1.790 (28,6%) | 1.689 (27,0%) |
+| (confirmed dentro de bloco) | 0 | **101** |
+
+**118 upgrades possible→confirmed, ZERO downgrades** (o hardening do
+`B7ParamType` não rebaixou nada no corpus). Onde fechou: clsscope 54,
+**money 20 (o padrão epônimo do alvo 2 — INLINE/OPERATOR)**, overload
+16, stripem 11, html 7, inhprob 5, classch 4, dbgcls 1. Dos 118, 101
+dentro de bloco (INLINE + detached/Eval) e 17 fora (send encadeado).
+
+Leitura honesta do que NÃO fechou: os **cls\*cast de tortura permanecem
+intactos** (classes montadas dinamicamente — alvo da alavanca D, como
+o critério exigia); o balde "send encadeado 697" fecha pouco NESTE
+corpus porque os encadeados dominantes atravessam construção dinâmica
+de tortura; os blocos de GET/tbrowse (SETGET/param de bloco) têm os
+Evals NA RTL, fora do projeto — ponto cego estrutural, degrade
+honesto; detached multi-write (1.284) permanece ⊤ por regra (sem
+ordem). O mecanismo está provado onde o fato existe (caso 86); a
+régua final segue sendo o dogfooding em código de produção.

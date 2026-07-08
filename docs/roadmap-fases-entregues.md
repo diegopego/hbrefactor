@@ -1558,3 +1558,57 @@ Fechamento provado por execução: suíte **582/0**, saída BYTE-IDÊNTICA
 paralelo × `JOBS=1`. Lição de fixture: send `::Msg()` NÃO conta como
 uso de SELF para o W0032 — o uso que conta é acesso a VAR (a fixture
 fixb7 documenta a forma no comentário).
+
+## Fase B7b — inferência fatia 3: retorno de método, Self em INLINE, blocos ✅ (2026-07-08)
+
+Portão aberto pela M-cov 2 (decisão do Diego: mais inferência sobre os
+fatos que JÁ temos antes de qualquer extensão de linguagem; B9 na
+gaveta). Spec: [spec-b7b-inferencia.md](spec-b7b-inferencia.md).
+**100% ferramenta — zero mudança no core, schema ast-6 inalterado.**
+
+**Alvo 1 — retorno de MÉTODO (send encadeado, 697 sites medidos)**:
+método DECLARADO sem tipo de retorno (o `_HB_MEMBER` sem `AS`, a forma
+normal do hbclass) deixou de curto-circuitar em NIL: cai para a
+implementação REGISTRADA da própria classe e tipa pela união com acordo
+dos pushes `ret` (ast-6) — `TypeOf`/`B7MethodRet`, mesmo memo/guardas
+do retorno de função; o acerto declarado continua parando o dispatch
+(não sobe vínculos). Identidade `RETURN Self` encadeia
+(`o:Soma(1):Soma(2)`); venenos honestos: Self reescrito no corpo (o
+furo pré-existente do `B7AllRetsSelf` sem cheque de veneno foi fechado
+junto), ciclo entre métodos, retornos discordantes.
+
+**Alvo 2 — Self em corpo INLINE/OPERATOR (padrão money)**: parâmetro de
+bloco decidido por FATO da declaração (`declarations[]` com
+`param: true` e `declLine` na linha do `{|`, em ordem — binder léxico
+pela pilha de blocos do uso; 2 blocos na mesma linha = inatribuível);
+o 1º parâmetro de bloco de membro INLINE registrado É o receptor —
+fato do VM (classes.c:4554 empilha Self como 1º argumento do bloco)
+sobre o registro como-escrito (par STRING+CODEBLOCK em ARGLIST da
+função-classe, leitura em profundidade-0), com `via` no rótulo.
+**Portão de generalidade fechado**: DSL não-espelho (fixb7b/forno.ch,
+`__clsNew`/`__clsAddMsg`/`HB_OO_MSG_INLINE`, param `tigela` ≠ Self)
+ganha o MESMO fato, com dispatch provado por execução; 2º+ parâmetro
+degrada honesto; régua do caso 64 assertada (nenhuma palavra da DSL na
+ferramenta).
+
+**Alvo 3 — blocos**: (a) detached de binding único lida dentro do bloco
+classifica (a decisão de sombra por linha de occurrence morreu — por
+declaração, imune à convenção de última-linha-física dos statements
+continuados); (b) parâmetro de bloco tipa pela união dos argumentos dos
+sites de Eval RASTREÁVEIS (o compilador traduz `Eval(b,…)` no send
+`b:EVAL(…)` — fato do dump): bloco obj direto de Eval ou binding único
+de local com TODAS as leituras em obj de Eval, na mesma função; pontos
+cegos (leitura fora de Eval, `@ref`, multi-write, param reescrito)
+degradam. Hardening que fechou furo latente: `B7ParamType` só aceita
+parâmetro da FUNÇÃO (declLine na linha da função) — param de bloco
+corrompia o índice da união de call sites.
+
+**Cobertura (caso 86, fixture fixb7b, 18 checks)**: os 3 alvos +
+venenos, hbclass E DSL própria, statement continuado, executável
+(imprime e roda — o ciclo Gira↔Volta é estático nos `ret` e termina em
+runtime por contador). Suíte **600/0**, byte-idêntica paralelo ×
+`JOBS=1`.
+
+**M-cov 2 re-rodada no MESMO corpus** (harness `tests/mcov2.sh`, binário
+antigo × novo): delta registrado na seção M-cov 2 do
+[limites-e-alavancas.md](limites-e-alavancas.md).

@@ -1,8 +1,23 @@
 # Spec B7b — Inferência fatia 3: retorno de método, Self em INLINE, blocos
 
-Status: **PORTÃO ABERTO (2026-07-08 — decisão do Diego após a M-cov 2:
+Status: **ENTREGUE (2026-07-08)** — registro integral no
+[roadmap-fases-entregues.md](roadmap-fases-entregues.md); regras de
+consumo na seção TypeOf do [ast-schema.md](ast-schema.md); delta da
+M-cov 2 na seção própria do
+[limites-e-alavancas.md](limites-e-alavancas.md). Critério de pronto
+fechado: caso 86 (fixture fixb7b — 3 alvos + venenos, hbclass E DSL
+não-espelho, executável), suíte 600/0 byte-idêntica paralelo ×
+`JOBS=1`, zero mudança no core (schema ast-6 inalterado). Nota do
+percurso: o fato que liga o bloco INLINE à classe se materializou como
+registro como-escrito (par STRING+CODEBLOCK na função-classe, que a
+co-derivação já liga à classe) + fato do VM (classes.c:4554: o
+receptor entra como 1º argumento do bloco); o alvo 2 do desenho
+original (co-derivação direta da regra) foi realizado por essa via,
+com o portão de generalidade provado por execução.
+
+Portão original (2026-07-08 — decisão do Diego após a M-cov 2:
 mais inferência sobre os fatos que JÁ temos, antes de qualquer extensão
-de linguagem). PRÓXIMA FASE. Zero mudança no core — 100% ferramenta.**
+de linguagem). Zero mudança no core — 100% ferramenta.
 Origem e números: seção M-cov 2 do
 [limites-e-alavancas.md](limites-e-alavancas.md).
 
