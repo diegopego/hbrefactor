@@ -279,6 +279,33 @@ Diego caso a caso; NENHUM assert alterado. Depois: asserts + casos
 novos de cobertura (fábrica, venenos, união, conjunto >1,
 generalidade em DSL não-espelho via canais da linguagem).
 
+### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **PORTÃO ABERTO (2026-07-08); execução APÓS o rito D4 da B7**
+
+Requisito do Diego (2026-07-08): macros como caso difícil + smoke test
+com `hb_compileFromBuf()` colhendo insights que generalizem. Spec com
+fatos verificados (arquivo:linha), decisões E1-E4 + dialética do pipe,
+veredito de valor, venenos e critério de pronto executável:
+**[spec-b8-macros.md](spec-b8-macros.md)**.
+Arquitetura (dialética fechada 2026-07-08): pipe `[pré: slot vazio
+documentado] | compilador -x (ast-7) | pós: seleção por análise +
+sondagem 100% core → <projeto>.astc.json`. O pré NÃO alimenta o core
+durante a compilação (só há 3 bocas de entrada; pp externo destruiria
+a derivação from/ppRules); o complemento (schema `astc-1`, um por
+projeto) fica epistemicamente SEPARADO do dump — sub-árvore de macro é
+verdade condicional ao valor rastreado, com proveniência por entrada.
+Resumo das fatias: (1) transporte ast-7 — `SubType`/`cMacroOp` do nó
+`HB_ET_MACRO` que o dump descarta hoje; só compast.c + zero impacto;
+fazer incondicionalmente (veredito). (M0) medição no corpus ANTES de
+construir a fatia 2 — quantos sites `&`/`HB_MACROBLOCK` são
+rastreáveis; os números dimensionam a profundidade (E3 interprocedural
+mantida ou encolhida para literal-local). (2) subcomando gera o
+`.astc.json` sondando via `hb_compileFromBuf` (dialeto `-k*` do trace,
+idioma do NameAccepted, + `-u -x<tmp>`); conteúdo não-rastreável
+degrada honesto. Plugin fino hbmk2 `post_build`: ADIADO (API
+documentada na spec como ponto de acoplamento; implementar só no
+dogfooding real). Critério de matar: divergência probe×macro.y grande
+→ probe degrada ou morre, com relato.
+
 ### B6 — PR upstream (BLOQUEADA: só quando o Diego mandar)
 
 Mensagem com consumidor real; 1 arquivo novo + ganchos opt-in; prova de
