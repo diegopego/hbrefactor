@@ -1,8 +1,15 @@
 # Spec B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`)
 
-Status: **PORTÃO FECHADO — PRONTA PARA EXECUÇÃO (2026-07-08; decisões
-T1-T5 tomadas pelo Diego).** Análise de origem e números: seções M-cov
-e Alavanca G do [limites-e-alavancas.md](limites-e-alavancas.md).
+Status: **NA GAVETA (2026-07-08 — decisões T1-T5 do Diego PRESERVADAS
+para quando/se a fase reviver).** Rebaixada no portão da B7b: a
+**M-cov 2** (programas fechados) mostrou que os baldes dominantes do
+"possible" são lacunas de INFERÊNCIA (fecháveis sem extensão de
+linguagem — spec-b7b-inferencia.md) e dinamismo genuíno (alvo da
+alavanca D); a reticência do Diego sobre implementar tipagem estava
+certa — o dado que falta é a fricção real do dogfooding. Revive se a
+inferência + alavanca D não fecharem a fricção medida. Análise de
+origem e números: seções M-cov, M-cov 2 e Alavanca G do
+[limites-e-alavancas.md](limites-e-alavancas.md).
 
 **Enquadramento (correção do Diego, 2026-07-08 — O NORTE)**: a fase
 impõe o **sistema de TIPOS declarados da linguagem inteiro** —

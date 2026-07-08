@@ -251,33 +251,31 @@ sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
 Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
 são dependências do alvo `test`).
 
-### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **PRONTA PARA EXECUÇÃO (portão fechado 2026-07-08, T1-T5 decididas)**
+### B7b — Inferência fatia 3: retorno de método, Self em INLINE, blocos — **PORTÃO ABERTO (2026-07-08); PRÓXIMA FASE — 100% ferramenta, zero core**
 
-Decisão do Diego (2026-07-08): seguir a recomendação da análise
-estratégica. **Enquadramento corrigido pelo Diego (O NORTE): a fase
-impõe o sistema de TIPOS da linguagem inteiro** (`AS NUMERIC/...`
-/ARRAY/BLOCK + `AS CLASS` — classe é SÓ UM CASO, o 'S'); o cheque
-genérico é de kind (`ValType`), classe é o ramo extra. Decisões:
-**T1** flag opt-in `-kt`, off = byte-idêntico, fluindo pelo hbmk2 sem
-mudanças nele (mecanismo do `-x`: `.hbp`/`-prgflag=`/
-`HB_USER_PRGFLAGS`); **T2** NIL FALHA (anotado = obrigatório e do
-tipo; rigidez em duplo opt-in — anotar + flag); **T3** is-a satisfaz;
-**T4** escopo = params + locals + retorno (retorno via canal
-`DECLARE`; FIELDs/MEMVARs/blocos registrados para fatias futuras);
-**T5** switch `-kt`. Origem: pergunta do Diego sobre os limites da abordagem
-só-fatos + medição **M-cov** (hbhttpd: 408 sends, 32% confirmed, 68%
-possible; baldes dominantes inalcançáveis por inferência — números e
-alavanca G no [limites-e-alavancas.md](limites-e-alavancas.md)). Spec
-com fatos arquivo:linha (a sintaxe existe no idioma INTEIRO —
-harbour.y:371/1145/1213/1224/1132/1228), desenho (cheques emitidos
-como pcode chamando helper de runtime, VM intocada), venenos e
-critério executável:
-**[spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md)**.
-Fatias: (1) cheques sob a flag + flag no dump (schema bump) + camada
-`guaranteed by checked annotation` no usages; (materialização) a
-ferramenta escreve os `AS <tipo>`/`AS CLASS` que a análise provou.
-Fase posterior da mesma família: alavanca D (funil `hb_vmSend` +
-gêmeo do macro.y — adendo verificado no mapa).
+Decisão do Diego (2026-07-08, após reticência sobre implementar
+tipagem + **M-cov 2** em corpus de programas fechados — 76 tests do
+core, 5.686 sites: 25,7% confirmed; baldes dominantes = **lacunas de
+inferência**, não fatos ausentes): mais inferência sobre os fatos que
+JÁ temos antes de qualquer extensão de linguagem. Alvos medidos: send
+encadeado 697 (retorno de MÉTODO — os rótulos `ret` do ast-6 já
+existem), Self em corpo INLINE/OPERATOR (padrão money — o fato é a
+CO-DERIVAÇÃO da regra, nada keyed a hbclass), blocos (detached de
+binding único; parâmetro de bloco via sites de Eval, 320). Critério
+inclui re-rodar a M-cov 2 e registrar o delta no mapa. Spec:
+**[spec-b7b-inferencia.md](spec-b7b-inferencia.md)**.
+
+### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **NA GAVETA (2026-07-08; especificada, decisões T1-T5 preservadas)**
+
+Rebaixada no mesmo portão da B7b: a M-cov 2 mostrou que os baldes
+dominantes do "possible" são lacunas de inferência (fecháveis sem
+extensão de linguagem) e dinamismo genuíno (alvo da alavanca D); a
+reticência do Diego sobre implementar tipagem estava certa — o dado
+que faltava era a fricção real, e a inferência vem antes. A spec fica
+pronta ([spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md),
+T1-T5 decididas: flag `-kt` opt-in fluindo pelo hbmk2, NIL falha,
+is-a satisfaz, escopo params+locals+retorno); revive se o dogfooding
+provar fricção que a inferência e a alavanca D não fecham.
 
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 

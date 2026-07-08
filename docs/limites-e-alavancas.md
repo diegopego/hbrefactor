@@ -149,3 +149,41 @@ gancho gated ali (dump de string + árvore + exprType + flags HB_SM +
 status) é o irmão do funil `hb_vmSend`: evidência de execução para
 macros — prova presença, nunca ausência. Mais simples que o dump do
 compilador (sem pp, sem from/ppRules).
+
+## M-cov 2 — programas fechados (2026-07-08, tests do core em work/tests)
+
+Corpus-contraponto à M-cov (que era biblioteca): os tests do core
+copiados para `work/tests` (230 .prg; 230 compilam standalone; 76 têm
+sends). Método: medição POR-PROGRAMA (cada test é um programa fechado
+independente — um projetão único poluiria homônimos entre programas);
+817 consultas `usages`, 5.686 linhas de send agregadas.
+
+| Camada | % |
+|---|---|
+| confirmed | 25,7% |
+| excluded | 0,2% |
+| possible fora de codeblock | 45,8% |
+| possible dentro de codeblock | 28,3% |
+
+Causas (nó receptor no dump) — fora de bloco: local sem cadeia 915,
+**send encadeado 697**, parâmetro 390, local multi-write 292, retorno
+sem fato 125, resto ~160. Dentro de bloco: local detached multi-write
+1.284 (loops do rto_get), **parâmetro de bloco 320**.
+
+**Interpretação (muda a escada de alavancas)**: os baldes dominantes
+NÃO são o caso-anotação — são **lacunas de INFERÊNCIA fecháveis sem
+tocar em linguagem**: (a) send encadeado = a B7 infere retorno de
+FUNÇÃO mas não de MÉTODO, embora os rótulos `ret` (ast-6) já existam
+nos corpos; (b) o padrão money: `::sends` em corpo de método
+INLINE/OPERATOR — o corpo compila como codeblock onde Self não tem
+canal, mas a CO-DERIVAÇÃO (B4d) liga o bloco à classe dona: o fato
+existe; (c) parâmetro de bloco: união via sites de Eval. O que sobra
+de dinamismo genuíno (cls*cast = testes de TORTURA de casting,
+2.260 sites) é alvo da alavanca D — e note: são programas que RODAM.
+
+Caveats: corpus adversarial (tortura de casting + GET afogado em
+blocos), não retrato de produção; diagnóstico por inspeção do nó (20
+não localizados); a régua final continua sendo o dogfooding no código
+do Diego. Consequência registrada (decisão do Diego, 2026-07-08):
+**escada revisada — inferência (fase B7b) > alavanca D > alavanca G/B9
+(gaveta, decisões T1-T5 preservadas)**.
