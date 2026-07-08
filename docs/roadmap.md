@@ -30,7 +30,9 @@ inaceitável. Régua executável: casos 64 e 72-74.
 feitos com enquadramento hbclass-cêntrico — há código, specs e testes a
 revisar. O instrumento é
 **[revisao-generalidade.md](revisao-generalidade.md)** (achados V1-V7
-verificados + checklist Q1-Q7 executável). É a frente prioritária.
+verificados + checklist Q1-Q8 executável). **REVISÃO CONCLUÍDA em
+2026-07-07** (casos 75-81 + atualizações; o documento fica como registro
+e régua para trabalho futuro).
 
 ## Fundação (provada no smoke test + B0/B1; não re-derivar)
 
@@ -64,7 +66,7 @@ cheque textual de continuação `;` em 2 pontos (falso positivo só recusa).
 
 ## Fases ATIVAS (por prioridade)
 
-### R — Revisão de generalidade (A FRENTE PRIORITÁRIA)
+### R — Revisão de generalidade ✅ CONCLUÍDA (2026-07-07)
 
 **Escopo e checklist**: [revisao-generalidade.md](revisao-generalidade.md).
 **Q4 ✅ FECHADA (2026-07-07, caso 75)**: o veneno do pai falso era real
@@ -100,10 +102,17 @@ expansão LIGOU o nome ao canal de classe (o `from` do próprio nome), NÃO
 a regra raiz do site — `CREATE CLASS` tem raiz `create` e o hbclass segue
 `(class ...)` porque a regra `CLASS` é quem declara; dona sem derivação
 cai para "class" (o nome do canal da linguagem). Suíte 520/0.
-Restante: Q5 (matar o regex da extensão: `resolve-at` por fato no CLI).
-**Critério**: todas as Q fechadas com caso na suíte; régua do caso 64
-assertada; `make test` verde; ast-schema atualizado onde a resposta for
-teto honesto.
+**Q5 ✅ FECHADA (2026-07-07, casos 81 + 71 novo; opção B do Diego)**: o
+`methodQuery` (regex hbclass da extensão, V1) morreu — a extensão manda a
+POSIÇÃO do cursor (`usages --at arq:linha:col`, UMA compilação) e o CLI
+resolve por fato (`ResolveAtQuery`, mesmo core do `resolve-at`
+standalone): co-derivação do site + aplicação-identidade (P1a) + canal
+declared. Homônimos pelo SITE; DSL qualquer promove (a regex só via
+hbclass); send/posição-vazia degradam honesto. Extensão 0.6.0.
+
+**A REVISÃO ESTÁ COMPLETA**: V1-V7 tratados, Q1-Q8 fechadas com prova
+executável (casos 75-81 + atualizações 64/72-74), régua do caso 64
+assertada nos casos novos, extensão sem regex de construto.
 
 ### B4g — a diretiva como fonte de primeira classe (schema ast-5)
 
@@ -121,9 +130,10 @@ suíte + lexdiff verdes.
 
 ### B5 — Extensão VSCode (restante)
 
-Fatias entregues no arquivo. Restante: `--show-expansion` como opção;
-preview `--dry-run --json` se a fricção pedir; **Q5 da revisão substitui
-o `methodQuery`** (deixa de ser heurística local).
+Fatias entregues no arquivo; **consulta por POSIÇÃO entregue (Q5,
+extensão 0.6.0)**: `usages --at` numa única compilação, `methodQuery`
+morto. Restante: `--show-expansion` como opção; preview
+`--dry-run --json` se a fricção pedir.
 **Critério**: Diego usa no dia a dia; sem regressão.
 
 ### B-infra — suíte paralela (pool dinâmico)

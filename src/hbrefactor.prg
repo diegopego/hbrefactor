@@ -56,6 +56,8 @@ PROCEDURE Main()
       nExit := RenameMethod( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "resolve-at"
+      nExit := ResolveAt( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "dump"
       nExit := DumpOnly( aArgs )
    OTHERWISE
@@ -78,7 +80,8 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor reorder-params <projeto> <função> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <projeto> <arq.prg> <ini>-<fim> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor inline-local <projeto> <arq.prg> <função> <nome> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor usages <projeto> <nome|Classe:Método> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
+   OutStd( "  hbrefactor usages <projeto> <nome|Classe:Método|--at arq:linha:col> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
+   OutStd( "  hbrefactor resolve-at <projeto> <arq.prg> <linha> <coluna>   (posição -> 'query: <spec>')" + hb_eol() )
    OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-method <projeto> <Classe:Método> <novo> [--force] [--dry-run]" + hb_eol() )
@@ -282,14 +285,28 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd
    LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
    LOCAL aDecl, aSite, cCur, nState, hOwnV
+   LOCAL cAtSpec := NIL, aAtParts, cAtFile, cAtPath, nAtLine, nAtCol0, hResAt
 
    IF Len( aArgs ) < 3
       Usage()
       RETURN EXIT_USAGE
    ENDIF
    cSpec := aArgs[ 2 ]
-   cName := aArgs[ 3 ]
-   FOR nI := 4 TO Len( aArgs )
+   // `--at arq:linha:col` no lugar do nome (revisão Q5): a consulta vem
+   // da POSIÇÃO, resolvida por fato depois que os dumps carregarem -
+   // uma única compilação para o consumo da extensão
+   IF Lower( aArgs[ 3 ] ) == "--at"
+      IF Len( aArgs ) < 4
+         Usage()
+         RETURN EXIT_USAGE
+      ENDIF
+      cAtSpec := aArgs[ 4 ]
+      nI      := 5
+   ELSE
+      cName := aArgs[ 3 ]
+      nI    := 4
+   ENDIF
+   FOR nI := nI TO Len( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--func" .AND. nI < Len( aArgs )
          cFuncFilter := Upper( aArgs[ ++nI ] )
@@ -299,21 +316,23 @@ STATIC FUNCTION Usages( aArgs )
          lShowExp := .T.
       ENDCASE
    NEXT
-   cUp := Upper( cName )
-
-   // forma Classe:Método (backlog 5): a DEFINIÇÃO filtra pela classe (mesma
-   // resolução por rastro do PickFunc); sends continuam por MENSAGEM - o
-   // dispatch é dinâmico e o receptor é desconhecido no ast-3
-   IF ( nAt := At( ":", cName ) ) > 0
-      cClass   := Upper( Left( cName, nAt - 1 ) )
-      cMethTok := SubStr( cName, nAt + 1 )
-      IF Empty( cClass ) .OR. Empty( cMethTok ) .OR. ":" $ cMethTok
-         RETURN Refuse( "forma Classe:Método malformada: '" + cName + "'" )
+   IF cAtSpec != NIL
+      // arquivo pode conter ':' (patológico): linha e coluna são os DOIS
+      // últimos segmentos
+      aAtParts := hb_ATokens( cAtSpec, ":" )
+      IF Len( aAtParts ) < 3
+         RETURN Refuse( "forma do --at é arq:linha:col (1-based): '" + cAtSpec + "'" )
       ENDIF
-   ELSE
-      cMethTok := cName
+      nAtCol0 := Val( ATail( aAtParts ) ) - 1
+      nAtLine := Val( aAtParts[ Len( aAtParts ) - 1 ] )
+      cAtFile := aAtParts[ 1 ]
+      FOR nI := 2 TO Len( aAtParts ) - 2
+         cAtFile += ":" + aAtParts[ nI ]
+      NEXT
+      IF nAtLine < 1 .OR. nAtCol0 < 0
+         RETURN Refuse( "posição inválida no --at: linha e coluna são 1-based" )
+      ENDIF
    ENDIF
-   cUpMeth := Upper( cMethTok )
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
@@ -335,6 +354,38 @@ STATIC FUNCTION Usages( aArgs )
       ENDIF
       hAsts[ cPath ] := hAst
    NEXT
+
+   IF cAtSpec != NIL
+      cAtPath := ProjectMember( hProj, cAtFile )
+      IF cAtPath == ""
+         RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + "'" )
+      ENDIF
+      hResAt := ResolveAtQuery( hAsts[ cAtPath ], hAsts, nAtLine, nAtCol0 )
+      IF hResAt == NIL
+         RETURN Refuse( "nenhum identificador de compilação em " + cAtFile + ":" + ;
+                        hb_ntos( nAtLine ) + ":" + hb_ntos( nAtCol0 + 1 ) )
+      ENDIF
+      OutStd( cAtFile + ":" + hb_ntos( nAtLine ) + ":" + hb_ntos( nAtCol0 + 1 ) + ;
+              ": " + hResAt[ "name" ] + " - " + hResAt[ "kind" ] + hb_eol() )
+      OutStd( "query: " + hResAt[ "query" ] + hb_eol() )
+      cName := hResAt[ "query" ]
+   ENDIF
+   cUp := Upper( cName )
+
+   // forma Classe:Método (backlog 5): a DEFINIÇÃO filtra pela classe (mesma
+   // resolução por rastro do PickFunc); sends continuam por MENSAGEM - o
+   // dispatch é dinâmico e o receptor é desconhecido no ast-3
+   IF ( nAt := At( ":", cName ) ) > 0
+      cClass   := Upper( Left( cName, nAt - 1 ) )
+      cMethTok := SubStr( cName, nAt + 1 )
+      IF Empty( cClass ) .OR. Empty( cMethTok ) .OR. ":" $ cMethTok
+         RETURN Refuse( "forma Classe:Método malformada: '" + cName + "'" )
+      ENDIF
+   ELSE
+      cMethTok := cName
+   ENDIF
+   cUpMeth := Upper( cMethTok )
+
    hDecl := DeclTables( hAsts )
    // grafo de classes do projeto (B4f-2): consumido pela resolução de
    // dispatch dos sends; NIL degrada para as camadas B4f
@@ -631,6 +682,246 @@ STATIC FUNCTION DumpOnly( aArgs )
    OutStd( "dumps em: " + cTmp + hb_eol() )
 
    RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// resolve-at - "o que está sob o cursor" como pergunta de FATO (revisão
+// Q5, mata o methodQuery por regex da extensão): a extensão passa posição
+// (linha/coluna 1-based), a resposta sai dos tokens consumidos de
+// ppApplications (posicionados byte-exatos) + rastro de derivação. A
+// linha final "query: <spec>" é o contrato de consumo (a extensão a
+// repassa ao usages). Camadas de fato, da mais específica:
+//   1. nome que preenche match marker de regra -> fecho de derivação
+//      DESTE site (não do nome no módulo inteiro: homônimo em outra
+//      linha não contamina); dona única por co-derivação
+//      (PpMarkerOwners sobre os artefatos do site) que nomeia
+//      função-de-classe do projeto -> promove a Dona:Nome
+//   2. palavra da própria regra (marker 0) -> a palavra (usages de DSL)
+//   3. identificador comum do stream -> cru (send/alias só relatados:
+//      dispatch é dinâmico, o receptor não é fato do site)
+// Dump sem rastro (ast-2) degrada para a consulta crua, sem recusar.
+// B4g (match[]/result[]) estende a cobertura a sites DENTRO de diretiva.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION ResolveAt( aArgs )
+
+   LOCAL cSpec, cFile, nLine, nCol0, hProj, cTmp, cSrcPath, cPath
+   LOCAL hAsts := { => }, hRes, aSrc
+
+   IF Len( aArgs ) < 5
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cSpec := aArgs[ 2 ]
+   cFile := aArgs[ 3 ]
+   nLine := Val( aArgs[ 4 ] )
+   nCol0 := Val( aArgs[ 5 ] ) - 1
+   IF nLine < 1 .OR. nCol0 < 0
+      RETURN Refuse( "posição inválida: linha e coluna são 1-based" )
+   ENDIF
+
+   hProj := LoadProject( cSpec )
+   IF hProj == NIL
+      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+   ENDIF
+   cSrcPath := ProjectMember( hProj, cFile )
+   IF cSrcPath == ""
+      RETURN Refuse( "'" + cFile + "' não é fonte do projeto '" + cSpec + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! AstDumps( hProj, cTmp )
+      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ( hAsts[ cPath ] := ReadAst( cTmp, cPath ) ) == NIL
+         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+      ENDIF
+   NEXT
+
+   hRes := ResolveAtQuery( hAsts[ cSrcPath ], hAsts, nLine, nCol0 )
+   IF hRes == NIL
+      RETURN Refuse( "nenhum identificador de compilação em " + cFile + ":" + ;
+                     hb_ntos( nLine ) + ":" + hb_ntos( nCol0 + 1 ) )
+   ENDIF
+   aSrc := hb_ATokens( StrTran( hb_MemoRead( cSrcPath ), Chr( 13 ) , "" ), Chr( 10 ) )
+   OutStd( cFile + ":" + hb_ntos( nLine ) + ":" + hb_ntos( nCol0 + 1 ) + ": " + ;
+           hRes[ "name" ] + " - " + hRes[ "kind" ] + ;
+           SrcLine( aSrc, nLine ) + hb_eol() )
+   OutStd( "query: " + hRes[ "query" ] + hb_eol() )
+
+   RETURN EXIT_OK
+
+// o core do resolve-at, comum ao comando e ao `usages --at` (uma única
+// compilação no consumo da extensão). Devolve { "name" (grafia escrita),
+// "kind" (o fato), "query" (a consulta p/ usages) } ou NIL (nada na
+// posição - quem chama recusa/degrada)
+STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
+
+   LOCAL hClassMap, hRule
+   LOCAL hApp, hTok, nApp, hPairs := { => }, cMk := NIL, cWd := NIL
+   LOCAL aArts, hOwners, cUpName, cOwn, hCand := { => }, aPrev, cKind, cQuery
+   LOCAL aPosApps := {}, hMk, hFunc, aParts, cPart, nCls, cCur, nState
+
+   // camadas 1/2: o site escrito nas aplicações de pp (a assinatura de um
+   // construto gerado só tem posição byte-exata AQUI - tokens[] colapsa)
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      nApp := hApp:__enumIndex() - 1
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+            hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+            nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+            IF hTok[ "marker" ] >= 1
+               cMk := hTok[ "text" ]
+               hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
+               AAdd( aPosApps, nApp )
+            ELSEIF cWd == NIL
+               cWd   := hTok[ "text" ]
+               hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
+            ENDIF
+         ENDIF
+      NEXT
+   NEXT
+
+   IF cMk != NIL
+      cUpName := Upper( cMk )
+      // fecho de derivação DESTE site: a mesma varredura de PpMarkerSeeds,
+      // semeada só com os pares da posição (from referencia aplicações
+      // anteriores - uma passada em ordem fecha o transitivo)
+      FOR EACH hApp IN hAst[ "ppApplications" ]
+         nApp := hApp:__enumIndex() - 1
+         FOR EACH hTok IN hApp[ "tokens" ]
+            IF hTok[ "marker" ] >= 1 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
+               ! Empty( PpMarkerRanges( hAst, hTok, hPairs, cUpName ) )
+               hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
+            ENDIF
+         NEXT
+      NEXT
+      hClassMap := ClassFuncMap( hAsts )
+      // fato 1 da dona: co-derivação a partir DESTE site (PpMarkerOwners
+      // sobre os artefatos do fecho) - cobre protótipo/registro (o from
+      // liga o site à colagem e ao stringify)
+      aArts     := PpMarkerArtifacts( hAst, hPairs, cUpName )
+      hOwners   := PpMarkerOwners( hAst, aArts, FuncStmtSpans( hAst ), cUpName )
+      FOR EACH cOwn IN hb_HKeys( hOwners )
+         IF hb_HHasKey( hClassMap, cOwn )
+            hCand[ cOwn ] := hClassMap[ cOwn ][ 3 ][ "name" ]
+         ENDIF
+      NEXT
+      // fato 2 da dona: aplicação-identidade (P1a) - a app da posição
+      // carrega TODAS as partes de um composto gerado como markers
+      // posicionados (a linha de implementação do hbclass deriva o
+      // composto das posições da DECLARAÇÃO - provado no probe da Q5: o
+      // from não liga este site; a identidade na MESMA app liga)
+      FOR EACH nApp IN aPosApps
+         hApp := hAst[ "ppApplications" ][ nApp + 1 ]
+         hMk  := { => }
+         FOR EACH hTok IN hApp[ "tokens" ]
+            IF hTok[ "marker" ] >= 1 .AND. hTok[ "type" ] == 21 .AND. ;
+               hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL
+               hMk[ Upper( hTok[ "text" ] ) ] := .T.
+            ENDIF
+         NEXT
+         FOR EACH hFunc IN hAst[ "functions" ]
+            IF ! hFunc[ "fileDecl" ] .AND. ;
+               Len( aParts := GenNameParts( hAst, hFunc ) ) >= 2 .AND. ;
+               AScan( aParts, cUpName ) > 0 .AND. IdentSubset( aParts, hMk ) .AND. ;
+               GenMsgPart( aParts, hClassMap ) == cUpName
+               // a dona é a parte que nomeia função-de-classe; composto
+               // com mais de uma parte-classe não decide (fica de fora)
+               nCls := 0
+               cOwn := ""
+               FOR EACH cPart IN aParts
+                  IF hb_HHasKey( hClassMap, cPart )
+                     nCls++
+                     cOwn := cPart
+                  ENDIF
+               NEXT
+               IF nCls == 1
+                  hCand[ cOwn ] := hClassMap[ cOwn ][ 3 ][ "name" ]
+               ENDIF
+            ENDIF
+         NEXT
+      NEXT
+      // fato 3 da dona: canal declared no stream - `_HB_CLASS <dona>` muda
+      // a classe corrente e `_HB_MEMBER <nome>` declara nela (semântica
+      // SEQUENCIAL do compilador; o nome chega POSICIONADO). Cobre DSL
+      // declarativa PURA: dona sem função geradora fica fora do
+      // hClassMap e da co-derivação, mas o canal a nomeia
+      cCur   := NIL
+      nState := 0
+      FOR EACH hTok IN hAst[ "tokens" ]
+         IF nState == 3
+            IF hTok[ "type" ] == 55
+               nState := 0
+            ELSEIF hTok[ "type" ] == 21 .AND. cCur != NIL .AND. ;
+               hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+               nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+               hCand[ Upper( cCur ) ] := cCur
+            ENDIF
+         ELSEIF hTok[ "type" ] == 21
+            DO CASE
+            CASE Upper( hTok[ "text" ] ) == "_HB_CLASS"
+               nState := 1
+            CASE Upper( hTok[ "text" ] ) == "_HB_MEMBER"
+               nState := 2
+            CASE nState == 1
+               cCur   := hTok[ "text" ]
+               nState := 0
+            CASE nState == 2
+               IF cCur != NIL .AND. hTok[ "col" ] != NIL .AND. ;
+                  hTok[ "line" ] == nLine .AND. ;
+                  nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+                  hCand[ Upper( cCur ) ] := cCur
+               ENDIF
+               nState := 0
+            ENDCASE
+         ELSEIF nState == 2 .AND. hTok[ "type" ] == 54
+            nState := 3
+         ELSE
+            nState := 0
+         ENDIF
+      NEXT
+      IF hb_HHasKey( hClassMap, cUpName )
+         cKind  := "função-de-classe do projeto"
+         cQuery := cMk
+      ELSEIF Len( hCand ) == 1
+         cKind  := "nome de marker, dona única no site (co-derivação/identidade/declared)"
+         cQuery := hb_HValueAt( hCand, 1 ) + ":" + cMk
+      ELSEIF Len( hCand ) > 1
+         // um site com mais de uma dona não decide: consulta crua honesta
+         cKind  := "nome de marker com mais de uma dona no site"
+         cQuery := cMk
+      ELSE
+         cKind  := "nome de marker (sem dona identificável)"
+         cQuery := cMk
+      ENDIF
+   ELSEIF cWd != NIL
+      cKind  := "palavra de regra de pp (" + RuleTag( hRule ) + ", " + ;
+                RuleWhere( hRule ) + ")"
+      cQuery := cWd
+   ELSE
+      // camada 3: identificador comum do stream do compilador
+      aPrev := NIL
+      FOR EACH hTok IN hAst[ "tokens" ]
+         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+            hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+            nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+            cMk    := hTok[ "text" ]
+            cKind  := iif( aPrev != NIL .AND. aPrev[ "type" ] == 58, ;
+                           "site de send (mensagem; dispatch dinâmico)", ;
+                      iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, ;
+                           "campo com alias", "identificador" ) )
+            cQuery := cMk
+            EXIT
+         ENDIF
+         aPrev := hTok
+      NEXT
+      IF cQuery == NIL
+         RETURN NIL
+      ENDIF
+   ENDIF
+
+   RETURN { "name" => iif( cMk != NIL, cMk, cWd ), "kind" => cKind, ;
+            "query" => cQuery }
 
 // ---------------------------------------------------------------------------
 // saída LSP Location[] (linhas/colunas 0-based)

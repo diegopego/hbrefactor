@@ -1742,14 +1742,16 @@ check "consulta da herdeira: decl/impl do pai vira possible (Q4 - vínculo não 
 ! grep -q "excluded" "$D/of.log"
 check "consultada com cadeia indecidível (fato 9) não exclui NENHUM site" $?
 
-echo "case 71: extensão VSCode - lifting de método no find-references (methodQuery real)"
-# a extensão promove a palavra sob o cursor a Classe:Método quando o cursor
-# está na implementação (METHOD x ... CLASS Y) ou num protótipo do bloco
-# CLASS/ENDCLASS - a forma onde o CLI decide o dispatch. O harness extrai a
-# methodQuery REAL do extension.js (não uma cópia) e a exercita contra
-# fixtures da suíte + sintéticos (13 checks, inclusive os negativos).
-node "$HERE/../vscode/test-methodquery.js" > /dev/null 2>&1
-check "methodQuery: 13/13 contra fixtures reais e sintéticos" $?
+echo "case 71: extensão VSCode - consulta por POSIÇÃO (Q5: methodQuery morto)"
+# a extensão não promove nada por regex: manda a posição do cursor
+# (usages --at arq:linha:col, 1-based - a conversão do 0-based do editor
+# é o risco real e o harness a testa) e o CLI resolve por FATO na MESMA
+# invocação (caso 81 é o contrato da resolução). Posição sem
+# identificador de compilação cai para a consulta crua da palavra. O
+# harness extrai as funções REAIS do extension.js (técnica do harness
+# anterior) e ASSERTA a morte da regex de construto (V1).
+node "$HERE/../vscode/test-resolveat.js" > /dev/null 2>&1
+check "extensão por posição: conversão real + fallback + methodQuery morto" $?
 
 echo "case 72: B4f-3 - A PROVA DA GENERALIDADE: homônimos em DSLs customizadas (#xcommand)"
 # DSLs INVENTADAS (rig.ch: RIG/COG/FORGE, espelho estrutural do hbclass;
@@ -2072,6 +2074,54 @@ grep -q "o1.prg:12: oficio definition Talha (tenda Banca)  | OFICIO Talha DA Ban
 check "dono no vocabulário da DSL não-espelho (tenda Banca), membro no da regra raiz (oficio)" $?
 ! grep -qi "(class banca" "$D/bt.log"
 check "nenhum rótulo 'class' para dona de DSL própria" $?
+
+echo "case 81: Q5 (revisao-generalidade) - resolve-at: o cursor vira consulta por FATO"
+# O methodQuery da extensão era regex hbclass hard-coded (V1): promovia
+# por FORMA e só via METHOD ... CLASS / bloco CREATE CLASS. resolve-at
+# responde "o que está sob o cursor" pelos tokens consumidos de
+# ppApplications (posição byte-exata) + rastro, em camadas de fato: dona
+# por CO-DERIVAÇÃO do site, por APLICAÇÃO-IDENTIDADE (P1a - o from da
+# implementação hbclass deriva das posições da DECLARAÇÃO, provado no
+# probe da Q5; a identidade inteira na MESMA app liga o site) e pelo
+# canal DECLARED sequencial (_HB_CLASS/_HB_MEMBER, cobre DSL declarativa
+# pura e a lista { } do VAR). Homônimo resolve pelo SITE (a linha), não
+# por unicidade de projeto; palavra de DSL responde a própria; send é
+# dispatch dinâmico (consulta crua honesta); posição sem identificador
+# recusa - a extensão cai para a palavra crua.
+D=$(freshdis case81)
+( cd "$D" && "$BIN" resolve-at fixdis.hbp d1.prg 13 11 > r1.log 2>&1 && grep -qi "^query: UWMain:Paint$" r1.log )
+check "hbclass protótipo promove (paridade com o methodQuery morto)" $?
+( cd "$D" && "$BIN" resolve-at fixdis.hbp d1.prg 23 8 > r2.log 2>&1 && grep -qi "^query: UWMain:Paint$" r2.log )
+check "hbclass implementação promove (fato da aplicação-identidade)" $?
+( cd "$D" && "$BIN" resolve-at fixdis.hbp d1.prg 31 11 > r3.log 2>&1 && grep -qi "^query: UWSecondary:Paint$" r3.log )
+check "homônimo hbclass resolve pelo SITE" $?
+D=$(freshofi case81b)
+( cd "$D" && "$BIN" resolve-at fixofi.hbp o1.prg 12 8 > r1.log 2>&1 && grep -qi "^query: Banca:Talha$" r1.log )
+check "DSL NÃO-espelho: assinatura única promove (a regex nunca cobriu)" $?
+( cd "$D" && "$BIN" resolve-at fixofi.hbp o1.prg 7 7 > r2.log 2>&1 && grep -qi "^query: Banca:Talha$" r2.log )
+check "site de registro runtime (LAVRA) promove pela co-derivação" $?
+D=$(freshhom case81c)
+( cd "$D" && "$BIN" resolve-at fixhom.hbp m1.prg 19 5 > r1.log 2>&1 && grep -qi "^query: Totem:Brilho$" r1.log && \
+  "$BIN" resolve-at fixhom.hbp m1.prg 27 5 > r2.log 2>&1 && grep -qi "^query: Idolo:Brilho$" r2.log )
+check "homônimos de DSL resolvem pelo SITE (19=Totem, 27=Idolo)" $?
+( cd "$D" && "$BIN" resolve-at fixhom.hbp m2.prg 7 6 > r3.log 2>&1 && grep -q "^query: Sol:Fulgor$" r3.log )
+check "DSL declarativa PURA promove pelo canal declared" $?
+( cd "$D" && "$BIN" resolve-at fixhom.hbp m3.prg 10 8 > r4.log 2>&1 && grep -q "^query: Grade:nT$" r4.log )
+check "VAR do hbclass promove pela lista { } do canal" $?
+( cd "$D" && "$BIN" resolve-at fixhom.hbp m1.prg 19 1 > r5.log 2>&1 && grep -q "^query: COG$" r5.log )
+check "palavra de DSL responde a própria palavra" $?
+( cd "$D" && "$BIN" resolve-at fixhom.hbp m1.prg 39 8 > r6.log 2>&1 && grep -q "^query: Brilho$" r6.log && grep -q "send" r6.log )
+check "send é dispatch dinâmico: consulta crua honesta" $?
+( cd "$D" && "$BIN" resolve-at fixhom.hbp m1.prg 39 1 > r7.log 2>&1; [ $? -ne 0 ] )
+check "posição sem identificador recusa (fallback da extensão)" $?
+# usages --at: o MESMO core numa única invocação/compilação - é o que a
+# extensão chama (a linha "query:" sai antes do relato normal do usages)
+( cd "$D" && "$BIN" usages fixhom.hbp --at m1.prg:19:5 > u1.log 2>&1 && \
+  grep -qi "^query: Totem:Brilho$" u1.log && grep -q "cog declaration (rig TOTEM)" u1.log )
+check "usages --at resolve a posição e consulta numa chamada só" $?
+( cd "$D" && "$BIN" usages fixhom.hbp --at m1.prg:39:1 > u2.log 2>&1; [ $? -ne 0 ] ) && \
+  grep -q "nenhum identificador" "$D/u2.log"
+check "usages --at recusa posição vazia nomeando o fato (fallback da extensão)" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

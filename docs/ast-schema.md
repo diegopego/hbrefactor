@@ -589,6 +589,24 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   `.ppo` e `.hrb -gh -l` de TODOS os módulos byte-idênticos, senão
   rollback. O `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de
   `-o`/cwd) — preservar um `.ppo` pré-existente do usuário.
+- **Consulta por posição (revisão Q5)** (`ResolveAtQuery`, core do
+  `resolve-at` e do `usages --at`): "o que está sob o cursor" responde
+  por camadas de fato — (1) nome que preenche match marker (apptoken
+  posicionado byte-exato; é a ÚNICA posição da assinatura de construto
+  gerado — tokens[] colapsa): a dona vem do fecho de derivação DAQUELE
+  site por três fatos somados — co-derivação (`PpMarkerOwners`),
+  APLICAÇÃO-IDENTIDADE (P1a: a app da posição carrega todas as partes do
+  composto como markers posicionados; necessário porque o `from` da
+  implementação hbclass deriva das posições da DECLARAÇÃO — provado no
+  probe da Q5) e canal declared sequencial (`_HB_CLASS`/`_HB_MEMBER`,
+  inclusive a lista `{ }` — cobre DSL declarativa pura); dona única →
+  `query: Dona:Nome`; mais de uma → cru honesto; (2) palavra de regra
+  (marker 0) → a própria; (3) identificador do stream → cru (send é
+  dispatch dinâmico: nunca promove). Homônimo resolve pelo SITE. Posição
+  sem identificador → recusa (consumidor cai para a palavra crua). Dump
+  sem rastro degrada para cru. Contrato de saída: linha `query: <spec>`
+  antes do relato. Coluna é BYTE (editor UTF-16 desalinha → fallback).
+  B4g estenderá a sites DENTRO de diretiva.
 - **Vocabulário do DONO (revisão Q6)** (`OwnerVocabMap`/`OwnerWord`): o
   rótulo de TIPO do dono (`cog declaration (rig TOTEM)`, `oficio
   definition Talha (tenda Banca)`) usa a cabeça da regra cuja expansão
