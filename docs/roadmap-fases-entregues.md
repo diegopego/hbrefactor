@@ -1514,3 +1514,47 @@ Lição de percurso (a armadilha do HB_BIN mordeu DE NOVO): a primeira
 `HB_BIN`, os dois runners falham com saída idêntica e `diff` limpo. Prova
 de paridade só vale conferindo ANTES que a baseline contém a suíte real
 (o exit=1 inexplicado era o aviso).
+
+## Fase B7 — tipos interprocedurais (alavanca B) ✅ (2026-07-08)
+
+Promovida do backlog pela fricção do fixext (sends de homônimos
+misturados no peek — `possible (receiver unknown)` para todos). Spec com
+decisões D1-D4: [spec-b7-tipos-interprocedurais.md](spec-b7-tipos-interprocedurais.md).
+
+**Core (ast-6, D2)**: `"ret": true` no push de RETURN (`hb_compAstReturn`,
+harbour.y + compast.c; .yyc regenerado com bison 3.0.2 preservando o
+patch manual do yynerrs); zero impacto provado 224/224 .hrb
+byte-idênticos (112 módulos de src/, -w0 E -w3); relink duplo
+harbour+hbmk2 conferido por strings.
+
+**Análise (fatias 1+2, bloco B7* + TypeOf/SendReceiverType)**: ponto
+fixo com conjuntos finitos de classes; oráculo D3 (tobject.prg com -x,
+cache tamanho+mtime em ~/.cache/hbrefactor) — "New herdado devolve
+QSelf()" é fato do fonte da linguagem, provado por probe executável;
+cadeia de construção por FUNREF; fold de IIF constante + união dos
+ramos de IIF de runtime (fechada no rito, caso 85); registro por pares
+(STRING, @F()) genérico; retorno rotulado de fábrica sem DECLARE;
+`::Super:` (D1: travessia de vínculo escrito na TIPAGEM, com ressalva
+de mundo fechado no rótulo); venenos → ⊤ sempre (Self reescrito, @ref,
+escrita destacada, memvar/field, pontos cegos auditados); união de
+parâmetros por call sites do projeto; conjunto >1 nomeia candidatos.
+
+**Rito D4 (2026-07-08, flips aprovados caso a caso pelo Diego)**:
+baseline pré-rito 560/5; a previsão da spec (unidades 62/63/66/72/73/75)
+errou parcialmente — flips reais em 39/61(×2)/63/66, 6 sites em 5
+checks: w2.prg:7 e c2.prg:28 e r2.prg:28 → confirmed via cadeia;
+c2.prg:30 e d1.prg:87/88 → excluded com despacho nomeado. "Declarar
+ctor" virou reforço, não requisito (descrição do caso 66 reescrita).
+
+**Cobertura (casos 84/85, 17 checks)**: caso 84 asserta o critério
+fixext linha a linha (simetria das duas consultas; `::Super:Deposita`
+com cadeia nomeada); caso 85 (fixture nova fixb7) prova fábrica sem
+DECLARE, união de call sites (`receiver one of DISCO or PECA`), IIF de
+runtime como união dos ramos, e os 3 venenos com send observável
+degradando honesto. Generalidade: fixq4 (caso 75) e fixofi intactos —
+fronteira `__clsInst` (primitiva C) permanece honesta.
+
+Fechamento provado por execução: suíte **582/0**, saída BYTE-IDÊNTICA
+paralelo × `JOBS=1`. Lição de fixture: send `::Msg()` NÃO conta como
+uso de SELF para o W0032 — o uso que conta é acesso a VAR (a fixture
+fixb7 documenta a forma no comentário).

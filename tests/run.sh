@@ -108,6 +108,13 @@ freshdis() { # freshdis <case-name> -> fixture for dispatch resolution (B4f-2)
    echo "$d"
 }
 
+freshb7() { # freshb7 <case-name> -> fixture for interprocedural types (B7)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixb7/*.prg "$HERE"/fixb7/*.hbp "$d"/
+   echo "$d"
+}
+
 freshhom() { # freshhom <case-name> -> fixture for DSL homonym generality (B4f-3)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -2448,7 +2455,68 @@ check "nenhum candidato resolvido: pergunta sem resposta (exit != 0), não órf�
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83"
+unit_84() {
+echo "case 84: B7 critério fixext - homônimos separados pelo receptor (rito D4)"
+# o critério de pronto da spec-b7, assertado: a construção no MAIN tipa
+# oC/oV pela cadeia; a consulta de cada classe confirma o próprio send,
+# exclui o do homônimo com o alvo nomeado, e o ::Super:Deposita sai com a
+# cadeia (não mais 'receiver unknown'). Os venenos Troca/Ajustada seguem na
+# fixture (nenhum send de Deposita atravessa o veneno - veneno com send
+# observável é cobertura do caso 85).
+D=$(freshext case84)
+( cd "$D" && "$BIN" usages fixext.hbp ContaVip:Deposita > vip.log 2>&1 )
+check "usages ContaVip:Deposita exit 0" $?
+grep -q "e1.prg:74: confirmed send (receiver class CONTAVIP via construction chain, class graph as written) in MAIN" "$D/vip.log"
+check "send de oV confirmado pela cadeia de construção" $?
+grep -q "e1.prg:71: excluded send within the written class graph (receiver class CONTA via construction chain, dispatches to CONTA:DEPOSITA) in MAIN" "$D/vip.log" && \
+   grep -q "e1.prg:73: excluded send within the written class graph (receiver class CONTA via construction chain, dispatches to CONTA:DEPOSITA) in MAIN" "$D/vip.log"
+check "sends de oC excluídos com o alvo nomeado" $?
+grep -q "e1.prg:64: excluded send within the written class graph (receiver class CONTA via construction chain, dispatches to CONTA:DEPOSITA) in CONTAVIP_DEPOSITA" "$D/vip.log"
+check "::Super:Deposita com a cadeia nomeada (não mais receiver unknown)" $?
+( cd "$D" && "$BIN" usages fixext.hbp Conta:Deposita > cta.log 2>&1 )
+check "usages Conta:Deposita exit 0" $?
+grep -q "e1.prg:71: confirmed send (receiver class CONTA via construction chain, class graph as written) in MAIN" "$D/cta.log" && \
+   grep -q "e1.prg:73: confirmed send (receiver class CONTA via construction chain, class graph as written) in MAIN" "$D/cta.log" && \
+   grep -q "e1.prg:64: confirmed send (receiver class CONTA via construction chain, class graph as written) in CONTAVIP_DEPOSITA" "$D/cta.log"
+check "consulta espelho: sends de oC e ::Super confirmados" $?
+grep -q "e1.prg:74: excluded send within the written class graph (receiver class CONTAVIP via construction chain, dispatches to CONTAVIP:DEPOSITA) in MAIN" "$D/cta.log"
+check "consulta espelho: send de oV excluído com o alvo nomeado" $?
+
+}
+
+unit_85() {
+echo "case 85: B7 cobertura - fábrica sem DECLARE, união, conjunto >1, venenos"
+# spec-b7, casos novos do critério: fábrica sem DECLARE tipa pelo RETURN
+# rotulado (ast-6, D2); parâmetro sem escrita/@ref = união dos call sites
+# do projeto; IIF de condição de runtime = união dos ramos (conjunto >1
+# nomeado); venenos com send observável (@ref, escrita destacada em bloco,
+# Self reescrito) ficam possible - fato faltante degrada honesto.
+"$HB_BIN/harbour" "$HERE/fixb7/b1.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixb7/b1.prg clean under -w3 -es2" $?
+D=$(freshb7 case85)
+( cd "$D" && "$BIN" usages fixb7.hbp Peca:Gira > pg.log 2>&1 )
+check "usages Peca:Gira exit 0" $?
+grep -q "b1.prg:53: confirmed send (receiver class PECA via construction chain, class graph as written) in MAIN" "$D/pg.log"
+check "fábrica sem DECLARE: retorno rotulado tipa o receptor (ast-6)" $?
+grep -q "b1.prg:39: possible send (receiver one of DISCO or PECA via construction chain, class graph as written) in USAQUALQUER" "$D/pg.log"
+check "parâmetro: união dos call sites nomeia o conjunto {DISCO, PECA}" $?
+grep -q "b1.prg:54: possible send (receiver one of DISCO or PECA via construction chain, class graph as written) in MAIN" "$D/pg.log"
+check "IIF de condição de runtime: união dos ramos nomeia o conjunto" $?
+grep -q "b1.prg:58: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/pg.log"
+check "veneno @ref: possible honesto" $?
+grep -q "b1.prg:61: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/pg.log"
+check "veneno escrita destacada em bloco: possible honesto" $?
+grep -q "b1.prg:30: possible send (dynamic dispatch, receiver unknown) in DISCO_SOLTA" "$D/pg.log"
+check "veneno Self reescrito: possible honesto" $?
+grep -q "b1.prg:21: excluded method definition (implements DISCO:GIRA)" "$D/pg.log"
+check "definição homônima excluída na consulta por classe" $?
+( cd "$D" && "$BIN" usages fixb7.hbp Disco:Gira > dg.log 2>&1 )
+grep -q "b1.prg:53: excluded send within the written class graph (receiver class PECA via construction chain, dispatches to PECA:GIRA) in MAIN" "$D/dg.log"
+check "consulta espelho: send da fábrica excluído com o alvo nomeado" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

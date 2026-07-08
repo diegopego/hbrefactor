@@ -40,7 +40,7 @@ Compilador como oráculo (ganchos de 1 linha gated, `.hrb` byte-idêntico
 sem `-x`); editor ≠ verificador (recompilar, comparar, rollback); hbmk2
 como resolvedor de projeto; fixtures como contrato de comportamento;
 réplica sintática na ferramenta é proibida (a fonte da verdade é o
-compilador). Dump por módulo `.ast.json` (schema atual **ast-5**), specs
+compilador). Dump por módulo `.ast.json` (schema atual **ast-6**), specs
 de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 
 ## Fases entregues (registro completo no [arquivo](roadmap-fases-entregues.md))
@@ -61,6 +61,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B4g (2026-07-07) | A regra POR DENTRO (ast-5): `match[]`/`result[]`; usages nomeia sites em regra; rename-dsl de qualquer palavra do match (reancoragem textual morta); rename-function `--edit-rules` (caso 74 acionável); resolve-at em diretiva; extensão 0.7.0; ADR-001; suíte 555/0 |
 | B-infra Etapa 1 (2026-07-07) | Suíte paralela: pool bash por-caso, saída byte-idêntica, 10/10 sem flake, 109 s → 11-14 s (~8×); `JOBS=1` p/ depurar |
 | B-infra Etapa 2 (2026-07-08) | Runner em Harbour: despacho+join `tests/parrun.prg` (`hb_processOpen`) + checker `tests/tcheck.prg` (`hb_jsonDecode`) — python fora do `make test`; paridade byte-idêntica nos dois modos, 10/10 sem flake, 14 s |
+| B7 (2026-07-08) | Tipos interprocedurais: cadeia de construção + oráculo QSelf (ast-6 `ret`); rito D4 (5 checks/6 sites aprovados caso a caso); homônimos separados por receptor; união de call sites/IIF; casos 84/85; suíte 582/0 |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -250,36 +251,7 @@ sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
 Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
 são dependências do alvo `test`).
 
-### B7 — Tipos interprocedurais (alavanca B) — **EM IMPLEMENTAÇÃO (portão fechado 2026-07-08)**
-
-Escopo, fatos de probe, regra (ponto fixo com conjuntos finitos de
-classes + venenos), decisões D1-D4 (aprovadas — registradas no topo da
-spec) e critério de pronto executável (fixext linha a linha):
-**[spec-b7-tipos-interprocedurais.md](spec-b7-tipos-interprocedurais.md)**.
-Promovida do backlog item 1 pela fricção de 2026-07-08 (sends de
-homônimos misturados no peek).
-Entregue: **gancho ast-6 no core** (D2): `"ret": true` no push de
-RETURN (`hb_compAstReturn`, harbour.y + compast.c, .yyc/.yyh
-regenerados com bison 3.0.2 preservando o patch manual do yynerrs);
-prova de zero impacto 224/224 .hrb byte-idênticos (112 módulos de src/
-em -w0 E -w3, com/sem -x); relink duplo harbour+hbmk2 conferido;
-hbrefactor aceita ast-6. **Fatias 1+2 da análise** (bloco B7* em
-src/hbrefactor.prg, regra estendida documentada na seção TypeOf do
-ast-schema): oráculo D3 (tobject.prg com -x, cache em
-~/.cache/hbrefactor), cadeia de construção por FUNREF (fold de IIF
-constante), registro por pares (STRING, @F()) genérico, QSelf() =
-identidade, retorno rotulado de fábrica, `::Super:`, venenos de Self,
-união de parâmetros com pontos cegos auditados (macro/string/@F()),
-conjuntos finitos nomeados. **Critério fixext PROVADO por execução**
-(as duas consultas, linha a linha, incluindo venenos do Troca/
-Ajustada); generalidade: fixq4 caso 75 intacto, fixofi honesto na
-fronteira `__clsInst` (primitiva C, sem fato).
-**AGUARDA RITO D4**: 5 checks (6 sites) flipam — apresentados ao
-Diego caso a caso; NENHUM assert alterado. Depois: asserts + casos
-novos de cobertura (fábrica, venenos, união, conjunto >1,
-generalidade em DSL não-espelho via canais da linguagem).
-
-### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **PORTÃO ABERTO (2026-07-08); execução APÓS o rito D4 da B7**
+### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **PORTÃO ABERTO; DESBLOQUEADA (rito D4 da B7 concluído em 2026-07-08) — começa pelo M0**
 
 Requisito do Diego (2026-07-08): macros como caso difícil + smoke test
 com `hb_compileFromBuf()` colhendo insights que generalizem. Spec com

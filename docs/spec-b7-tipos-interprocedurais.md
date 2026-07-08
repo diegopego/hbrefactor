@@ -1,8 +1,13 @@
 # Spec B7 — Tipos interprocedurais (alavanca B): receptor de send por fato
 
-Status: **IMPLEMENTADA (fatias 1+2, 2026-07-08) — AGUARDA RITO D4**
-(5 checks/6 sites flipam; nenhum assert alterado até a aprovação caso a
-caso). Critério do fixext PROVADO por execução. Fronteira registrada:
+Status: **ENTREGUE (2026-07-08) — rito D4 concluído: flips aprovados
+caso a caso pelo Diego (casos 39/61×2/63/66, 6 sites; a previsão
+"unidades 62/63/66/72/73/75" errou parcialmente — vale o fato);
+cobertura nos casos 84 (critério fixext assertado) e 85 (fábrica sem
+DECLARE, união de call sites e de IIF de runtime, conjunto >1 nomeado,
+venenos com send observável); suíte 582/0, byte-idêntica paralelo ×
+JOBS=1. Registro no [arquivo](roadmap-fases-entregues.md).**
+Critério do fixext PROVADO por execução. Fronteira registrada:
 retorno por primitiva C (`__clsInst` do fixofi) não tem fato de
 compilação — permanece possible; o veneno do forjador (Q4/caso 75)
 alcança a TIPAGEM aninhada em mundo fechado com o rótulo carregando a

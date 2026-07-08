@@ -1,8 +1,10 @@
 # Spec B8 — Macros: pipe hbmk2, contexto do site (ast-7) + complemento por probe
 
 Status: **PORTÃO ABERTO (2026-07-08, decisões E1-E4 do Diego +
-dialética do pipe fechada em 2026-07-08). Execução APÓS o rito D4 da
-B7** (o rastreio de string reusa a máquina de ponto fixo da B7 fatia 2).
+dialética do pipe fechada em 2026-07-08). DESBLOQUEADA — o rito D4 da
+B7 foi concluído em 2026-07-08; próxima fase, começando pelo portão
+M0** (o rastreio de string reusa a máquina de ponto fixo da B7 fatia 2,
+agora entregue).
 Motivação (requisito do Diego, 2026-07-08): macros são o caso difícil —
 código que o compilador principal NÃO compila (adia para runtime) e que
 hoje é ponto cego do usages; a meta-programação do Harbour

@@ -6122,6 +6122,25 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
          RETURN TypeOf( ATail( hExpr[ "items" ] ), hFunc, hDecl, lBlock, hSeen, ;
                         hInter, hAst )
       ENDIF
+
+   CASE cEt == "IIF"
+      // condição LOGICAL constante segue só o ramo tomado (a semântica do
+      // HB_EA_REDUCE, que elimina o ramo morto do pcode); condição de
+      // runtime (B7): o valor é a UNIÃO dos dois ramos - conjunto finito;
+      // ramo sem fato envenena a união (B7Merge => NIL)
+      IF Len( hb_HGetDef( hExpr, "items", {} ) ) == 3
+         IF HB_ISHASH( hExpr[ "items" ][ 1 ] ) .AND. ;
+            hb_HGetDef( hExpr[ "items" ][ 1 ], "et", "" ) == "LOGICAL"
+            RETURN TypeOf( hExpr[ "items" ][ ;
+                              iif( hb_HGetDef( hExpr[ "items" ][ 1 ], "val", .F. ), 2, 3 ) ], ;
+                           hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+         ENDIF
+         IF hInter != NIL
+            RETURN B7Merge( ;
+               TypeOf( hExpr[ "items" ][ 2 ], hFunc, hDecl, lBlock, hSeen, hInter, hAst ), ;
+               TypeOf( hExpr[ "items" ][ 3 ], hFunc, hDecl, lBlock, hSeen, hInter, hAst ) )
+         ENDIF
+      ENDIF
    ENDCASE
 
    RETURN NIL
