@@ -115,6 +115,13 @@ freshb7() { # freshb7 <case-name> -> fixture for interprocedural types (B7)
    echo "$d"
 }
 
+freshb7b() { # freshb7b <case-name> -> fixture for inference slice 3 (B7b)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixb7b/*.prg "$HERE"/fixb7b/*.ch "$HERE"/fixb7b/*.hbp "$d"/
+   echo "$d"
+}
+
 freshhom() { # freshhom <case-name> -> fixture for DSL homonym generality (B4f-3)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -2516,7 +2523,60 @@ check "consulta espelho: send da fábrica excluído com o alvo nomeado" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85"
+unit_86() {
+echo "case 86: B7b inferência fatia 3 - retorno de método, Self em INLINE, blocos"
+# spec-b7b: (1) send encadeado - método declarado sem tipo cai para os
+# pushes "ret" da implementação registrada (identidade Self em cadeia
+# inclusa); (2) Self em corpo INLINE/OPERATOR - o 1º parâmetro do bloco de
+# membro inline É o receptor (fato do VM, classes.c:4554), provado em
+# hbclass E em DSL própria não-espelho (portão de generalidade - régua do
+# caso 64); (3) blocos - detached de binding único, parâmetro de bloco
+# pela união dos sites de Eval (statement continuado incluso). Venenos
+# permanecem honestos: Self reescrito (nem a identidade de RETURN Self
+# vale), ciclo entre métodos, retornos discordantes, bloco irrastreável,
+# detached multi-write.
+"$HB_BIN/harbour" "$HERE/fixb7b/q1.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixb7b/q1.prg clean under -w3 -es2" $?
+"$HB_BIN/harbour" "$HERE/fixb7b/q2.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixb7b/q2.prg clean under -w3 -es2" $?
+D=$(freshb7b case86)
+( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > ms.log 2>&1 )
+check "usages Moeda:Soma exit 0" $?
+grep -q "q1.prg:13: confirmed send (receiver class MOEDA via construction chain, class graph as written, codeblock) in MOEDA" "$D/ms.log" && \
+   grep -q "q1.prg:14: confirmed send (receiver class MOEDA via construction chain, class graph as written, codeblock) in MOEDA" "$D/ms.log"
+check "INLINE e OPERATOR: 1º param do bloco inline é o receptor (money)" $?
+grep -q "q1.prg:73: confirmed send (receiver class MOEDA via construction chain, class graph as written) in MAIN" "$D/ms.log"
+check "send encadeado: retorno não-Self do método pelos pushes ret" $?
+[ "$(grep -c "q1.prg:75: confirmed send (receiver class MOEDA via construction chain, class graph as written) in MAIN" "$D/ms.log")" = "2" ]
+check "identidade em cadeia: RETURN Self encadeia os dois sends da linha" $?
+grep -q "q1.prg:77: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/ms.log"
+check "veneno Self reescrito: RETURN Self não é identidade - possible" $?
+grep -q "q1.prg:78: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/ms.log"
+check "veneno ciclo Gira<->Volta nos RETURNs: possible honesto" $?
+grep -q "q1.prg:79: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/ms.log"
+check "veneno retornos discordantes (classe x valor): possible honesto" $?
+grep -q "q1.prg:82: confirmed send (receiver class MOEDA via construction chain, class graph as written, codeblock) in MAIN" "$D/ms.log"
+check "bloco lendo detached de binding único: confirmado" $?
+grep -q "q1.prg:85: confirmed send (receiver class MOEDA via construction chain, class graph as written, codeblock) in MAIN" "$D/ms.log"
+check "parâmetro de bloco pela união dos sites de Eval: confirmado" $?
+grep -q "q1.prg:90: confirmed send (receiver class MOEDA via construction chain, class graph as written, codeblock) in MAIN" "$D/ms.log"
+check "param de bloco em statement continuado: decisão por fato, não linha" $?
+grep -q "q1.prg:93: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN" "$D/ms.log"
+check "bloco que sai da função (leitura fora de Eval): possible honesto" $?
+grep -q "q1.prg:96: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN" "$D/ms.log"
+check "detached multi-write no bloco: permanece possible (⊤)" $?
+( cd "$D" && "$BIN" usages fixb7b.hbp Fornalha:mexe > fm.log 2>&1 )
+check "usages Fornalha:mexe exit 0" $?
+grep -q "q2.prg:9: confirmed send (receiver class FORNALHA via construction chain, class graph as written, codeblock) in FORNALHA" "$D/fm.log"
+check "PORTÃO DE GENERALIDADE: DSL não-espelho ganha o mesmo fato (tigela)" $?
+grep -q "q2.prg:10: possible send (dynamic dispatch, receiver unknown, codeblock) in FORNALHA" "$D/fm.log"
+check "2º parâmetro do bloco inline NÃO é o receptor: possible honesto" $?
+! grep -qiE 'fornalha|brasa|tigela|forno|tacho' "$HERE/../src/hbrefactor.prg"
+check "régua do caso 64: nenhuma palavra da DSL no fonte da ferramenta" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

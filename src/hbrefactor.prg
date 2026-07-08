@@ -5951,19 +5951,27 @@ STATIC FUNCTION DeclType( hItem, cHow )
 // função do projeto; SEND cujo método não é declarado na classe resolve
 // pela cadeia de construção ESCRITA até o teto de runtime (oráculo D3),
 // com QSelf() = identidade do receptor; `::Super:` tipa pela cadeia.
-// Travessia de vínculo escrito marca "via" (D1: vale em mundo fechado, o
-// rótulo carrega a ressalva). Venenos: `Self := x` e `@Self` => NIL.
-// Fora da regra => NIL (desconhecido, camada "possible"). hSeen quebra
-// ciclos de binding (a := b, b := a)
-STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+// B7b (portão de 2026-07-08, spec-b7b): método declarado SEM tipo cai
+// para a implementação registrada (pushes "ret"); parâmetro de bloco é
+// decidido pelo FATO da declaração (param + declLine na linha do bloco) e
+// tipado pelo registro inline (1º param = receptor, classes.c:4554) ou
+// pela união dos sites de Eval rastreáveis. Travessia de vínculo escrito
+// marca "via" (D1: vale em mundo fechado, o rótulo carrega a ressalva).
+// Venenos: `Self := x` e `@Self` => NIL. Fora da regra => NIL
+// (desconhecido, camada "possible"). hSeen quebra ciclos de binding
+// (a := b, b := a). xBlock: .F. fora de bloco, .T. bloco DESCONHECIDO
+// (degrada como sempre), ou o próprio nó CODEBLOCK que contém hExpr
+STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
 
-   LOCAL cEt, cSym, cMsg, hItem, hExprA, hRes, hOcc, hFun
+   LOCAL cEt, cSym, cMsg, hItem, hExprA, hRes, hOcc, hFun, lBlock, hBlk, aBP
    LOCAL nWrites := 0, nRefs := 0, nAssigns := 0, hAssign := NIL, lAsgBlock := .F.
 
    IF ! HB_ISHASH( hExpr )
       RETURN NIL
    ENDIF
-   cEt := hb_HGetDef( hExpr, "et", "" )
+   cEt    := hb_HGetDef( hExpr, "et", "" )
+   hBlk   := iif( HB_ISHASH( xBlock ), xBlock, NIL )
+   lBlock := iif( HB_ISLOGICAL( xBlock ), xBlock, .T. )
 
    DO CASE
    CASE cEt == "VARIABLE"
@@ -5973,18 +5981,6 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
       // regra sem ordem => a função inteira degrada (conservador)
       IF cSym == "SELF" .AND. B7SelfPoisoned( hFunc )
          RETURN NIL
-      ENDIF
-      // dentro de codeblock, uso de local EXTERNA resolve como 'detached';
-      // 'local'+block na mesma linha é PARÂMETRO do bloco - sombra sem
-      // classe possível (o CBVAR do compilador não guarda classe)
-      IF lBlock
-         FOR EACH hOcc IN hFunc[ "occurrences" ]
-            IF Upper( hOcc[ "sym" ] ) == cSym .AND. hOcc[ "block" ] .AND. ;
-               hOcc[ "line" ] == hb_HGetDef( hExpr, "line", -1 ) .AND. ;
-               hOcc[ "scope" ] == "local"
-               RETURN NIL
-            ENDIF
-         NEXT
       ENDIF
       FOR EACH hOcc IN hFunc[ "occurrences" ]
          IF Upper( hOcc[ "sym" ] ) == cSym
@@ -5999,6 +5995,35 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
             ENDIF
          ENDIF
       NEXT
+      // dentro de codeblock, uso de local EXTERNA resolve como 'detached'
+      // (segue o caminho normal); PARÂMETRO de bloco é fato da declaração
+      // (param + declLine na linha do bloco - B7b): tipo declarado do
+      // próprio param vence; senão o registro inline tipa o 1º param como
+      // o RECEPTOR (classes.c:4554) e a união dos sites de Eval cobre o
+      // resto; bloco irrastreável/ambíguo degrada (NIL)
+      IF lBlock .AND. ( aBP := B7BlockParam( hFunc, hBlk, cSym ) ) != NIL
+         IF Len( aBP ) == 0
+            RETURN NIL      // param de bloco sem atribuição única de bloco
+         ENDIF
+         IF ( hRes := DeclType( aBP[ 3 ], "declared" ) ) != NIL
+            RETURN hRes     // {|x AS CLASS Foo|...}: canal declarado
+         ENDIF
+         // veneno: param reescrito/@ref dentro do bloco (regra sem ordem)
+         IF nWrites > 0 .OR. nRefs > 0 .OR. hInter == NIL
+            RETURN NIL
+         ENDIF
+         IF hSeen == NIL
+            hSeen := { => }
+         ENDIF
+         IF hb_HHasKey( hSeen, cSym )
+            RETURN NIL
+         ENDIF
+         hSeen[ cSym ] := .T.
+         IF ( hRes := B7InlineSelfType( hFunc, hAst, aBP, hInter ) ) != NIL
+            RETURN hRes
+         ENDIF
+         RETURN B7BlockEvalType( hFunc, hAst, aBP, cSym, hDecl, hSeen, hInter )
+      ENDIF
       // 1) classe/tipo DECLARADO da própria variável (Self entra por aqui)
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == cSym .AND. ;
@@ -6077,15 +6102,22 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
          // `::Super:Msg()` - obj é SEND SUPER: o MESMO objeto visto pela
          // cadeia escrita do pai (B7/D1; só decide com vínculo ÚNICO)
          IF cMsg == "SUPER"
-            RETURN B7SuperType( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+            RETURN B7SuperType( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
          ENDIF
-         hRes := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, lBlock, ;
+         hRes := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, xBlock, ;
                          hSeen, hInter, hAst )
          IF hRes != NIL .AND. hb_HHasKey( hRes, "cls" )
             IF hb_HHasKey( hDecl[ "c" ], hRes[ "cls" ] ) .AND. ;
                hb_HHasKey( hDecl[ "c" ][ hRes[ "cls" ] ], cMsg )
-               RETURN B7ViaMark( DeclType( hDecl[ "c" ][ hRes[ "cls" ] ][ cMsg ], "chain" ), ;
-                                 hb_HGetDef( hRes, "via", .F. ) )
+               hExprA := B7ViaMark( DeclType( hDecl[ "c" ][ hRes[ "cls" ] ][ cMsg ], "chain" ), ;
+                                    hb_HGetDef( hRes, "via", .F. ) )
+               // B7b: método DECLARADO mas sem tipo de retorno - o fato
+               // vem dos pushes "ret" da implementação registrada (a
+               // resolução declared/registro é a mesma do B7MethodRet)
+               IF hExprA == NIL .AND. hInter != NIL
+                  hExprA := B7SendRet( hRes, cMsg, hInter )
+               ENDIF
+               RETURN hExprA
             ENDIF
             // B7: método NÃO declarado na classe do receptor - resolve
             // pela cadeia de construção escrita até o teto de runtime
@@ -6119,7 +6151,7 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
    CASE cEt == "LIST"
       // expressão parentetizada: o valor é o do ÚLTIMO item
       IF ! Empty( hb_HGetDef( hExpr, "items", {} ) )
-         RETURN TypeOf( ATail( hExpr[ "items" ] ), hFunc, hDecl, lBlock, hSeen, ;
+         RETURN TypeOf( ATail( hExpr[ "items" ] ), hFunc, hDecl, xBlock, hSeen, ;
                         hInter, hAst )
       ENDIF
 
@@ -6133,12 +6165,12 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
             hb_HGetDef( hExpr[ "items" ][ 1 ], "et", "" ) == "LOGICAL"
             RETURN TypeOf( hExpr[ "items" ][ ;
                               iif( hb_HGetDef( hExpr[ "items" ][ 1 ], "val", .F. ), 2, 3 ) ], ;
-                           hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+                           hFunc, hDecl, xBlock, hSeen, hInter, hAst )
          ENDIF
          IF hInter != NIL
             RETURN B7Merge( ;
-               TypeOf( hExpr[ "items" ][ 2 ], hFunc, hDecl, lBlock, hSeen, hInter, hAst ), ;
-               TypeOf( hExpr[ "items" ][ 3 ], hFunc, hDecl, lBlock, hSeen, hInter, hAst ) )
+               TypeOf( hExpr[ "items" ][ 2 ], hFunc, hDecl, xBlock, hSeen, hInter, hAst ), ;
+               TypeOf( hExpr[ "items" ][ 3 ], hFunc, hDecl, xBlock, hSeen, hInter, hAst ) )
          ENDIF
       ENDIF
    ENDCASE
@@ -6185,10 +6217,11 @@ STATIC FUNCTION SendReceiverType( hFunc, hSend, hDecl, hInter, hAst )
    RETURN hType
 
 // coleta recursiva dos nós SEND de uma mensagem numa linha; desce a árvore
-// inteira marcando o contexto de codeblock (corpo de CODEBLOCK)
-STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, lBlock, aNodes )
+// inteira carregando o contexto de codeblock (B7b: o próprio nó CODEBLOCK
+// mais interno, para a decisão de parâmetro de bloco por fato)
+STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, xBlock, aNodes )
 
-   LOCAL xVal, lChildBlock
+   LOCAL xVal, xChildBlock
 
    IF ! HB_ISHASH( hExpr )
       RETURN
@@ -6196,14 +6229,14 @@ STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, lBlock, aNodes )
    IF hb_HGetDef( hExpr, "et", "" ) == "SEND" .AND. ;
       hb_HGetDef( hExpr, "line", -1 ) == nLine .AND. ;
       Upper( hb_HGetDef( hExpr, "msg", "" ) ) == cUpMsg
-      AAdd( aNodes, { hb_HGetDef( hExpr, "obj", NIL ), lBlock } )
+      AAdd( aNodes, { hb_HGetDef( hExpr, "obj", NIL ), xBlock } )
    ENDIF
-   lChildBlock := lBlock .OR. hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK"
+   xChildBlock := iif( hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK", hExpr, xBlock )
    FOR EACH xVal IN hExpr
       IF HB_ISHASH( xVal )
-         SendNodesWalk( xVal, cUpMsg, nLine, lChildBlock, aNodes )
+         SendNodesWalk( xVal, cUpMsg, nLine, xChildBlock, aNodes )
       ELSEIF HB_ISARRAY( xVal )
-         AEval( xVal, {| xItem | SendNodesWalk( xItem, cUpMsg, nLine, lChildBlock, aNodes ) } )
+         AEval( xVal, {| xItem | SendNodesWalk( xItem, cUpMsg, nLine, xChildBlock, aNodes ) } )
       ENDIF
    NEXT
 
@@ -6232,8 +6265,9 @@ STATIC FUNCTION B7Ctx( hAsts, hDecl )
                      "orc" => OracleLoad(), "funcs" => { => }, ;
                      "links" => { => }, "regs" => { => }, "rets" => { => }, ;
                      "params" => { => }, "asts" => hAsts, "dyn" => NIL, ;
-                     "strs" => NIL, "active" => { => } }
-   LOCAL cPath, hAst, hFunc, hMod, cUpF
+                     "strs" => NIL, "active" => { => }, ;
+                     "clsfn" => { => }, "inlblk" => { => } }
+   LOCAL cPath, hAst, hFunc, hMod, cUpF, aCF
 
    FOR EACH cPath IN hb_HKeys( hAsts )
       hAst := hAsts[ cPath ]
@@ -6263,6 +6297,18 @@ STATIC FUNCTION B7Ctx( hAsts, hDecl )
          ENDIF
       NEXT
       hInter[ "orc" ][ "ast" ][ "_b7funcs" ] := hMod
+   ENDIF
+   // B7b: mapa reverso função-classe -> classe (módulo!função), para o
+   // tipo do 1º parâmetro de bloco inline registrado (co-derivação: a
+   // função-classe já vem ligada à classe pelo rastro - ClassFuncMap)
+   FOR EACH cUpF IN hb_HKeys( hInter[ "clsmap" ] )
+      aCF := hInter[ "clsmap" ][ cUpF ]
+      hInter[ "clsfn" ][ hb_HGetDef( aCF[ 2 ], "module", "" ) + "!" + ;
+                         Upper( aCF[ 3 ][ "name" ] ) ] := cUpF
+   NEXT
+   IF hInter[ "orc" ] != NIL
+      hInter[ "clsfn" ][ hb_HGetDef( hInter[ "orc" ][ "ast" ], "module", "" ) + "!" + ;
+                         Upper( hInter[ "orc" ][ "fun" ][ "name" ] ) ] := hInter[ "orc" ][ "cls" ]
    ENDIF
 
    RETURN hInter
@@ -6366,12 +6412,14 @@ STATIC FUNCTION B7RetPushes( hFunc )
    RETURN aOut
 
 // todo RETURN da implementação devolve QSelf()? (o compilador traduz
-// QSelf() para o nó SELF - fato do dump, probe qself.prg na spec)
+// QSelf() para o nó SELF - fato do dump, probe qself.prg na spec).
+// B7b: corpo com Self envenenado (`Self := x`/`@Self`) NÃO é identidade -
+// o Self devolvido pode ser outra instância (regra sem ordem, conservador)
 STATIC FUNCTION B7AllRetsSelf( hFunc )
 
    LOCAL aPushes := B7RetPushes( hFunc ), hExpr
 
-   IF Empty( aPushes )
+   IF Empty( aPushes ) .OR. B7SelfPoisoned( hFunc )
       RETURN .F.
    ENDIF
    FOR EACH hExpr IN aPushes
@@ -6535,12 +6583,13 @@ STATIC PROCEDURE B7FunRefsWalk( hExpr, aRefs )
 // de biblioteca)
 STATIC FUNCTION B7Regs( cUpCls, hInter )
 
-   LOCAL hRegs, aCF, hFunCls, hStmt
+   LOCAL hRegs, aCF, hFunCls, hStmt, hBlks
 
    IF hb_HHasKey( hInter[ "regs" ], cUpCls )
       RETURN hInter[ "regs" ][ cUpCls ]
    ENDIF
    hRegs := { => }
+   hBlks := { => }
    IF hInter[ "orc" ] != NIL .AND. cUpCls == hInter[ "orc" ][ "cls" ]
       hFunCls := hInter[ "orc" ][ "fun" ]
    ELSEIF ( aCF := hb_HGetDef( hInter[ "clsmap" ], cUpCls, NIL ) ) != NIL
@@ -6549,18 +6598,23 @@ STATIC FUNCTION B7Regs( cUpCls, hInter )
    IF hFunCls != NIL
       FOR EACH hStmt IN hFunCls[ "statements" ]
          B7RegPairsWalk( hb_HGetDef( hStmt, "expr", NIL ), ;
-                         Upper( hFunCls[ "name" ] ), hRegs )
+                         Upper( hFunCls[ "name" ] ), hRegs, hBlks )
       NEXT
    ENDIF
    hInter[ "regs" ][ cUpCls ] := hRegs
+   hInter[ "inlblk" ][ cUpCls ] := hBlks      // blocos de membro INLINE (B7b)
 
    RETURN hRegs
 
-STATIC PROCEDURE B7RegPairsWalk( hExpr, cUpClsFun, hRegs )
+// B7b: a leitura é em PROFUNDIDADE-0 (não desce em corpo de CODEBLOCK) -
+// registro dentro de bloco não roda na construção da classe (executaria
+// por dispatch: fronteira de runtime, fora do como-escrito). hBlks
+// (opcional) colhe os blocos de membro INLINE: chave do nó => mensagem
+STATIC PROCEDURE B7RegPairsWalk( hExpr, cUpClsFun, hRegs, hBlks )
 
-   LOCAL xVal, hItem, hParms, cName, cImpl, lInline
+   LOCAL xVal, hItem, hParms, cName, cImpl, lInline, hCb
 
-   IF ! HB_ISHASH( hExpr )
+   IF ! HB_ISHASH( hExpr ) .OR. hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK"
       RETURN
    ENDIF
    hParms := hb_HGetDef( hExpr, "parms", NIL )
@@ -6568,6 +6622,7 @@ STATIC PROCEDURE B7RegPairsWalk( hExpr, cUpClsFun, hRegs )
       cName := NIL
       cImpl := NIL
       lInline := .F.
+      hCb := NIL
       FOR EACH hItem IN hb_HGetDef( hParms, "items", {} )
          IF ! HB_ISHASH( hItem )
             LOOP
@@ -6578,21 +6633,25 @@ STATIC PROCEDURE B7RegPairsWalk( hExpr, cUpClsFun, hRegs )
             cName := Upper( hItem[ "val" ] )
          CASE hb_HGetDef( hItem, "et", "" ) == "FUNREF" .AND. cImpl == NIL
             cImpl := Upper( hb_HGetDef( hItem, "val", "" ) )
-         CASE hb_HGetDef( hItem, "et", "" ) == "CODEBLOCK" .AND. cImpl == NIL
+         CASE hb_HGetDef( hItem, "et", "" ) == "CODEBLOCK" .AND. cImpl == NIL .AND. ! lInline
             lInline := .T.
+            hCb := hItem
          ENDCASE
       NEXT
       IF cName != NIL .AND. ( cImpl != NIL .OR. lInline ) .AND. ;
          !( cImpl == cUpClsFun ) .AND. ! hb_HHasKey( hRegs, cName )
          hRegs[ cName ] := cImpl      // NIL quando inline (sem fato)
+         IF hBlks != NIL .AND. cImpl == NIL .AND. hCb != NIL
+            hBlks[ B7NodeKey( hCb ) ] := cName
+         ENDIF
       ENDIF
    ENDIF
    FOR EACH xVal IN hExpr
       IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
-         B7RegPairsWalk( xVal, cUpClsFun, hRegs )
+         B7RegPairsWalk( xVal, cUpClsFun, hRegs, hBlks )
       ELSEIF HB_ISARRAY( xVal )
          FOR EACH hItem IN xVal
-            B7RegPairsWalk( hItem, cUpClsFun, hRegs )
+            B7RegPairsWalk( hItem, cUpClsFun, hRegs, hBlks )
          NEXT
       ENDIF
    NEXT
@@ -6605,6 +6664,7 @@ STATIC PROCEDURE B7RegPairsWalk( hExpr, cUpClsFun, hRegs )
 STATIC FUNCTION B7MethodRet( cCur, hRecv, cUpMsg, lVia, hInter, hSeen )
 
    LOCAL hDecl := hInter[ "decl" ], hRegs, aFA, cLink, aR, hAstCls, aCF
+   LOCAL lDeclHit := .F., hT
 
    IF hSeen == NIL
       hSeen := { => }
@@ -6614,9 +6674,15 @@ STATIC FUNCTION B7MethodRet( cCur, hRecv, cUpMsg, lVia, hInter, hSeen )
    ENDIF
    hSeen[ cCur ] := .T.
 
-   // 1. método DECLARADO na classe corrente (canal declared)
+   // 1. método DECLARADO na classe corrente (canal declared). Declarado
+   //    SEM tipo (B7b): a mensagem é PRÓPRIA daqui (o dispatch para), mas
+   //    o fato de retorno vem da implementação registrada - cai ao passo 2
    IF hb_HHasKey( hDecl[ "c" ], cCur ) .AND. hb_HHasKey( hDecl[ "c" ][ cCur ], cUpMsg )
-      RETURN { .T., B7ViaMark( DeclType( hDecl[ "c" ][ cCur ][ cUpMsg ], "chain" ), lVia ) }
+      hT := B7ViaMark( DeclType( hDecl[ "c" ][ cCur ][ cUpMsg ], "chain" ), lVia )
+      IF hT != NIL
+         RETURN { .T., hT }
+      ENDIF
+      lDeclHit := .T.
    ENDIF
 
    // 2. método REGISTRADO na classe corrente (pares STRING/@F())
@@ -6639,6 +6705,11 @@ STATIC FUNCTION B7MethodRet( cCur, hRecv, cUpMsg, lVia, hInter, hSeen )
          RETURN { .T., B7ViaMark( hb_HClone( hRecv ), lVia ) }
       ENDIF
       RETURN { .T., B7ViaMark( B7FunRet( hRegs[ cUpMsg ], hAstCls, hInter ), lVia ) }
+   ENDIF
+   // declarada aqui sem registro visível: achada, sem fato (não sobe -
+   // o acerto é próprio)
+   IF lDeclHit
+      RETURN { .T., NIL }
    ENDIF
 
    // 3. sobe pelos vínculos escritos, na ordem; primeiro ACHADO vence
@@ -6687,14 +6758,14 @@ STATIC FUNCTION B7SendRet( hRecv, cUpMsg, hInter )
 
 // tipo de `::Super:...` - o MESMO objeto visto pela cadeia do pai escrito;
 // só decide com vínculo ÚNICO (multiherança: conservador, NIL)
-STATIC FUNCTION B7SuperType( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+STATIC FUNCTION B7SuperType( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
 
    LOCAL hBase, aLinks
 
    IF hInter == NIL
       RETURN NIL
    ENDIF
-   hBase := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, lBlock, ;
+   hBase := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, xBlock, ;
                     hSeen, hInter, hAst )
    IF hBase == NIL .OR. ! hb_HHasKey( hBase, "cls" )
       RETURN NIL
@@ -6705,6 +6776,409 @@ STATIC FUNCTION B7SuperType( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
    ENDIF
 
    RETURN NIL
+
+// ---------------------------------------------------------------------------
+// B7b - inferência fatia 3 (spec-b7b-inferencia.md, portão de 2026-07-08):
+// parâmetro de bloco decidido por FATO da declaração (o dump registra os
+// params do bloco com param=true e declLine na linha do `{|`, em ordem);
+// 1º parâmetro de bloco de membro INLINE registrado = o RECEPTOR (fato do
+// VM: classes.c:4554 empilha Self como 1º argumento do bloco - vale para
+// __clsAddMsg/AddInline/qualquer DSL, nada keyed a hbclass); demais params
+// de bloco tipam pela união dos argumentos dos sites de Eval QUANDO o
+// bloco é rastreável até eles (obj direto de Eval, ou binding único de
+// local cujas leituras são TODAS obj de Eval) - ponto cego => NIL honesto
+// ---------------------------------------------------------------------------
+
+// identidade de um nó da árvore no dump (tok de nascimento + linha):
+// suficiente para distinguir nós CODEBLOCK entre si dentro de uma função
+STATIC FUNCTION B7NodeKey( hNode )
+   RETURN hb_ntos( hb_HGetDef( hNode, "tok", -1 ) ) + "|" + ;
+          hb_ntos( hb_HGetDef( hNode, "line", -1 ) )
+
+// quantos nós CODEBLOCK a função tem naquela linha? (>1 = as declarações
+// de param da linha não são atribuíveis a um bloco - ambíguo, degrada)
+STATIC FUNCTION B7BlkLineCount( hFunc, nLine )
+
+   LOCAL hCnt, hStmt
+
+   IF hb_HHasKey( hFunc, "_b7blkl" )
+      hCnt := hFunc[ "_b7blkl" ]
+   ELSE
+      hCnt := { => }
+      FOR EACH hStmt IN hFunc[ "statements" ]
+         B7BlkCountWalk( hb_HGetDef( hStmt, "expr", NIL ), hCnt )
+      NEXT
+      hFunc[ "_b7blkl" ] := hCnt
+   ENDIF
+
+   RETURN hb_HGetDef( hCnt, nLine, 0 )
+
+STATIC PROCEDURE B7BlkCountWalk( hExpr, hCnt )
+
+   LOCAL xVal, hItem, nLine
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK"
+      nLine := hb_HGetDef( hExpr, "line", -1 )
+      hCnt[ nLine ] := hb_HGetDef( hCnt, nLine, 0 ) + 1
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         B7BlkCountWalk( xVal, hCnt )
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            B7BlkCountWalk( hItem, hCnt )
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN
+
+// pilha de blocos que envolvem hBlk (do mais externo ao próprio hBlk),
+// achada nas árvores de statements; NIL = não localizado
+STATIC FUNCTION B7BlkStack( hFunc, hBlk )
+
+   LOCAL hStmt, aOut, cKey := B7NodeKey( hBlk )
+
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      aOut := B7BlkStackWalk( hb_HGetDef( hStmt, "expr", NIL ), cKey, {} )
+      IF aOut != NIL
+         RETURN aOut
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+STATIC FUNCTION B7BlkStackWalk( hExpr, cKey, aStack )
+
+   LOCAL xVal, hItem, aR
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN NIL
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK"
+      aStack := AClone( aStack )
+      AAdd( aStack, hExpr )
+      IF B7NodeKey( hExpr ) == cKey
+         RETURN aStack
+      ENDIF
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         aR := B7BlkStackWalk( xVal, cKey, aStack )
+         IF aR != NIL
+            RETURN aR
+         ENDIF
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            aR := B7BlkStackWalk( hItem, cKey, aStack )
+            IF aR != NIL
+               RETURN aR
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+// cSym é PARÂMETRO DE BLOCO neste uso? Resolução LÉXICA por fato: a
+// declaração param fora da linha da função é de bloco; o binder é o bloco
+// mais interno da pilha de hBlk cuja linha declara cSym. Devolve:
+//   NIL                  -> não é param de bloco daqui (caminho normal)
+//   {} (vazio)           -> é/pode ser param de bloco sem vinculação
+//                           decidível -> degrada (conservador)
+//   { hCb, nIdx, hDecl } -> param nIdx (1-based) do bloco hCb
+STATIC FUNCTION B7BlockParam( hFunc, hBlk, cSym )
+
+   LOCAL hItem, lIsPar := .F., nFnLine := hFunc[ "line" ], aStack, nI, nLine
+   LOCAL nIdx, hMine
+
+   FOR EACH hItem IN hFunc[ "declarations" ]
+      IF hb_HGetDef( hItem, "param", .F. ) .AND. ;
+         !( hItem[ "declLine" ] == nFnLine ) .AND. Upper( hItem[ "sym" ] ) == cSym
+         lIsPar := .T.
+         EXIT
+      ENDIF
+   NEXT
+   IF ! lIsPar
+      RETURN NIL
+   ENDIF
+   IF hBlk == NIL
+      RETURN {}      // contexto de bloco desconhecido: degrada como sempre
+   ENDIF
+   IF ( aStack := B7BlkStack( hFunc, hBlk ) ) == NIL
+      RETURN {}
+   ENDIF
+   FOR nI := Len( aStack ) TO 1 STEP -1
+      nLine := hb_HGetDef( aStack[ nI ], "line", -1 )
+      nIdx  := 0
+      hMine := NIL
+      FOR EACH hItem IN hFunc[ "declarations" ]
+         IF hb_HGetDef( hItem, "param", .F. ) .AND. hItem[ "declLine" ] == nLine .AND. ;
+            !( nLine == nFnLine )
+            nIdx++
+            IF Upper( hItem[ "sym" ] ) == cSym
+               hMine := hItem
+               EXIT
+            ENDIF
+         ENDIF
+      NEXT
+      IF hMine != NIL
+         // dois blocos na mesma linha: as declarações da linha não são
+         // atribuíveis a um só bloco - ambíguo
+         IF B7BlkLineCount( hFunc, nLine ) != 1
+            RETURN {}
+         ENDIF
+         RETURN { aStack[ nI ], nIdx, hMine }
+      ENDIF
+   NEXT
+
+   RETURN NIL      // param de bloco que NÃO envolve o uso: captura externa
+
+// alvo 2 (B7b): o bloco é membro INLINE registrado da classe cuja
+// função-classe é hFunc? Então o 1º parâmetro é o RECEPTOR (classes.c:4554
+// empilha Self como 1º argumento) - tipo = a classe, com a ressalva do
+// como-escrito ("via"): o registro é vínculo escrito e um descendente que
+// herde o inline chega aqui com receptor próprio
+STATIC FUNCTION B7InlineSelfType( hFunc, hAst, aBP, hInter )
+
+   LOCAL cCls
+
+   IF aBP[ 2 ] != 1
+      RETURN NIL
+   ENDIF
+   cCls := hb_HGetDef( hInter[ "clsfn" ], ;
+                       hb_HGetDef( hAst, "module", "" ) + "!" + Upper( hFunc[ "name" ] ), NIL )
+   IF cCls == NIL
+      RETURN NIL
+   ENDIF
+   B7Regs( cCls, hInter )      // materializa o memo dos blocos inline
+   IF hb_HHasKey( hb_HGetDef( hInter[ "inlblk" ], cCls, { => } ), B7NodeKey( aBP[ 1 ] ) )
+      RETURN { "cls" => cCls, "how" => "chain", "via" => .T. }
+   ENDIF
+
+   RETURN NIL
+
+// alvo 3b (B7b): tipo de um parâmetro de bloco pela união dos argumentos
+// dos sites de Eval rastreáveis (o compilador traduz Eval(b,...) para o
+// send b:EVAL(...) - fato do dump). Rastreável = o bloco é obj direto de
+// um Eval, OU é o único write de uma local (binding único) cujas leituras
+// são TODAS obj de Eval. Qualquer outra aparição/leitura (arg de função,
+// item de array, RETURN, @ref) = ponto cego => NIL. Memo + guarda de ciclo
+STATIC FUNCTION B7BlockEvalType( hFunc, hAst, aBP, cSym, hDecl, hSeen, hInter )
+
+   LOCAL cKey, aSites, aSite, hOne, hOut := NIL
+
+   HB_SYMBOL_UNUSED( hSeen )
+   cKey := "b!" + hb_HGetDef( hAst, "module", "" ) + "!" + Upper( hFunc[ "name" ] ) + ;
+           "!" + B7NodeKey( aBP[ 1 ] ) + "!" + cSym
+   IF hb_HHasKey( hInter[ "params" ], cKey )
+      RETURN hInter[ "params" ][ cKey ]
+   ENDIF
+   IF hb_HHasKey( hInter[ "active" ], cKey )
+      RETURN NIL
+   ENDIF
+   hInter[ "active" ][ cKey ] := .T.
+   aSites := B7BlockEvalArgs( hFunc, aBP[ 1 ], aBP[ 2 ] )
+   IF aSites == NIL .OR. Empty( aSites )
+      hOut := NIL
+   ELSE
+      FOR EACH aSite IN aSites
+         // arg ausente/NONE = omitido (NIL em runtime)
+         hOne := iif( aSite[ 1 ] == NIL, { "val" => "nil" }, ;
+                      TypeOf( aSite[ 1 ], hFunc, hDecl, aSite[ 2 ], NIL, hInter, hAst ) )
+         hOut := iif( aSite:__enumIndex() == 1, hOne, B7Merge( hOut, hOne ) )
+         IF hOut == NIL
+            EXIT
+         ENDIF
+      NEXT
+   ENDIF
+   hb_HDel( hInter[ "active" ], cKey )
+   IF hOut != NIL .AND. hb_HGetDef( hOut, "how", "" ) == "declared"
+      hOut := hb_HClone( hOut )
+      hOut[ "how" ] := "chain"
+   ENDIF
+   hInter[ "params" ][ cKey ] := hOut
+
+   RETURN hOut
+
+// os argumentos na posição nIdx de cada site de Eval do bloco hBlk, com o
+// contexto de bloco de cada site; NIL = bloco não rastreável até os Evals
+STATIC FUNCTION B7BlockEvalArgs( hFunc, hBlk, nIdx )
+
+   LOCAL aCtx := B7BlkNodeCtx( hFunc, hBlk ), aOut := {}, aEvals, aE
+   LOCAL cVar, hOcc, nWrites := 0, nRefs := 0
+
+   IF aCtx == NIL
+      RETURN NIL
+   ENDIF
+   IF aCtx[ 1 ] == "evalobj"
+      AAdd( aOut, { B7EvalArgAt( aCtx[ 2 ], nIdx ), aCtx[ 3 ] } )
+      RETURN aOut
+   ENDIF
+   IF !( aCtx[ 1 ] == "bind" )
+      RETURN NIL
+   ENDIF
+   // binding único da local que recebeu o bloco: 1 write, 0 refs, fora do
+   // alcance dinâmico (memvar/field ficam de fora pelo scope da occurrence)
+   cVar := aCtx[ 2 ]
+   FOR EACH hOcc IN hFunc[ "occurrences" ]
+      IF Upper( hOcc[ "sym" ] ) == cVar
+         IF hb_AScan( { "memvar", "memvar_implicit", "field" }, hOcc[ "scope" ] ) > 0
+            RETURN NIL
+         ENDIF
+         IF hOcc[ "access" ] == "write"
+            nWrites++
+         ELSEIF hOcc[ "access" ] == "ref"
+            nRefs++
+         ENDIF
+      ENDIF
+   NEXT
+   IF nWrites != 1 .OR. nRefs != 0
+      RETURN NIL
+   ENDIF
+   IF ( aEvals := B7VarEvalReads( hFunc, cVar ) ) == NIL
+      RETURN NIL
+   ENDIF
+   FOR EACH aE IN aEvals
+      AAdd( aOut, { B7EvalArgAt( aE[ 1 ], nIdx ), aE[ 2 ] } )
+   NEXT
+
+   RETURN aOut
+
+// argumento nIdx (1-based) de um nó SEND Eval; NIL = omitido/NONE
+STATIC FUNCTION B7EvalArgAt( hSend, nIdx )
+
+   LOCAL aItems := hb_HGetDef( hb_HGetDef( hSend, "parms", { => } ), "items", {} )
+
+   IF nIdx <= Len( aItems ) .AND. HB_ISHASH( aItems[ nIdx ] ) .AND. ;
+      !( hb_HGetDef( aItems[ nIdx ], "et", "" ) == "NONE" )
+      RETURN aItems[ nIdx ]
+   ENDIF
+
+   RETURN NIL
+
+// classifica a aparição do bloco nas árvores da função:
+//   { "evalobj", hSend, xBlkCtx } -> obj direto de um send EVAL
+//   { "bind", cVarUpper }         -> lado direito de ASSIGN de topo p/ local
+//   { "other" }                   -> qualquer outra posição (não rastreável)
+//   NIL                           -> não localizado
+STATIC FUNCTION B7BlkNodeCtx( hFunc, hBlk )
+
+   LOCAL hStmt, hExpr, cKey := B7NodeKey( hBlk ), aR
+
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      hExpr := hb_HGetDef( hStmt, "expr", NIL )
+      IF HB_ISHASH( hExpr ) .AND. hb_HGetDef( hExpr, "et", "" ) == "ASSIGN" .AND. ;
+         HB_ISHASH( hb_HGetDef( hExpr, "right", NIL ) ) .AND. ;
+         hb_HGetDef( hExpr[ "right" ], "et", "" ) == "CODEBLOCK" .AND. ;
+         B7NodeKey( hExpr[ "right" ] ) == cKey .AND. ;
+         HB_ISHASH( hb_HGetDef( hExpr, "left", NIL ) ) .AND. ;
+         hb_HGetDef( hExpr[ "left" ], "et", "" ) == "VARIABLE"
+         RETURN { "bind", Upper( hb_HGetDef( hExpr[ "left" ], "val", "" ) ) }
+      ENDIF
+      aR := B7BlkCtxWalk( hExpr, cKey, iif( hStmt[ "block" ], .T., .F. ), NIL )
+      IF aR != NIL
+         RETURN aR
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+STATIC FUNCTION B7BlkCtxWalk( hExpr, cKey, xBlk, hParent )
+
+   LOCAL xVal, hItem, aR, xChild
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN NIL
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK" .AND. B7NodeKey( hExpr ) == cKey
+      IF hParent != NIL .AND. hb_HGetDef( hParent, "et", "" ) == "SEND" .AND. ;
+         Upper( hb_HGetDef( hParent, "msg", "" ) ) == "EVAL" .AND. ;
+         HB_ISHASH( hb_HGetDef( hParent, "obj", NIL ) ) .AND. ;
+         hb_HGetDef( hParent[ "obj" ], "et", "" ) == "CODEBLOCK" .AND. ;
+         B7NodeKey( hParent[ "obj" ] ) == cKey
+         RETURN { "evalobj", hParent, xBlk }
+      ENDIF
+      RETURN { "other" }
+   ENDIF
+   xChild := iif( hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK", hExpr, xBlk )
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         aR := B7BlkCtxWalk( xVal, cKey, xChild, hExpr )
+         IF aR != NIL
+            RETURN aR
+         ENDIF
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            aR := B7BlkCtxWalk( hItem, cKey, xChild, hExpr )
+            IF aR != NIL
+               RETURN aR
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+// TODAS as leituras da local cVar nas árvores devem ser obj de send EVAL
+// (a escrita do binding fica de fora); devolve { hSend, xBlkCtx } por site
+// ou NIL se alguma leitura está em outra posição (ponto cego)
+STATIC FUNCTION B7VarEvalReads( hFunc, cUpVar )
+
+   LOCAL hStmt, aOut := {}, lOk := .T.
+
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      B7VarReadsWalk( hb_HGetDef( hStmt, "expr", NIL ), cUpVar, ;
+                      iif( hStmt[ "block" ], .T., .F. ), NIL, aOut, @lOk )
+      IF ! lOk
+         RETURN NIL
+      ENDIF
+   NEXT
+
+   RETURN aOut
+
+STATIC PROCEDURE B7VarReadsWalk( hExpr, cUpVar, xBlk, hParent, aOut, lOk )
+
+   LOCAL xVal, hItem, xChild
+
+   IF ! HB_ISHASH( hExpr ) .OR. ! lOk
+      RETURN
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "VARIABLE" .AND. ;
+      Upper( hb_HGetDef( hExpr, "val", "" ) ) == cUpVar
+      DO CASE
+      CASE hParent != NIL .AND. hb_HGetDef( hParent, "et", "" ) == "ASSIGN" .AND. ;
+           HB_ISHASH( hb_HGetDef( hParent, "left", NIL ) ) .AND. ;
+           hParent[ "left" ] [ "et" ] == "VARIABLE" .AND. ;
+           Upper( hb_HGetDef( hParent[ "left" ], "val", "" ) ) == cUpVar .AND. ;
+           B7NodeKey( hParent[ "left" ] ) == B7NodeKey( hExpr )
+         // a escrita do binding (left do ASSIGN): fora
+      CASE hParent != NIL .AND. hb_HGetDef( hParent, "et", "" ) == "SEND" .AND. ;
+           Upper( hb_HGetDef( hParent, "msg", "" ) ) == "EVAL" .AND. ;
+           HB_ISHASH( hb_HGetDef( hParent, "obj", NIL ) ) .AND. ;
+           B7NodeKey( hParent[ "obj" ] ) == B7NodeKey( hExpr ) .AND. ;
+           hParent[ "obj" ][ "et" ] == "VARIABLE"
+         AAdd( aOut, { hParent, xBlk } )
+      OTHERWISE
+         lOk := .F.      // leitura fora de Eval: ponto cego
+         RETURN
+      ENDCASE
+   ENDIF
+   xChild := iif( hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK", hExpr, xBlk )
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         B7VarReadsWalk( xVal, cUpVar, xChild, hExpr, aOut, @lOk )
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            B7VarReadsWalk( hItem, cUpVar, xChild, hExpr, aOut, @lOk )
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN
 
 // tipo de um PARÂMETRO pela união dos argumentos de todos os call sites
 // do projeto (B7). Só com o mundo fechado AUDITADO: macro em qualquer
@@ -6717,8 +7191,12 @@ STATIC FUNCTION B7ParamType( hFuncOwn, hAstOwn, cUpSym, hInter )
    LOCAL nIdx := 0, nP := 0, hItem, cUpFun := Upper( hFuncOwn[ "name" ] )
    LOCAL cKey, hOut := NIL, aSites, aSite, hOne
 
+   // B7b: só parâmetro da FUNÇÃO conta (declLine na linha da função);
+   // param de codeblock (declLine na linha do bloco) corrompia o índice
+   // e cairia na união de call sites errada - degrada honesto
    FOR EACH hItem IN hFuncOwn[ "declarations" ]
-      IF hb_HGetDef( hItem, "param", .F. )
+      IF hb_HGetDef( hItem, "param", .F. ) .AND. ;
+         hItem[ "declLine" ] == hFuncOwn[ "line" ]
          nP++
          IF Upper( hItem[ "sym" ] ) == cUpSym
             nIdx := nP
@@ -6797,9 +7275,9 @@ STATIC FUNCTION B7CallArgs( cUpFun, lStatic, hAstOwn, nIdx, hInter )
 
    RETURN aOut
 
-STATIC PROCEDURE B7ArgWalk( hExpr, cUpFun, nIdx, hFunc, hAst, lBlock, aOut )
+STATIC PROCEDURE B7ArgWalk( hExpr, cUpFun, nIdx, hFunc, hAst, xBlock, aOut )
 
-   LOCAL xVal, hItem, hFun, aItems, hArg
+   LOCAL xVal, hItem, hFun, aItems, hArg, xChild
 
    IF ! HB_ISHASH( hExpr )
       RETURN
@@ -6814,15 +7292,15 @@ STATIC PROCEDURE B7ArgWalk( hExpr, cUpFun, nIdx, hFunc, hAst, lBlock, aOut )
          !( hb_HGetDef( aItems[ nIdx ], "et", "" ) == "NONE" )
          hArg := aItems[ nIdx ]
       ENDIF
-      AAdd( aOut, { hArg, hFunc, hAst, lBlock } )
+      AAdd( aOut, { hArg, hFunc, hAst, xBlock } )
    ENDIF
    FOR EACH xVal IN hExpr
       IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
-         B7ArgWalk( xVal, cUpFun, nIdx, hFunc, hAst, ;
-                    lBlock .OR. hb_HGetDef( xVal, "et", "" ) == "CODEBLOCK", aOut )
+         xChild := iif( hb_HGetDef( xVal, "et", "" ) == "CODEBLOCK", xVal, xBlock )
+         B7ArgWalk( xVal, cUpFun, nIdx, hFunc, hAst, xChild, aOut )
       ELSEIF HB_ISARRAY( xVal )
          FOR EACH hItem IN xVal
-            B7ArgWalk( hItem, cUpFun, nIdx, hFunc, hAst, lBlock, aOut )
+            B7ArgWalk( hItem, cUpFun, nIdx, hFunc, hAst, xBlock, aOut )
          NEXT
       ENDIF
    NEXT

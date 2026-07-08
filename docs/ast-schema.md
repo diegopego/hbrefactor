@@ -393,7 +393,7 @@ emissão — zero impacto sem `-x` provado por `.hrb` byte-idênticos em -w0 E
 subsistema; a decodificação no writer é best-effort (faixas se sobrepõem)
 — consumidores atuais só usam RETORNOS.
 
-### TypeOf — propagação na ferramenta (regra FECHADA; extensão B7 pelo portão de 2026-07-08)
+### TypeOf — propagação na ferramenta (regra FECHADA; extensões B7 e B7b pelos portões de 2026-07-08)
 
 Regra local: a ferramenta classifica o receptor de send propagando tipos
 declarados sobre `statements[]`: `VARIABLE` (classe declarada; senão
@@ -440,6 +440,49 @@ só a TIPAGEM consome; as camadas de dispatch da Q4 ficam intocadas:
   num site que em runtime é código morto). Fronteira: retorno por
   primitiva C (`__clsInst` etc.) não tem fato de compilação —
   `possible` honesto (fixofi permanece assim).
+
+**Extensão B7b (spec-b7b-inferencia.md, portão de 2026-07-08 — fase
+100% ferramenta, schema inalterado)**:
+
+- **Retorno de MÉTODO (send encadeado)**: método DECLARADO na classe do
+  receptor mas SEM tipo de retorno (o `_HB_MEMBER` sem `AS` — a forma
+  normal do hbclass) cai para a implementação REGISTRADA da própria
+  classe e tipa pela união com acordo dos pushes `ret` (ast-6) — a
+  mesma máquina do retorno de função; o acerto declarado continua
+  parando o dispatch ali (não sobe vínculos). Identidade `RETURN Self`
+  encadeia (`o:Soma(1):Soma(2)`); corpo com Self ENVENENADO
+  (`Self := x`/`@Self`) não vale como identidade nem tipa; ciclo entre
+  métodos degrada pela guarda; retornos discordantes degradam pela
+  união.
+- **PARÂMETRO DE BLOCO é decidido por FATO da declaração**, não por
+  linha de occurrence: o dump registra os params do bloco em
+  `declarations[]` com `param: true` e `declLine` na linha do `{|`, em
+  ordem (param da FUNÇÃO tem `declLine` na linha da função). O binder
+  léxico é o bloco mais interno da pilha do uso cuja linha declara o
+  nome; duas CODEBLOCK na mesma linha = inatribuível (degrada). O
+  `B7ParamType` (união de call sites) passou a aceitar SÓ parâmetro de
+  função — param de bloco corrompia o índice da união (furo latente,
+  fechado no B7b).
+- **1º parâmetro de bloco de membro INLINE = o RECEPTOR**: fato do VM
+  (classes.c:4554 — `hb_vmPush( hb_stackSelfItem() )` antes dos
+  argumentos), sobre o registro como-escrito (par STRING+CODEBLOCK em
+  itens diretos do mesmo ARGLIST na função-classe — genérico:
+  hbclass `AddInline`, `__clsAddMsg`, qualquer DSL; provado em DSL
+  não-espelho no caso 86 com param que NÃO se chama Self). Tipo =
+  classe da função-classe, com `via` (um descendente que herde o
+  inline chega com receptor próprio — mundo fechado). Param declarado
+  (`{|x AS CLASS F|`) vence pelo canal declarado; 2º+ param não tipa
+  por aqui.
+- **Demais parâmetros de bloco: união dos sites de Eval rastreáveis**.
+  O compilador traduz `Eval(b,…)` para o send `b:EVAL(…)` (fato do
+  dump); rastreável = o bloco é obj DIRETO de um Eval, ou é o ÚNICO
+  write (binding único, 0 refs) de uma local cujas leituras são TODAS
+  obj de Eval na MESMA função. Qualquer outra aparição/leitura (arg de
+  função/iterador, item de array, RETURN, `@ref`, param reescrito no
+  corpo) = ponto cego ⇒ degrada. Argumento omitido = NIL.
+- **A leitura de pares de registro (B7Regs) é em PROFUNDIDADE-0**: não
+  desce em corpo de CODEBLOCK — registro dentro de bloco não roda na
+  construção da classe (executaria por dispatch: fronteira de runtime).
 
 Estender a regra além disto = novo portão.
 
