@@ -167,6 +167,52 @@ Restante, por fricção do uso diário:
 
 **Critério**: Diego usa no dia a dia; sem regressão.
 
+### U — Verbos de refatoração unificados (`rename`/`extract`/`reorder`) — **PORTÃO: decisão do Diego**
+
+**A pergunta, firme**: por que a CLI expõe OITO comandos de rename
+(`rename-local`, `rename-static`, `rename-memvar`, `rename-param`,
+`rename-function`, `rename-method`, `rename-dsl`, `rename-pp-marker`) mais
+`extract-function`, `inline-local`, `reorder-params`? Para renomear, o
+usuário precisa CLASSIFICAR de antemão o alvo — é local ou static? memvar
+ou param? método ou função ou palavra de DSL ou marcador de pp? Isso é
+justo o trabalho que **o compilador já fez** e que a ferramenta consome em
+`usages --at` / `resolve-at` / `ResolveAtQuery` (Q5): dado um ponto, o
+FATO diz o que o nome é. Fazer o usuário repetir essa taxonomia no sufixo
+do comando é uma **réplica sintática na superfície da CLI** — o mesmo
+anti-padrão que O NORTE proíbe no motor (sem ajuste por-caso; a fonte da
+verdade é o compilador, não uma tabela de tipos remontada à mão, aqui na
+UX).
+
+**Proposta a avaliar**: colapsar para os verbos que descrevem a AÇÃO, não a
+espécie do alvo — `rename <arq:linha:col> <novo>`, `extract`, `reorder` —
+despachando pelo fato da árvore no ponto (a máquina do `resolve-at` já
+existe e já é o caminho da extensão). O KIND deixa de ser escolha do
+usuário e vira consequência do que está sob o cursor.
+
+**Contra-argumentos honestos (para o portão, não varrer)**:
+- Os sufixos explícitos são também um CONTRATO/salvaguarda: `rename` cego
+  num ponto ambíguo poderia renomear a coisa errada em silêncio. Resposta
+  proposta: degradar honesto — desambiguar/recusar nomeando a exceção
+  (idioma já usado no SELF/dispatch), NUNCA adivinhar. Isso pode custar uma
+  pergunta interativa que hoje o sufixo dispensa.
+- Alguns comandos carregam semântica/flags próprias que o verbo único
+  precisa PRESERVAR, não perder: `rename-function --edit-rules` (caso 74),
+  `rename-pp-marker` genérico, `rename-dsl` de qualquer palavra do match
+  (B4g). Unificar sem regressão dessas capacidades é o custo real.
+- Scripts/harness (os ~565 casos) e a extensão chamam os nomes antigos —
+  aliases retrocompatíveis ou migração registrada, decisão do Diego.
+- Peso fraco a favor de manter separado: o sufixo é auto-documentado no
+  `--help` e no shell-completion; um `rename` único esconde o alcance.
+
+**Critério de pronto (executável, se o portão abrir)**: `rename
+<arq:linha:col> <novo>` resolve o KIND pelo fato e produz saída
+BYTE-IDÊNTICA ao `rename-*` específico correspondente, provado em casos
+cobrindo os oito alvos (local/static/memvar/param/function/method/dsl/
+pp-marker); ponto ambíguo ou sem fato degrada honesto (recusa nomeada, sem
+adivinhação); capacidades por-flag preservadas sob o verbo; nomes antigos
+viram aliases OU a remoção fica registrada em ADR; `extract`/`reorder`
+recebem o mesmo tratamento se o fato os cobrir. Zero regressão na suíte.
+
 ### B-infra — suíte paralela (pool dinâmico)
 
 Racional: [testes-paralelos.md](testes-paralelos.md).
@@ -204,6 +250,35 @@ sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
 Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
 são dependências do alvo `test`).
 
+### B7 — Tipos interprocedurais (alavanca B) — **EM IMPLEMENTAÇÃO (portão fechado 2026-07-08)**
+
+Escopo, fatos de probe, regra (ponto fixo com conjuntos finitos de
+classes + venenos), decisões D1-D4 (aprovadas — registradas no topo da
+spec) e critério de pronto executável (fixext linha a linha):
+**[spec-b7-tipos-interprocedurais.md](spec-b7-tipos-interprocedurais.md)**.
+Promovida do backlog item 1 pela fricção de 2026-07-08 (sends de
+homônimos misturados no peek).
+Entregue: **gancho ast-6 no core** (D2): `"ret": true` no push de
+RETURN (`hb_compAstReturn`, harbour.y + compast.c, .yyc/.yyh
+regenerados com bison 3.0.2 preservando o patch manual do yynerrs);
+prova de zero impacto 224/224 .hrb byte-idênticos (112 módulos de src/
+em -w0 E -w3, com/sem -x); relink duplo harbour+hbmk2 conferido;
+hbrefactor aceita ast-6. **Fatias 1+2 da análise** (bloco B7* em
+src/hbrefactor.prg, regra estendida documentada na seção TypeOf do
+ast-schema): oráculo D3 (tobject.prg com -x, cache em
+~/.cache/hbrefactor), cadeia de construção por FUNREF (fold de IIF
+constante), registro por pares (STRING, @F()) genérico, QSelf() =
+identidade, retorno rotulado de fábrica, `::Super:`, venenos de Self,
+união de parâmetros com pontos cegos auditados (macro/string/@F()),
+conjuntos finitos nomeados. **Critério fixext PROVADO por execução**
+(as duas consultas, linha a linha, incluindo venenos do Troca/
+Ajustada); generalidade: fixq4 caso 75 intacto, fixofi honesto na
+fronteira `__clsInst` (primitiva C, sem fato).
+**AGUARDA RITO D4**: 5 checks (6 sites) flipam — apresentados ao
+Diego caso a caso; NENHUM assert alterado. Depois: asserts + casos
+novos de cobertura (fábrica, venenos, união, conjunto >1,
+generalidade em DSL não-espelho via canais da linguagem).
+
 ### B6 — PR upstream (BLOQUEADA: só quando o Diego mandar)
 
 Mensagem com consumidor real; 1 arquivo novo + ganchos opt-in; prova de
@@ -216,10 +291,22 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 
 0. **Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
    verificação proporcional à edição quando o uso real doer.
-1. **Análise de programa inteiro (tipos interprocedurais)**: ponto fixo
-   sobre os dumps com conjuntos finitos de classes — alavanca B do
-   [mapa](limites-e-alavancas.md); os fatos (parms/RETURN) já estão no
-   dump. Encolhe o "possible" para código disciplinado sem heurística.
+1. **Análise de programa inteiro (tipos interprocedurais)** — **PROMOVIDA
+   para a fase B7 (2026-07-08)**, spec no portão:
+   [spec-b7-tipos-interprocedurais.md](spec-b7-tipos-interprocedurais.md).
+   Ponto fixo sobre os dumps com conjuntos finitos de classes — alavanca
+   B do [mapa](limites-e-alavancas.md); nota de probe: RETURN vira `push`
+   no dump mas SEM rótulo (D2 da spec propõe o gancho ast-6).
+   **Fricção relatada (Diego, 2026-07-08, fixext)**: usages de `Deposita`
+   mistura os sends de `oC` (Conta) e `oV` (ContaVip) — os 4 sends saem
+   `possible (receiver unknown)` nas DUAS consultas e o peek junta tudo.
+   A separação por homônimo nas definições/declarações JÁ funciona
+   (caso 81: excluded com fato nos dois sentidos); o que falta é tipar o
+   RECEPTOR dos sends. Alvo executável: com `oC := Conta():New()` /
+   `oV := ContaVip():New()` no MAIN, a consulta `CONTAVIP:Deposita` deve
+   excluir os sends de `oC` e confirmar o de `oV`, cada um com seu fato;
+   receptor sem fato (parâmetro de fora, macro, `Self := oOutra` do
+   próprio fixture) permanece possible — o contrato de 3 camadas fica.
 2. **Evidência de execução (funil `hb_vmSend`)**: gancho gated no VM
    registrando despachos observados — terceiro nível epistêmico, nunca
    misturado ao estático (alavanca D do mapa).

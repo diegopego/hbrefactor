@@ -190,8 +190,8 @@ STATIC FUNCTION Cons65( cDir )
    LOCAL hDump, cCls, hFunc, hDecl, aSelfs, hFuncs, hCen
    LOCAL aWrites, aRefs, aAssigns, hStmt, hExpr, hRhs, nPass
 
-   IF hb_AScan( { "ast-4", "ast-5" }, hD1[ "schema" ] ) == 0 .OR. ;
-      hb_AScan( { "ast-4", "ast-5" }, hD2[ "schema" ] ) == 0
+   IF hb_AScan( { "ast-4", "ast-5", "ast-6" }, hD1[ "schema" ] ) == 0 .OR. ;
+      hb_AScan( { "ast-4", "ast-5", "ast-6" }, hD2[ "schema" ] ) == 0
       RETURN Fail( "schema" )
    ENDIF
 
@@ -385,8 +385,9 @@ STATIC FUNCTION B4g82( cAstA, cAstB, cDir )
    LOCAL lStd := .F., lSmart := .F., hKinds, aAlts, aTp, aTexts
    LOCAL nOpens, nCloses, aPr, aWant, hCunho, nAt
 
-   IF !( hA[ "schema" ] == "ast-5" ) .OR. !( hB[ "schema" ] == "ast-5" )
-      RETURN Fail( "schema ast-5" )
+   IF hb_AScan( { "ast-5", "ast-6" }, hA[ "schema" ] ) == 0 .OR. ;
+      hb_AScan( { "ast-5", "ast-6" }, hB[ "schema" ] ) == 0
+      RETURN Fail( "schema ast-5+" )
    ENDIF
 
    // 1. byte-exato: todo token posicionado de match[]/result[] soletra o

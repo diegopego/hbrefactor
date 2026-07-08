@@ -239,11 +239,12 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // fase B4d); ast-4 = ast-3 + canal de tipos da linguagem (declarations
    // tipadas parse-time + tabelas DECLARE em "declared", fase B4f);
    // ast-5 = ast-4 + a regra por dentro (match[]/result[] em ppRules,
-   // fase B4g). O leitor usa só seções presentes em todos - comandos que
-   // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
-   // clara (FromReady/Ast4Ready/RuleToksReady)
+   // fase B4g); ast-6 = ast-5 + "ret": true no push que carrega o valor
+   // de RETURN (fase B7). O leitor usa só seções presentes em todos -
+   // comandos que exigem o rastro/o canal/a regra recusam ou degradam com
+   // mensagem clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -296,7 +297,7 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL cSpec, cName, cFuncFilter := "", cJsonOut := "", lShowExp := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}, aRuleSeen := {}
-   LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd
+   LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd, hInter
    LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
    LOCAL aDecl, aSite, cCur, nState, hOwnV
    LOCAL cAtSpec := NIL, aAtParts, cAtFile, cAtPath, nAtLine, nAtCol0, hResAt
@@ -404,6 +405,13 @@ STATIC FUNCTION Usages( aArgs )
    // grafo de classes do projeto (B4f-2): consumido pela resolução de
    // dispatch dos sends; NIL degrada para as camadas B4f
    hGraph := iif( hDecl == NIL, NIL, ClassGraph( hAsts, hDecl ) )
+   // contexto interprocedural (B7): índice de funções, vínculos de
+   // construção por classe, registro (STRING, @F()) por classe e o teto de
+   // runtime pelo oráculo (D3). Só a TIPAGEM do receptor consome (D1:
+   // travessia de vínculo escrito vale para tipar, em mundo fechado, com a
+   // ressalva no rótulo); as camadas de dispatch da Q4 ficam como estão.
+   // NIL degrada para o TypeOf local de sempre
+   hInter := iif( hDecl == NIL, NIL, B7Ctx( hAsts, hDecl ) )
    // resolução do dispatch da CLASSE CONSULTADA (B4f-2, sites de
    // declaração): a dona que Classe:Método alcança - decide os sites de
    // declaração/implementação homônimos; NIL = indecidível (classe fora
@@ -524,7 +532,7 @@ STATIC FUNCTION Usages( aArgs )
             IF Upper( hItem[ "sym" ] ) == cUpMeth .OR. ;
                Upper( hItem[ "sym" ] ) == "_" + cUpMeth
                nHits++
-               aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl ), ;
+               aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl, hInter, hAst ), ;
                                      cClass, cUpMeth, Upper( hItem[ "sym" ] ), ;
                                      hGraph, hItem[ "block" ] )
                // excluded é não-referência PROVADA: fica no relato (com o
@@ -5844,7 +5852,7 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION FromReady( hAst )
-   RETURN hb_AScan( { "ast-3", "ast-4", "ast-5" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-3", "ast-4", "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // ---------------------------------------------------------------------------
 // B4f - canal de tipos da linguagem (schema ast-4). O compilador PARSEIA e
@@ -5859,7 +5867,7 @@ STATIC FUNCTION FromReady( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION Ast4Ready( hAst )
-   RETURN hb_AScan( { "ast-4", "ast-5" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-4", "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // ---------------------------------------------------------------------------
 // B4g - a regra por dentro (schema ast-5): ppRules[] ganha match[]/result[],
@@ -5873,7 +5881,7 @@ STATIC FUNCTION Ast4Ready( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION RuleToksReady( hAst )
-   RETURN hb_HGetDef( hAst, "schema", "" ) == "ast-5"
+   RETURN hb_AScan( { "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // tabelas DECLARE agregadas do PROJETO (as do dump são por módulo):
 // { "f" => { FUNÇÃO => item }, "c" => { CLASSE => { MÉTODO => item } } }.
@@ -5935,12 +5943,19 @@ STATIC FUNCTION DeclType( hItem, cHow )
    RETURN NIL
 
 // TypeOf - propagação bottom-up de tipos DECLARADOS sobre um nó da árvore
-// de expressão do dump. Regra fechada: VARIABLE (declarada, ou binding
+// de expressão do dump. Regra local: VARIABLE (declarada, ou binding
 // único), FUNCALL (retorno declarado), SEND (retorno declarado do método na
 // classe do obj), literais de valor, LIST (valor do último item), SELF.
+// B7 (extensão autorizada no portão de 2026-07-08, spec-b7): com hInter,
+// FUNCALL sem retorno declarado propaga o retorno ROTULADO (ast-6) da
+// função do projeto; SEND cujo método não é declarado na classe resolve
+// pela cadeia de construção ESCRITA até o teto de runtime (oráculo D3),
+// com QSelf() = identidade do receptor; `::Super:` tipa pela cadeia.
+// Travessia de vínculo escrito marca "via" (D1: vale em mundo fechado, o
+// rótulo carrega a ressalva). Venenos: `Self := x` e `@Self` => NIL.
 // Fora da regra => NIL (desconhecido, camada "possible"). hSeen quebra
 // ciclos de binding (a := b, b := a)
-STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
+STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
 
    LOCAL cEt, cSym, cMsg, hItem, hExprA, hRes, hOcc, hFun
    LOCAL nWrites := 0, nRefs := 0, nAssigns := 0, hAssign := NIL, lAsgBlock := .F.
@@ -5953,6 +5968,12 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
    DO CASE
    CASE cEt == "VARIABLE"
       cSym := Upper( hb_HGetDef( hExpr, "val", "" ) )
+      // veneno B7: `Self := x` (ASSIGN real, não o prólogo Self := Self
+      // do método) ou `@Self` - a instância deixa de ser a declarada;
+      // regra sem ordem => a função inteira degrada (conservador)
+      IF cSym == "SELF" .AND. B7SelfPoisoned( hFunc )
+         RETURN NIL
+      ENDIF
       // dentro de codeblock, uso de local EXTERNA resolve como 'detached';
       // 'local'+block na mesma linha é PARÂMETRO do bloco - sombra sem
       // classe possível (o CBVAR do compilador não guarda classe)
@@ -6011,11 +6032,25 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
          NEXT
          IF nAssigns == 1
             RETURN TypeOf( hb_HGetDef( hAssign, "right", NIL ), hFunc, hDecl, ;
-                           lAsgBlock, hSeen )
+                           lAsgBlock, hSeen, hInter, hAst )
          ENDIF
+      ENDIF
+      // B7: parâmetro sem escrita nem @ref - o tipo é a UNIÃO dos
+      // argumentos de TODOS os call sites do projeto (mundo fechado só
+      // com o fechamento auditado: macro no projeto, nome em string ou
+      // @F() referenciada => ⊤)
+      IF hInter != NIL .AND. nWrites == 0 .AND. nRefs == 0
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cSym .AND. hb_HGetDef( hItem, "param", .F. )
+               RETURN B7ParamType( hFunc, hAst, cSym, hInter )
+            ENDIF
+         NEXT
       ENDIF
 
    CASE cEt == "SELF"
+      IF B7SelfPoisoned( hFunc )
+         RETURN NIL
+      ENDIF
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == "SELF" .AND. ;
             ( hRes := DeclType( hItem, "declared" ) ) != NIL
@@ -6026,17 +6061,41 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
    CASE cEt == "FUNCALL"
       hFun := hb_HGetDef( hExpr, "fun", NIL )
       IF HB_ISHASH( hFun ) .AND. hb_HGetDef( hFun, "et", "" ) == "FUNNAME"
-         RETURN DeclType( hb_HGetDef( hDecl[ "f" ], ;
-                          Upper( hb_HGetDef( hFun, "val", "" ) ), NIL ), "chain" )
+         hRes := DeclType( hb_HGetDef( hDecl[ "f" ], ;
+                           Upper( hb_HGetDef( hFun, "val", "" ) ), NIL ), "chain" )
+         // B7: fábrica sem DECLARE - o retorno vem dos pushes ROTULADOS
+         // de RETURN (ast-6) da própria função do projeto
+         IF hRes == NIL .AND. hInter != NIL
+            hRes := B7FunRet( Upper( hb_HGetDef( hFun, "val", "" ) ), hAst, hInter )
+         ENDIF
+         RETURN hRes
       ENDIF
 
    CASE cEt == "SEND"
       cMsg := Upper( hb_HGetDef( hExpr, "msg", "" ) )
       IF ! Empty( cMsg )
-         hRes := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, lBlock, hSeen )
-         IF hRes != NIL .AND. hb_HHasKey( hRes, "cls" ) .AND. ;
-            hb_HHasKey( hDecl[ "c" ], hRes[ "cls" ] )
-            RETURN DeclType( hb_HGetDef( hDecl[ "c" ][ hRes[ "cls" ] ], cMsg, NIL ), "chain" )
+         // `::Super:Msg()` - obj é SEND SUPER: o MESMO objeto visto pela
+         // cadeia escrita do pai (B7/D1; só decide com vínculo ÚNICO)
+         IF cMsg == "SUPER"
+            RETURN B7SuperType( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+         ENDIF
+         hRes := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, lBlock, ;
+                         hSeen, hInter, hAst )
+         IF hRes != NIL .AND. hb_HHasKey( hRes, "cls" )
+            IF hb_HHasKey( hDecl[ "c" ], hRes[ "cls" ] ) .AND. ;
+               hb_HHasKey( hDecl[ "c" ][ hRes[ "cls" ] ], cMsg )
+               RETURN B7ViaMark( DeclType( hDecl[ "c" ][ hRes[ "cls" ] ][ cMsg ], "chain" ), ;
+                                 hb_HGetDef( hRes, "via", .F. ) )
+            ENDIF
+            // B7: método NÃO declarado na classe do receptor - resolve
+            // pela cadeia de construção escrita até o teto de runtime
+            IF hInter != NIL
+               RETURN B7SendRet( hRes, cMsg, hInter )
+            ENDIF
+         ELSEIF hRes != NIL .AND. hb_HHasKey( hRes, "clsset" ) .AND. hInter != NIL
+            // conjunto finito (B7): resolve para CADA candidato; só
+            // decide com acordo
+            RETURN B7SendRet( hRes, cMsg, hInter )
          ENDIF
       ENDIF
 
@@ -6060,7 +6119,8 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
    CASE cEt == "LIST"
       // expressão parentetizada: o valor é o do ÚLTIMO item
       IF ! Empty( hb_HGetDef( hExpr, "items", {} ) )
-         RETURN TypeOf( ATail( hExpr[ "items" ] ), hFunc, hDecl, lBlock, hSeen )
+         RETURN TypeOf( ATail( hExpr[ "items" ] ), hFunc, hDecl, lBlock, hSeen, ;
+                        hInter, hAst )
       ENDIF
    ENDCASE
 
@@ -6070,7 +6130,7 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, lBlock, hSeen )
 // mesma mensagem na mesma linha em statements[] e tipa o obj. Vários nós
 // candidatos só classificam se concordarem; nó sem obj (WITH OBJECT) ou
 // mensagem por macro => desconhecido
-STATIC FUNCTION SendReceiverType( hFunc, hSend, hDecl )
+STATIC FUNCTION SendReceiverType( hFunc, hSend, hDecl, hInter, hAst )
 
    LOCAL aNodes := {}, aNode, hStmt, hType := NIL, hOne
 
@@ -6091,7 +6151,7 @@ STATIC FUNCTION SendReceiverType( hFunc, hSend, hDecl )
       NEXT
    ENDIF
    FOR EACH aNode IN aNodes
-      hOne := TypeOf( aNode[ 1 ], hFunc, hDecl, aNode[ 2 ], NIL )
+      hOne := TypeOf( aNode[ 1 ], hFunc, hDecl, aNode[ 2 ], NIL, hInter, hAst )
       IF hOne == NIL
          RETURN NIL
       ENDIF
@@ -6125,6 +6185,769 @@ STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, lBlock, aNodes )
          SendNodesWalk( xVal, cUpMsg, nLine, lChildBlock, aNodes )
       ELSEIF HB_ISARRAY( xVal )
          AEval( xVal, {| xItem | SendNodesWalk( xItem, cUpMsg, nLine, lChildBlock, aNodes ) } )
+      ENDIF
+   NEXT
+
+   RETURN
+
+// ---------------------------------------------------------------------------
+// B7 - tipos interprocedurais (spec-b7-tipos-interprocedurais.md, portão
+// fechado em 2026-07-08). Extensão AUTORIZADA da TypeOf: retorno rotulado
+// de RETURN (ast-6) das funções do projeto, cadeia de construção ESCRITA
+// (FUNREFs na árvore da função-classe - fato da expansão, com fold de IIF
+// de condição constante = a semântica do próprio reduce) e o teto de
+// runtime pelo ORÁCULO (D3: src/rtl/tobject.prg compilado com -x, cache).
+// QSelf() devolve o receptor por IDENTIDADE (probe executado, registrado
+// na spec) - no dump compila para et SELF, então "retorna o receptor" =
+// todo push de RETURN da implementação é et SELF. D1: travessia de
+// vínculo escrito vale para TIPAR em mundo fechado; toda travessia marca
+// "via" e o rótulo do SendVerdict carrega a ressalva ("class graph as
+// written"). SÓ a tipagem consome isto - as camadas de dispatch da Q4
+// (DispatchVia etc.) ficam intocadas.
+// ---------------------------------------------------------------------------
+
+// contexto interprocedural: índices e memos de um run de usages
+STATIC FUNCTION B7Ctx( hAsts, hDecl )
+
+   LOCAL hInter := { "decl" => hDecl, "clsmap" => ClassFuncMap( hAsts ), ;
+                     "orc" => OracleLoad(), "funcs" => { => }, ;
+                     "links" => { => }, "regs" => { => }, "rets" => { => }, ;
+                     "params" => { => }, "asts" => hAsts, "dyn" => NIL, ;
+                     "strs" => NIL, "active" => { => } }
+   LOCAL cPath, hAst, hFunc, hMod, cUpF
+
+   FOR EACH cPath IN hb_HKeys( hAsts )
+      hAst := hAsts[ cPath ]
+      hMod := { => }
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         cUpF := Upper( hFunc[ "name" ] )
+         hMod[ cUpF ] := { hAst, hFunc }
+         // índice global só de PÚBLICAS; colisão de nome => NIL (⊤ -
+         // vínculo inválido de qualquer forma, nunca palpite)
+         IF ! hFunc[ "static" ]
+            hInter[ "funcs" ][ cUpF ] := ;
+               iif( hb_HHasKey( hInter[ "funcs" ], cUpF ), NIL, { hAst, hFunc } )
+         ENDIF
+      NEXT
+      // resolução LOCAL-primeiro (STATIC homônima entre módulos)
+      hAst[ "_b7funcs" ] := hMod
+   NEXT
+   IF hInter[ "orc" ] != NIL
+      // as impls do oráculo resolvem no módulo do próprio oráculo
+      hMod := { => }
+      FOR EACH hFunc IN hInter[ "orc" ][ "ast" ][ "functions" ]
+         IF ! hFunc[ "fileDecl" ]
+            hMod[ Upper( hFunc[ "name" ] ) ] := { hInter[ "orc" ][ "ast" ], hFunc }
+         ENDIF
+      NEXT
+      hInter[ "orc" ][ "ast" ][ "_b7funcs" ] := hMod
+   ENDIF
+
+   RETURN hInter
+
+// o dump carrega o rótulo de RETURN? (ast-6+)
+STATIC FUNCTION B7Ret6( hAst )
+   RETURN hb_AScan( { "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+
+// função por nome: STATIC/pública do MÓDULO primeiro, depois pública do
+// projeto (colisão de públicas = NIL). Fora do projeto => NIL
+STATIC FUNCTION B7FunOf( cUpFun, hAst, hInter )
+
+   IF hAst != NIL .AND. hb_HHasKey( hAst, "_b7funcs" ) .AND. ;
+      hb_HHasKey( hAst[ "_b7funcs" ], cUpFun )
+      RETURN hAst[ "_b7funcs" ][ cUpFun ]
+   ENDIF
+
+   RETURN hb_HGetDef( hInter[ "funcs" ], cUpFun, NIL )
+
+// `Self := x` real (right não é o prólogo Self := Self) ou `@Self` na
+// função? Memoizado no próprio hFunc
+STATIC FUNCTION B7SelfPoisoned( hFunc )
+
+   LOCAL hStmt, hOcc, lPoison
+
+   IF hb_HHasKey( hFunc, "_b7selfp" )
+      RETURN hFunc[ "_b7selfp" ]
+   ENDIF
+   lPoison := .F.
+   FOR EACH hOcc IN hFunc[ "occurrences" ]
+      IF Upper( hOcc[ "sym" ] ) == "SELF" .AND. hOcc[ "access" ] == "ref"
+         lPoison := .T.
+         EXIT
+      ENDIF
+   NEXT
+   IF ! lPoison
+      FOR EACH hStmt IN hFunc[ "statements" ]
+         IF B7SelfWriteWalk( hb_HGetDef( hStmt, "expr", NIL ) )
+            lPoison := .T.
+            EXIT
+         ENDIF
+      NEXT
+   ENDIF
+   hFunc[ "_b7selfp" ] := lPoison
+
+   RETURN lPoison
+
+STATIC FUNCTION B7SelfWriteWalk( hExpr )
+
+   LOCAL xVal, hItem
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN .F.
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "ASSIGN" .AND. ;
+      HB_ISHASH( hb_HGetDef( hExpr, "left", NIL ) ) .AND. ;
+      hb_HGetDef( hExpr[ "left" ], "et", "" ) == "VARIABLE" .AND. ;
+      Upper( hb_HGetDef( hExpr[ "left" ], "val", "" ) ) == "SELF" .AND. ;
+      !( hb_HGetDef( hb_HGetDef( hExpr, "right", { => } ), "et", "" ) == "SELF" )
+      RETURN .T.
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         IF B7SelfWriteWalk( xVal )
+            RETURN .T.
+         ENDIF
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            IF B7SelfWriteWalk( hItem )
+               RETURN .T.
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// marca a travessia de vínculo escrito no tipo (D1)
+STATIC FUNCTION B7ViaMark( hType, lVia )
+
+   IF hType != NIL .AND. lVia
+      hType := hb_HClone( hType )
+      hType[ "via" ] := .T.
+   ENDIF
+
+   RETURN hType
+
+// pushes ROTULADOS de RETURN da função (ast-6), fora de codeblock (RETURN
+// de bloco estendido devolve do BLOCO, não da função)
+STATIC FUNCTION B7RetPushes( hFunc )
+
+   LOCAL aOut := {}, hStmt
+
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      IF hStmt[ "kind" ] == "push" .AND. ! hStmt[ "block" ] .AND. ;
+         hb_HGetDef( hStmt, "ret", .F. )
+         AAdd( aOut, hb_HGetDef( hStmt, "expr", NIL ) )
+      ENDIF
+   NEXT
+
+   RETURN aOut
+
+// todo RETURN da implementação devolve QSelf()? (o compilador traduz
+// QSelf() para o nó SELF - fato do dump, probe qself.prg na spec)
+STATIC FUNCTION B7AllRetsSelf( hFunc )
+
+   LOCAL aPushes := B7RetPushes( hFunc ), hExpr
+
+   IF Empty( aPushes )
+      RETURN .F.
+   ENDIF
+   FOR EACH hExpr IN aPushes
+      IF ! HB_ISHASH( hExpr ) .OR. !( hb_HGetDef( hExpr, "et", "" ) == "SELF" )
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
+// une dois tipos B7 com ACORDO: classes unem em conjunto finito; valores
+// iguais mantêm; mistura ou desconhecido => NIL (⊤)
+STATIC FUNCTION B7Merge( hA, hB )
+
+   LOCAL hSet, cK
+
+   IF hA == NIL .OR. hB == NIL
+      RETURN NIL
+   ENDIF
+   IF hb_HHasKey( hA, "val" ) .AND. hb_HHasKey( hB, "val" )
+      RETURN iif( hA[ "val" ] == hB[ "val" ], hA, NIL )
+   ENDIF
+   IF ( hb_HHasKey( hA, "cls" ) .OR. hb_HHasKey( hA, "clsset" ) ) .AND. ;
+      ( hb_HHasKey( hB, "cls" ) .OR. hb_HHasKey( hB, "clsset" ) )
+      hSet := { => }
+      FOR EACH cK IN B7ClsList( hA )
+         hSet[ cK ] := .T.
+      NEXT
+      FOR EACH cK IN B7ClsList( hB )
+         hSet[ cK ] := .T.
+      NEXT
+      IF Len( hSet ) == 1
+         RETURN { "cls" => hb_HKeys( hSet )[ 1 ], "how" => "chain", ;
+                  "via" => hb_HGetDef( hA, "via", .F. ) .OR. hb_HGetDef( hB, "via", .F. ) }
+      ENDIF
+      RETURN { "clsset" => hSet, "how" => "chain", ;
+               "via" => hb_HGetDef( hA, "via", .F. ) .OR. hb_HGetDef( hB, "via", .F. ) }
+   ENDIF
+
+   RETURN NIL
+
+STATIC FUNCTION B7ClsList( hType )
+
+   IF hb_HHasKey( hType, "cls" )
+      RETURN { hType[ "cls" ] }
+   ENDIF
+
+   RETURN hb_HKeys( hb_HGetDef( hType, "clsset", { => } ) )
+
+// retorno interprocedural de uma função do projeto: união com acordo dos
+// pushes rotulados de RETURN (ast-6). Ciclo/módulo sem rótulo/função de
+// fora => NIL. Memo por módulo!função
+STATIC FUNCTION B7FunRet( cUpFun, hAst, hInter )
+
+   LOCAL aFA := B7FunOf( cUpFun, hAst, hInter )
+   LOCAL cKey, hOut, hOne, hExpr, aPushes
+
+   IF aFA == NIL
+      RETURN NIL
+   ENDIF
+   cKey := hb_HGetDef( aFA[ 1 ], "module", "" ) + "!" + Upper( aFA[ 2 ][ "name" ] )
+   IF hb_HHasKey( hInter[ "rets" ], cKey )
+      RETURN hInter[ "rets" ][ cKey ]
+   ENDIF
+   IF hb_HHasKey( hInter[ "active" ], cKey ) .OR. ! B7Ret6( aFA[ 1 ] )
+      RETURN NIL
+   ENDIF
+   hInter[ "active" ][ cKey ] := .T.
+   aPushes := B7RetPushes( aFA[ 2 ] )
+   hOut := NIL
+   FOR EACH hExpr IN aPushes
+      hOne := TypeOf( hExpr, aFA[ 2 ], hInter[ "decl" ], .F., NIL, hInter, aFA[ 1 ] )
+      hOut := iif( hExpr:__enumIndex() == 1, hOne, B7Merge( hOut, hOne ) )
+      IF hOut == NIL
+         EXIT
+      ENDIF
+   NEXT
+   IF Empty( aPushes )
+      hOut := NIL
+   ENDIF
+   hb_HDel( hInter[ "active" ], cKey )
+   // um retorno de classe vindo de OUTRA função é sempre cadeia (promessa
+   // herdada) - nunca "declared" do ponto de vista do chamador
+   IF hOut != NIL .AND. hb_HHasKey( hOut, "cls" ) .AND. ;
+      hb_HGetDef( hOut, "how", "" ) == "declared"
+      hOut := hb_HClone( hOut )
+      hOut[ "how" ] := "chain"
+   ENDIF
+   hInter[ "rets" ][ cKey ] := hOut
+
+   RETURN hOut
+
+// vínculos de construção ESCRITOS de uma classe: FUNREFs na árvore da
+// função-classe que apontam OUTRA função-classe do projeto ou o teto de
+// runtime (oráculo). IIF de condição LOGICAL constante segue só o ramo
+// tomado (a semântica do próprio HB_EA_REDUCE). Ordem de escrita, dedup
+STATIC FUNCTION B7Links( cUpCls, hInter )
+
+   LOCAL aOut, aRefs, cRef, aCF, hStmt
+
+   IF hb_HHasKey( hInter[ "links" ], cUpCls )
+      RETURN hInter[ "links" ][ cUpCls ]
+   ENDIF
+   aOut := {}
+   IF hInter[ "orc" ] != NIL .AND. cUpCls == hInter[ "orc" ][ "cls" ]
+      // raiz de runtime: sem pais
+   ELSEIF ( aCF := hb_HGetDef( hInter[ "clsmap" ], cUpCls, NIL ) ) != NIL
+      aRefs := {}
+      FOR EACH hStmt IN aCF[ 3 ][ "statements" ]
+         B7FunRefsWalk( hb_HGetDef( hStmt, "expr", NIL ), aRefs )
+      NEXT
+      FOR EACH cRef IN aRefs
+         IF !( cRef == cUpCls ) .AND. AScan( aOut, {| c | c == cRef } ) == 0 .AND. ;
+            ( hb_HHasKey( hInter[ "clsmap" ], cRef ) .OR. ;
+              ( hInter[ "orc" ] != NIL .AND. cRef == hInter[ "orc" ][ "cls" ] ) )
+            AAdd( aOut, cRef )
+         ENDIF
+      NEXT
+   ENDIF
+   hInter[ "links" ][ cUpCls ] := aOut
+
+   RETURN aOut
+
+STATIC PROCEDURE B7FunRefsWalk( hExpr, aRefs )
+
+   LOCAL xVal, hItem, aItems
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "FUNREF"
+      AAdd( aRefs, Upper( hb_HGetDef( hExpr, "val", "" ) ) )
+      RETURN
+   ENDIF
+   // fold do IIF constante: o ramo morto não é vínculo (o reduce do
+   // compilador o elimina do pcode)
+   IF hb_HGetDef( hExpr, "et", "" ) == "IIF" .AND. ;
+      Len( aItems := hb_HGetDef( hExpr, "items", {} ) ) == 3 .AND. ;
+      HB_ISHASH( aItems[ 1 ] ) .AND. ;
+      hb_HGetDef( aItems[ 1 ], "et", "" ) == "LOGICAL"
+      B7FunRefsWalk( aItems[ iif( hb_HGetDef( aItems[ 1 ], "val", .F. ), 2, 3 ) ], aRefs )
+      RETURN
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         B7FunRefsWalk( xVal, aRefs )
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            B7FunRefsWalk( hItem, aRefs )
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN
+
+// pares de REGISTRO (STRING, @F()|codeblock) da função-classe: itens
+// DIRETOS do mesmo ARGLIST - a primeira STRING nomeia, o primeiro FUNREF
+// direto é a impl (codeblock direto = membro inline, sem fato de retorno).
+// O par-classe (impl == a própria função-classe) fica de fora. Mesma
+// leitura para classes do projeto e para o oráculo (genérica: nenhum nome
+// de biblioteca)
+STATIC FUNCTION B7Regs( cUpCls, hInter )
+
+   LOCAL hRegs, aCF, hFunCls, hStmt
+
+   IF hb_HHasKey( hInter[ "regs" ], cUpCls )
+      RETURN hInter[ "regs" ][ cUpCls ]
+   ENDIF
+   hRegs := { => }
+   IF hInter[ "orc" ] != NIL .AND. cUpCls == hInter[ "orc" ][ "cls" ]
+      hFunCls := hInter[ "orc" ][ "fun" ]
+   ELSEIF ( aCF := hb_HGetDef( hInter[ "clsmap" ], cUpCls, NIL ) ) != NIL
+      hFunCls := aCF[ 3 ]
+   ENDIF
+   IF hFunCls != NIL
+      FOR EACH hStmt IN hFunCls[ "statements" ]
+         B7RegPairsWalk( hb_HGetDef( hStmt, "expr", NIL ), ;
+                         Upper( hFunCls[ "name" ] ), hRegs )
+      NEXT
+   ENDIF
+   hInter[ "regs" ][ cUpCls ] := hRegs
+
+   RETURN hRegs
+
+STATIC PROCEDURE B7RegPairsWalk( hExpr, cUpClsFun, hRegs )
+
+   LOCAL xVal, hItem, hParms, cName, cImpl, lInline
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN
+   ENDIF
+   hParms := hb_HGetDef( hExpr, "parms", NIL )
+   IF HB_ISHASH( hParms ) .AND. hb_HGetDef( hParms, "et", "" ) == "ARGLIST"
+      cName := NIL
+      cImpl := NIL
+      lInline := .F.
+      FOR EACH hItem IN hb_HGetDef( hParms, "items", {} )
+         IF ! HB_ISHASH( hItem )
+            LOOP
+         ENDIF
+         DO CASE
+         CASE hb_HGetDef( hItem, "et", "" ) == "STRING" .AND. cName == NIL .AND. ;
+              Len( hb_HGetDef( hItem, "val", "" ) ) > 0
+            cName := Upper( hItem[ "val" ] )
+         CASE hb_HGetDef( hItem, "et", "" ) == "FUNREF" .AND. cImpl == NIL
+            cImpl := Upper( hb_HGetDef( hItem, "val", "" ) )
+         CASE hb_HGetDef( hItem, "et", "" ) == "CODEBLOCK" .AND. cImpl == NIL
+            lInline := .T.
+         ENDCASE
+      NEXT
+      IF cName != NIL .AND. ( cImpl != NIL .OR. lInline ) .AND. ;
+         !( cImpl == cUpClsFun ) .AND. ! hb_HHasKey( hRegs, cName )
+         hRegs[ cName ] := cImpl      // NIL quando inline (sem fato)
+      ENDIF
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         B7RegPairsWalk( xVal, cUpClsFun, hRegs )
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            B7RegPairsWalk( hItem, cUpClsFun, hRegs )
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN
+
+// retorno do MÉTODO resolvido pela cadeia escrita a partir da classe do
+// receptor (B7/D1). Devolve { lAchado, hTipo }: achado sem fato de
+// retorno = { .T., NIL } (para a subida - o dispatch pararia ali)
+STATIC FUNCTION B7MethodRet( cCur, hRecv, cUpMsg, lVia, hInter, hSeen )
+
+   LOCAL hDecl := hInter[ "decl" ], hRegs, aFA, cLink, aR, hAstCls, aCF
+
+   IF hSeen == NIL
+      hSeen := { => }
+   ENDIF
+   IF hb_HHasKey( hSeen, cCur )
+      RETURN { .F., NIL }
+   ENDIF
+   hSeen[ cCur ] := .T.
+
+   // 1. método DECLARADO na classe corrente (canal declared)
+   IF hb_HHasKey( hDecl[ "c" ], cCur ) .AND. hb_HHasKey( hDecl[ "c" ][ cCur ], cUpMsg )
+      RETURN { .T., B7ViaMark( DeclType( hDecl[ "c" ][ cCur ][ cUpMsg ], "chain" ), lVia ) }
+   ENDIF
+
+   // 2. método REGISTRADO na classe corrente (pares STRING/@F())
+   hRegs := B7Regs( cCur, hInter )
+   IF hb_HHasKey( hRegs, cUpMsg )
+      IF hRegs[ cUpMsg ] == NIL
+         RETURN { .T., NIL }      // inline/codeblock: sem fato de retorno
+      ENDIF
+      hAstCls := iif( hInter[ "orc" ] != NIL .AND. cCur == hInter[ "orc" ][ "cls" ], ;
+                      hInter[ "orc" ][ "ast" ], ;
+                      iif( ( aCF := hb_HGetDef( hInter[ "clsmap" ], cCur, NIL ) ) != NIL, ;
+                           aCF[ 2 ], NIL ) )
+      aFA := B7FunOf( hRegs[ cUpMsg ], hAstCls, hInter )
+      IF aFA == NIL
+         RETURN { .T., NIL }
+      ENDIF
+      // QSelf() = o RECEPTOR por identidade (fato provado): o tipo é o do
+      // próprio receptor, não o da classe dona da implementação
+      IF B7AllRetsSelf( aFA[ 2 ] )
+         RETURN { .T., B7ViaMark( hb_HClone( hRecv ), lVia ) }
+      ENDIF
+      RETURN { .T., B7ViaMark( B7FunRet( hRegs[ cUpMsg ], hAstCls, hInter ), lVia ) }
+   ENDIF
+
+   // 3. sobe pelos vínculos escritos, na ordem; primeiro ACHADO vence
+   //    (profundidade - regra do VM sobre o grafo como-escrito)
+   FOR EACH cLink IN B7Links( cCur, hInter )
+      aR := B7MethodRet( cLink, hRecv, cUpMsg, .T., hInter, hSeen )
+      IF aR[ 1 ]
+         RETURN aR
+      ENDIF
+   NEXT
+
+   RETURN { .F., NIL }
+
+// retorno de um SEND resolvido pela cadeia (receptor de classe conhecida
+// ou conjunto finito): acordo entre os candidatos ou NIL
+STATIC FUNCTION B7SendRet( hRecv, cUpMsg, hInter )
+
+   LOCAL aCls := B7ClsList( hRecv ), cCls, hOne, hOut := NIL, aR
+   LOCAL cKey, lVia := hb_HGetDef( hRecv, "via", .F. )
+
+   IF Empty( aCls )
+      RETURN NIL
+   ENDIF
+   FOR EACH cCls IN aCls
+      // guarda de ciclo entre sends aninhados (a():b():a()...)
+      cKey := "s!" + cCls + "!" + cUpMsg
+      IF hb_HHasKey( hInter[ "active" ], cKey )
+         RETURN NIL
+      ENDIF
+      hInter[ "active" ][ cKey ] := .T.
+      aR := B7MethodRet( cCls, iif( Len( aCls ) == 1, hRecv, ;
+              { "cls" => cCls, "how" => "chain", "via" => lVia } ), ;
+              cUpMsg, lVia, hInter, NIL )
+      hb_HDel( hInter[ "active" ], cKey )
+      hOne := iif( aR[ 1 ], aR[ 2 ], NIL )
+      IF hOne == NIL
+         RETURN NIL
+      ENDIF
+      hOut := iif( cCls:__enumIndex() == 1, hOne, B7Merge( hOut, hOne ) )
+      IF hOut == NIL
+         RETURN NIL
+      ENDIF
+   NEXT
+
+   RETURN hOut
+
+// tipo de `::Super:...` - o MESMO objeto visto pela cadeia do pai escrito;
+// só decide com vínculo ÚNICO (multiherança: conservador, NIL)
+STATIC FUNCTION B7SuperType( hExpr, hFunc, hDecl, lBlock, hSeen, hInter, hAst )
+
+   LOCAL hBase, aLinks
+
+   IF hInter == NIL
+      RETURN NIL
+   ENDIF
+   hBase := TypeOf( hb_HGetDef( hExpr, "obj", NIL ), hFunc, hDecl, lBlock, ;
+                    hSeen, hInter, hAst )
+   IF hBase == NIL .OR. ! hb_HHasKey( hBase, "cls" )
+      RETURN NIL
+   ENDIF
+   aLinks := B7Links( hBase[ "cls" ], hInter )
+   IF Len( aLinks ) == 1
+      RETURN { "cls" => aLinks[ 1 ], "how" => "chain", "via" => .T. }
+   ENDIF
+
+   RETURN NIL
+
+// tipo de um PARÂMETRO pela união dos argumentos de todos os call sites
+// do projeto (B7). Só com o mundo fechado AUDITADO: macro em qualquer
+// módulo, o nome da função citado em string ou a função referenciada por
+// @F() (chamada indireta/dispatch) => ⊤. STATIC une só o próprio módulo;
+// pública pula módulos onde um STATIC homônimo a sombreia. Argumento
+// omitido = NIL em runtime. Memo por módulo!função!parâmetro
+STATIC FUNCTION B7ParamType( hFuncOwn, hAstOwn, cUpSym, hInter )
+
+   LOCAL nIdx := 0, nP := 0, hItem, cUpFun := Upper( hFuncOwn[ "name" ] )
+   LOCAL cKey, hOut := NIL, aSites, aSite, hOne
+
+   FOR EACH hItem IN hFuncOwn[ "declarations" ]
+      IF hb_HGetDef( hItem, "param", .F. )
+         nP++
+         IF Upper( hItem[ "sym" ] ) == cUpSym
+            nIdx := nP
+            EXIT
+         ENDIF
+      ENDIF
+   NEXT
+   IF nIdx == 0
+      RETURN NIL
+   ENDIF
+   B7DynAudit( hInter )
+   IF hInter[ "dyn" ] .OR. hb_HHasKey( hInter[ "strs" ], cUpFun ) .OR. ;
+      hb_HHasKey( hInter[ "funrefs" ], cUpFun )
+      RETURN NIL
+   ENDIF
+   cKey := "p!" + hb_HGetDef( hAstOwn, "module", "" ) + "!" + cUpFun + "!" + cUpSym
+   IF hb_HHasKey( hInter[ "params" ], cKey )
+      RETURN hInter[ "params" ][ cKey ]
+   ENDIF
+   IF hb_HHasKey( hInter[ "active" ], cKey )
+      RETURN NIL
+   ENDIF
+   hInter[ "active" ][ cKey ] := .T.
+   aSites := B7CallArgs( cUpFun, hFuncOwn[ "static" ], hAstOwn, nIdx, hInter )
+   FOR EACH aSite IN aSites
+      // NONE/faltante = argumento omitido (NIL em runtime)
+      hOne := iif( aSite[ 1 ] == NIL, { "val" => "nil" }, ;
+                   TypeOf( aSite[ 1 ], aSite[ 2 ], hInter[ "decl" ], aSite[ 4 ], ;
+                           NIL, hInter, aSite[ 3 ] ) )
+      hOut := iif( aSite:__enumIndex() == 1, hOne, B7Merge( hOut, hOne ) )
+      IF hOut == NIL
+         EXIT
+      ENDIF
+   NEXT
+   IF Empty( aSites )
+      hOut := NIL      // sem chamador visível: sem fato
+   ENDIF
+   hb_HDel( hInter[ "active" ], cKey )
+   IF hOut != NIL .AND. hb_HGetDef( hOut, "how", "" ) == "declared"
+      hOut := hb_HClone( hOut )
+      hOut[ "how" ] := "chain"
+   ENDIF
+   hInter[ "params" ][ cKey ] := hOut
+
+   RETURN hOut
+
+// call sites FUNCALL de uma função no projeto: { arg-expr|NIL, hFunc,
+// hAst, block } por site
+STATIC FUNCTION B7CallArgs( cUpFun, lStatic, hAstOwn, nIdx, hInter )
+
+   LOCAL aOut := {}, cPath, hAst, hFunc, hStmt, aFA
+   LOCAL cModOwn := hb_HGetDef( hAstOwn, "module", "" )
+
+   FOR EACH cPath IN hb_HKeys( hInter[ "asts" ] )
+      hAst := hInter[ "asts" ][ cPath ]
+      IF lStatic .AND. !( hb_HGetDef( hAst, "module", "" ) == cModOwn )
+         LOOP
+      ENDIF
+      IF ! lStatic .AND. !( hb_HGetDef( hAst, "module", "" ) == cModOwn )
+         // STATIC homônimo naquele módulo sombreia a pública
+         aFA := hb_HGetDef( hAst[ "_b7funcs" ], cUpFun, NIL )
+         IF aFA != NIL .AND. aFA[ 2 ][ "static" ]
+            LOOP
+         ENDIF
+      ENDIF
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         FOR EACH hStmt IN hFunc[ "statements" ]
+            B7ArgWalk( hb_HGetDef( hStmt, "expr", NIL ), cUpFun, nIdx, ;
+                       hFunc, hAst, hStmt[ "block" ], aOut )
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN aOut
+
+STATIC PROCEDURE B7ArgWalk( hExpr, cUpFun, nIdx, hFunc, hAst, lBlock, aOut )
+
+   LOCAL xVal, hItem, hFun, aItems, hArg
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "FUNCALL" .AND. ;
+      HB_ISHASH( hFun := hb_HGetDef( hExpr, "fun", NIL ) ) .AND. ;
+      hb_HGetDef( hFun, "et", "" ) == "FUNNAME" .AND. ;
+      Upper( hb_HGetDef( hFun, "val", "" ) ) == cUpFun
+      aItems := hb_HGetDef( hb_HGetDef( hExpr, "parms", { => } ), "items", {} )
+      hArg := NIL
+      IF nIdx <= Len( aItems ) .AND. HB_ISHASH( aItems[ nIdx ] ) .AND. ;
+         !( hb_HGetDef( aItems[ nIdx ], "et", "" ) == "NONE" )
+         hArg := aItems[ nIdx ]
+      ENDIF
+      AAdd( aOut, { hArg, hFunc, hAst, lBlock } )
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         B7ArgWalk( xVal, cUpFun, nIdx, hFunc, hAst, ;
+                    lBlock .OR. hb_HGetDef( xVal, "et", "" ) == "CODEBLOCK", aOut )
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            B7ArgWalk( hItem, cUpFun, nIdx, hFunc, hAst, lBlock, aOut )
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN
+
+// auditoria dos pontos cegos do mundo fechado, UMA vez por run: strings
+// do projeto (nome citado), FUNREFs (chamada indireta/registro) e
+// presença de macro (& ou send por macro) em qualquer módulo
+STATIC PROCEDURE B7DynAudit( hInter )
+
+   LOCAL cPath, hAst, hFunc, hStmt
+
+   IF hInter[ "strs" ] != NIL
+      RETURN
+   ENDIF
+   hInter[ "strs" ]    := { => }
+   hInter[ "funrefs" ] := { => }
+   hInter[ "dyn" ]     := .F.
+   FOR EACH cPath IN hb_HKeys( hInter[ "asts" ] )
+      hAst := hInter[ "asts" ][ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
+         FOR EACH hStmt IN hFunc[ "statements" ]
+            B7AuditWalk( hb_HGetDef( hStmt, "expr", NIL ), hInter )
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN
+
+STATIC PROCEDURE B7AuditWalk( hExpr, hInter )
+
+   LOCAL xVal, hItem, cEt
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN
+   ENDIF
+   cEt := hb_HGetDef( hExpr, "et", "" )
+   DO CASE
+   CASE cEt == "STRING"
+      hInter[ "strs" ][ Upper( hb_HGetDef( hExpr, "val", "" ) ) ] := .T.
+   CASE cEt == "FUNREF"
+      hInter[ "funrefs" ][ Upper( hb_HGetDef( hExpr, "val", "" ) ) ] := .T.
+   CASE "MACRO" $ cEt
+      hInter[ "dyn" ] := .T.
+   ENDCASE
+   IF hb_HGetDef( hExpr, "msgmacro", NIL ) != NIL
+      hInter[ "dyn" ] := .T.
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         B7AuditWalk( xVal, hInter )
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            B7AuditWalk( hItem, hInter )
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN
+
+// D3: teto de runtime pelo ORÁCULO - compila UMA vez (cache por
+// tamanho+mtime) o fonte da raiz de runtime do PRÓPRIO Harbour
+// (src/rtl/tobject.prg, achado a partir de HB_BIN) com -x e lê o registro
+// como escrito: o par (STRING, @F()) cuja impl é a PRÓPRIA função
+// container nomeia a classe; os demais pares são os membros. Sem HB_BIN,
+// sem a árvore de fontes ou sem dump com rótulo de RETURN: NIL - degrada
+// honesto para o comportamento de hoje (possible)
+STATIC FUNCTION OracleLoad()
+
+   LOCAL cBin := hb_GetEnv( "HB_BIN" ), cRoot, cSrc, cCacheDir, cJson
+   LOCAL tSrc, cOut := "", cErr := "", hAst, hFunc, hRegs, cM, cCls, hMembers
+   LOCAL cPs := hb_ps()
+
+   IF Empty( cBin )
+      RETURN NIL
+   ENDIF
+   cRoot := hb_PathNormalize( hb_DirSepAdd( cBin ) + ".." + cPs + ".." + cPs + ".." )
+   cSrc  := hb_DirSepAdd( cRoot ) + "src" + cPs + "rtl" + cPs + "tobject.prg"
+   IF ! hb_vfExists( cSrc )
+      RETURN NIL
+   ENDIF
+   hb_vfTimeGet( cSrc, @tSrc )
+   cCacheDir := hb_GetEnv( "XDG_CACHE_HOME" )
+   IF Empty( cCacheDir )
+      cCacheDir := hb_DirSepAdd( hb_GetEnv( "HOME" ) ) + ".cache"
+   ENDIF
+   cCacheDir += cPs + "hbrefactor"
+   cJson := hb_DirSepAdd( cCacheDir ) + "tobject-" + ;
+            hb_ntos( hb_vfSize( cSrc ) ) + "-" + ;
+            StrTran( StrTran( hb_TToS( tSrc ), ":", "" ), " ", "" ) + ".ast.json"
+   IF ! hb_vfExists( cJson )
+      hb_DirBuild( cCacheDir )
+      IF hb_processRun( hb_DirSepAdd( cBin ) + "harbour " + cSrc + ;
+            " -n -q0 -w0 -gh -o" + hb_DirSepAdd( cCacheDir ) + "tobject.hrb" + ;
+            " -x" + hb_DirSepAdd( cCacheDir ) + ;
+            " -i" + hb_DirSepAdd( cRoot ) + "include",, @cOut, @cErr ) != 0
+         RETURN NIL
+      ENDIF
+      hb_vfErase( hb_DirSepAdd( cCacheDir ) + "tobject.hrb" )
+      IF hb_vfRename( hb_DirSepAdd( cCacheDir ) + "tobject.ast.json", cJson ) != 0
+         RETURN NIL
+      ENDIF
+   ENDIF
+   hAst := hb_jsonDecode( hb_MemoRead( cJson ) )
+   IF ! HB_ISHASH( hAst ) .OR. ! B7Ret6( hAst )
+      RETURN NIL
+   ENDIF
+   // acha a função-classe pelo par que se auto-referencia
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF hFunc[ "fileDecl" ]
+         LOOP
+      ENDIF
+      hRegs := { => }
+      B7RegSelfScan( hFunc, hRegs, @cCls )
+      IF cCls != NIL
+         hMembers := { => }
+         FOR EACH cM IN hb_HKeys( hRegs )
+            IF !( cM == cCls )
+               hMembers[ cM ] := hRegs[ cM ]
+            ENDIF
+         NEXT
+         RETURN { "cls" => cCls, "ast" => hAst, "fun" => hFunc, ;
+                  "members" => hMembers }
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+// pares de registro de uma função + o nome de classe do par-classe (a
+// STRING pareada com @F() da PRÓPRIA função container), se houver
+STATIC PROCEDURE B7RegSelfScan( hFunc, hRegs, cCls )
+
+   LOCAL hStmt, hAll := { => }, cM
+
+   cCls := NIL
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      B7RegPairsWalk( hb_HGetDef( hStmt, "expr", NIL ), "", hAll )
+   NEXT
+   FOR EACH cM IN hb_HKeys( hAll )
+      IF hAll[ cM ] != NIL .AND. hAll[ cM ] == Upper( hFunc[ "name" ] )
+         cCls := cM
+      ELSE
+         hRegs[ cM ] := hAll[ cM ]
       ENDIF
    NEXT
 
@@ -6325,7 +7148,7 @@ STATIC FUNCTION ResolveDispatchMsg( cUpClass, cUpSym, cUpBase, hGraph )
 STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
 
    LOCAL cSuf := iif( lBlock, ", codeblock", "" )
-   LOCAL cRcls, cOwnerQ, cOwnerR, aHij
+   LOCAL cRcls, cOwnerQ, cOwnerR, aHij, lVia, aSet
 
    IF hType == NIL
       RETURN { "possible send (dynamic dispatch, receiver unknown" + cSuf + ")", .F. }
@@ -6334,8 +7157,24 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
       RETURN { "excluded send (receiver holds a value of kind " + ;
                hType[ "val" ] + cSuf + ")", .T. }
    ENDIF
+   lVia := hb_HGetDef( hType, "via", .F. )
+   // conjunto finito >1 (B7): possible NOMEANDO os candidatos - nunca
+   // decide (a regra de consumo da spec)
+   IF hb_HHasKey( hType, "clsset" )
+      aSet := hb_HKeys( hType[ "clsset" ] )
+      ASort( aSet )
+      RETURN { "possible send (receiver one of " + B7JoinOr( aSet ) + ;
+               iif( lVia, " via construction chain, class graph as written", "" ) + ;
+               cSuf + ")", .F. }
+   ENDIF
    cRcls := hType[ "cls" ]
    IF Empty( cClass ) .OR. cRcls == cClass
+      // D1: tipagem que atravessou vínculo escrito confirma só em mundo
+      // fechado - o rótulo carrega a ressalva
+      IF lVia
+         RETURN { "confirmed send (receiver class " + cRcls + ;
+                  " via construction chain, class graph as written" + cSuf + ")", .F. }
+      ENDIF
       RETURN { "confirmed send (receiver " + ;
                iif( hType[ "how" ] == "declared", "declared AS CLASS " + cRcls, ;
                     "class " + cRcls + " via declared types" ) + cSuf + ")", .F. }
@@ -6360,11 +7199,23 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
                      cRcls + cSuf + ")", .F. }
          ENDIF
          IF cOwnerR == cOwnerQ
+            IF lVia
+               RETURN { "confirmed send (receiver class " + cRcls + ;
+                        " via construction chain dispatches to " + cOwnerQ + ":" + ;
+                        cUpMeth + ", class graph as written" + cSuf + ")", .F. }
+            ENDIF
             RETURN { "confirmed send (receiver class " + cRcls + " dispatches to " + ;
                      cOwnerQ + ":" + cUpMeth + cSuf + ")", .F. }
          ENDIF
          IF !( hType[ "how" ] == "declared" )
-            // instância EXATA (cadeia declarada): a resolução é absoluta
+            // instância EXATA (cadeia declarada): a resolução é absoluta;
+            // com travessia (D1) a exclusão vale no mundo fechado do grafo
+            // como-escrito - o rótulo nomeia o fato E a ressalva
+            IF lVia
+               RETURN { "excluded send within the written class graph (receiver class " + ;
+                        cRcls + " via construction chain, dispatches to " + ;
+                        cOwnerR + ":" + cUpMeth + cSuf + ")", .T. }
+            ENDIF
             RETURN { "excluded send (dispatches to " + cOwnerR + ":" + cUpMeth + ;
                      cSuf + ")", .T. }
          ENDIF
@@ -6381,8 +7232,19 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
    // classe conhecida != consultada sem resolução NÃO exclui: promessa
    // não verificada + cadeia indecidível (pai fora do projeto, classe
    // desconhecida, runtime)
-   RETURN { "possible send (receiver class " + cRcls + ", relation to " + cClass + ;
+   RETURN { "possible send (receiver class " + cRcls + ;
+            iif( lVia, " via construction chain", "" ) + ", relation to " + cClass + ;
             " unknown" + cSuf + ")", .F. }
+
+STATIC FUNCTION B7JoinOr( aNames )
+
+   LOCAL cOut := "", cN
+
+   FOR EACH cN IN aNames
+      cOut += iif( cN:__enumIndex() == 1, "", " or " ) + cN
+   NEXT
+
+   RETURN cOut
 
 STATIC FUNCTION PairKey( nApp, nMarker )
    RETURN hb_ntos( nApp ) + "|" + hb_ntos( nMarker )

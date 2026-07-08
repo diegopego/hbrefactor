@@ -1,9 +1,11 @@
-# Schema `ast-5` — o dump AST do compilador (spec)
+# Schema `ast-6` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-5` (fase B4g) = `ast-4` + A REGRA POR DENTRO
+com `-x`. O `ast-6` (fase B7) = `ast-5` + `"ret": true` no statement
+`push` que carrega o valor de RETURN (ver `statements[]`); o `ast-5`
+(fase B4g) = `ast-4` + A REGRA POR DENTRO
 (`match[]`/`result[]` em `ppRules[]` — ver lá); o `ast-4` (fase B4f) =
 `ast-3` + o CANAL DE TIPOS DA LINGUAGEM (seção `declared` +
 `declarations[]` parse-time tipadas — ver a seção própria); o `ast-3`
@@ -31,7 +33,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-5",           // versão emitida hoje (ast-1→...→ast-5)
+{ "schema": "ast-6",           // versão emitida hoje (ast-1→...→ast-6)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -300,6 +302,10 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
       "event": "open"|"close", "line": 24, "tok": 118 } ],
   "statements": [   // árvore de expressão PRÉ-reduce de cada statement/push
     { "kind": "stmt"|"push", "line": 12, "block": false,
+      // ast-6: "ret": true SÓ no push que carrega o valor de RETURN
+      // (campo AUSENTE nos demais - condição de IF/WHILE, limites de
+      // FOR, BREAK <expr> saem sem ele); gancho hb_compAstReturn() na
+      // redução RETURN Expression do harbour.y, gated por fAst
       "expr": { "et": "ASSIGN",          // nome do HB_ET_*/HB_EO_*
                 "line": 12, "tok": 7,    // tok = índice em tokens[] no
                                          // NASCIMENTO do nó (aproximado ±1
@@ -319,6 +325,8 @@ Folhas com `val`: VARIABLE, FUNNAME, STRING (+ NUMERIC/LOGICAL/DATE).
 Semânticas importantes:
 - `stmt` = statement-expressão completo; `push` = expressão empurrada em
   contexto de valor (condição de IF/WHILE, valor de RETURN, limites de FOR).
+  Desde o ast-6 o push do valor de RETURN é o ÚNICO com `"ret": true` —
+  antes era indistinguível dos demais (fato provado por probe na B7).
 - Sombra léxica JÁ DECIDIDA: em cada occurrence o `scope` é o que o
   compilador resolveu ali (parâmetro de codeblock homônimo = `local`+
   `block:true`; captura de local externa = `detached`).
@@ -385,18 +393,55 @@ emissão — zero impacto sem `-x` provado por `.hrb` byte-idênticos em -w0 E
 subsistema; a decodificação no writer é best-effort (faixas se sobrepõem)
 — consumidores atuais só usam RETORNOS.
 
-### TypeOf — propagação na ferramenta (regra FECHADA)
+### TypeOf — propagação na ferramenta (regra FECHADA; extensão B7 pelo portão de 2026-07-08)
 
-A ferramenta classifica o receptor de send propagando SÓ tipos declarados
-sobre `statements[]`: `VARIABLE` (classe declarada; senão binding único =
-exatamente 1 write + 0 refs + um só ASSIGN de topo → tipo do RHS),
-`FUNCALL` (retorno declarado), `SEND` (retorno declarado do método na
-classe do obj), literais de valor, `LIST` (último item), `SELF`. Sem
-ordem, sem caminhos, sem fixpoint; fora da regra → desconhecido
-(`possible`). Sombras de codeblock: uso de local externa dentro de bloco
-resolve como `detached` (classifica); `local`+`block` é PARÂMETRO do bloco
-(não classifica — o CBVAR não guarda classe). Estender a regra = novo
-portão.
+Regra local: a ferramenta classifica o receptor de send propagando tipos
+declarados sobre `statements[]`: `VARIABLE` (classe declarada; senão
+binding único = exatamente 1 write + 0 refs + um só ASSIGN de topo →
+tipo do RHS), `FUNCALL` (retorno declarado), `SEND` (retorno declarado
+do método na classe do obj), literais de valor, `LIST` (último item),
+`SELF`. Sem ordem, sem caminhos. Sombras de codeblock: uso de local
+externa dentro de bloco resolve como `detached` (classifica);
+`local`+`block` é PARÂMETRO do bloco (não classifica — o CBVAR não
+guarda classe).
+
+**Extensão B7 (spec-b7-tipos-interprocedurais.md, decisões D1-D3)** —
+só a TIPAGEM consome; as camadas de dispatch da Q4 ficam intocadas:
+
+- `FUNCALL` sem retorno declarado: união (com acordo) dos pushes
+  ROTULADOS de RETURN (`"ret": true`, ast-6) da função do PROJETO;
+  ciclo/módulo sem rótulo/função de fora → desconhecido.
+- `SEND` cujo método não é declarado na classe do receptor: resolve pela
+  CADEIA DE CONSTRUÇÃO como escrita — FUNREFs na árvore da função-classe
+  (fato da expansão; IIF de condição constante segue só o ramo tomado,
+  como o reduce) — subindo até o teto de runtime pelo ORÁCULO (D3:
+  `src/rtl/tobject.prg` compilado com `-x`, cache por mtime). Método
+  achado por REGISTRO = par (STRING, `@F()`) em itens diretos do mesmo
+  ARGLIST (genérico — hbclass, `__clsAddMsg`, qualquer DSL); par com
+  codeblock = inline, sem fato de retorno. Implementação cujo todo
+  RETURN é `QSelf()` (nó `SELF` no dump) devolve o RECEPTOR por
+  IDENTIDADE (probe executado). `::Super:` tipa pela cadeia (vínculo
+  único).
+- PARÂMETRO sem escrita/`@ref`: união dos argumentos de TODOS os call
+  sites FUNCALL do projeto — só com o mundo fechado AUDITADO (macro em
+  qualquer módulo, nome citado em string ou função referenciada por
+  `@F()` ⇒ desconhecido). STATIC une só o módulo; pública pula módulos
+  onde STATIC homônima a sombreia; argumento omitido = NIL.
+- Conjuntos FINITOS >1 classe: `possible` NOMEANDO os candidatos —
+  nunca decide.
+- Venenos: `Self := x` (ASSIGN real; o prólogo `Self := Self` do método
+  não conta) e `@Self` degradam a função inteira (regra sem ordem).
+- TODA travessia de vínculo escrito marca o tipo (`via`) e o rótulo do
+  veredito carrega a ressalva: `via construction chain, class graph as
+  written` (D1: mundo fechado; o veneno do forjador da Q4 — vínculo
+  escrito que NÃO é pai — decide errado no mundo aberto e o rótulo é o
+  que mantém a honestidade; provado por execução no fixq4: tipagem
+  aninhada `x := t:Pintar(); x:Pintar()` decide LOUSA em mundo fechado
+  num site que em runtime é código morto). Fronteira: retorno por
+  primitiva C (`__clsInst` etc.) não tem fato de compilação —
+  `possible` honesto (fixofi permanece assim).
+
+Estender a regra além disto = novo portão.
 
 ### Resolução de dispatch (B4f-2, ferramenta — spec-b4f2-dispatch.md)
 
