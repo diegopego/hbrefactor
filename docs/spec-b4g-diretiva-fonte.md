@@ -1,5 +1,14 @@
 # Spec B4g — a diretiva como fonte de primeira classe (schema ast-5)
 
+**✅ ENTREGUE (2026-07-07)** — portão vencido (fatos 8-13 abaixo; decisões
+do Diego no [ADR-001](adr-001-b4g-diretiva-fonte.md)) e volume executado:
+critérios de pronto 1-7 fechados (zero impacto 224/224 em -w0 E -w3 +
+relink duplo; byte-exato campo a campo no caso 82; caso 74 acionável com
+`--edit-rules` + round-trip + execução idêntica; renames de secundária e
+restrição; usages nomeando sites em regra; suíte 555/0 + lexdiff limpo;
+ast-schema/roadmap/extensão 0.7.0 no mesmo pacote). O documento fica como
+registro do desenho.
+
 **ORDEM DE SERVIÇO (2026-07-07)** — escrita ANTES do código (pedido do
 Diego na sessão que investigou o veículo da generalidade). Volume de core
 só depois do **portão**: probes P1-P5 + rascunho do schema apresentados ao
@@ -77,8 +86,23 @@ stringify, multi-passe). Aprendizados que informam o desenho:
 | 5 | **Papéis de token têm vocabulário pronto no pp**: match `HB_PP_MMARKER_REGULAR/LIST/RESTRICT/WILD/EXTEXP/NAME/OPTIONAL`; result `HB_PP_RMARKER_REGULAR/STRDUMP/STRSTD/STRSMART/BLOCK/LOGICAL/NUL/OPTIONAL/DYNVAL/REFERENCE`. Opcional é token-marker nos DOIS lados (grupo em `pMTokens`) — representação homogênea. | include/hbpp.h:125-142 |
 | 6 | O trace `.ppt` sai do MESMO funil das aplicações (`hb_pp_patternReplace`) — ordem do `.ppt` == ordem de `ppApplications` (provado 1:1 na S5/caso 42). | ppcore.c:5086-5100; caso 42 |
 | 7 | `#define` com corpo segue o MESMO formato de regra (pMatch/pResult; caso degenerado sem markers ou com pseudo-função `<x,y>`) — registro em `defineAdd` (fato 4, 'd'). | ppcore.c:3480-3526 |
+| 8 | **A posTbl guarda LINHA e COLUNA para QUALQUER arquivo** (`posTrack` grava `iCurrentLine`/col da linha corrente; `fMainFile` é só flag) — o col null de `prov 'i'` em `tokens[]` é decisão do EMISSOR, não falta de fato. `match[]`/`result[]` podem ser byte-exatos contra o `.ch` sem fonte nova. | ppcore.c:609-624; probe forja |
+| 9 | **P1 ✅ (probe forja, 2026-07-07)**: literais keyword/número/string de `pMatch`/`pResult` retêm entrada VIVA na posTbl no instante do registro, posição byte-exata conferida contra o `.ch`. Pontuação/operadores curtos (`( ) , { } ; * / :=` e o `[`/`]` de opcional) têm entrada com linha certa e col -1 (mesma regra de `tokens[]`). Única mutação de identidade no caminho: `<@>` (RMARKER_REFERENCE) troca o value para `"~"` → pos honesto null. | probe forja; ppcore.c:3919-3924 |
+| 10 | **P2 ✅**: o token sobrevivente de TODO marker é o do NOME, com posição byte-exata do nome no `.ch`, nos DOIS lados (match regular/list/restrict/wild/extexp/name; result regular/strdump/strstd/strsmart) e `index` = marker 1-based (o mesmo de `ppApplications`). RESTRIÇÃO: as alternativas (`RAPIDO`, `LENTO`) vivem em `pMTokens` do token-marker COM posições próprias → rename de palavra de restrição tem posição-fato. | probe forja |
+| 11 | **P3 ✅**: diretiva continuada por `;` — cada token carrega sua linha física real (match nas linhas 8-10, result na 11, no probe). `match[0]` dá a âncora byte-exata da cabeça → a reancoragem textual do rename-dsl MORRE. | probe forja |
+| 12 | **P4 ✅**: grupo opcional — o token `[` vira o marker OPTIONAL (col null, pontuação), grupo em `pMTokens` com literais e markers internos POSICIONADOS. **SURPRESA**: opcionais consecutivos em que o PRIMEIRO não tem keyword são REORDENADOS no registro (`hb_pp_matchPatternNew` troca os `pMTokens` para manter o grupo com keyword primeiro, ppcore.c:3796-3800): `[<n>] [GRAU <g>]` armazena o grupo GRAU antes. Ordem de `match[]` = ordem ARMAZENADA (a que casa); a ordem do FONTE é recuperável pelas posições internas — documentar no ast-schema. | probe forja; ppcore.c:3796-3800 |
+| 13 | **P5 ✅ (melhor que o previsto)**: regra nascida de EXPANSÃO (padrão cstruct, probe molde) registra com posições REAIS de origem — a cabeça aponta o texto dentro do RESULT da diretiva-mãe, o recheio de marker externo aponta o site de USO, o marker interno escapado (`\<v>`) aponta a diretiva-mãe. O rule record (`file`/`line`) fica no site da APLICAÇÃO. Nada a consertar; a posição pode viver em OUTRO arquivo que o da regra (a posTbl não guarda nome de arquivo, fato 8) — o guard de edição byte-exato contra o arquivo da regra decide (não confere → recusa honesta), e o oráculo pós-edição cobre o resto. Builtin lazy: file null, todas as posições null, como previsto. | probe molde; probe builtin |
 
 ## Probes ANTES do volume (executor; scratchpad; compilar tudo -w3 -es2)
+
+**EXECUTADOS em 2026-07-07** (patch experimental descartável em
+`hb_pp_trackRuleAdd`, gated por env; revertido, binários pristinos
+reconferidos). Resultados = fatos 8-13 acima: **nenhum fallback foi
+necessário** — P1-P5 confirmaram o caminho preferido. Fixtures do probe:
+`forja.ch`/`forja.prg` (multi-marker, secundária, opcional, lista,
+restrição, wild, stringify, name, extexp, continuada em 3 linhas,
+opcionais consecutivos) e `molde.prg` (regra dentro de expansão, padrão
+cstruct) — promover a fixtures da suíte no volume.
 
 | # | Pergunta | Método | Fallback se falhar |
 |---|----------|--------|--------------------|
@@ -116,10 +140,21 @@ por pilha — o padrão de `blocks[]`; sem árvore no schema):
   `regular|list|restrict|wild|extexp|name`; result
   `regular|strdump|strstd|strsmart|block|logical|nul|dynval|reference`.
   `marker` = índice 1-based (o MESMO que `ppApplications[].tokens[].marker`
-  — as duas seções se ligam por ele).
-- Posições `line/col/len/prov` pelas MESMAS regras de `tokens[]` (col
-  byte-exata ou null; prov 's'/'i'/'n'). Regra builtin: `match`/`result`
-  presentes com posições null (`file: null` já existe).
+  — as duas seções se ligam por ele; conferido no probe: `index` do token).
+- Posições `line/col/len/prov` pelas regras de `tokens[]` com UMA diferença
+  deliberada: **col é emitida também para tokens de include** (prov 'i') —
+  a posTbl a guarda (fato 8) e é ela que dá o byte-exato contra o `.ch`,
+  onde as regras de verdade vivem. Pontuação/operador curto: col null
+  (fato 9). Regra builtin: `match`/`result` presentes com posições null
+  (`file: null` já existe). `<@>` no result: pos null (fato 9).
+- **Alternativas de RESTRIÇÃO**: itens achatados logo após o token-marker,
+  `role: "restrict"` + `marker` = índice do marker dono, um item por token
+  do grupo (vírgulas incluídas, col null) — posições próprias (fato 10)
+  tornam a palavra de restrição renomeável.
+- **Ordem de `match[]`** = ordem ARMAZENADA da regra (a que o pp usa para
+  casar). Opcionais consecutivos sem keyword no primeiro são reordenados
+  pelo pp no registro (fato 12) — consumidor que precise da ordem do FONTE
+  reordena pelas posições; documentar no ast-schema.
 - **Snapshot no instante do registro** (padrão B4d "cópia no instante"):
   `hb_pp_trackRuleAdd` (ppcore.c:942) caminha `pMatch`/`pResult` e grava
   texto+papel+posição na tabela lateral da regra — imune a qualquer
@@ -206,3 +241,8 @@ régua do caso 64 (nenhuma palavra de DSL em `src/hbrefactor.prg`).
 Executar P1-P5 e apresentar ao Diego: resultados dos probes + schema
 draft ajustado + qualquer surpresa (vira fato numerado aqui). Só então o
 volume de core. Autorizações de commit continuam por-commit, como sempre.
+
+**✅ VENCIDO em 2026-07-07**: probes executados (fatos 8-13), Diego
+aprovou as três decisões — volume autorizado; ordem ARMAZENADA no
+`match[]` (opção a); fixtures do probe promovidas à suíte. Fundamentação
+histórica: [adr-001-b4g-diretiva-fonte.md](adr-001-b4g-diretiva-fonte.md).

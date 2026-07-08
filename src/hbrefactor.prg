@@ -75,14 +75,14 @@ STATIC PROCEDURE Usage()
    OutStd( "Usage:" + hb_eol() )
    OutStd( "  hbrefactor rename-local <projeto> <arq.prg> <função> <velho> <novo> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-param <projeto> <arq.prg> <função> <velho> <novo> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor rename-function <projeto> <velho> <novo> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor rename-function <projeto> <velho> <novo> [--file <f.prg>] [--force] [--edit-rules] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-static <projeto> <arq.prg> <velho> <novo> [--func <função>] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor reorder-params <projeto> <função> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <projeto> <arq.prg> <ini>-<fim> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor inline-local <projeto> <arq.prg> <função> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <projeto> <nome|Classe:Método|--at arq:linha:col> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
    OutStd( "  hbrefactor resolve-at <projeto> <arq.prg> <linha> <coluna>   (posição -> 'query: <spec>')" + hb_eol() )
-   OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]   (cabeça, keyword do match ou palavra de restrição)" + hb_eol() )
    OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-method <projeto> <Classe:Método> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-pp-marker <projeto> <nome> <novo> [--force] [--dry-run]" + hb_eol() )
@@ -224,12 +224,13 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 
    // ast-3 = ast-2 + rastro de derivação ("from" nos tokens sintetizados,
    // fase B4d); ast-4 = ast-3 + canal de tipos da linguagem (declarations
-   // tipadas parse-time + tabelas DECLARE em "declared", fase B4f). O
-   // leitor usa só seções presentes em todos - comandos que exigem o
-   // rastro/o canal recusam ou degradam com mensagem clara (FromReady/
-   // Ast4Ready)
+   // tipadas parse-time + tabelas DECLARE em "declared", fase B4f);
+   // ast-5 = ast-4 + a regra por dentro (match[]/result[] em ppRules,
+   // fase B4g). O leitor usa só seções presentes em todos - comandos que
+   // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
+   // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -281,7 +282,7 @@ STATIC FUNCTION Usages( aArgs )
 
    LOCAL cSpec, cName, cFuncFilter := "", cJsonOut := "", lShowExp := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
-   LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}
+   LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}, aRuleSeen := {}
    LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd
    LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
    LOCAL aDecl, aSite, cCur, nState, hOwnV
@@ -640,6 +641,10 @@ STATIC FUNCTION Usages( aArgs )
       // portanto invisível em tokens[]): diretivas e aplicações (ast-2)
       nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ) )
 
+      // o nome citado DENTRO do texto das regras (match[]/result[], B4g):
+      // keyword de match, identificador em result, palavra de restrição
+      nHits += RuleSiteHits( hAst, cUp, aRuleSeen )
+
       // sites do NOME DE MARKER que atravessam diretivas (B4d): posições
       // escritas que nenhum relator acima cobriu (decl. de método/handler...)
       IF FromReady( hAst )
@@ -759,7 +764,7 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
    LOCAL hClassMap, hRule
    LOCAL hApp, hTok, nApp, hPairs := { => }, cMk := NIL, cWd := NIL
    LOCAL aArts, hOwners, cUpName, cOwn, hCand := { => }, aPrev, cKind, cQuery
-   LOCAL aPosApps := {}, hMk, hFunc, aParts, cPart, nCls, cCur, nState
+   LOCAL aPosApps := {}, hMk, hFunc, aParts, cPart, nCls, cCur, nState, cSide
 
    // camadas 1/2: o site escrito nas aplicações de pp (a assinatura de um
    // construto gerado só tem posição byte-exata AQUI - tokens[] colapsa)
@@ -899,22 +904,63 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                 RuleWhere( hRule ) + ")"
       cQuery := cWd
    ELSE
-      // camada 3: identificador comum do stream do compilador
-      aPrev := NIL
-      FOR EACH hTok IN hAst[ "tokens" ]
-         IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
-            hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
-            nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
-            cMk    := hTok[ "text" ]
-            cKind  := iif( aPrev != NIL .AND. aPrev[ "type" ] == 58, ;
-                           "site de send (mensagem; dispatch dinâmico)", ;
-                      iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, ;
-                           "campo com alias", "identificador" ) )
-            cQuery := cMk
-            EXIT
-         ENDIF
-         aPrev := hTok
-      NEXT
+      // camada 3 (B4g): posição DENTRO do texto de uma diretiva do próprio
+      // módulo - vem ANTES do stream: linhas de diretiva não têm tokens
+      // próprios (o pp as consome), mas um CLONE de expansão carrega esta
+      // mesma posição (fato 13 da spec-b4g) e descreveria o site como
+      // identificador comum; o fato do SITE é a palavra da regra.
+      // match[]/result[] do ast-5 dão a palavra por posição-fato; consulta
+      // crua (o usages responde com os sites, RuleSiteHits inclusos)
+      IF RuleToksReady( hAst )
+         FOR EACH hRule IN hAst[ "ppRules" ]
+            IF hRule[ "file" ] == NIL .OR. ;
+               ! Lower( hb_FNameNameExt( hRule[ "file" ] ) ) == ;
+                 Lower( hb_FNameNameExt( hAst[ "module" ] ) )
+               LOOP
+            ENDIF
+            FOR EACH cSide IN { "match", "result" }
+               FOR EACH hTok IN hRule[ cSide ]
+                  IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+                     hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+                     nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+                     cMk    := hTok[ "text" ]
+                     cKind  := iif( hTok[ "role" ] == "marker", ;
+                                    "nome de marker da regra (local à diretiva; ", ;
+                               iif( hTok[ "role" ] == "restrict", ;
+                                    "palavra de restrição (", ;
+                                    "palavra no " + cSide + " da regra (" ) ) + ;
+                               RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")"
+                     cQuery := cMk
+                     EXIT
+                  ENDIF
+               NEXT
+               IF cQuery != NIL
+                  EXIT
+               ENDIF
+            NEXT
+            IF cQuery != NIL
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
+      // camada 4: identificador comum do stream do compilador
+      IF cQuery == NIL
+         aPrev := NIL
+         FOR EACH hTok IN hAst[ "tokens" ]
+            IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+               hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+               nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+               cMk    := hTok[ "text" ]
+               cKind  := iif( aPrev != NIL .AND. aPrev[ "type" ] == 58, ;
+                              "site de send (mensagem; dispatch dinâmico)", ;
+                         iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, ;
+                              "campo com alias", "identificador" ) )
+               cQuery := cMk
+               EXIT
+            ENDIF
+            aPrev := hTok
+         NEXT
+      ENDIF
       IF cQuery == NIL
          RETURN NIL
       ENDIF
@@ -1789,6 +1835,8 @@ STATIC FUNCTION RenameFunction( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI
    LOCAL lStatic := .F., cDefFile := "", aWarn := {}, hEdits := { => }, aE
    LOCAL cUpOld, cUpNew, cText, hOrig := { => }, nLine, nTotal := 0, aHit
+   LOCAL lEditRules := .F., aRuleSeen := {}, aRuleSites := {}, aSite
+   LOCAL hRule, hTok, cSide, cKey, cChPath, cCwd, cSiteDesc
 
    IF Len( aArgs ) < 4
       Usage()
@@ -1803,6 +1851,8 @@ STATIC FUNCTION RenameFunction( aArgs )
          lForce := .T.
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
+      CASE Lower( aArgs[ nI ] ) == "--edit-rules"
+         lEditRules := .T.
       CASE Lower( aArgs[ nI ] ) == "--file" .AND. nI < Len( aArgs )
          cOnlyFile := aArgs[ ++nI ]
       ENDCASE
@@ -1873,6 +1923,94 @@ STATIC FUNCTION RenameFunction( aArgs )
       RETURN Refuse( "função '" + cOld + "' não está definida no projeto" )
    ENDIF
 
+   // B4g: o nome citado DENTRO de regras de pp (match[]/result[] do ast-5) -
+   // depois do rename a regra reescreveria sites para o nome VELHO (órfã;
+   // regra nunca aplicada nem dispara o oráculo). Recusa ACIONÁVEL nomeando
+   // diretiva+posição (upgrade do caso 74); com --edit-rules a diretiva
+   // entra no conjunto de edições e passa pelo MESMO oráculo de sempre
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      IF ! RuleToksReady( hAst )
+         LOOP           // dump antigo: sem o fato (o oráculo pega regra aplicada)
+      ENDIF
+      FOR EACH hRule IN hAst[ "ppRules" ]
+         cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ] + "|" + ;
+                 iif( hRule[ "head" ] == NIL, "", hRule[ "head" ] )
+         IF hb_AScan( aRuleSeen, cKey,,, .T. ) > 0
+            LOOP
+         ENDIF
+         AAdd( aRuleSeen, cKey )
+         FOR EACH cSide IN { "match", "result" }
+            FOR EACH hTok IN hRule[ cSide ]
+               IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+                  Upper( hTok[ "text" ] ) == cUpOld .AND. ;
+                  ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
+                    hTok[ "role" ] == "restrict" )
+                  AAdd( aRuleSites, { hRule, hTok, cSide } )
+               ENDIF
+            NEXT
+         NEXT
+      NEXT
+   NEXT
+   IF ! Empty( aRuleSites )
+      FOR EACH aSite IN aRuleSites
+         hRule := aSite[ 1 ]
+         hTok  := aSite[ 2 ]
+         cSiteDesc := iif( hRule[ "file" ] == NIL, "(builtin)", ;
+                           hRule[ "file" ] + ;
+                           iif( hTok[ "line" ] == NIL, "", ;
+                                ":" + hb_ntos( hTok[ "line" ] ) ) + ;
+                           iif( hTok[ "col" ] == NIL, "", ;
+                                ":" + hb_ntos( hTok[ "col" ] + 1 ) ) ) + ;
+                      ": in rule " + aSite[ 3 ] + " (" + RuleTag( hRule ) + ")"
+         OutErr( "rule site: " + cSiteDesc + hb_eol() )
+      NEXT
+      IF ! lEditRules
+         RETURN Refuse( "'" + cOld + "' é citado dentro de regra(s) de pp (sites acima) - " + ;
+                        "a regra reescreveria para o nome velho; repita com --edit-rules " + ;
+                        "para editar as diretivas junto" )
+      ENDIF
+      cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
+      FOR EACH aSite IN aRuleSites
+         hRule := aSite[ 1 ]
+         hTok  := aSite[ 2 ]
+         IF hRule[ "file" ] == NIL
+            RETURN Refuse( "'" + cOld + "' citado em regra BUILTIN (" + RuleTag( hRule ) + ;
+                           ") - não há diretiva a editar" )
+         ENDIF
+         IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
+            RETURN Refuse( "site de '" + cOld + "' na regra " + RuleTag( hRule ) + " (" + ;
+                           RuleWhere( hRule ) + ") sem posição no fonte (diretiva nascida " + ;
+                           "de expansão) - recuso editar" )
+         ENDIF
+         cChPath := ResolveInclude( hProj, hRule[ "file" ] )
+         IF Empty( cChPath )
+            RETURN Refuse( "não achei o arquivo da diretiva '" + hRule[ "file" ] + "'" )
+         ENDIF
+         IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
+            RETURN Refuse( "diretiva em '" + cChPath + "' fora do diretório do projeto - " + ;
+                           "recuso editar include de sistema/compartilhado" )
+         ENDIF
+         cChPath := hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) )
+         // diretiva num fonte do PROJETO (regra no próprio .prg): a chave
+         // tem que ser o cPath do projeto - as edições vão na mesma aplicação
+         FOR EACH cPath IN hProj[ "files" ]
+            IF hb_PathNormalize( hb_PathJoin( cCwd, cPath ) ) == cChPath
+               cChPath := cPath
+               EXIT
+            ENDIF
+         NEXT
+         IF ! hb_HHasKey( hEdits, cChPath )
+            hEdits[ cChPath ] := {}
+         ENDIF
+         AAdd( hEdits[ cChPath ], { hTok[ "line" ], hTok[ "col" ] + 1 } )
+         nTotal++
+      NEXT
+      FOR EACH cKey IN hb_HKeys( hEdits )
+         DedupHits( hEdits[ cKey ] )
+      NEXT
+   ENDIF
+
    // sites: definição + calls; STATIC fica no módulo da definição
    FOR EACH cPath IN hProj[ "files" ]
       IF lStatic .AND. ! cPath == cDefFile
@@ -1906,7 +2044,14 @@ STATIC FUNCTION RenameFunction( aArgs )
       NEXT
       IF ! Empty( aE )
          DedupHits( aE )
-         hEdits[ cPath ] := aE
+         IF hb_HHasKey( hEdits, cPath )          // já há edição de diretiva aqui
+            FOR EACH aHit IN aE
+               AAdd( hEdits[ cPath ], aHit )
+            NEXT
+            DedupHits( hEdits[ cPath ] )
+         ELSE
+            hEdits[ cPath ] := aE
+         ENDIF
          nTotal += Len( aE )
       ENDIF
       // strings que citam o nome (call-by-name possível): relato, nunca edição
@@ -4621,12 +4766,68 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
    RETURN nHits
 
 // ---------------------------------------------------------------------------
-// rename-dsl - renomeia a CABEÇA de uma regra de pp: a palavra na diretiva
-// (lado do match, antes do '=>') + todos os sites de aplicação (posições de
-// ppApplications, marker 0). Verificação padrão-ouro: rename consistente
-// produz expansão idêntica -> .ppo e .hrb de TODOS os módulos byte-idênticos
-// antes/depois; qualquer diferença = rollback. O #define constante é o caso
-// degenerado (regra sem markers).
+// B4g - sites DENTRO das regras (match[]/result[] do ast-5): identificador
+// ou palavra citado no TEXTO da diretiva - o último esconderijo de um nome.
+// Papéis do próprio pp: literal type 21 (keyword/identificador) e
+// alternativa de restrição; nome de MARKER fica de fora (é variável local
+// da regra, não uso do nome). Dedupe global por regra (o mesmo .ch registra
+// a regra em cada módulo que o inclui). Sai pelo canal textual; a posição é
+// no ARQUIVO DA REGRA (não no módulo), por isso não entra nas Location[].
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen )
+
+   LOCAL hRule, hTok, cSide, nHits := 0, cKey, cWhat, cWhere
+
+   IF ! RuleToksReady( hAst )
+      RETURN 0                  // dump antigo: sem o fato, sem os hits
+   ENDIF
+   FOR EACH hRule IN hAst[ "ppRules" ]
+      cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ] + "|" + ;
+              iif( hRule[ "head" ] == NIL, "", hRule[ "head" ] )
+      IF hb_AScan( aRuleSeen, cKey,,, .T. ) > 0
+         LOOP
+      ENDIF
+      AAdd( aRuleSeen, cKey )
+      FOR EACH cSide IN { "match", "result" }
+         FOR EACH hTok IN hRule[ cSide ]
+            IF Len( hb_HGetDef( hTok, "text", "" ) ) == 0 .OR. ;
+               ! Upper( hTok[ "text" ] ) == cUp
+               LOOP
+            ENDIF
+            IF hTok[ "role" ] == "restrict"
+               cWhat := "in rule restriction (" + RuleTag( hRule ) + ;
+                        ", marker " + hb_ntos( hTok[ "marker" ] ) + ")"
+            ELSEIF hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21
+               cWhat := "in rule " + cSide + " (" + RuleTag( hRule ) + ")"
+            ELSE
+               LOOP
+            ENDIF
+            nHits++
+            cWhere := iif( hRule[ "file" ] == NIL, "(builtin)", ;
+                           hRule[ "file" ] + ;
+                           iif( hTok[ "line" ] == NIL, "", ;
+                                ":" + hb_ntos( hTok[ "line" ] ) ) + ;
+                           iif( hTok[ "col" ] == NIL, "", ;
+                                ":" + hb_ntos( hTok[ "col" ] + 1 ) ) )
+            OutStd( cWhere + ": " + cWhat + hb_eol() )
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN nHits
+
+// ---------------------------------------------------------------------------
+// rename-dsl - renomeia uma PALAVRA de regra de pp: a cabeça, a keyword
+// secundária do match ou a palavra de RESTRIÇÃO. Edições por posição-fato
+// (match[] do ast-5 na diretiva; tokens posicionados de ppApplications nos
+// sites de uso - marker 0 para palavra literal, marker N para o recheio da
+// restrição). A reancoragem textual da cabeça morreu na B4g (P3: cada token
+// da diretiva carrega linha/coluna físicas reais). Verificação padrão-ouro:
+// rename consistente produz expansão idêntica -> .ppo e .hrb de TODOS os
+// módulos byte-idênticos antes/depois; qualquer diferença = rollback (uma
+// restrição cujo valor VAZA para o resultado - stringify do marker - muda a
+// expansão e recusa aqui, honesto). O #define constante é o caso degenerado.
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION RenameDsl( aArgs )
@@ -4635,8 +4836,9 @@ STATIC FUNCTION RenameDsl( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hApp, hTok
    LOCAL cUpOld, cUpNew, aTargets := {}, cKey, aDefSeen := {}
    LOCAL hEdits := { => }, aE, cChPath, cText, hOrig := { => }
-   LOCAL nSites := 0, nDirEdits := 0, cWhy := "", nLine
+   LOCAL nSites := 0, nDirEdits := 0, nLine
    LOCAL hPpoBefore := { => }, cPpo, cCwd
+   LOCAL lTarget, hTargetKeys := { => }, aMk
 
    IF Len( aArgs ) < 4
       Usage()
@@ -4679,23 +4881,41 @@ STATIC FUNCTION RenameDsl( aArgs )
          RETURN Refuse( "dump sem ppRules/ppApplications (schema ast-2) - " + ;
                         "recompile o harbour do branch feature/compiler-ast-dump" )
       ENDIF
+      IF ! RuleToksReady( hAst )
+         RETURN Refuse( "dump sem match[]/result[] (schema anterior ao ast-5) - " + ;
+                        "recompile o harbour do branch feature/compiler-ast-dump" )
+      ENDIF
       hAsts[ cPath ] := hAst
 
       FOR EACH hRule IN hAst[ "ppRules" ]
-         IF hRule[ "head" ] == NIL
-            LOOP
+         // alvo: a palavra vive no MATCH da regra - cabeça (qualquer tipo
+         // de token: '@'/'?' são cabeças de pontuação), keyword secundária
+         // (literal identificador) ou alternativa de restrição
+         lTarget := hRule[ "head" ] != NIL .AND. Upper( hRule[ "head" ] ) == cUpOld
+         IF ! lTarget
+            FOR EACH hTok IN hRule[ "match" ]
+               IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+                  Upper( hTok[ "text" ] ) == cUpOld .AND. ;
+                  ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
+                    hTok[ "role" ] == "restrict" )
+                  lTarget := .T.
+                  EXIT
+               ENDIF
+            NEXT
          ENDIF
-         IF Upper( hRule[ "head" ] ) == cUpOld
+         IF lTarget
             IF hRule[ "file" ] == NIL
-               RETURN Refuse( "'" + cOld + "' é regra builtin (std rules/-D, sem arquivo " + ;
-                              "de diretiva) - não há diretiva a editar" )
+               RETURN Refuse( "'" + cOld + "' é palavra de regra builtin (std rules/-D, sem " + ;
+                              "arquivo de diretiva) - não há diretiva a editar" )
             ENDIF
             cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ]
             IF hb_AScan( aDefSeen, cKey,,, .T. ) == 0
                AAdd( aDefSeen, cKey )
                AAdd( aTargets, hRule )
+               hTargetKeys[ cKey ] := .T.
             ENDIF
-         ELSE
+         ENDIF
+         IF hRule[ "head" ] != NIL .AND. ! Upper( hRule[ "head" ] ) == cUpOld
             IF Upper( hRule[ "head" ] ) == cUpNew
                RETURN Refuse( "'" + cNew + "' já é cabeça de regra (" + RuleTag( hRule ) + ;
                               ", " + RuleWhere( hRule ) + ")" )
@@ -4712,10 +4932,23 @@ STATIC FUNCTION RenameDsl( aArgs )
                               "ambiguidade pré-existente, resolva antes do rename" )
             ENDIF
          ENDIF
+         // o nome novo já é palavra do match de alguma regra: a renomeada o
+         // capturaria (ou vice-versa) - visível mesmo em regra nunca
+         // aplicada, pelo ast-5
+         FOR EACH hTok IN hRule[ "match" ]
+            IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+               Upper( hTok[ "text" ] ) == cUpNew .AND. ;
+               ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
+                 hTok[ "role" ] == "restrict" )
+               RETURN Refuse( "'" + cNew + "' já é palavra do match da regra " + ;
+                              RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
+            ENDIF
+         NEXT
       NEXT
    NEXT
    IF Empty( aTargets )
-      RETURN Refuse( "'" + cOld + "' não é cabeça de regra de pp do projeto" )
+      RETURN Refuse( "'" + cOld + "' não é palavra de match de regra de pp do projeto " + ;
+                     "(cabeça, keyword secundária ou restrição)" )
    ENDIF
 
    // sequestro: o nome novo já vive no projeto como identificador ou como
@@ -4742,17 +4975,28 @@ STATIC FUNCTION RenameDsl( aArgs )
       NEXT
    NEXT
 
-   // sites de aplicação nos módulos (tokens marker 0 com o texto da cabeça)
+   // sites de aplicação nos módulos: tokens marker 0 (palavra literal da
+   // regra - cabeça e secundárias) + recheio de marker de RESTRIÇÃO que
+   // carrega a palavra (marker N da regra alvo, texto == velho)
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
       aE := {}
       FOR EACH hApp IN hAst[ "ppApplications" ]
          hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
-         IF hRule[ "head" ] == NIL .OR. ! Upper( hRule[ "head" ] ) == cUpOld
+         IF ! hb_HHasKey( hTargetKeys, RuleWhere( hRule ) + "|" + hRule[ "kind" ] )
             LOOP
          ENDIF
+         // markers de restrição da regra alvo que carregam a palavra
+         aMk := {}
+         FOR EACH hTok IN hRule[ "match" ]
+            IF hTok[ "role" ] == "restrict" .AND. ;
+               Upper( hb_HGetDef( hTok, "text", "" ) ) == cUpOld .AND. ;
+               hb_AScan( aMk, hTok[ "marker" ] ) == 0
+               AAdd( aMk, hTok[ "marker" ] )
+            ENDIF
+         NEXT
          FOR EACH hTok IN hApp[ "tokens" ]
-            IF hTok[ "marker" ] != 0
+            IF ! ( hTok[ "marker" ] == 0 .OR. hb_AScan( aMk, hTok[ "marker" ] ) > 0 )
                LOOP
             ENDIF
             IF Upper( hTok[ "text" ] ) == cUpOld
@@ -4764,7 +5008,7 @@ STATIC FUNCTION RenameDsl( aArgs )
                AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
             ELSEIF hb_BLen( hTok[ "text" ] ) >= 4 .AND. ;
                Upper( hTok[ "text" ] ) == Left( cUpOld, hb_BLen( hTok[ "text" ] ) )
-               // uso ABREVIADO da cabeça (dBase 4 letras): o texto do site
+               // uso ABREVIADO da palavra (dBase 4 letras): o texto do site
                // não é a palavra inteira - edição cega deixaria site órfão
                RETURN Refuse( "uso abreviado '" + hTok[ "text" ] + "' da regra em " + ;
                               hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
@@ -4779,7 +5023,11 @@ STATIC FUNCTION RenameDsl( aArgs )
       ENDIF
    NEXT
 
-   // a diretiva: a palavra no lado do MATCH (antes do '=>')
+   // a diretiva: as ocorrências da palavra no lado do MATCH, por
+   // POSIÇÃO-FATO (match[] do ast-5; cada token com linha/coluna físicas
+   // reais - P3). A reancoragem textual da cabeça morreu aqui (B4g). O
+   // lado do RESULTADO fica intocado: regra recursiva que emita a própria
+   // palavra quebra a expansão e a rede .ppo/.hrb recusa com rollback
    cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
    FOR EACH hRule IN aTargets
       cChPath := ResolveInclude( hProj, hRule[ "file" ] )
@@ -4791,10 +5039,21 @@ STATIC FUNCTION RenameDsl( aArgs )
                         "recuso editar include de sistema/compartilhado" )
       ENDIF
       aE := {}
-      IF ! DirectiveHeadEdits( hb_MemoRead( cChPath ), hRule[ "line" ], hRule[ "kind" ], ;
-                               cUpOld, aE, @cWhy )
-         RETURN Refuse( "diretiva " + RuleTag( hRule ) + " em " + RuleWhere( hRule ) + ;
-                        ": " + cWhy )
+      FOR EACH hTok IN hRule[ "match" ]
+         IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+            Upper( hTok[ "text" ] ) == cUpOld .AND. ;
+            ( hTok[ "role" ] == "literal" .OR. hTok[ "role" ] == "restrict" )
+            IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
+               RETURN Refuse( "palavra '" + cOld + "' na diretiva " + RuleTag( hRule ) + ;
+                              " (" + RuleWhere( hRule ) + ") sem posição no fonte " + ;
+                              "(diretiva nascida de expansão) - recuso editar" )
+            ENDIF
+            AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
+         ENDIF
+      NEXT
+      IF Empty( aE )
+         RETURN Refuse( "palavra '" + cOld + "' não encontrada no match da diretiva " + ;
+                        RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
       ENDIF
       nDirEdits += Len( aE )
       AbsEditsAdd( hEdits, cChPath, aE )
@@ -4916,103 +5175,9 @@ STATIC FUNCTION ResolveInclude( hProj, cFile )
 
    RETURN ""
 
-// ocorrências (linha, col 1-based) da palavra-cabeça no lado do MATCH da
-// diretiva (da linha da diretiva até o '=>'; continuação por ';'). O lado
-// do RESULTADO fica intocado: regra recursiva que emita a própria cabeça
-// quebra a expansão e a rede .ppo/.hrb recusa com rollback. #define não tem
-// '=>': só a primeira ocorrência (a cabeça logo após #define).
-STATIC FUNCTION DirectiveHeadEdits( cText, nLine, cKind, cUpOld, aEdits, cWhy )
-
-   LOCAL aSrc := hb_ATokens( StrTran( cText, Chr( 13 ), "" ), Chr( 10 ) )
-   LOCAL nL, cLine, cScan, nArrow, nCol, lArrow := .F.
-
-   IF nLine < 1 .OR. nLine > Len( aSrc )
-      cWhy := "linha " + hb_ntos( nLine ) + " fora do arquivo"
-      RETURN .F.
-   ENDIF
-   // o line da regra segue a convenção do pp (linha de INPUT corrente =
-   // última linha física da diretiva continuada por ';') - reancorar no
-   // INÍCIO físico: a linha '#<kind>' mais próxima, para trás
-   nL := nLine
-   DO WHILE nL >= 1 .AND. ! DirectiveStart( aSrc[ nL ], cKind )
-      nL--
-   ENDDO
-   IF nL < 1
-      cWhy := "início da diretiva #" + cKind + " não encontrado até a linha " + ;
-              hb_ntos( nLine )
-      RETURN .F.
-   ENDIF
-   DO WHILE nL <= Len( aSrc )
-      cLine := aSrc[ nL ]
-      nArrow := At( "=>", cLine )
-      cScan := iif( nArrow > 0, Left( cLine, nArrow - 1 ), cLine )
-      FOR EACH nCol IN WordOccs( cScan, cUpOld )
-         AAdd( aEdits, { nL, nCol } )
-         IF cKind == "define"
-            RETURN .T.
-         ENDIF
-      NEXT
-      IF nArrow > 0
-         lArrow := .T.
-         EXIT
-      ENDIF
-      IF !( Right( RTrim( cLine ), 1 ) == ";" )
-         EXIT
-      ENDIF
-      nL++
-   ENDDO
-
-   IF cKind == "define"
-      cWhy := "cabeça '" + cUpOld + "' não encontrada na linha da diretiva"
-      RETURN .F.
-   ENDIF
-   IF ! lArrow
-      cWhy := "diretiva sem '=>' reconhecível"
-      RETURN .F.
-   ENDIF
-   IF Empty( aEdits )
-      cWhy := "cabeça '" + cUpOld + "' não encontrada no lado do match"
-      RETURN .F.
-   ENDIF
-
-   RETURN .T.
-
-// a linha abre a diretiva do tipo dado? ('#' + nome, aceitando o nome
-// abreviado em >= 4 letras que o pp aceita, ex.: #xtrans p/ #xtranslate)
-STATIC FUNCTION DirectiveStart( cLine, cKind )
-
-   LOCAL cWord
-
-   cLine := LTrim( cLine )
-   IF ! Left( cLine, 1 ) == "#"
-      RETURN .F.
-   ENDIF
-   cLine := LTrim( SubStr( cLine, 2 ) )
-   cWord := Lower( hb_TokenGet( cLine, 1 ) )
-
-   RETURN cWord == cKind .OR. ;
-          ( hb_BLen( cWord ) >= 4 .AND. cWord == Left( cKind, hb_BLen( cWord ) ) )
-
-// colunas 1-based das ocorrências INTEIRAS da palavra na linha (fronteira =
-// vizinho não alfanumérico/_). Territorio textual assumido: linhas de
-// diretiva não têm tokens no dump (o pp as consome) - e toda edição passa
-// pela rede .ppo/.hrb byte-idênticos.
-STATIC FUNCTION WordOccs( cLine, cUpWord )
-
-   LOCAL aCols := {}, cUp := Upper( cLine )
-   LOCAL nAt := 0, nLen := hb_BLen( cUpWord )
-
-   DO WHILE ( nAt := hb_BAt( cUpWord, cUp, nAt + 1 ) ) > 0
-      IF ! IsIdByte( hb_BSubStr( cUp, nAt - 1, 1 ) ) .AND. ;
-         ! IsIdByte( hb_BSubStr( cUp, nAt + nLen, 1 ) )
-         AAdd( aCols, nAt )
-      ENDIF
-   ENDDO
-
-   RETURN aCols
-
-STATIC FUNCTION IsIdByte( cCh )
-   RETURN ! Empty( cCh ) .AND. ( hb_asciiIsAlpha( cCh ) .OR. hb_asciiIsDigit( cCh ) .OR. cCh == "_" )
+// (a reancoragem textual da cabeça - DirectiveHeadEdits/DirectiveStart/
+// WordOccs/IsIdByte - morreu na B4g: a diretiva é editada por
+// posição-fato, via match[] do ast-5)
 
 // .ppo do módulo com os flags do projeto - o harbour grava <fonte>.ppo ao
 // lado do FONTE (independe de -o/cwd): preserva um .ppo pré-existente do
@@ -5599,7 +5764,7 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION FromReady( hAst )
-   RETURN hb_AScan( { "ast-3", "ast-4" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-3", "ast-4", "ast-5" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // ---------------------------------------------------------------------------
 // B4f - canal de tipos da linguagem (schema ast-4). O compilador PARSEIA e
@@ -5614,7 +5779,21 @@ STATIC FUNCTION FromReady( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION Ast4Ready( hAst )
-   RETURN hb_HGetDef( hAst, "schema", "" ) == "ast-4"
+   RETURN hb_AScan( { "ast-4", "ast-5" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+
+// ---------------------------------------------------------------------------
+// B4g - a regra por dentro (schema ast-5): ppRules[] ganha match[]/result[],
+// um item por token do padrão com o PAPEL que o próprio pp atribuiu ao
+// parsear a diretiva (literal | marker+mkind | restrict | opt-open/close) e
+// posição byte-exata no arquivo da diretiva (col emitida também para .ch
+// incluído - diferente de tokens[]). A ordem é a ARMAZENADA pelo pp (grupos
+// opcionais consecutivos sem keyword no primeiro são reordenados no
+// registro); a ordem do fonte é recuperável pelas posições. Comandos que
+// exigem a regra por dentro degradam/recusam com o fato em dump antigo.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION RuleToksReady( hAst )
+   RETURN hb_HGetDef( hAst, "schema", "" ) == "ast-5"
 
 // tabelas DECLARE agregadas do PROJETO (as do dump são por módulo):
 // { "f" => { FUNÇÃO => item }, "c" => { CLASSE => { MÉTODO => item } } }.

@@ -196,14 +196,27 @@ async function cmdRenameFunction() {
   const novo = await vscode.window.showInputBox({ prompt: `Novo nome para a função ${word}` });
   if (!novo) return;
   await saveAll();
+  const flags = [];
   let res = await run(['rename-function', c.spec, word, novo], c.cwd);
-  if (res.code !== 0 && /textual references found/.test(res.stderr + res.stdout)) {
+  // B4g: o nome citado DENTRO de regra de pp - a recusa nomeia diretiva e
+  // posição; --edit-rules edita as diretivas junto (mesmo oráculo)
+  if (res.code !== 0 && /--edit-rules/.test(res.stderr + res.stdout)) {
+    report(`rename-function ${word} -> ${novo} (citado em regra de pp)`, res);
+    const go = await vscode.window.showWarningMessage(
+      'O nome é citado DENTRO de regra(s) de pp (diretivas nomeadas na saída). Editar as diretivas junto?',
+      'Prosseguir (--edit-rules)', 'Cancelar');
+    if (go !== 'Prosseguir (--edit-rules)') return;
+    flags.push('--edit-rules');
+    res = await run(['rename-function', c.spec, word, novo, ...flags], c.cwd);
+  }
+  if (res.code !== 0 && /referências textuais/.test(res.stderr + res.stdout)) {
     report(`rename-function ${word} -> ${novo} (referências textuais)`, res);
     const go = await vscode.window.showWarningMessage(
       'Há referências textuais (strings/HB_FUNC) que NÃO serão alteradas. Prosseguir mesmo assim?',
       'Prosseguir (--force)', 'Cancelar');
     if (go !== 'Prosseguir (--force)') return;
-    res = await run(['rename-function', c.spec, word, novo, '--force'], c.cwd);
+    flags.push('--force');
+    res = await run(['rename-function', c.spec, word, novo, ...flags], c.cwd);
   }
   report(`rename-function ${word} -> ${novo}`, res);
 }

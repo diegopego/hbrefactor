@@ -2,7 +2,7 @@
   "name": "hbrefactor",
   "displayName": "hbrefactor - Harbour refactoring",
   "description": "Refatoração verificada para Harbour: rename (local/param/static/function/method/nome de match marker de pp/palavra de diretiva), reorder, extract, usages e relatórios via CLI hbrefactor (oráculo do compilador -x, projetos resolvidos pelo hbmk2).",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "diegopego",
   "license": "MIT",
   "engines": { "vscode": "^1.80.0" },

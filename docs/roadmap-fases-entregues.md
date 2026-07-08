@@ -1437,3 +1437,46 @@ palpite.
    dentro do `CREATE CLASS` não é listado (o relator de marker não filtra
    por classe) — a forma crua o cobre via "name through pp rule". Fatia 1
    entregue na fase com o desenho v3 (canal de tipos da linguagem).
+
+## Fase B4g — a diretiva como fonte de primeira classe (schema ast-5) ✅ (2026-07-07)
+
+Portão dos probes VENCIDO e decisões do Diego registradas no
+**[adr-001-b4g-diretiva-fonte.md](adr-001-b4g-diretiva-fonte.md)** (probes
+P1-P5 = fatos 8-13 da [spec-b4g-diretiva-fonte.md](spec-b4g-diretiva-fonte.md);
+nenhum fallback necessário). Entregas:
+
+- **Core (ast-5)**: `ppRules[]` ganhou `match[]`/`result[]` — um item por
+  token do padrão, com papel (`literal|marker+mkind|restrict|opt-open/
+  close`), marker 1-based (o mesmo de `ppApplications`) e posição
+  byte-exata (col emitida também para `.ch` incluído — fato 8). Snapshot
+  no instante do registro em `hb_pp_trackRuleAdd` (zero ganchos novos;
+  padrão "cópia no instante" da B4d), accessors em `hbpp.h`, emissão em
+  `compast.c`. **Zero impacto provado**: varredura de `src/` inteira
+  (112 módulos × -w0 E -w3 = 224 comparações `.hrb`) byte-idêntica
+  com/sem `-x`; relink duplo `harbour` E `hbmk2` conferido.
+- **Ferramenta**: `usages` nomeia sites DENTRO de regra (`RuleSiteHits`:
+  `in rule match/result/restriction`, posição no arquivo da regra);
+  `rename-dsl` renomeia QUALQUER palavra do match (cabeça — inclusive de
+  pontuação —, keyword secundária, palavra de restrição) com a diretiva
+  editada por POSIÇÃO-FATO — **a reancoragem textual morreu**
+  (DirectiveHeadEdits/DirectiveStart/WordOccs/IsIdByte removidas);
+  restrição cujo valor vaza (stringify) recusa pela rede `.ppo` com
+  rollback, honesto; `rename-function --edit-rules` (upgrade do caso 74:
+  recusa ACIONÁVEL nomeando diretiva+posição ANTES de editar — pega até
+  regra nunca aplicada, que o oráculo não via — e, com o flag, edita a
+  diretiva pelo mesmo oráculo com round-trip A→B→A + execução idêntica);
+  `resolve-at`/`usages --at` cobrem posição DENTRO de diretiva (camada
+  antes do stream: o clone de expansão carrega a mesma posição — fato 13).
+- **Extensão 0.7.0**: `cmdRenameFunction` com confirm-then-force para
+  `--edit-rules`; de quebra, o confirm de `--force` (referências textuais)
+  estava MORTO — a regex testava a mensagem em inglês e o CLI fala
+  português — e foi consertado.
+- **Suíte 555/0** + lexdiff 0 divergências reais. Fixtures do probe
+  promovidas (`fixb4g/`: forja/molde — todos os mkinds, continuada em 3
+  linhas, opcionais consecutivos REORDENADOS pelo pp, opcional aninhado,
+  restrição que vaza e que não vaza, regra nascida de expansão) com
+  invariantes campo a campo no caso 82; caso 65 aceita ast-4|ast-5; régua
+  do caso 64 assertada para o vocabulário novo (fronteira de palavra).
+- Decisão de desenho (Diego): `match[]` na ordem ARMAZENADA pelo pp
+  (opcionais reordenados ficam como o pp casa; a ordem do fonte é
+  recuperável pelas posições) — o dump transporta fato 1:1.

@@ -1,15 +1,17 @@
-# Schema `ast-4` — o dump AST do compilador (spec)
+# Schema `ast-5` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-4` (fase B4f) = `ast-3` + o CANAL DE TIPOS DA LINGUAGEM
-(seção `declared` + `declarations[]` parse-time tipadas — ver a seção
-própria); o `ast-3` (fase B4d) = `ast-2` (fase B4) + o campo `from`
-(rastro de derivação) nos tokens SINTETIZADOS; o `ast-2` = `ast-1`
-(commit `2cca58e4b8`) + seções `ppRules`/`ppApplications`. Fora as adições,
-tudo é idêntico byte a byte entre as versões — exceto `declarations[]`,
-cuja fonte MUDOU no ast-4 (ver lá).
+com `-x`. O `ast-5` (fase B4g) = `ast-4` + A REGRA POR DENTRO
+(`match[]`/`result[]` em `ppRules[]` — ver lá); o `ast-4` (fase B4f) =
+`ast-3` + o CANAL DE TIPOS DA LINGUAGEM (seção `declared` +
+`declarations[]` parse-time tipadas — ver a seção própria); o `ast-3`
+(fase B4d) = `ast-2` (fase B4) + o campo `from` (rastro de derivação) nos
+tokens SINTETIZADOS; o `ast-2` = `ast-1` (commit `2cca58e4b8`) + seções
+`ppRules`/`ppApplications`. Fora as adições, tudo é idêntico byte a byte
+entre as versões — exceto `declarations[]`, cuja fonte MUDOU no ast-4
+(ver lá).
 
 **Como gerar** (a ferramenta faz isso via `AstDumps()`):
 ```
@@ -29,7 +31,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-4",           // versão emitida hoje (ast-1→...→ast-4)
+{ "schema": "ast-5",           // versão emitida hoje (ast-1→...→ast-5)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -146,10 +148,14 @@ no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
     "kind": "command",     // define|translate|xtranslate|command|xcommand
     "file": "menu.ch",     // arquivo da DIRETIVA; null = regra builtin
                            // (std rules compiladas, -D, dyn defines)
-    "line": 3,             // linha da diretiva (0 quando builtin)
+    "line": 3,             // linha da diretiva (0 quando builtin); para
+                           // diretiva CONTINUADA por ';' é a ÚLTIMA linha
+                           // física - a âncora real é match[0] (ast-5)
     "head": "MENUITEM",    // palavra-cabeça; null se a regra começa com
                            // match marker
-    "markers": 4 } ],      // nº de match markers da regra
+    "markers": 4,          // nº de match markers da regra
+    "match": [ ... ],      // ast-5: a regra POR DENTRO (abaixo)
+    "result": [ ... ] } ],
 
 "ppApplications": [        // UMA entrada por aplicação, na ORDEM em que o
                            // pp as fez (multi-passe visível: aplicação
@@ -200,6 +206,67 @@ Garantias e limites (provados no smoke test da B4):
   expansão — `UNTIL <c> => IF <c> ; EXIT ; ENDIF ; ENDDO` perde o ENDDO
   (comportamento PRÉ-EXISTENTE do Harbour, provado em binário pristino).
   Forma que funciona: `IF <c> ; EXIT ; END ; END`.
+
+### `match[]`/`result[]` — a regra POR DENTRO (ast-5, fase B4g)
+
+Um item por token do padrão da regra, com o PAPEL que o próprio pp
+atribuiu ao parsear a diretiva (snapshot no instante do REGISTRO —
+`hb_pp_trackRuleAdd` —, imune a mutação posterior dos tokens). Fecha a
+lacuna dos casos 72-74: a regra deixou de ser opaca (era só cabeça +
+contagem de markers). Fundamentação e probes: spec-b4g (fatos 1-13) +
+ADR-001.
+
+```jsonc
+"match": [
+  { "role": "literal", "type": 21, "line": 12, "col": 10, "len": 5,
+    "prov": "i", "text": "FORJA" },                 // palavra da regra
+  { "role": "marker", "marker": 1, "mkind": "regular",
+    "line": 12, "col": 17, "len": 3, "prov": "i", "text": "oIt" },
+  { "role": "opt-open" },                           // grupo [ ... ]
+  { "role": "literal", "type": 21, ..., "text": "ROTULO" },
+  { "role": "marker", "marker": 4, "mkind": "regular", ..., "text": "cRot" },
+  { "role": "opt-close" },
+  { "role": "marker", "marker": 3, "mkind": "restrict", ..., "text": "modo" },
+  { "role": "restrict", "marker": 3, "type": 21, ..., "text": "RAPIDO" } ],
+"result": [
+  { "role": "marker", "marker": 1, "mkind": "regular", ..., "text": "oIt" },
+  { "role": "literal", "type": 21, ..., "text": "ForjaNova" },
+  { "role": "marker", "marker": 3, "mkind": "strstd", ..., "text": "modo" } ]
+```
+
+- **`role`**: `literal` (palavra/pontuação da regra, com `type` cru do
+  pp), `marker` (o token sobrevivente é o do NOME do marker, com
+  `marker` 1-based — o MESMO índice de `ppApplications[].tokens[].marker`
+  — e `mkind`), `restrict` (alternativa de restrição, com `marker` do
+  dono; vírgulas do grupo incluídas, col null), `opt-open`/`opt-close`
+  (grupo opcional achatado, reconstruível por pilha; o match pode
+  ANINHAR — o result não).
+- **`mkind`** (vocabulário do pp, hbpp.h): match
+  `regular|list|restrict|wild|extexp|name`; result
+  `regular|strdump|strstd|strsmart|block|logical|nul|dynval|reference`.
+  Marker de match casado mas NÃO usado no result fica com `marker: 0`
+  (não numerado) — e o recheio dele em `ppApplications` também vem com
+  `marker: 0` (comportamento do rastreador, não deste snapshot).
+- **Posições**: `line`/`col`/`len`/`prov` como em `tokens[]`, com UMA
+  diferença deliberada: **col é emitida também para token de include**
+  (`prov 'i'`) — a posTbl guarda coluna de qualquer arquivo (fato 8 da
+  spec-b4g) e as regras vivem em `.ch`; o byte-exato contra o arquivo da
+  regra é o contrato (provado campo a campo no caso 82). Pontuação e
+  operador curto: linha real, col null. `<@>` no result: pos null (o pp
+  troca o value). Regra builtin: tudo null.
+- **Ordem = a ARMAZENADA pela regra** (a que o pp usa para casar), NÃO a
+  do fonte: grupos opcionais consecutivos onde o PRIMEIRO não tem keyword
+  são reordenados no registro (`hb_pp_matchPatternNew` mantém o grupo com
+  keyword primeiro — decisão do Diego no portão, ADR-001: o dump
+  transporta o fato 1:1). A ordem do fonte é recuperável pelas posições;
+  fixture executável: regra TEMPERA do caso 82.
+- **Regra nascida de EXPANSÃO** (cstruct/caso 73; fato 13): as posições
+  são REAIS e rastreáveis — a cabeça aponta o texto DENTRO do result da
+  diretiva-mãe, recheio de marker aponta o site de uso; o rule record
+  (`file`/`line`) fica no site da APLICAÇÃO. A posição pode viver em
+  OUTRO arquivo que o da regra (a posTbl não guarda nome de arquivo) — o
+  guard de edição byte-exato contra o arquivo da regra decide (não
+  confere → recusa honesta), e o oráculo pós-edição cobre o resto.
 
 ## `functions[]` — um item por FUNCTION/PROCEDURE (+ pseudo-função fileDecl)
 
@@ -578,17 +645,38 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   de `ppApplications` com `marker == 0` e o texto — cobre a cabeça E as
   palavras secundárias (ACTION, AT, SAY...), builtin incluso. Genérico
   por construção: só cabeça/kind/atribuição de marker, nada por família.
-- **rename-dsl**: edita (a) os tokens `marker 0` posicionados das
-  aplicações da regra e (b) a palavra no lado do MATCH da diretiva (antes
-  do `=>`; reancorada no início físico — ver convenção de `line` acima;
-  `#define` = só a 1ª ocorrência). Recusas fato-based: builtin
-  (`file null`), diretiva fora do projeto, cabeça nova já regra/abreviação
-  dBase (4 letras, famílias sem `x`), nome novo já identificador no stream
-  (captura), aplicação sem posição (multi-passe/include), uso abreviado.
-  Verificação padrão-ouro: rename consistente não muda a expansão →
-  `.ppo` e `.hrb -gh -l` de TODOS os módulos byte-idênticos, senão
-  rollback. O `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de
-  `-o`/cwd) — preservar um `.ppo` pré-existente do usuário.
+- **Sites DENTRO da regra** (`usages`/`RuleSiteHits`, B4g): identificador
+  ou palavra citado no TEXTO da diretiva — `in rule match`/`in rule
+  result` (literal type 21) e `in rule restriction` (alternativa, com o
+  marker do dono) — via `match[]`/`result[]`, com arquivo:linha:coluna da
+  REGRA. Nome de MARKER fica de fora (variável local da regra). Fecha o
+  último esconderijo de um nome; canal textual (a posição é no arquivo da
+  regra, não no módulo — fora das `Location[]`).
+- **rename-dsl (B4g: qualquer palavra do MATCH)**: alvo = regra cujo
+  match contém a palavra — CABEÇA (qualquer tipo de token: `@`/`?` são
+  cabeças de pontuação), keyword SECUNDÁRIA (literal identificador) ou
+  palavra de RESTRIÇÃO. Edita (a) os tokens posicionados das aplicações
+  (`marker 0` para palavra literal; recheio do marker de restrição para
+  alternativa) e (b) as ocorrências no lado do MATCH da diretiva por
+  POSIÇÃO-FATO (`match[]` — cada token com linha/coluna físicas reais; a
+  reancoragem textual da cabeça MORREU na B4g). Recusas fato-based:
+  builtin (`file null`), diretiva fora do projeto, nome novo já
+  cabeça/palavra de match de regra (captura visível até em regra nunca
+  aplicada)/abreviação dBase (4 letras, famílias sem `x`)/identificador
+  no stream, aplicação ou token de diretiva sem posição (expansão),
+  uso abreviado. Verificação padrão-ouro: rename consistente não muda a
+  expansão → `.ppo` e `.hrb -gh -l` de TODOS os módulos byte-idênticos,
+  senão rollback — restrição cujo valor VAZA para o resultado (stringify
+  do marker) muda a expansão e recusa AQUI, honesto (caso 82). O
+  `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de `-o`/cwd) —
+  preservar um `.ppo` pré-existente do usuário.
+- **rename-function `--edit-rules` (B4g, upgrade do caso 74)**: nome
+  citado dentro de regra do projeto → recusa ACIONÁVEL nomeando
+  diretiva+posição (sem o flag, ANTES de qualquer edição — regra nunca
+  aplicada não dispara o oráculo e ficaria órfã em silêncio); com o flag,
+  os tokens de `match[]`/`result[]` entram no conjunto de edições e
+  passam pelo MESMO oráculo (mapa de símbolos + rollback + execução).
+  Builtin ou token sem posição → recusa nomeando o motivo.
 - **Consulta por posição (revisão Q5)** (`ResolveAtQuery`, core do
   `resolve-at` e do `usages --at`): "o que está sob o cursor" responde
   por camadas de fato — (1) nome que preenche match marker (apptoken
@@ -606,7 +694,12 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   sem identificador → recusa (consumidor cai para a palavra crua). Dump
   sem rastro degrada para cru. Contrato de saída: linha `query: <spec>`
   antes do relato. Coluna é BYTE (editor UTF-16 desalinha → fallback).
-  B4g estenderá a sites DENTRO de diretiva.
+  B4g estendeu a sites DENTRO de diretiva: posição no TEXTO de uma regra
+  do próprio módulo responde a palavra por posição-fato (`match[]`/
+  `result[]`) — e vem ANTES do stream, porque um clone de expansão
+  carrega a MESMA posição (fato 13) e descreveria o site como
+  identificador comum; consulta crua (o usages responde com os sites,
+  `RuleSiteHits` inclusos).
 - **Vocabulário do DONO (revisão Q6)** (`OwnerVocabMap`/`OwnerWord`): o
   rótulo de TIPO do dono (`cog declaration (rig TOTEM)`, `oficio
   definition Talha (tenda Banca)`) usa a cabeça da regra cuja expansão
@@ -757,10 +850,15 @@ ast-2 (fase B4, consumidos por usages/rename-dsl/lifting). O campo `from`
 versionou de ast-2 para ast-3. O canal de tipos da linguagem
 (`declarations[]` parse-time tipadas + seção `declared`) entregue no
 **ast-4** (fase B4f, 2026-07-06), consumido pelas camadas
-confirmed/excluded do usages (TypeOf). O leitor da ferramenta (`ReadAst`)
-aceita `ast-2`/`ast-3`/`ast-4`; comandos que EXIGEM o rastro usam
-`FromReady` (ast-3+) e a classificação de receptor exige projeto inteiro
-em ast-4 (`Ast4Ready`/`DeclTables`) — em dump antigo degrada para a camada
-`possible`, sem recusar. Próximo a avaliar: span original de string no
-posTrack (mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e
-atualizar este documento NO MESMO commit.
+confirmed/excluded do usages (TypeOf). A regra POR DENTRO
+(`match[]`/`result[]` em `ppRules[]`) entregue no **ast-5** (fase B4g,
+2026-07-07; portão no ADR-001), consumida por usages (`RuleSiteHits`),
+rename-dsl (palavra do match por posição-fato), rename-function
+`--edit-rules` e resolve-at (posição dentro de diretiva). O leitor da
+ferramenta (`ReadAst`) aceita `ast-2`..`ast-5`; comandos que EXIGEM o
+rastro usam `FromReady` (ast-3+), a classificação de receptor exige
+projeto inteiro em ast-4+ (`Ast4Ready`/`DeclTables`) e a regra por dentro
+usa `RuleToksReady` (ast-5) — em dump antigo degrada/recusa com o fato,
+sem quebrar. Próximo a avaliar: span original de string no posTrack
+(mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e atualizar este
+documento NO MESMO commit.

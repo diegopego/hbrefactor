@@ -120,6 +120,13 @@ freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    echo "$d"
 }
 
+freshb4g() { # freshb4g <case-name> -> fixture da regra por dentro (B4g/ast-5)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixb4g/* "$d"/
+   echo "$d"
+}
+
 freshofi() { # freshofi <case-name> -> fixture with a NON-mirror user DSL (revisão Q1-Q3/Q7)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -1573,7 +1580,7 @@ python3 - "$DIR" > "$D/cons.log" 2>&1 <<'PYEOF'
 import json, sys, os
 d1 = json.load(open(os.path.join(sys.argv[1], 'r1.ast.json')))
 d2 = json.load(open(os.path.join(sys.argv[1], 'r2.ast.json')))
-assert d1['schema'] == 'ast-4' and d2['schema'] == 'ast-4'
+assert d1['schema'] in ('ast-4', 'ast-5') and d2['schema'] in ('ast-4', 'ast-5')
 # Self tipado (S + classe) em toda função de método <CLASSE>_<MÉTODO>
 for d, cls in ((d1, 'CAIXA'), (d2, 'SEMCTOR')):
     for f in d['functions']:
@@ -1881,10 +1888,30 @@ grep -q "CONTA mm" "$D/sf1.prg" && grep -q "mm := Dobro( mm )" "$D/sf1.prg" && \
 check "rename editou o site do comando e verificou byte-idêntico" $?
 ( cd "$D" && "$BIN" rename-function sf1.hbp Dobro Duplo > rf.log 2>&1 )
 RC=$?
-check "rename-function com o nome no CORPO da regra: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "rollback" "$D/rf.log" && grep -q "FUNCTION Dobro( n )" "$D/sf1.prg" && \
+check "rename-function com o nome no CORPO da regra: recusa ACIONÁVEL (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+# B4g: a recusa deixou de ser cega - nomeia diretiva+posição (match[]/
+# result[] do ast-5) ANTES de qualquer edição e oferece --edit-rules
+grep -q "suga.ch:2:" "$D/rf.log" && grep -q "in rule result (#command DOBRA)" "$D/rf.log" && \
+   grep -q -- "--edit-rules" "$D/rf.log" && grep -q "FUNCTION Dobro( n )" "$D/sf1.prg" && \
    grep -q "Dobro( <v> )" "$D/suga.ch"
-check "oráculo pegou (símbolos mudaram) e o rollback preservou fonte e regra" $?
+check "recusa NOMEIA diretiva+posição, oferece --edit-rules; nada editado" $?
+# --edit-rules: a diretiva entra no conjunto de edições e passa pelo MESMO
+# oráculo (mapa de símbolos + rollback); execução idêntica fecha o contrato
+cp "$D/sf1.prg" "$D/sf1.antes"; cp "$D/suga.ch" "$D/suga.antes"
+( cd "$D" && rm -rf .hbmk && "$HB_BIN/hbmk2" sf1.prg -oapp -gtcgi -q0 -main=UsaS > /dev/null 2>&1 && ./app > saida_antes.txt 2>/dev/null )
+( cd "$D" && "$BIN" rename-function sf1.hbp Dobro Duplo --edit-rules > rf2.log 2>&1 )
+RC=$?
+check "rename-function --edit-rules exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "FUNCTION Duplo( n )" "$D/sf1.prg" && grep -q "Duplo( <v> )" "$D/suga.ch" && \
+   grep -q "verified" "$D/rf2.log"
+check "--edit-rules editou fonte E diretiva; oráculo verificou" $?
+( cd "$D" && rm -rf .hbmk && "$HB_BIN/hbmk2" sf1.prg -oapp2 -gtcgi -q0 -main=UsaS > /dev/null 2>&1 && ./app2 > saida_depois.txt 2>/dev/null )
+cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
+check "execução idêntica após o rename com --edit-rules" $?
+( cd "$D" && "$BIN" rename-function sf1.hbp Duplo Dobro --edit-rules > rf3.log 2>&1 )
+RC=$?
+cmp -s "$D/sf1.prg" "$D/sf1.antes" && cmp -s "$D/suga.ch" "$D/suga.antes" && [ $RC -eq 0 ]
+check "ida-e-volta A->B->A byte-exata (fonte e diretiva)" $?
 
 echo "case 75: Q4 (revisao-generalidade) - vínculo escrito NÃO é pai: sem confirmed/excluded falso"
 # O probe da revisão provou o veneno (2026-07-07): a DSL fixq4 põe o
@@ -2122,6 +2149,135 @@ check "usages --at resolve a posição e consulta numa chamada só" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp --at m1.prg:39:1 > u2.log 2>&1; [ $? -ne 0 ] ) && \
   grep -q "nenhum identificador" "$D/u2.log"
 check "usages --at recusa posição vazia nomeando o fato (fallback da extensão)" $?
+
+echo "case 82: B4g - a regra POR DENTRO (match[]/result[] do ast-5)"
+# Fixtures promovidas do probe do portão (ADR-001): todos os tipos de
+# marker, diretiva continuada, opcionais consecutivos reordenados,
+# restrição (que vaza e que não vaza) e regra nascida de expansão (P5).
+D=$(freshb4g case82)
+( cd "$D" && "$HB_BIN/harbour" forja.prg -n -q0 -w3 -es2 -s -i. > /dev/null 2>&1 )
+check "fixb4g/forja.prg clean under -w3 -es2" $?
+( cd "$D" && "$HB_BIN/harbour" molde.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+check "fixb4g/molde.prg clean under -w3 -es2" $?
+DIR=$( cd "$D" && "$BIN" dump forja.hbp 2>/dev/null | sed -n 's/^dumps em: //p' )
+DIRM=$( cd "$D" && "$BIN" dump molde.hbp 2>/dev/null | sed -n 's/^dumps em: //p' )
+test -n "$DIR" && test -f "$DIR/forja.ast.json" && test -n "$DIRM" && test -f "$DIRM/molde.ast.json"
+check "dumps ast-5 gerados" $?
+python3 - "$DIR/forja.ast.json" "$DIRM/molde.ast.json" "$D" > "$D/b4g.log" 2>&1 <<'PYEOF'
+import json, sys, os
+forja = json.load(open(sys.argv[1])); molde = json.load(open(sys.argv[2]))
+assert forja['schema'] == 'ast-5' and molde['schema'] == 'ast-5'
+# 1. byte-exato: todo token posicionado de match[]/result[] soletra o texto
+#   no arquivo da regra (col emitida também para include - fato 8)
+ok = 0
+for ast in (forja, molde):
+    srcs = {}
+    for r in ast['ppRules']:
+        f = r.get('file')
+        for side in ('match', 'result'):
+            for t in r.get(side, []):
+                if f is None or 'text' not in t or t.get('col') is None:
+                    continue
+                if f not in srcs:
+                    srcs[f] = open(os.path.join(sys.argv[3], f), 'rb').read().split(b'\n')
+                line = srcs[f][t['line'] - 1]
+                assert line[t['col']:t['col'] + t['len']].decode() == t['text'], (f, t)
+                ok += 1
+assert ok > 60, ok
+rules = {r.get('head'): r for r in forja['ppRules'] if r.get('file') == 'forja.ch'}
+fj = rules['FORJA']
+# 2. diretiva continuada (P3): a regra registra a ÚLTIMA linha física, mas
+#   a cabeça é match[0] com linha/coluna físicas reais - a âncora é fato
+assert fj['line'] == 15 and fj['match'][0]['text'] == 'FORJA'
+assert fj['match'][0]['line'] == 12 and fj['match'][0]['col'] == 10
+assert [t['line'] for t in fj['match'] if 'line' in t and t['line']] == [12, 12, 12, 12, 13, 13, 14, 14, 14, 14, 14]
+# 3. papéis e mkinds: o vocabulário do próprio pp
+mk = {t['text']: t['mkind'] for t in fj['match'] if t.get('role') == 'marker'}
+assert mk == {'oIt': 'regular', 'nTam': 'regular', 'modo': 'restrict', 'cRot': 'regular'}
+rk = {(t['text'], t['mkind']) for t in fj['result'] if t.get('role') == 'marker'}
+assert ('modo', 'strstd') in rk and ('cRot', 'strsmart') in rk
+kinds = {t['mkind'] for r in rules.values() for t in r['match'] if t.get('role') == 'marker'}
+assert kinds >= {'regular', 'list', 'restrict', 'wild', 'extexp', 'name'}, kinds
+# 4. restrição com posição própria (renomeável) e marker do dono
+alts = [(t['text'], t['marker'], t['line'], t['col']) for t in fj['match'] if t.get('role') == 'restrict' and t.get('col') is not None]
+assert alts == [('RAPIDO', 3, 14, 18), ('LENTO', 3, 14, 26)], alts
+# 5. opcionais consecutivos REORDENADOS no registro (fato 12): o grupo com
+#   keyword (GRAU) fica ANTES do sem keyword no match ARMAZENADO
+tp = rules['TEMPERA']['match']
+texts = [t.get('text') for t in tp]
+assert texts.index('GRAU') < texts.index('n'), texts
+opens = sum(1 for t in tp if t.get('role') == 'opt-open')
+closes = sum(1 for t in tp if t.get('role') == 'opt-close')
+assert opens == 2 and closes == 2
+# 6. opcional ANINHADO no match (critério 2): o achatamento recursa -
+#   pares opt-open/close reconstroem a árvore por pilha
+pr = [(t['role'], t.get('text')) for t in rules['PRENSA']['match']]
+assert pr == [('literal', 'PRENSA'), ('marker', 'p'), ('opt-open', None),
+              ('literal', 'COM'), ('marker', 'f'), ('opt-open', None),
+              ('literal', 'EM'), ('marker', 't'), ('opt-close', None),
+              ('opt-close', None)], pr
+# 7. P5 (fato 13): regra nascida de expansão tem posições REAIS - a cabeça
+#   da regra interna aponta para DENTRO do result da diretiva-mãe
+cunho = [r for r in molde['ppRules'] if r.get('head') == 'CUNHO'][0]
+assert cunho['file'] == 'molde.prg' and cunho['line'] == 15   # site da aplicação
+assert cunho['match'][0]['line'] == 6 and cunho['match'][0]['col'] == 37
+# o recheio do marker externo aponta o site de USO (onde Ferro foi escrito)
+assert cunho['match'][1]['text'] == 'Ferro' and cunho['match'][1]['line'] == 15
+print('b4g-invariantes-ok')
+PYEOF
+grep -q "^b4g-invariantes-ok$" "$D/b4g.log"
+check "invariantes do ast-5 sobre o dump real (byte-exato, P3, mkinds, restrição, reordenação, P5)" $?
+( cd "$D" && "$BIN" usages forja.hbp ForjaNova > fn.log 2>&1 )
+grep -q "forja.ch:15:13: in rule result (#xcommand FORJA)" "$D/fn.log"
+check "usages nomeia identificador citado DENTRO de regra (result)" $?
+( cd "$D" && "$BIN" usages forja.hbp TAMANHO > tam.log 2>&1 )
+grep -q "forja.ch:12:23: in rule match (#xcommand FORJA)" "$D/tam.log" && \
+   grep -q "forja.prg:9:14: keyword (#xcommand FORJA" "$D/tam.log"
+check "usages: keyword secundária na diretiva E no site de aplicação" $?
+( cd "$D" && "$BIN" usages forja.hbp RAPIDO > rap.log 2>&1 )
+grep -q "forja.ch:14:19: in rule restriction (#xcommand FORJA, marker 3)" "$D/rap.log"
+check "usages: palavra de restrição com posição-fato" $?
+# rename-dsl de keyword SECUNDÁRIA (não-cabeça): diretiva + sites, padrão-ouro
+cp "$D/forja.ch" "$D/forja.ch.antes"; cp "$D/forja.prg" "$D/forja.prg.antes"
+( cd "$D" && "$BIN" rename-dsl forja.hbp TAMANHO MEDIDA > rd1.log 2>&1 )
+RC=$?
+check "rename-dsl de keyword secundária exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "MEDIDA <nTam>" "$D/forja.ch" && grep -q "FORJA oIt MEDIDA DOBRO" "$D/forja.prg" && \
+   grep -q "byte-identical" "$D/rd1.log"
+check "secundária editada na diretiva e no uso; .ppo/.hrb byte-idênticos" $?
+( cd "$D" && "$BIN" rename-dsl forja.hbp MEDIDA TAMANHO > rd2.log 2>&1 )
+cmp -s "$D/forja.ch" "$D/forja.ch.antes" && cmp -s "$D/forja.prg" "$D/forja.prg.antes"
+check "ida-e-volta A->B->A byte-exata da secundária" $?
+# restrição que NÃO vaza (marker fora do result): renomeável padrão-ouro
+( cd "$D" && "$BIN" rename-dsl forja.hbp FRIO GELADO > rd3.log 2>&1 )
+RC=$?
+check "rename-dsl de palavra de restrição (não vaza) exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "<m: GELADO, QUENTE>" "$D/forja.ch" && grep -q "RECOZE MODO GELADO" "$D/forja.prg"
+check "restrição editada na diretiva e no uso" $?
+( cd "$D" && "$BIN" rename-dsl forja.hbp GELADO FRIO > /dev/null 2>&1 )
+cmp -s "$D/forja.ch" "$D/forja.ch.antes" && cmp -s "$D/forja.prg" "$D/forja.prg.antes"
+check "ida-e-volta da restrição byte-exata" $?
+# restrição cujo valor VAZA (stringify do marker): a expansão mudaria em
+# silêncio - a rede .ppo recusa com rollback, honesto
+( cd "$D" && "$BIN" rename-dsl forja.hbp RAPIDO VELOZ > rd4.log 2>&1 )
+RC=$?
+check "restrição que vaza: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "rollback" "$D/rd4.log" && cmp -s "$D/forja.ch" "$D/forja.ch.antes" && \
+   cmp -s "$D/forja.prg" "$D/forja.prg.antes"
+check "rollback preservou diretiva e fonte (expansão teria mudado)" $?
+# resolve-at DENTRO de diretiva (camada 4): a posição vira palavra de regra
+( cd "$D" && "$BIN" resolve-at molde.hbp molde.prg 6 51 > ra.log 2>&1 )
+RC=$?
+check "resolve-at dentro de diretiva exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+grep -q "palavra no result da regra (#xcommand MOLDE, molde.prg:6)" "$D/ra.log" && \
+   grep -q "query: CunhoNovo" "$D/ra.log"
+check "camada 4: palavra dentro da diretiva por posição-fato, consulta crua" $?
+# régua do caso 64: nenhuma palavra das DSLs de fixture na ferramenta nem
+# no core (fronteira de palavra: 'forjador' do fixq4 é outro vocabulário)
+! grep -qiE "\bforja\b|\bmolde\b|\btempera\b|\bcunho\b|\bprensa\b|\bbatiza\b|\brecoze\b" "$HERE/../src/hbrefactor.prg" && \
+   ! grep -qiE "\bforja\b|\bmolde\b|\btempera\b|\bcunho\b|\bprensa\b|\bbatiza\b|\brecoze\b" "$HB_BIN/../../../src/compiler/compast.c" && \
+   ! grep -qiE "\bforja\b|\bmolde\b|\btempera\b|\bcunho\b|\bprensa\b|\bbatiza\b|\brecoze\b" "$HB_BIN/../../../src/pp/ppcore.c"
+check "régua do caso 64: nenhuma palavra da fixture na ferramenta nem no core" $?
 
 echo
 echo "passed: $PASS  failed: $FAIL"

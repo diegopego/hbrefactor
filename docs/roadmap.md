@@ -40,7 +40,7 @@ Compilador como oráculo (ganchos de 1 linha gated, `.hrb` byte-idêntico
 sem `-x`); editor ≠ verificador (recompilar, comparar, rollback); hbmk2
 como resolvedor de projeto; fixtures como contrato de comportamento;
 réplica sintática na ferramenta é proibida (a fonte da verdade é o
-compilador). Dump por módulo `.ast.json` (schema atual **ast-4**), specs
+compilador). Dump por módulo `.ast.json` (schema atual **ast-5**), specs
 de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 
 ## Fases entregues (registro completo no [arquivo](roadmap-fases-entregues.md))
@@ -58,6 +58,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B4f (2026-07-06) | Canal de tipos da linguagem (ast-4); camadas confirmed/excluded/possible no usages |
 | B4f-2 (2026-07-07) | Resolução de dispatch (`ResolveDispatch`); homônimos; declarações vinculadas à dona; extensão v0.5.0 — **`ClassParentsSeq`/methodQuery: ver revisão Q4/Q5** |
 | B4f-3 (2026-07-07) | PROVA da generalidade: DSLs inventadas com homônimos, comandos embrulhando classes, cstruct real, escrita `o:x`, construtos não-classe (casos 72-74; suíte 467/0) |
+| B4g (2026-07-07) | A regra POR DENTRO (ast-5): `match[]`/`result[]`; usages nomeia sites em regra; rename-dsl de qualquer palavra do match (reancoragem textual morta); rename-function `--edit-rules` (caso 74 acionável); resolve-at em diretiva; extensão 0.7.0; ADR-001; suíte 555/0 |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -114,26 +115,22 @@ hbclass); send/posição-vazia degradam honesto. Extensão 0.6.0.
 executável (casos 75-81 + atualizações 64/72-74), régua do caso 64
 assertada nos casos novos, extensão sem regex de construto.
 
-### B4g — a diretiva como fonte de primeira classe (schema ast-5)
+### B4g ✅ ENTREGUE (2026-07-07) — registro no [arquivo](roadmap-fases-entregues.md)
 
-**Spec executável (escrita 2026-07-07, aguarda portão dos probes)**:
-[spec-b4g-diretiva-fonte.md](spec-b4g-diretiva-fonte.md). `ppRules[]`
-ganha `match[]`/`result[]` (token a token: papel, tipo de marker,
-posição byte-exata; snapshot no registro via `hb_pp_trackRule`, gated
-`fTrackPos`, zero impacto sem `-x`). Ferramenta: usages nomeando sites
-DENTRO de regra; caso 74 acionável + `--edit-rules`; rename de palavra
-secundária e de restrição; morte da reancoragem textual da cabeça.
-Alimenta o Q5 da revisão (resolve-at cobre sites de diretiva).
-**Critério**: na spec (mecânico) — zero impacto -w0 E -w3 + relink
-duplo; `match[]`/`result[]` byte-exatos contra os `.ch`; round-trips;
-suíte + lexdiff verdes.
+Portão + decisões: [adr-001-b4g-diretiva-fonte.md](adr-001-b4g-diretiva-fonte.md);
+spec (fatos 1-13): [spec-b4g-diretiva-fonte.md](spec-b4g-diretiva-fonte.md).
+Todos os critérios mecânicos fechados (zero impacto 224/224; byte-exato
+campo a campo no caso 82; caso 74 acionável com round-trip; suíte 555/0 +
+lexdiff limpo; extensão 0.7.0).
 
 ### B5 — Extensão VSCode (restante)
 
 Fatias entregues no arquivo; **consulta por POSIÇÃO entregue (Q5,
-extensão 0.6.0)**: `usages --at` numa única compilação, `methodQuery`
-morto. Restante: `--show-expansion` como opção; preview
-`--dry-run --json` se a fricção pedir.
+extensão 0.6.0)**; **B4g entregue (0.7.0)**: confirm-then-force de
+`--edit-rules` no rename-function + conserto do confirm de `--force`
+(regex testava mensagem em inglês, CLI fala português — estava morto).
+Restante: `--show-expansion` como opção; preview `--dry-run --json` se a
+fricção pedir.
 **Critério**: Diego usa no dia a dia; sem regressão.
 
 ### B-infra — suíte paralela (pool dinâmico)
@@ -150,7 +147,8 @@ wall-time < sequencial; `JOBS=1` para depurar.
 
 Mensagem com consumidor real; 1 arquivo novo + ganchos opt-in; prova de
 zero impacto na árvore inteira; build limpo (corrigir o `-Wtype-limits`
-de compast.c:578 — tirar o `iType >= 0`); regen bison 3.8.2 documentado;
+de compast.c:658 — tirar o `iType >= 0`; a linha andou com o ast-5);
+regen bison 3.8.2 documentado;
 split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 
 ## Backlog (por valor)
