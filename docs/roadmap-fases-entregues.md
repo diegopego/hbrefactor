@@ -1480,3 +1480,37 @@ nenhum fallback necessário). Entregas:
 - Decisão de desenho (Diego): `match[]` na ordem ARMAZENADA pelo pp
   (opcionais reordenados ficam como o pp casa; a ordem do fonte é
   recuperável pelas posições) — o dump transporta fato 1:1.
+
+## Fase B-infra Etapa 1 — suíte paralela em bash ✅ (2026-07-07)
+
+Desenho integral em [testes-paralelos.md](testes-paralelos.md) (forma:
+pool dinâmico por-caso; tecnologia da Etapa 1: bash puro, zero dependência
+nova, asserts INTACTOS — drift zero). Implementação no próprio
+`tests/run.sh`:
+
+- cada caso virou função auto-contida `unit_N` (R3); auditoria prévia
+  achou UM acoplamento real — os casos 67-69 continuam no `$D` do caso 66
+  e releem o `pm.log` dele — e eles viraram UMA unidade (`unit_66`);
+  nenhuma outra variável herdada entre blocos; compiles em diretório de
+  fixture compartilhado são todos `-s` (só leitura);
+- driver: `JOBS<=1` roda em processo, na ordem, com saída ao vivo (R7 —
+  depuração idêntica ao runner antigo); senão pool `xargs -P JOBS`
+  (default `nproc`) re-invocando `run.sh --unit N` — cada unidade com
+  `TMPDIR` próprio (R2; `hb_DirTemp()` o respeita, cinto-e-suspensório
+  com o R1 da B4b), log em artefato próprio (R5, mata a intercalação) e
+  contadores em-banda (`@@counts`); o join imprime os logs NA ORDEM dos
+  casos — a saída paralela é BYTE-IDÊNTICA à sequencial — e soma o tally;
+  unidade que morre sem contadores conta FAIL e mostra o log (silêncio
+  nunca parece sucesso);
+- `make test` = paralelo por default; `make test JOBS=1` sequencial.
+
+Verificação (protocolo do doc): baseline 108,98 s (runner antigo,
+resgatado do git); novo `JOBS=1` 109,34 s byte-idêntico; paralelo 20
+cores 11-14 s (**~8×**); paridade byte-idêntica também no paralelo;
+**10/10 rodadas consecutivas** idênticas, zero flake.
+
+Lição de percurso (a armadilha do HB_BIN mordeu DE NOVO): a primeira
+"prova" de paridade comparou duas cópias da MESMA linha de erro — sem
+`HB_BIN`, os dois runners falham com saída idêntica e `diff` limpo. Prova
+de paridade só vale conferindo ANTES que a baseline contém a suíte real
+(o exit=1 inexplicado era o aviso).

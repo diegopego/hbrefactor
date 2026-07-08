@@ -142,6 +142,15 @@ ofirun() { # ofirun <dir> <out-file> -> build fixofi copy and run it
    ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" o1.prg o2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
 }
 
+# ---------------------------------------------------------------------------
+# B-infra: cada caso e uma funcao auto-contida (R3). Os casos 67-69
+# continuam no $D do caso 66 e releem o pm.log dele - sao UMA unidade
+# (unit_66). Nao ha outro acoplamento entre casos (auditoria 2026-07-07:
+# nenhuma variavel herdada entre blocos, compiles em fixture compartilhada
+# sao todos -s, so leitura).
+# ---------------------------------------------------------------------------
+
+unit_0() {
 echo "case 0: base fixtures compile clean under the flags the .hbp declares"
 # the fixture project declares -w3 -es2; the fixtures themselves must be
 # warning-clean idiomatic Harbour (a warning that slips through here is a
@@ -151,6 +160,9 @@ for f in a.prg b.prg; do
    check "$f clean under -w3 -es2"  $?
 done
 
+}
+
+unit_1() {
 echo "case 1: rename nTotal->nSoma in Main (success + verification)"
 D=$(fresh case1)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal nSoma > out.log 2>&1 )
@@ -163,6 +175,9 @@ check "b.prg untouched"            $?
 grep -q "verified: all 2 module" "$D/out.log"
 check "reports 2 modules verified" $?
 
+}
+
+unit_2() {
 echo "case 2: collision with existing local (refuse)"
 D=$(fresh case2)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal i > out.log 2>&1 )
@@ -171,6 +186,9 @@ check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+}
+
+unit_3() {
 echo "case 3: unrelated #define on the declaration line (safe rename succeeds)"
 D=$(fresh case3)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg LimiteMax nMax nTeto > out.log 2>&1 )
@@ -181,12 +199,18 @@ check "nTeto renamed, define kept" $?
 grep -q "verified: all 2 module" "$D/out.log"
 check "verification passed"        $?
 
+}
+
+unit_4() {
 echo "case 4: new name is reserved word written as 'nIL' (refuse)"
 D=$(fresh case4)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal nIL > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 
+}
+
+unit_5() {
 echo "case 5: homonymous codeblock parameter shadows target (refuse)"
 D=$(fresh case5)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Sombra xVal xNovo > out.log 2>&1 )
@@ -197,12 +221,18 @@ check "reason mentions shadowing"  $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+}
+
+unit_6() {
 echo "case 6: variable does not exist (refuse)"
 D=$(fresh case6)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main naoExiste nQualquer > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 
+}
+
+unit_7() {
 echo "case 7: symbol consumed by stringify marker - verification must roll back"
 D=$(fresh case7)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Rotulada nVisto nOutro > out.log 2>&1 )
@@ -213,6 +243,9 @@ check "reports rollback"           $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg restored byte-exact"  $?
 
+}
+
+unit_8() {
 echo "case 8: usages of a function across modules"
 D=$(fresh case8)
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla > out.log 2>&1 )
@@ -223,6 +256,9 @@ check "definition found in b.prg"  $?
 grep -q "a.prg:10: call in MAIN" "$D/out.log"
 check "call found in a.prg (Main)" $?
 
+}
+
+unit_9() {
 echo "case 9: usages of a local variable (scope-aware, incl. codeblock)"
 D=$(fresh case9)
 ( cd "$D" && "$BIN" usages fix01.hbp nTotal --func Main > out.log 2>&1 )
@@ -235,6 +271,9 @@ check "detached codeblock capture listed" $?
 grep -q "a.prg:13: read (local) in MAIN" "$D/out.log"
 check "read listed"                $?
 
+}
+
+unit_10() {
 echo "case 10: rename-function across modules + idempotence (A->B->A)"
 D=$(fresh case10)
 ( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
@@ -250,6 +289,9 @@ check "structural verification"    $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg" && cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "idempotence: A->B->A restores sources" $?
 
+}
+
+unit_11() {
 echo "case 11: string literal with the function name (refuse without --force)"
 D=$(fresh case11)
 printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
@@ -269,6 +311,9 @@ check "string left untouched"      $?
 grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
 check "definition renamed"         $?
 
+}
+
+unit_12() {
 echo "case 12: STATIC FUNCTION renamed inside its module only"
 D=$(fresh case12)
 ( cd "$D" && "$BIN" rename-function fix01.hbp Meio Metade > out.log 2>&1 )
@@ -281,6 +326,9 @@ check "internal calls renamed"     $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+}
+
+unit_13() {
 echo "case 13: rename-param (parameter is a local; non-param refused)"
 D=$(fresh case13)
 ( cd "$D" && "$BIN" rename-param fix01.hbp b.prg Dupla nV nValor > out.log 2>&1 )
@@ -294,6 +342,9 @@ check "parameter renamed in body"  $?
 RC=$?
 check "non-parameter refused"      $([ $RC -ne 0 ] && echo 0 || echo 1)
 
+}
+
+unit_14() {
 echo "case 14: reorder-params preserves behavior (program output identical)"
 D=$(fresh case14)
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
@@ -308,6 +359,9 @@ check "call site arguments swapped" $?
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
 
+}
+
+unit_15() {
 echo "case 15: reorder-params refuses call site with fewer arguments"
 D=$(fresh case15)
 printf '\nFUNCTION ChamaCurta()\n\n   RETURN Sub2( 5 )\n' >> "$D/a.prg"
@@ -319,6 +373,9 @@ check "reason mentions implicit NIL" $?
 cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "b.prg untouched"            $?
 
+}
+
+unit_16() {
 echo "case 16: extract-function (FOR loop) preserves behavior"
 D=$(fresh case16)
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
@@ -339,6 +396,9 @@ check "declaration removed from Main" $?
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
 
+}
+
+unit_17() {
 echo "case 17: extract-function refuses a cut FOR/NEXT and RETURN in range"
 D=$(fresh case17)
 ( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-10 Metade2 > out.log 2>&1 )
@@ -352,6 +412,9 @@ check "RETURN in range refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+}
+
+unit_18() {
 echo "case 18: usages --json emits LSP Location[]"
 D=$(fresh case18)
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
@@ -380,6 +443,9 @@ assert any(l["uri"].endswith("b.prg") for l in locs), "def loc present"
 PYEOF
 check "absolute spec: URI not doubled (extension path)" $?
 
+}
+
+unit_19() {
 echo "case 19: unused-locals reports never-used and assigned-never-read"
 D=$(fresh case19)
 printf '\nFUNCTION ComSobras()\n\n   LOCAL nNada\n   LOCAL nSobra := 1\n   LOCAL nUsada := 2\n\n   RETURN nUsada\n' >> "$D/b.prg"
@@ -393,6 +459,9 @@ check "assigned-never-read reported" $?
 grep -qv "NUSADA" "$D/out.log"
 check "used local not reported"    $?
 
+}
+
+unit_20() {
 echo "case 20: call-graph shows cross-module and external calls"
 D=$(fresh case20)
 ( cd "$D" && "$BIN" call-graph fix01.hbp > out.log 2>&1 )
@@ -406,6 +475,9 @@ check "external callee tagged"     $?
 grep -q "MAIN -> DUPLA" "$D/filt.log" && ! grep -q "QOUT" "$D/filt.log"
 check "filter by function works"   $?
 
+}
+
+unit_21() {
 echo "case 21: rename-static (file-wide) with byte-identical verification"
 D=$(fresh case21)
 ( cd "$D" && "$BIN" rename-static fix01.hbp b.prg s_nContador s_nSeq > out.log 2>&1 )
@@ -420,6 +492,9 @@ check "byte-identical verification" $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+}
+
+unit_22() {
 echo "case 22: find-dynamic-calls audits strings and macro zones"
 D=$(fresh case22)
 printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n\nFUNCTION Dinamica( cVar )\n\n   RETURN &cVar\n' >> "$D/a.prg"
@@ -431,6 +506,9 @@ check "string naming function reported" $?
 grep -q "function DINAMICA uses & macros" "$D/out.log"
 check "macro zone reported"        $?
 
+}
+
+unit_23() {
 echo "case 23: sends (Eval) and PRIVATE initialization visible"
 D=$(fresh case23)
 ( cd "$D" && "$BIN" usages fix01.hbp Eval > eval.log 2>&1 )
@@ -446,6 +524,9 @@ check "PRIVATE init write listed"  $?
 grep -q "read (memvar) in COMPRIVADA" "$D/priv.log"
 check "later read listed"          $?
 
+}
+
+unit_24() {
 echo "case 24: rename inside a ;-continued statement (token on middle line)"
 D=$(fresh case24)
 ( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Continuada cMsg cTexto > out.log 2>&1 )
@@ -458,6 +539,9 @@ check "last line renamed"          $?
 grep -q "verified: all 2 module" "$D/out.log"
 check "byte-identical verification" $?
 
+}
+
+unit_25() {
 echo "case 25: aliased variables (M-> and alias->) visible in usages"
 D=$(fresh case25)
 printf '\nFUNCTION UsaAlias()\n\n   M->xGlob := 1\n\n   RETURN M->xGlob + CLIENTES->saldo\n' >> "$D/b.prg"
@@ -468,6 +552,9 @@ check "M-> write listed as memvar" $?
 grep -q "read (field) in USAALIAS" "$D/fld.log"
 check "alias-> read listed as field" $?
 
+}
+
+unit_26() {
 echo "case 26: usages --json carries real columns"
 D=$(fresh case26)
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
@@ -479,6 +566,9 @@ assert all(l["range"]["end"]["character"] >= l["range"]["start"]["character"] fo
 PYEOF
 check "columns present in Location[]" $?
 
+}
+
+unit_27() {
 echo "case 27: rename-function warns about DYNAMIC in .hbx export file"
 D=$(fresh case27)
 printf 'DYNAMIC Dupla\n' > "$D/exports.hbx"
@@ -489,6 +579,9 @@ check "refused without --force"    $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "DYNAMIC DUPLA em export (.hbx)" "$D/out.log"
 check "hbx warning listed"         $?
 
+}
+
+unit_28() {
 echo "case 28: project as a plain list of .prg files (no .hbp)"
 D=$(fresh case28)
 ( cd "$D" && "$BIN" usages "a.prg,b.prg" Dupla > out.log 2>&1 )
@@ -499,6 +592,9 @@ check "definition found"           $?
 grep -q "call in MAIN" "$D/out.log"
 check "call found"                 $?
 
+}
+
+unit_29() {
 echo "case 29: real-project .hbp dialect (-inc, \${hb_name}.hbx, .hbc dep, class)"
 # mirrors what dogfooding on contrib/hbhttpd required: hbmk2 switches the
 # tool must skip (-inc), target-name macros, a dependency .hbc contributing
@@ -549,6 +645,9 @@ check "hbx via \${hb_name} refused without --force" $([ $RC -ne 0 ] && echo 0 ||
 grep -q "DYNAMIC DUPLA em export (.hbx)" "$D/hbx.log"
 check "hbx warning proves macro expansion" $?
 
+}
+
+unit_30() {
 echo "case 30: broken build is reported, never silent"
 D=$(fresh case30)
 printf '\nFUNCTION Quebrada()\n\n   RETURN NaoFecha(\n' >> "$D/b.prg"
@@ -565,6 +664,9 @@ check "usages exit != 0"           $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q " Error E" "$D/usages.log"
 check "usages surfaces the error"  $?
 
+}
+
+unit_31() {
 echo "case 31: reorder-params on multi-line call site and ','/')' inside strings"
 # new power of the AST era: the occ incarnation refused multi-line call
 # sites; token spans make them (and quoted ','/')' in arguments) trivial
@@ -594,6 +696,9 @@ check "quoted ','/')' argument moved intact" $?
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
 
+}
+
+unit_32() {
 echo "case 32: rename-function call site inside a ;-continued statement"
 # the call record points at the LAST physical line; the statement token
 # spans must still find the name on the middle line
@@ -618,6 +723,9 @@ check "definition renamed"         $?
 grep -q "pcode byte-identical" "$D/out.log"
 check "structural verification"    $?
 
+}
+
+unit_33() {
 echo "case 33: extract-function migrates decls from a mixed LOCAL line (per-var)"
 # LOCAL nJ, cCh, cSai := "": nJ and cCh are selection-only and must migrate
 # even though cSai (kept, has initializer) shares the line - the neighbour
@@ -654,6 +762,9 @@ check "migrated decls removed from origin" $?
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
 
+}
+
+unit_34() {
 echo "case 34: reorder-params moves a multi-line ARGUMENT intact (B3)"
 # the ';' continuation travels inside the argument text and the result
 # stays valid - the argument spans are real source ranges, not line-bound
@@ -677,6 +788,9 @@ check "continuation line preserved" $?
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
 
+}
+
+unit_35() {
 echo "case 35: inline-local replaces reads with the init expression (B3)"
 # Dupla is executed by Main: behaviour must be identical after inlining nR
 D=$(fresh case35)
@@ -694,6 +808,9 @@ check "structural verification"    $?
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
 check "program output identical"   $?
 
+}
+
+unit_36() {
 echo "case 36: inline-local refusals (purity is the gate)"
 D=$(fresh case36)
 cat >> "$D/b.prg" <<'EOF'
@@ -731,6 +848,9 @@ check "#define init (no source position) refused" $([ $RC -ne 0 ] && echo 0 || e
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
 
+}
+
+unit_37() {
 echo "case 37: name validity comes from the project's compiler, not from lists"
 # WHILE is rejected by the compiler as a variable name -> clean refusal
 D=$(fresh case37)
@@ -775,6 +895,9 @@ check "name already called in project refused" $([ $RC -ne 0 ] && echo 0 || echo
 grep -q "sequestraria" "$D/hij.log"
 check "refusal explains the hijack" $?
 
+}
+
+unit_38() {
 echo "case 38: S1 - user pp DSL (three families): usages + rename-dsl round-trip"
 # fixtures compile clean first (working rule: never test with a broken fixture)
 for f in a.prg b.prg; do
@@ -831,6 +954,9 @@ check "refusal cites the abbreviation rule" $?
 RC=$?
 check "word that is not a rule head refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 
+}
+
+unit_39() {
 echo "case 39: S2 - hbclass.ch classes: usages answers in method/class vocabulary"
 for f in w1.prg w2.prg; do
    "$HB_BIN/harbour" "$HERE/fixcls/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
@@ -855,6 +981,9 @@ check "hbclass.ch rules reported as the DSL they are" $?
 grep -q "w1.prg:11:1: application (#xcommand METHOD" "$D/mth.log"
 check "hbclass.ch application with span in USER source" $?
 
+}
+
+unit_40() {
 echo "case 40: S3 - builtin rules (std.ch family): facts yes, rename no"
 D=$(freshdsl case40)
 ( cd "$D" && "$BIN" usages fixdsl.hbp SAY > say.log 2>&1 )
@@ -873,6 +1002,9 @@ check "refusal explains there is no directive file" $?
 RC=$?
 check "rename of secondary word refused (not a head)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 
+}
+
+unit_41() {
 echo "case 41: S4 - the two families: #[x]command statement-wide, #[x]translate mid-statement"
 D=$(freshdsl case41)
 # xcommand: uso continuado por ';' - cada token na sua linha física real
@@ -893,6 +1025,9 @@ check "xcommand rename round-trips"   $?
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "xcommand round-trip byte-exact" $?
 
+}
+
+unit_42() {
 echo "case 42: S5 - ppApplications matches the pp trace (.ppt) 1:1"
 D=$(freshdsl case42)
 ( cd "$D" && "$BIN" dump fixdsl.hbp > dump.log 2>&1 )
@@ -917,6 +1052,9 @@ sys.exit(0 if traces == apps and len(apps) > 0 else 1)
 PYEOF
 check "count, order, lines and kinds match the .ppt trace" $?
 
+}
+
+unit_43() {
 echo "case 43: DSL-created block structure guards extract-function"
 D=$(freshdsl case43)
 ( cd "$D" && "$BIN" extract-function fixdsl.hbp a.prg 19-20 Pedaco > ext.log 2>&1 )
@@ -927,6 +1065,9 @@ check "refusal is structural (block facts), line exact" $?
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg"
 check "a.prg untouched"               $?
 
+}
+
+unit_44() {
 echo "case 44: B4b - memvar visibility map (creators, reach, shadows, holes)"
 # a fixture usa memvar implícita de propósito (W0001) - compila sem -es2
 for f in a.prg b.prg; do
@@ -955,6 +1096,9 @@ check "invisible '&' creation reported" $?
 grep -q "implicit use: IMPLICITA" "$D/imp.log"
 check "implicit memvar highlighted in map" $?
 
+}
+
+unit_45() {
 echo "case 45: B4b - rename-memvar on a closed clean reach (behaviour identical)"
 D=$(freshmv case45)
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
@@ -981,6 +1125,9 @@ check "execution identical after rename" $?
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
 check "A->B->A round-trip byte-exact"  $?
 
+}
+
+unit_46() {
 echo "case 46: B4b - rename-memvar refusals explain the hole"
 D=$(freshmv case46)
 ( cd "$D" && "$BIN" rename-memvar fixmv.hbp xSaldo xGrana > r1.log 2>&1 )
@@ -1015,6 +1162,9 @@ check "reverse guard explains the shadowing" $?
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
 check "sources untouched by all refusals" $?
 
+}
+
+unit_47() {
 echo "case 47: B4c - rename-method (decl + impl + sends; INLINE; string gate)"
 for f in c1.prg c2.prg; do
    "$HB_BIN/harbour" "$HERE/fixmth/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
@@ -1049,6 +1199,9 @@ check "INLINE method renames with --force and returns" $?
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "INLINE round-trip byte-exact"   $?
 
+}
+
+unit_48() {
 echo "case 48: B4c - send is dynamic dispatch: refusals explain the ambiguity"
 D=$(freshmth case48)
 ( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Soma Junta > r1.log 2>&1 )
@@ -1074,6 +1227,9 @@ check "refusal shows the assignment send" $?
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "sources untouched by all refusals" $?
 
+}
+
+unit_49() {
 echo "case 49: B4c - bare method name resolves when unique in the project"
 D=$(freshmth case49)
 ( cd "$D" && "$BIN" rename-method fixmth.hbp Zera Limpa > z.log 2>&1 && \
@@ -1085,6 +1241,9 @@ check "bare-name round-trip byte-exact" $?
 RC=$?
 check "ambiguous bare name refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
 
+}
+
+unit_50() {
 echo "case 50: B4d G2/G6 - invented DSL: usages lifts in source vocabulary"
 for f in e1.prg e2.prg; do
    "$HB_BIN/harbour" "$HERE/fixppm/$f" -n -q0 -w3 -es2 -s -I"$HERE/fixppm" > /dev/null 2>&1
@@ -1121,6 +1280,9 @@ check "execution identical after rename" $?
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "A->B->A round-trip byte-exact"  $?
 
+}
+
+unit_51() {
 echo "case 51: B4d G3 - pure stringify: the derived string is a predicted fact"
 D=$(freshppm case51)
 ( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Pronto Feito > ren.log 2>&1 )
@@ -1135,6 +1297,9 @@ check "runtime string regenerated from the edited identifier" $?
 cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "A->B->A round-trip byte-exact"  $?
 
+}
+
+unit_52() {
 echo "case 52: B4d G4 - clone+paste+stringify in ONE rule; derived call crosses modules"
 D=$(freshppm case52)
 ( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
@@ -1154,6 +1319,9 @@ check "output changed exactly as the prediction says" $?
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "A->B->A round-trip byte-exact"  $?
 
+}
+
+unit_53() {
 echo "case 53: B4d G5 - co-derivation: neighbour intact; collisions refused by name"
 D=$(freshppm case53)
 ( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Motor Trem > ren.log 2>&1 )
@@ -1179,6 +1347,9 @@ check "refusal points at the spelled generated name" $?
 cmp -s "$D/e1.prg" "$D/e1.saved" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "sources untouched by all refusals" $?
 
+}
+
+unit_54() {
 echo "case 54: B4e regression - shared-origin sites must not double-apply an edit"
 # a função gerada pf_Dobra tem o parâmetro nX declarado E usado no corpo -
 # ambos são clones do MESMO token-fonte (o marker em PARAMFN Dobra( nX )),
@@ -1199,6 +1370,9 @@ check "the shared-origin site is listed only once" $?
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg"
 check "A->B->A round-trip byte-exact"  $?
 
+}
+
+unit_55() {
 echo "case 55: B4e P1a - rename-param aware of the METHOD signature (2+ params)"
 # renomear o param de um método tem que mover a DECLARAÇÃO fora do corpo: o
 # protótipo no CREATE CLASS e a linha METHOD ... CLASS. Em tokens[] a posição
@@ -1238,6 +1412,9 @@ check "second method's param renames independently" $([ $RC -eq 0 ] && echo 0 ||
 grep -q "METHOD Grow( nDx, nDelta )" "$D/w1.prg" && grep -q "METHOD Resize( nW, nH )" "$D/w1.prg"
 check "Grow signature moved, Resize signature untouched" $?
 
+}
+
+unit_56() {
 echo "case 56: B4e P1b - reorder-params ciente de método (assinatura + sends + unicidade)"
 # reordenar o param de um método move a assinatura (protótipo + METHOD...CLASS,
 # via ppApplications como na P1a) E os argumentos nos call sites de SEND
@@ -1274,6 +1451,9 @@ check "refusal names the classes and the dynamic dispatch" $?
 cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg" && cmp -s "$D/w2.prg" "$HERE/fixsig/w2.prg"
 check "sources untouched by the refusal" $?
 
+}
+
+unit_57() {
 echo "case 57: B4e P2b - call-graph resolve método -> símbolo; sends = arestas dinâmicas"
 # call-graph <método> responde a DEFINIÇÃO (nome gerado) e lista os SENDS que
 # o invocam como arestas DINÂMICAS (~>), nunca estáticas. Mensagem homônima em
@@ -1294,6 +1474,9 @@ check "homonym message shows both classes' definitions" $?
 grep -q "dynamic: WIDGET_RESIZE | PANEL_RESIZE" "$D/cgr.log"
 check "dynamic edge shows the ambiguous dispatch targets" $?
 
+}
+
+unit_58() {
 echo "case 58: B4e P3 - find-dynamic-calls filtra o ruído do & da expansão hbclass"
 # a função da classe (CREATE CLASS) tem usesMacro=T por causa do & INTERNO da
 # expansão do hbclass.ch - falso positivo. Só macro REAL do usuário (token '&'
@@ -1311,6 +1494,9 @@ check "a real user macro is still flagged" $?
 grep -q "^1 finding" "$D/fd2.log"
 check "exactly the user macro, none of the class noise" $?
 
+}
+
+unit_59() {
 echo "case 59: B4e P2a - extract-function em corpo de método (extract-to-method)"
 # range que usa ::/Self extrai para um NOVO METHOD da mesma classe: corpo
 # verbatim (::/sends/Super continuam válidos - mesma classe), protótipo
@@ -1384,6 +1570,9 @@ extrun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical for the Self-free extract" $?
 
+}
+
+unit_60() {
 echo "case 60: B4e P2a - recusas fato-a-fato e aviso honesto"
 # cada recusa nasce de um FATO do dump (occurrence de SELF, membro registrado
 # por stringify, send existente, protótipo sem posição); pai fora do projeto
@@ -1444,6 +1633,9 @@ extrun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after warned extract" $?
 
+}
+
+unit_61() {
 echo "case 61: B4f fatia 0 - usages aceita Classe:Método + camada 'possible' nos sends"
 # Backlog 5 (dogfooding hbhttpd): send não carrega a classe do receptor no
 # ast-3, então TODO send é 'possible (dynamic dispatch, receiver unknown)' -
@@ -1486,6 +1678,9 @@ check "malformed Classe: refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "malformada" "$D/mf.log"
 check "refusal names the malformed form" $?
 
+}
+
+unit_62() {
 echo "case 62: B4f fatia 1 - canal de tipos: declarado, cadeia de ctor, valor, honestos"
 # ast-4 transporta o CANAL DE TIPOS DA LINGUAGEM (AS CLASS nas declarations,
 # tabelas DECLARE/_HB_CLASS/_HB_MEMBER em declared) e a ferramenta PROPAGA
@@ -1529,6 +1724,9 @@ assert 39 not in r1, 'excluded a:Soma vazou para o json'  # r1.prg:40
 PYEOF
 check "--json: excluded fora das Locations, confirmed/possible dentro" $?
 
+}
+
+unit_63() {
 echo "case 63: B4f - honestidade preservada: sem declaração, camada possible"
 # classe SEM ctor declarado: Semctor():New() não tem retorno no canal ->
 # possible (o fato não existe em compilação); função desconhecida idem.
@@ -1546,6 +1744,9 @@ check "função sem declaração: send fica possible (honesto)" $?
 grep -q "confirmed send (receiver class CAIXA via declared types) in CENARIOS  | g:Soma( 2 )" "$D/sm.log"
 check "consulta por nome cru também classifica em camadas" $?
 
+}
+
+unit_64() {
 echo "case 64: B4f - A PROVA DO REQUISITO: DSL inventado refatorável sem tocar em nada"
 # gizmo.ch define comandos PRÓPRIOS (CONTRAPTION/APTITUDE/GIZMO) que
 # declaram pelo canal da linguagem na expansão. A classificação sai
@@ -1568,6 +1769,9 @@ test -f "$HB_BIN/../../../src/compiler/compast.c" && \
    ! grep -q '"NEW"' "$HB_BIN/../../../src/compiler/compast.c"
 check "o core tampouco (transporte 1:1 do canal, sem convenções)" $?
 
+}
+
+unit_65() {
 echo "case 65: B4f - consistência do dump: canal re-derivável dos fatos brutos"
 # invariantes do ast-4 verificados sobre o dump real: Self tipado em todo
 # método, declared coerente (classe/função/ctor), e o binding único usado
@@ -1618,6 +1822,9 @@ PYEOF
 grep -q "^consistente$" "$D/cons.log"
 check "invariantes do canal verificados sobre o dump real" $?
 
+}
+
+unit_66() {
 echo "case 66: B4f-2 - o furo dos homônimos (caso do Diego): dispatch decide"
 # duas classes com métodos homônimos (UWMain/UWSecondary, ambas Add/Paint).
 # A B4f parava em 'possible (relation unknown)'; a B4f-2 consome os fatos já
@@ -1709,6 +1916,9 @@ check "hit no projeto pelo vínculo escrito: possible nomeando o candidato (Q4)"
 ! grep -q "excluded.*OPFIRST\|OPFIRST.*excluded" "$D/pm.log" "$D/ob.log"
 check "nenhuma consulta exclui send de receptor com cadeia indecidível" $?
 
+}
+
+unit_70() {
 echo "case 70: B4f-2 - homônimos de DECLARAÇÃO: protótipo/impl de outra classe fora do find-references"
 # Relato do Diego pós-entrega: os SENDS homônimos saíram, mas os protótipos
 # 'METHOD Paint()' das outras classes continuavam nas Location[] via camada
@@ -1749,6 +1959,9 @@ check "consulta da herdeira: decl/impl do pai vira possible (Q4 - vínculo não 
 ! grep -q "excluded" "$D/of.log"
 check "consultada com cadeia indecidível (fato 9) não exclui NENHUM site" $?
 
+}
+
+unit_71() {
 echo "case 71: extensão VSCode - consulta por POSIÇÃO (Q5: methodQuery morto)"
 # a extensão não promove nada por regex: manda a posição do cursor
 # (usages --at arq:linha:col, 1-based - a conversão do 0-based do editor
@@ -1760,6 +1973,9 @@ echo "case 71: extensão VSCode - consulta por POSIÇÃO (Q5: methodQuery morto)
 node "$HERE/../vscode/test-resolveat.js" > /dev/null 2>&1
 check "extensão por posição: conversão real + fallback + methodQuery morto" $?
 
+}
+
+unit_72() {
 echo "case 72: B4f-3 - A PROVA DA GENERALIDADE: homônimos em DSLs customizadas (#xcommand)"
 # DSLs INVENTADAS (rig.ch: RIG/COG/FORGE, espelho estrutural do hbclass;
 # amuleto.ch: AMULETO/DOTE, declarativa PURA - só o canal, sem função
@@ -1841,6 +2057,9 @@ check "VAR: site de declaração via lista { } do canal, confirmado/excluído" $
 ! grep -qiwE "rig|cog|forge|totem|idolo|farol|brilho|amuleto|dote|fulgor|zenite|mybrowse|mylousa|mypaint|mytela|grade|lousa|pintar" "$HERE/../src/hbrefactor.prg"
 check "a ferramenta não menciona NENHUMA palavra das DSLs (régua do caso 64)" $?
 
+}
+
+unit_73() {
 echo "case 73: B4f-3 - DSL REAL do contrib (xhb/cstruct.ch): classes de RUNTIME, relato honesto"
 # apontada pelo Diego como exemplo do que qualquer programador cria no seu
 # aplicativo: cstruct cria as classes em RUNTIME (hb_CStructure/__clsNew),
@@ -1863,6 +2082,9 @@ check "classe de RUNTIME nunca gera excluded/confirmed (o teto é da linguagem)"
 ( cd "$D" && "$BIN" usages c1.hbp x > x.log 2>&1 )
 check "consulta crua x também exit 0 (regras de pp criadas por expansão não quebram)" $?
 
+}
+
+unit_74() {
 echo "case 74: B4f-3 - o princípio é CONSTRUTO-AGNÓSTICO: açúcar sobre FUNÇÕES e LOCAIS"
 # alinhamento do Diego: classes são SÓ UM CASO. O harbour inteiro se apoia
 # em diretivas para criar açúcar sintático; o hbrefactor refatora qualquer
@@ -1913,6 +2135,9 @@ RC=$?
 cmp -s "$D/sf1.prg" "$D/sf1.antes" && cmp -s "$D/suga.ch" "$D/suga.antes" && [ $RC -eq 0 ]
 check "ida-e-volta A->B->A byte-exata (fonte e diretiva)" $?
 
+}
+
+unit_75() {
 echo "case 75: Q4 (revisao-generalidade) - vínculo escrito NÃO é pai: sem confirmed/excluded falso"
 # O probe da revisão provou o veneno (2026-07-07): a DSL fixq4 põe o
 # FORJADOR na linha da declaração, passado por @ref - a MESMA forma do pai
@@ -1940,6 +2165,9 @@ check "vínculo para função comum degrada honesto (nunca decide)" $?
 ! grep -qiwE "arma|tempera|gume|endarma|afia|faca|lamina|pedrabase|afiapedra|armamake|arsenal" "$HERE/../src/hbrefactor.prg"
 check "a ferramenta não menciona NENHUMA palavra da DSL fixq4 (régua do caso 64)" $?
 
+}
+
+unit_76() {
 echo "case 76: Q1 (revisao-generalidade) - reorder-params em 'método' de DSL própria NÃO-espelho"
 # fixofi: a DSL cola a MENSAGEM primeiro e a dona por último
 # (Talha_na_Banca), assinatura numa única linha (sem par protótipo/impl) e
@@ -1988,6 +2216,9 @@ check "recusa nomeia as donas e o despacho dinâmico" $?
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "fontes intactos após a recusa" $?
 
+}
+
+unit_77() {
 echo "case 77: Q2 (revisao-generalidade) - rename-method Dona:Membro resolve dona de DSL própria"
 # o açúcar Dona:Membro é SÓ política de unicidade sobre o motor genérico
 # (PpMarkerSeeds/Artifacts/Owners): a dona vem da co-derivação, a previsão
@@ -2024,6 +2255,9 @@ check "recusa nomeia a outra dona (política de unicidade)" $?
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "fontes intactos após a recusa" $?
 
+}
+
+unit_78() {
 echo "case 78: Q3 (revisao-generalidade) - call-graph resolve membro de DSL própria"
 # CONSERTO Q3: o índice de mensagens elegia a última parte da colagem
 # (forma-de-hbclass) - numa DSL mensagem-primeiro a DONA virava chave e o
@@ -2048,6 +2282,9 @@ check "mensagem homônima mostra as definições das duas donas" $?
 grep -q "dynamic: LUSTRO_NA_BANCA | LUSTRO_NA_TEAR" "$D/cgh.log"
 check "aresta dinâmica mostra o alvo ambíguo (unicidade visível)" $?
 
+}
+
+unit_79() {
 echo "case 79: Q7 (revisao-generalidade) - extract em corpo de ofício: função verificada OU recusa limpa"
 # a síntese de método (METHOD ... CLASS + protótipo) é a exceção
 # DOCUMENTADA do hbclass (V4: o pp não roda ao contrário) - o portão é o
@@ -2083,6 +2320,9 @@ check "fontes intactos após a recusa" $?
 ! grep -qiwE "tenda|lavra|oficio|endtenda|banca|tear|talha|verniz|lustro|cinzela|polir|ajusta|rotula|pede|nlado|nfundo|nbrilho|ncera|npano|nfio|ntrama|nmiolo|ntom|cmarca" "$HERE/../src/hbrefactor.prg"
 check "a ferramenta não menciona NENHUMA palavra da DSL fixofi (régua do caso 64)" $?
 
+}
+
+unit_80() {
 echo "case 80: Q6 (revisao-generalidade) - rótulo do DONO no vocabulário da DSL que o declarou"
 # O TIPO do membro já liftava para a cabeça da regra raiz (cog/dote/
 # oficio); o do DONO dizia "class" para qualquer DSL (V5). O vocábulo do
@@ -2102,6 +2342,9 @@ check "dono no vocabulário da DSL não-espelho (tenda Banca), membro no da regr
 ! grep -qi "(class banca" "$D/bt.log"
 check "nenhum rótulo 'class' para dona de DSL própria" $?
 
+}
+
+unit_81() {
 echo "case 81: Q5 (revisao-generalidade) - resolve-at: o cursor vira consulta por FATO"
 # O methodQuery da extensão era regex hbclass hard-coded (V1): promovia
 # por FORMA e só via METHOD ... CLASS / bloco CREATE CLASS. resolve-at
@@ -2150,6 +2393,9 @@ check "usages --at resolve a posição e consulta numa chamada só" $?
   grep -q "nenhum identificador" "$D/u2.log"
 check "usages --at recusa posição vazia nomeando o fato (fallback da extensão)" $?
 
+}
+
+unit_82() {
 echo "case 82: B4g - a regra POR DENTRO (match[]/result[] do ast-5)"
 # Fixtures promovidas do probe do portão (ADR-001): todos os tipos de
 # marker, diretiva continuada, opcionais consecutivos reordenados,
@@ -2279,6 +2525,56 @@ check "camada 4: palavra dentro da diretiva por posição-fato, consulta crua" $
    ! grep -qiE "\bforja\b|\bmolde\b|\btempera\b|\bcunho\b|\bprensa\b|\bbatiza\b|\brecoze\b" "$HB_BIN/../../../src/pp/ppcore.c"
 check "régua do caso 64: nenhuma palavra da fixture na ferramenta nem no core" $?
 
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82"
+
+# ---------------------------------------------------------------------------
+# B-infra: pool dinamico por-caso (docs/testes-paralelos.md, Etapa 1 bash).
+# JOBS=N controla o teto (default nproc); JOBS=1 roda em processo, na ordem,
+# com saida ao vivo (R7 - depuracao identica ao runner antigo).
+# Modo filho (--unit N): TMPDIR proprio (R2 - hb_DirTemp() o respeita),
+# saida no artefato proprio (R5 - mata a intercalacao) e contadores
+# em-banda na ultima linha (@@counts) - o join imprime os logs NA ORDEM
+# dos casos (saida byte-identica a sequencial) e soma o tally. Unidade
+# sem @@counts = morreu no meio: conta FAIL e mostra o log (silencio
+# nunca parece sucesso).
+# ---------------------------------------------------------------------------
+PARDIR="$HERE/tmp/.par"
+
+if [ "${1:-}" = "--unit" ]; then
+   u="$2"
+   export TMPDIR="$PARDIR/$u.tmp"
+   mkdir -p "$TMPDIR"
+   exec > "$PARDIR/$u.log" 2>&1
+   "unit_$u"
+   echo "@@counts $PASS $FAIL"
+   exit 0
+fi
+
+JOBS="${JOBS:-$(nproc)}"
+if [ "$JOBS" -le 1 ]; then
+   for u in $ALL_UNITS; do
+      "unit_$u"
+   done
+else
+   rm -rf "$PARDIR"
+   mkdir -p "$PARDIR"
+   printf '%s\n' $ALL_UNITS | xargs -P "$JOBS" -I{} "$0" --unit {}
+   for u in $ALL_UNITS; do
+      log="$PARDIR/$u.log"
+      if [ ! -f "$log" ] || ! grep -q '^@@counts ' "$log"; then
+         [ -f "$log" ] && grep -v '^@@counts ' "$log"
+         note "FAIL: unidade $u morreu sem contadores (ver $log)"
+         FAIL=$((FAIL+1))
+         continue
+      fi
+      grep -v '^@@counts ' "$log"
+      read -r _ p f < <(grep '^@@counts ' "$log" | tail -1)
+      PASS=$((PASS+p))
+      FAIL=$((FAIL+f))
+   done
+fi
 echo
 echo "passed: $PASS  failed: $FAIL"
 [ "$FAIL" -eq 0 ]

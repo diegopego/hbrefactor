@@ -20,8 +20,10 @@ $(BIN): src/hbrefactor.prg
 	@mkdir -p bin
 	$(HBMK2) src/hbrefactor.prg -o$(BIN) -q0 -w3 -es2 -gtcgi
 
+# paralelo por padrão (pool por-caso, teto nproc - B-infra Etapa 1);
+# JOBS=1 força o modo sequencial com saída ao vivo, para depurar um caso
 test: build
-	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tests/run.sh
+	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
 
 # porta de precisão da B1: dump ast vs TokenScan arquivado, corpus
 # fixtures + hbhttpd (0 divergências reais exigidas)

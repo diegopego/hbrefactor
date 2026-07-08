@@ -4,6 +4,15 @@ Documento de design da Fase B-infra (ver [roadmap.md](roadmap.md)). Aqui fica o
 racional completo — a análise das *formas* de paralelizar e das tecnologias que as
 implementam. A spec executável (escopo + critério de pronto) vive no roadmap.
 
+> **Etapa 1 ✅ ENTREGUE (2026-07-07)** — pool bash no próprio `run.sh`
+> (R1-R7 todos atendidos; registro completo no
+> [arquivo de fases](roadmap-fases-entregues.md)). Números medidos:
+> sequencial 109 s → paralelo 11-14 s em 20 cores (**~8×**), saída
+> byte-idêntica nos dois modos, 10/10 rodadas sem flake. Nota: quando
+> escrito, este doc citava ~34 casos/125 checks; na entrega a suíte tinha
+> 80 unidades/555 checks — a forma escolhida escalou sem ajuste. A
+> Etapa 2 (runner em Harbour via `hb_processOpen`) segue como futuro.
+
 ## Contexto
 
 `tests/run.sh` roda **~34 casos / 125 checks** estritamente em sequência. O custo é

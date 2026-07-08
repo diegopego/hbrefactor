@@ -59,6 +59,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B4f-2 (2026-07-07) | Resolução de dispatch (`ResolveDispatch`); homônimos; declarações vinculadas à dona; extensão v0.5.0 — **`ClassParentsSeq`/methodQuery: ver revisão Q4/Q5** |
 | B4f-3 (2026-07-07) | PROVA da generalidade: DSLs inventadas com homônimos, comandos embrulhando classes, cstruct real, escrita `o:x`, construtos não-classe (casos 72-74; suíte 467/0) |
 | B4g (2026-07-07) | A regra POR DENTRO (ast-5): `match[]`/`result[]`; usages nomeia sites em regra; rename-dsl de qualquer palavra do match (reancoragem textual morta); rename-function `--edit-rules` (caso 74 acionável); resolve-at em diretiva; extensão 0.7.0; ADR-001; suíte 555/0 |
+| B-infra Etapa 1 (2026-07-07) | Suíte paralela: pool bash por-caso, saída byte-idêntica, 10/10 sem flake, 109 s → 11-14 s (~8×); `JOBS=1` p/ depurar |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -135,13 +136,16 @@ fricção pedir.
 
 ### B-infra — suíte paralela (pool dinâmico)
 
-Racional: [testes-paralelos.md](testes-paralelos.md). Pré-requisito R1
-(WorkDir atômico) ✅ na B4b. Forma travada: pool dinâmico por-caso
-(`xargs -P`/`wait -n`), `TMPDIR` isolado, resultado por artefato, tally
-no join; Etapa 1 em bash, Etapa 2 em `.prg` (`hb_processOpen`, mata o
-python dos casos 18/26).
-**Critério**: paridade pass/fail com o runner anterior; 10× sem flake;
-wall-time < sequencial; `JOBS=1` para depurar.
+Racional: [testes-paralelos.md](testes-paralelos.md).
+**Etapa 1 ✅ ENTREGUE (2026-07-07)** — registro no
+[arquivo](roadmap-fases-entregues.md): pool bash `xargs -P` por-caso,
+`TMPDIR` por unidade, artefato + tally no join; asserts intactos (drift
+zero). Provas: saída BYTE-IDÊNTICA à sequencial (J1 e paralelo), 10/10
+rodadas sem flake, **109 s → 11-14 s (~8×)**; `make test` = paralelo
+default, `JOBS=1` sequencial com saída ao vivo para depurar.
+**Etapa 2 (futura)**: migrar o runner para `hb_processOpen` (toolchain
+única, mata o python dos casos 18/26) — mesma forma, outra tecnologia;
+paridade protege a migração.
 
 ### B6 — PR upstream (BLOQUEADA: só quando o Diego mandar)
 
