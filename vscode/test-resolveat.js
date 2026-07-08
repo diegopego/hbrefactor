@@ -35,7 +35,16 @@ check('documento salvo ANTES da consulta (posição tem que casar com o disco)',
 check('fallback para a palavra crua quando o CLI recusa a posição',
   /nenhum identificador/.test(src) && /\[\s*'usages',\s*c\.spec,\s*word,/.test(src));
 
-// 3. a morte do methodQuery (V1): nenhuma promoção por regex de construto
+// 3. --show-expansion sempre-ligado (B5): o flag é só-rótulo do canal
+// (o --json do peek é byte-idêntico com/sem ele) e cada invocação
+// recompila o projeto - as DUAS consultas (posição e fallback) já levam
+// o flag para a expansão não custar uma segunda compilação
+check('consulta por posição leva --show-expansion',
+  /\[\s*'usages',\s*c\.spec,\s*'--at',\s*at,\s*'--json',\s*json,\s*'--show-expansion'\s*\]/.test(src));
+check('fallback de palavra crua leva --show-expansion',
+  /\[\s*'usages',\s*c\.spec,\s*word,\s*'--json',\s*json,\s*'--show-expansion'\s*\]/.test(src));
+
+// 4. a morte do methodQuery (V1): nenhuma promoção por regex de construto
 // (menção em comentário é história legítima; definição/chamada não)
 check('methodQuery não existe mais (nem definição nem chamada)',
   !/function methodQuery|methodQuery\(/.test(src));

@@ -130,8 +130,15 @@ Fatias entregues no arquivo; **consulta por POSIÇÃO entregue (Q5,
 extensão 0.6.0)**; **B4g entregue (0.7.0)**: confirm-then-force de
 `--edit-rules` no rename-function + conserto do confirm de `--force`
 (regex testava mensagem em inglês, CLI fala português — estava morto).
-Restante: `--show-expansion` como opção; preview `--dry-run --json` se a
-fricção pedir.
+**`--show-expansion` entregue (0.7.1, 2026-07-08 — decisão do Diego:
+SEMPRE-ligado no usages da extensão, sem comando/setting novos)**: o
+flag é só-rótulo do canal (` -> CAIXA_SOMA`, ` -> derives ...`) e o
+`--json` do peek é byte-idêntico com/sem ele (provado em fixmth e
+fixppm), então suprimir custaria caro — cada invocação recompila o
+projeto (`hbmk2 -rebuild`) e re-perguntar pagaria outra compilação;
+divergência com o default do CLI documentada no README da extensão;
+guarda executável no harness do caso 71.
+Restante: preview `--dry-run --json` se a fricção pedir.
 **Critério**: Diego usa no dia a dia; sem regressão.
 
 ### B-infra — suíte paralela (pool dinâmico)

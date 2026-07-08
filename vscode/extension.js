@@ -141,6 +141,12 @@ function atSpec(file, line0, char0) {
 // hbclass) morreu aqui. Posição sem identificador de compilação (cursor
 // em comentário/string, coluna desalinhada) cai para a consulta crua da
 // palavra - o comportamento antigo, nunca palpite.
+// --show-expansion SEMPRE (B5): o flag só acrescenta sufixos de rótulo
+// no canal (` -> CAIXA_SOMA`, ` -> derives ...`); o --json que alimenta
+// o peek de referências é byte-idêntico com/sem ele - o peek segue no
+// vocabulário do fonte. Ligado sempre porque cada invocação recompila o
+// projeto (hbmk2 -rebuild): re-perguntar só para ver o nome gerado
+// custaria outra compilação inteira.
 async function cmdUsages() {
   const c = await ctx();
   if (!c) return;
@@ -150,10 +156,10 @@ async function cmdUsages() {
   const pos = c.editor.selection.active;
   const at = atSpec(c.file, pos.line, pos.character);
   const json = tmpJson();
-  let res = await run(['usages', c.spec, '--at', at, '--json', json], c.cwd);
+  let res = await run(['usages', c.spec, '--at', at, '--json', json, '--show-expansion'], c.cwd);
   let title = 'usages @ ' + at;
   if (res.code !== 0 && /nenhum identificador/.test(res.stderr + res.stdout)) {
-    res = await run(['usages', c.spec, word, '--json', json], c.cwd);
+    res = await run(['usages', c.spec, word, '--json', json, '--show-expansion'], c.cwd);
     title = 'usages ' + word;
   }
   report(title, res);

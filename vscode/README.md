@@ -39,7 +39,7 @@ Harbour é a árvore de fontes (não uma instalação com os headers copiados).
 
 | Comando | O que faz |
 |---|---|
-| `hbrefactor: Usages` | Todas as referências do símbolo sob o cursor (variável, função, método **ou palavra de diretiva de pp**) no painel de referências + canal |
+| `hbrefactor: Usages` | Todas as referências do símbolo sob o cursor (variável, função, método **ou palavra de diretiva de pp**) no painel de referências + canal. No canal, o relato inclui o que a expansão fabrica (`-> CAIXA_SOMA`, `-> derives ...`): a extensão passa `--show-expansion` sempre — diferente do CLI pelado, cujo default omite os nomes gerados; o painel de referências segue no vocabulário do fonte (o `--json` não muda com o flag) |
 | `hbrefactor: Rename local/param under cursor` | Rename verificado de LOCAL/parâmetro (funciona dentro de `METHOD ... CLASS` — a extensão passa `Classe:Método` ao CLI) |
 | `hbrefactor: Rename function under cursor` | Rename de função no projeto inteiro; se houver referências textuais, mostra os avisos e oferece prosseguir com `--force` |
 | `hbrefactor: Rename directive/command word (pp DSL)` | Renomeia a palavra-cabeça de uma diretiva `#command`/`#xcommand`/`#[x]translate`/`#define` na definição (o `.ch`) **e** em todos os usos; o CLI verifica `.ppo`/`.hrb` byte-idênticos e faz rollback |
