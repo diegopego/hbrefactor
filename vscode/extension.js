@@ -20,8 +20,12 @@ function out() {
 function cfg() { return vscode.workspace.getConfiguration('hbrefactor'); }
 
 // o CLI aceita qualquer alvo que o hbmk2 entenda: .hbp, .hbc com sources=,
-// ou lista de .prg
-async function projectSpec() {
+// ou lista de .prg. Com vários candidatos e um arquivo em foco, o picker é
+// CIENTE DO ARQUIVO (B5): pergunta ao CLI de quais projetos o arquivo é
+// fonte (fato do hbmk2 - nada de parsear .hbp aqui) e só oferece esses;
+// dono único nem pergunta. Arquivo órfão ou pergunta falhada degrada para
+// o comportamento antigo (todos os candidatos).
+async function projectSpec(forFile) {
   const fixed = cfg().get('project');
   if (fixed) return fixed;
   const files = await vscode.workspace.findFiles('**/*.{hbp,hbc}', '**/{node_modules,.git,.hbmk}/**', 32);
@@ -30,7 +34,35 @@ async function projectSpec() {
     return null;
   }
   if (files.length === 1) return files[0].fsPath;
-  return await vscode.window.showQuickPick(files.map(f => f.fsPath), { placeHolder: 'Projeto (.hbp/.hbc)' }) || null;
+  const candidates = files.map(f => f.fsPath);
+  const owners = forFile ? await projectsOf(forFile, candidates) : null;
+  const pick = pickerChoices(candidates, owners);
+  if (pick.auto) return pick.auto;
+  return await vscode.window.showQuickPick(pick.ask, { placeHolder: 'Projeto (.hbp/.hbc)' }) || null;
+}
+
+// decisão pura do picker: donos vindos do CLI; null (pergunta falhou) ou
+// vazio (arquivo órfão) -> oferece todos; um dono -> direto, sem pergunta;
+// vários donos (fonte compartilhada) -> pergunta só entre eles
+function pickerChoices(all, owners) {
+  if (!owners || owners.length === 0) return { auto: null, ask: all };
+  if (owners.length === 1) return { auto: owners[0], ask: null };
+  return { auto: null, ask: owners };
+}
+
+// pergunta de FATO ao CLI: `projects-of` resolve cada candidato no hbmk2
+// (-traceonly, ~3 ms por candidato - sem compilar) e responde quais têm o
+// arquivo como fonte. null = a pergunta em si falhou (CLI/hbmk2
+// indisponível), distinto de resposta vazia (órfão legítimo)
+async function projectsOf(file, candidates) {
+  const json = tmpJson();
+  const res = await run(['projects-of', file].concat(candidates, ['--json', json]), path.dirname(file));
+  if (res.code !== 0) return null;
+  try {
+    const owners = JSON.parse(fs.readFileSync(json, 'utf8'));
+    fs.unlinkSync(json);
+    return owners;
+  } catch (e) { return null; }
 }
 
 // resolve o executável: caminho explícito na config vence; senão o binário
@@ -113,7 +145,9 @@ function tmpJson() {
 async function ctx() {
   const editor = vscode.window.activeTextEditor;
   if (!editor) return null;
-  const spec = await projectSpec();
+  // documento sem arquivo no disco (untitled) não tem pertencimento a
+  // perguntar - o picker cai para a lista completa
+  const spec = await projectSpec(editor.document.isUntitled ? null : editor.document.fileName);
   if (!spec) return null;
   return { editor, spec, cwd: path.dirname(spec), file: path.basename(editor.document.fileName) };
 }

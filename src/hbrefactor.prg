@@ -60,6 +60,8 @@ PROCEDURE Main()
       nExit := ResolveAt( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "dump"
       nExit := DumpOnly( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "projects-of"
+      nExit := ProjectsOf( aArgs )
    OTHERWISE
       Usage()
       nExit := EXIT_USAGE
@@ -90,6 +92,8 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor call-graph <projeto> [<função>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <projeto>" + hb_eol() )
    OutStd( "  hbrefactor dump <projeto>          (gera os .ast.json e informa o diretório)" + hb_eol() )
+   OutStd( "  hbrefactor projects-of <arq.prg> <projeto1> [<projeto2> ...] [--json <out>]" + hb_eol() )
+   OutStd( "                                     (quais destes projetos têm o arquivo como fonte)" + hb_eol() )
    OutStd( "  <projeto> = qualquer alvo que o hbmk2 aceite (.hbp, .hbc com sources=," + hb_eol() )
    OutStd( "              lista de .prg separada por vírgula ou espaço)" + hb_eol() )
 
@@ -694,6 +698,73 @@ STATIC FUNCTION DumpOnly( aArgs )
       RETURN Refuse( "o projeto não compila" )
    ENDIF
    OutStd( "dumps em: " + cTmp + hb_eol() )
+
+   RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// projects-of - de quais destes projetos o arquivo é fonte (picker ciente
+// do arquivo na extensão): pertencer = o hbmk2 resolve o arquivo como
+// fonte na linha de comando do compilador (-traceonly, ~3 ms por
+// candidato) - fato do builder oficial, nunca parse de .hbp. Identidade
+// por caminho canônico COMPLETO (o ProjectMember do --at compara só
+// nome+ext, que entre projetos daria falso positivo com main.prg em
+// diretórios distintos). Candidato que o hbmk2 não resolve não pode
+// reivindicar o arquivo: sai do páreo com nota no stderr; se NENHUM
+// resolver a pergunta não foi respondida (exit != 0) - diferente de
+// arquivo órfão, que é resposta válida: lista vazia com exit 0.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION ProjectsOf( aArgs )
+
+   LOCAL cFile, cAbs, cCwd, cJsonOut := "", aCand := {}, aOwn := {}
+   LOCAL cSpec, hProj, cPath, nResolved := 0, nI
+
+   IF Len( aArgs ) < 3
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cFile := aArgs[ 2 ]
+   FOR nI := 3 TO Len( aArgs )
+      IF Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
+         cJsonOut := aArgs[ ++nI ]
+      ELSE
+         AAdd( aCand, aArgs[ nI ] )
+      ENDIF
+   NEXT
+   IF Empty( aCand )
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+
+   cCwd := hb_DirSepAdd( hb_cwd() )
+   cAbs := hb_PathNormalize( hb_PathJoin( cCwd, cFile ) )
+
+   FOR EACH cSpec IN aCand
+      hProj := LoadProject( cSpec )
+      IF hProj == NIL
+         OutErr( "hbrefactor: candidato '" + cSpec + ;
+                 "' não resolveu no hbmk2 - fora do picker" + hb_eol() )
+         LOOP
+      ENDIF
+      nResolved++
+      FOR EACH cPath IN hProj[ "files" ]
+         IF hb_PathNormalize( hb_PathJoin( cCwd, cPath ) ) == cAbs
+            AAdd( aOwn, cSpec )
+            EXIT
+         ENDIF
+      NEXT
+   NEXT
+
+   IF nResolved == 0
+      RETURN Refuse( "nenhum candidato resolveu no hbmk2 - a pergunta ficou sem resposta" )
+   ENDIF
+
+   FOR EACH cSpec IN aOwn
+      OutStd( cSpec + hb_eol() )
+   NEXT
+   IF ! Empty( cJsonOut )
+      hb_MemoWrit( cJsonOut, hb_jsonEncode( aOwn ) )
+   ENDIF
 
    RETURN EXIT_OK
 

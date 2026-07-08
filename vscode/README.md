@@ -17,6 +17,12 @@ painel de referências nativo).
    com "o projeto não compila" — o CLI agora nomeia essa causa no erro.
 3. Projeto no workspace: `.hbp`, `.hbc` com `sources=` ou lista de `.prg`
    (qualquer alvo que o hbmk2 aceite; `hbrefactor.project` fixa a escolha).
+   Com **vários** `.hbp`/`.hbc` no workspace, o picker é **ciente do
+   arquivo**: a extensão pergunta ao CLI (`projects-of`, fato do hbmk2 —
+   a extensão nunca parseia `.hbp`) de quais projetos o arquivo em foco é
+   fonte — dono único entra direto sem pergunta; fonte compartilhada
+   pergunta só entre os donos; arquivo órfão (ou pergunta falhada) cai
+   para a lista completa, o comportamento antigo.
 
 ## Instalação (desenvolvimento)
 

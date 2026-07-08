@@ -147,18 +147,22 @@ camadas: default do setting = layout do repo
 (`~/devel/harbour-core/harbour/bin/linux/gcc`, o mesmo do Makefile);
 dica honesta no `AstDumps` do CLI nomeando a causa quando o build falha
 com `HB_BIN` vazio; 2 guardas novas no harness do caso 71 (13 pass).
-Restante, por fricção do uso diário (relato do Diego, 2026-07-08):
+**Picker ciente do arquivo entregue (0.8.0, 2026-07-08)**: subcomando
+`projects-of <arq> <candidatos...> [--json]` no CLI — pertencer = o
+hbmk2 resolve o arquivo como fonte na linha de comando do compilador
+(`LoadProject`/`-traceonly`, medido ~3 ms por candidato ⇒ sem cache),
+identidade por caminho canônico COMPLETO (nome+ext daria falso positivo
+entre projetos com `main.prg` distintos — provado no caso 83); órfão =
+resposta vazia com exit 0, nenhum candidato resolvido = exit != 0 (a
+pergunta falhou, não é órfão). Na extensão a decisão é pura
+(`pickerChoices`): dono único entra SEM pergunta, fonte compartilhada
+pergunta só entre os donos, órfão/falha degrada para a lista completa;
+`projCtx` (relatórios de projeto inteiro) inalterado. Provas: caso 83
+novo (10 checks, inclui a armadilha do basename e a forma absoluta da
+extensão) + 9 guardas novas no harness do caso 71 (22 pass); suíte
+**565/0**.
+Restante, por fricção do uso diário:
 
-- **Picker de projeto ciente do arquivo**: com vários `.hbp` no
-  workspace o Usages pergunta entre TODOS — deve oferecer só os `.hbp`
-  dos quais o arquivo atual faz parte. Fato, não heurística: pertencer =
-  o hbmk2 resolve o arquivo como fonte do projeto (nada de parsear
-  `.hbp` na extensão — réplica proibida); candidato: resolução via
-  `-traceonly` por candidato com cache, ou subcomando do CLI que
-  responda "quais destes projetos contêm este arquivo". Critério de
-  pronto: com N `.hbp` no workspace, cursor num `.prg` de um deles →
-  sem pergunta (ou pergunta só entre os que o contêm); arquivo órfão →
-  comportamento atual; guarda no harness do caso 71.
 - preview `--dry-run --json` se a fricção pedir.
 
 **Critério**: Diego usa no dia a dia; sem regressão.

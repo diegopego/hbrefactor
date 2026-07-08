@@ -62,5 +62,36 @@ check('hbrefactor.hbBin tem default não-vazio (bin do fork, layout do repo)',
 check('run() repassa hbBin como env HB_BIN com ~ expandido',
   /env\.HB_BIN = hb\.replace\(\/\^~\/, os\.homedir\(\)\)/.test(src));
 
+// 6. picker ciente do arquivo (B5): a DECISÃO é pura (pickerChoices,
+// extraída e executada aqui) e a PERGUNTA é fato do CLI (projects-of) -
+// a extensão nunca parseia .hbp (réplica proibida). Degradações: pergunta
+// falhada (null) e arquivo órfão ([]) caem para a lista completa, nunca
+// escondem projeto.
+const mp = src.match(/function pickerChoices\(all, owners\) \{[\s\S]*?\n\}/);
+check('pickerChoices existe no extension.js', !!mp);
+if (mp) {
+  const pickerChoices = eval('(' + mp[0].replace(/^function pickerChoices/, 'function') + ')');
+  const all = ['x.hbp', 'y.hbp', 'z.hbp'];
+  let r = pickerChoices(all, null);
+  check('pergunta falhada (null) -> oferece todos (degrada, nunca esconde)',
+    r.auto === null && r.ask === all);
+  r = pickerChoices(all, []);
+  check('arquivo órfão ([]) -> oferece todos (comportamento antigo)',
+    r.auto === null && r.ask === all);
+  r = pickerChoices(all, ['y.hbp']);
+  check('dono único -> projeto direto, SEM pergunta', r.auto === 'y.hbp' && r.ask === null);
+  r = pickerChoices(all, ['x.hbp', 'z.hbp']);
+  check('fonte compartilhada -> pergunta só entre os donos',
+    r.auto === null && JSON.stringify(r.ask) === '["x.hbp","z.hbp"]');
+}
+check('a pergunta é fato do CLI: run projects-of com arquivo + candidatos + --json',
+  /run\(\s*\[\s*'projects-of',\s*file\]\.concat\(candidates,\s*\['--json',\s*json\]\)/.test(src));
+check('ctx passa o arquivo do editor ao picker (untitled fica de fora)',
+  /projectSpec\(\s*editor\.document\.isUntitled\s*\?\s*null\s*:\s*editor\.document\.fileName\s*\)/.test(src));
+check('relatórios de projeto inteiro não mudam: projCtx pergunta sem arquivo',
+  /async function projCtx\(\) \{[\s\S]*?projectSpec\(\)[\s\S]*?\n\}/.test(src));
+check('extensão não lê .hbp (o fato vem do hbmk2 via CLI)',
+  !/readFileSync\([^)]*\.hbp/i.test(src) && !/hb[pc]'?\s*\)\s*\.map[^)]*parse/i.test(src));
+
 console.log('\n' + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);

@@ -22,6 +22,7 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "json70"  ; lOk := Json70( cA1 )            ; EXIT
    CASE "json72"  ; lOk := Json72( cA1 )            ; EXIT
    CASE "b4g82"   ; lOk := B4g82( cA1, cA2, cA3 )   ; EXIT
+   CASE "pof83"   ; lOk := Pof83( cA1 )             ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
       lOk := .F.
@@ -572,5 +573,25 @@ STATIC FUNCTION B4g82( cAstA, cAstB, cDir )
    ENDIF
 
    OutStd( "b4g-invariantes-ok" + hb_eol() )
+
+   RETURN .T.
+
+// unidade 83: projects-of --json emite o array de donos que a extensão
+// decodifica (JSON.parse) para filtrar o picker de projeto - o assert
+// prova o round-trip pelo decodificador, não só a forma textual
+STATIC FUNCTION Pof83( cJson )
+
+   LOCAL xVal := JLoad( cJson )
+
+   IF ! HB_ISARRAY( xVal )
+      RETURN Fail( "pof83: não é array JSON" )
+   ENDIF
+   IF Len( xVal ) != 2
+      RETURN Fail( "pof83: esperava 2 donos, veio " + hb_ntos( Len( xVal ) ) )
+   ENDIF
+   IF !( xVal[ 1 ] == "p1.hbp" .AND. xVal[ 2 ] == "p2.hbp" )
+      RETURN Fail( "pof83: donos errados: " + hb_jsonEncode( xVal ) )
+   ENDIF
+   OutStd( "json ok" + hb_eol() )
 
    RETURN .T.

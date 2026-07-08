@@ -2366,7 +2366,82 @@ check "régua do caso 64: nenhuma palavra da fixture na ferramenta nem no core" 
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82"
+unit_83() {
+echo "case 83: projects-of - picker ciente do arquivo (B5): pertencer é fato do hbmk2"
+# A extensão pergunta "de quais destes projetos o arquivo é fonte" e o
+# CLI responde pela linha de comando do compilador que o hbmk2 resolve
+# (-traceonly, sem compilar) - nunca parseando .hbp. Identidade por
+# caminho canônico COMPLETO: p2 tem um a.prg PRÓPRIO em subdiretório
+# (mesmo nome+ext) para provar que base de nome não decide. Órfão =
+# resposta válida VAZIA (exit 0, o picker cai para todos); nenhum
+# candidato resolvido = pergunta SEM resposta (exit != 0); candidato
+# quebrado no meio sai do páreo com nota sem derrubar a resposta.
+D="$HERE/tmp/case83"; rm -rf "$D"; mkdir -p "$D/sub"
+cat > "$D/a.prg" <<'EOF'
+PROCEDURE Main()
+
+   OutStd( Comum() + hb_eol() )
+
+   RETURN
+EOF
+cat > "$D/s.prg" <<'EOF'
+FUNCTION Comum()
+
+   RETURN "c"
+EOF
+cat > "$D/sub/a.prg" <<'EOF'
+PROCEDURE Main()
+
+   OutStd( "sub" + Comum() + hb_eol() )
+
+   RETURN
+EOF
+cat > "$D/orfao.prg" <<'EOF'
+PROCEDURE Main()
+
+   RETURN
+EOF
+printf -- '-w3\n-es2\na.prg\ns.prg\n' > "$D/p1.hbp"
+printf -- '-w3\n-es2\nsub/a.prg\ns.prg\n' > "$D/p2.hbp"
+( cd "$D" && "$HB_BIN/harbour" a.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 && \
+  "$HB_BIN/harbour" s.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 && \
+  "$HB_BIN/harbour" sub/a.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 && \
+  "$HB_BIN/harbour" orfao.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+check "fixtures do caso 83 clean under -w3 -es2" $?
+( cd "$D" && "$BIN" projects-of a.prg p1.hbp p2.hbp > own.log 2>&1 )
+check "projects-of a.prg exit 0" $?
+[ "$(cat "$D/own.log")" = "p1.hbp" ]
+check "a.prg da raiz: só p1 (o a.prg de p2 é OUTRO arquivo - nome+ext não decide)" $?
+( cd "$D" && "$BIN" projects-of sub/a.prg p1.hbp p2.hbp > own2.log 2>&1 )
+[ "$(cat "$D/own2.log")" = "p2.hbp" ]
+check "sub/a.prg: só p2 (identidade por caminho canônico completo)" $?
+( cd "$D" && "$BIN" projects-of s.prg p1.hbp p2.hbp > own3.log 2>&1 )
+[ "$(printf 'p1.hbp\np2.hbp')" = "$(cat "$D/own3.log")" ]
+check "fonte compartilhada: os DOIS projetos, na ordem dos candidatos" $?
+( cd "$D" && "$BIN" projects-of "$D/s.prg" "$D/p1.hbp" "$D/p2.hbp" > own6.log 2>&1 )
+[ "$(printf '%s\n%s' "$D/p1.hbp" "$D/p2.hbp")" = "$(cat "$D/own6.log")" ]
+check "forma da extensão (tudo absoluto): mesma resposta com specs absolutos" $?
+( cd "$D" && "$BIN" projects-of orfao.prg p1.hbp p2.hbp > own4.log 2>&1 )
+RC=$?
+[ $RC -eq 0 ] && [ ! -s "$D/own4.log" ]
+check "órfão: resposta válida VAZIA com exit 0 (picker cai para todos)" $?
+( cd "$D" && "$BIN" projects-of s.prg p1.hbp p2.hbp --json own.json > /dev/null 2>&1 )
+"$TCHECK" pof83 "$D/own.json"
+check "--json: o array que a extensão decodifica (tcheck via hb_jsonDecode)" $?
+( cd "$D" && "$BIN" projects-of a.prg naoexiste.hbp p1.hbp > own5.log 2> own5.err )
+RC=$?
+[ $RC -eq 0 ] && [ "$(cat "$D/own5.log")" = "p1.hbp" ] && grep -q "não resolveu no hbmk2" "$D/own5.err"
+check "candidato quebrado no meio: fora do páreo com nota, resposta segue" $?
+( cd "$D" && "$BIN" projects-of a.prg naoexiste.hbp > /dev/null 2>&1 )
+RC=$?
+[ $RC -ne 0 ]
+check "nenhum candidato resolvido: pergunta sem resposta (exit != 0), não órfão" $?
+# as guardas do lado da extensão (pickerChoices/projectsOf) vivem no
+# harness do caso 71 (vscode/test-resolveat.js)
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -
