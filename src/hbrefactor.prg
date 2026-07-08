@@ -212,6 +212,15 @@ STATIC FUNCTION AstDumps( hProj, cTmp )
                      " -hbcmp -rebuild -q '-prgflag=-x" + hb_DirSepAdd( cTmp ) + ;
                      "'",, @cOut, @cErr ) != 0
       OutErr( ErrLines( cOut + cErr ) )
+      // a falha clássica sem HB_BIN é o hbmk2 do PATH (sem -x) reprovando
+      // um projeto que compila - nomear a causa provável evita o
+      // diagnóstico enganoso "o projeto não compila"
+      IF Empty( hb_GetEnv( "HB_BIN" ) )
+         OutErr( "hbrefactor: HB_BIN não definido - usei o hbmk2 do PATH, " + ;
+                 "que pode não ter o -x do fork; exporte " + ;
+                 "HB_BIN=<dir dos binários com -x> (ou configure " + ;
+                 "hbrefactor.hbBin na extensão)" + hb_eol() )
+      ENDIF
       RETURN .F.
    ENDIF
 

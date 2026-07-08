@@ -2,7 +2,7 @@
   "name": "hbrefactor",
   "displayName": "hbrefactor - Harbour refactoring",
   "description": "Refatoração verificada para Harbour: rename (local/param/static/function/method/nome de match marker de pp/palavra de diretiva), reorder, extract, usages e relatórios via CLI hbrefactor (oráculo do compilador -x, projetos resolvidos pelo hbmk2).",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "publisher": "diegopego",
   "license": "MIT",
   "engines": { "vscode": "^1.80.0" },
@@ -33,8 +33,8 @@
         },
         "hbrefactor.hbBin": {
           "type": "string",
-          "default": "",
-          "description": "Diretório dos binários do Harbour com suporte a -x (vira HB_BIN). Ex.: ~/devel/harbour-core/harbour/bin/linux/gcc"
+          "default": "~/devel/harbour-core/harbour/bin/linux/gcc",
+          "description": "Diretório dos binários do Harbour com suporte a -x (vira HB_BIN). O default é o layout do repo (mesmo do Makefile); sem ele o CLI cai no hbmk2 do PATH, sem -x, e todo comando morre com 'o projeto não compila'."
         },
         "hbrefactor.project": {
           "type": "string",

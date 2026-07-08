@@ -8,8 +8,13 @@ painel de referências nativo).
 ## Requisitos
 
 1. `hbrefactor` compilado (`make build` na raiz deste repo → `bin/hbrefactor`).
-2. Harbour com o patch `-x` (branch `feature/refactoring-mechanism` do
-   harbour-core) — o diretório dos binários vai na configuração `hbrefactor.hbBin`.
+2. Harbour com o patch `-x` (branch `feature/compiler-ast-dump` do
+   harbour-core) — o diretório dos binários vai na configuração
+   `hbrefactor.hbBin`, cujo **default já é o layout do repo**
+   (`~/devel/harbour-core/harbour/bin/linux/gcc`, o mesmo do Makefile);
+   só configure se a árvore estiver em outro lugar. Sem um `hbBin`
+   válido o CLI cai no hbmk2 do PATH (sem `-x`) e todo comando morre
+   com "o projeto não compila" — o CLI agora nomeia essa causa no erro.
 3. Projeto no workspace: `.hbp`, `.hbc` com `sources=` ou lista de `.prg`
    (qualquer alvo que o hbmk2 aceite; `hbrefactor.project` fixa a escolha).
 

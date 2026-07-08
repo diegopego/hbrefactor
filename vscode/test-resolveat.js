@@ -51,5 +51,16 @@ check('methodQuery não existe mais (nem definição nem chamada)',
 check('nenhuma regex de bloco de classe na extensão',
   !/endclass/i.test(src) && !/create\\s\+\)\?class/i.test(src));
 
+// 5. HB_BIN definitivo (0.7.2): sem default no setting, o host de
+// desenvolvimento não passava HB_BIN, o CLI caía no hbmk2 do PATH (sem -x)
+// e todo comando morria com "o projeto não compila" - default = layout do
+// repo (mesmo do Makefile), e o run() tem que repassá-lo como env
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const hbBinDefault = pkg.contributes.configuration.properties['hbrefactor.hbBin'].default;
+check('hbrefactor.hbBin tem default não-vazio (bin do fork, layout do repo)',
+  /harbour.*bin/.test(hbBinDefault), '-> ' + JSON.stringify(hbBinDefault));
+check('run() repassa hbBin como env HB_BIN com ~ expandido',
+  /env\.HB_BIN = hb\.replace\(\/\^~\/, os\.homedir\(\)\)/.test(src));
+
 console.log('\n' + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);

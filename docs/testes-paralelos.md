@@ -10,8 +10,17 @@ implementam. A spec executável (escopo + critério de pronto) vive no roadmap.
 > sequencial 109 s → paralelo 11-14 s em 20 cores (**~8×**), saída
 > byte-idêntica nos dois modos, 10/10 rodadas sem flake. Nota: quando
 > escrito, este doc citava ~34 casos/125 checks; na entrega a suíte tinha
-> 80 unidades/555 checks — a forma escolhida escalou sem ajuste. A
-> Etapa 2 (runner em Harbour via `hb_processOpen`) segue como futuro.
+> 80 unidades/555 checks — a forma escolhida escalou sem ajuste.
+>
+> **Etapa 2 ✅ ENTREGUE (2026-07-08)** — a Opção 3 implementada como
+> MIGRAÇÃO, não reescrita: o despacho+join do pai virou `tests/parrun.prg`
+> (`hb_processOpen`/`hb_processValue`) e os heredocs `python3` viraram
+> subcomandos de `tests/tcheck.prg` (`hb_jsonDecode`) — as unidades bash e
+> seus 555 asserts ficaram intactos (drift zero, mesmo racional da
+> Etapa 1). O python saiu do `make test`; o protocolo filho
+> (`--unit N` + `@@counts` + artefato por unidade) é o mesmo. Saída
+> byte-idêntica à Etapa 1 nos dois modos. Registro no
+> [roadmap](roadmap.md).
 
 ## Contexto
 

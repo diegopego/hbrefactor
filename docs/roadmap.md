@@ -60,6 +60,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B4f-3 (2026-07-07) | PROVA da generalidade: DSLs inventadas com homônimos, comandos embrulhando classes, cstruct real, escrita `o:x`, construtos não-classe (casos 72-74; suíte 467/0) |
 | B4g (2026-07-07) | A regra POR DENTRO (ast-5): `match[]`/`result[]`; usages nomeia sites em regra; rename-dsl de qualquer palavra do match (reancoragem textual morta); rename-function `--edit-rules` (caso 74 acionável); resolve-at em diretiva; extensão 0.7.0; ADR-001; suíte 555/0 |
 | B-infra Etapa 1 (2026-07-07) | Suíte paralela: pool bash por-caso, saída byte-idêntica, 10/10 sem flake, 109 s → 11-14 s (~8×); `JOBS=1` p/ depurar |
+| B-infra Etapa 2 (2026-07-08) | Runner em Harbour: despacho+join `tests/parrun.prg` (`hb_processOpen`) + checker `tests/tcheck.prg` (`hb_jsonDecode`) — python fora do `make test`; paridade byte-idêntica nos dois modos, 10/10 sem flake, 14 s |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -138,7 +139,28 @@ fixppm), então suprimir custaria caro — cada invocação recompila o
 projeto (`hbmk2 -rebuild`) e re-perguntar pagaria outra compilação;
 divergência com o default do CLI documentada no README da extensão;
 guarda executável no harness do caso 71.
-Restante: preview `--dry-run --json` se a fricção pedir.
+**HB_BIN definitivo (0.7.2, 2026-07-08)**: a validação do Diego morreu
+com "o projeto não compila" porque o host de desenvolvimento não tinha
+`hbrefactor.hbBin` configurado — sem `HB_BIN` o CLI cai no hbmk2 do
+PATH (sem `-x`), sintoma já catalogado no CLAUDE.md. Conserto em três
+camadas: default do setting = layout do repo
+(`~/devel/harbour-core/harbour/bin/linux/gcc`, o mesmo do Makefile);
+dica honesta no `AstDumps` do CLI nomeando a causa quando o build falha
+com `HB_BIN` vazio; 2 guardas novas no harness do caso 71 (13 pass).
+Restante, por fricção do uso diário (relato do Diego, 2026-07-08):
+
+- **Picker de projeto ciente do arquivo**: com vários `.hbp` no
+  workspace o Usages pergunta entre TODOS — deve oferecer só os `.hbp`
+  dos quais o arquivo atual faz parte. Fato, não heurística: pertencer =
+  o hbmk2 resolve o arquivo como fonte do projeto (nada de parsear
+  `.hbp` na extensão — réplica proibida); candidato: resolução via
+  `-traceonly` por candidato com cache, ou subcomando do CLI que
+  responda "quais destes projetos contêm este arquivo". Critério de
+  pronto: com N `.hbp` no workspace, cursor num `.prg` de um deles →
+  sem pergunta (ou pergunta só entre os que o contêm); arquivo órfão →
+  comportamento atual; guarda no harness do caso 71.
+- preview `--dry-run --json` se a fricção pedir.
+
 **Critério**: Diego usa no dia a dia; sem regressão.
 
 ### B-infra — suíte paralela (pool dinâmico)
@@ -150,9 +172,33 @@ Racional: [testes-paralelos.md](testes-paralelos.md).
 zero). Provas: saída BYTE-IDÊNTICA à sequencial (J1 e paralelo), 10/10
 rodadas sem flake, **109 s → 11-14 s (~8×)**; `make test` = paralelo
 default, `JOBS=1` sequencial com saída ao vivo para depurar.
-**Etapa 2 (futura)**: migrar o runner para `hb_processOpen` (toolchain
-única, mata o python dos casos 18/26) — mesma forma, outra tecnologia;
-paridade protege a migração.
+**Etapa 2 — runner em Harbour ✅ ENTREGUE (2026-07-08)**: mesma FORMA
+da Etapa 1 (pool por-caso, unidades bash intactas, protocolo filho
+`--unit N` + `@@counts` + logs impressos na ordem), só a tecnologia
+troca, em duas fatias independentes:
+
+- **(a) checker Harbour** — `tests/tcheck.prg` (compilado pelo
+  Makefile) substitui os **10 heredocs `python3`** das unidades
+  18/26/42/62/65/66/70/72/82 (o "18/26" do desenho original cresceu):
+  asserts sobre JSON via `hb_jsonDecode`, mesmos exit codes e mesmas
+  saídas assertadas ("json ok", "consistente").
+- **(b) despacho+join Harbour** — `tests/parrun.prg` via
+  `hb_processOpen`/`hb_processValue` (fato verificado no fonte:
+  `waitpid(WNOHANG)`, -1 enquanto roda) substitui o ramo `xargs -P`
+  do run.sh; `JOBS>1` delega ao binário, `JOBS=1` continua bash
+  sequencial com saída ao vivo (R7 preservado).
+
+Fora do escopo (decisão de menor arrependimento, mesma da Etapa 1):
+reescrever os 555 asserts em .prg (drift alto, valor novo nulo — as
+unidades bash JÁ são auto-contidas) e o `occ_ast_diff.py` do
+`make lexdiff` (fora do caminho do `make test`; morre quando o alvo
+legado morrer). Critério de pronto, TODO provado por execução no
+fechamento (2026-07-08): `python3` ausente do `run.sh` (resta 1 menção
+em comentário — história); saída do `make test` **byte-idêntica** nos
+dois modos (diff paralelo × `JOBS=1` limpo); 10/10 rodadas paralelas
+sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
+Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
+são dependências do alvo `test`).
 
 ### B6 — PR upstream (BLOQUEADA: só quando o Diego mandar)
 

@@ -24,6 +24,9 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BIN="${BIN:-$HERE/../bin/hbrefactor}"
+# tcheck: asserts que eram heredocs python3 (B-infra Etapa 2 - toolchain única)
+TCHECK="${TCHECK:-$HERE/../bin/tcheck}"
+[ -x "$TCHECK" ] || { echo "tcheck ausente ($TCHECK) - rode via make test"; exit 1; }
 export HB_BIN="${HB_BIN:?HB_BIN must point to the harbour binaries dir (branch feature/compiler-ast-dump)}"
 
 PASS=0
@@ -420,27 +423,13 @@ D=$(fresh case18)
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-python3 - "$D/locs.json" <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-assert isinstance(locs, list) and len(locs) >= 2, "few locations"
-assert any(l["uri"].endswith("b.prg") and l["range"]["start"]["line"] == 4 for l in locs), "definition loc"
-assert any(l["uri"].endswith("a.prg") for l in locs), "call loc"
-PYEOF
+"$TCHECK" locs18 "$D/locs.json"
 check "Location[] valid with def+call" $?
 # spec ABSOLUTO (o caminho que a extensão VSCode sempre passa): o URI não
 # pode duplicar o prefixo do cwd - regressão do LocationsJson (hb_PathJoin,
 # não hb_FNameMerge, para não concatenar caminho já absoluto)
 ( cd "$D" && "$BIN" usages "$D/fix01.hbp" Dupla --json absl.json > /dev/null 2>&1 )
-python3 - "$D/absl.json" <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-for l in locs:
-    p = l["uri"][len("file://"):]
-    assert p.count("/absl") == 0, "path prefix doubled: " + l["uri"]
-    assert "/case18/case18" not in p, "cwd doubled in uri: " + l["uri"]
-assert any(l["uri"].endswith("b.prg") for l in locs), "def loc present"
-PYEOF
+"$TCHECK" absuri18 "$D/absl.json"
 check "absolute spec: URI not doubled (extension path)" $?
 
 }
@@ -558,12 +547,7 @@ unit_26() {
 echo "case 26: usages --json carries real columns"
 D=$(fresh case26)
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
-python3 - "$D/locs.json" <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-assert any(l["range"]["start"]["character"] > 0 for l in locs), "no real column found"
-assert all(l["range"]["end"]["character"] >= l["range"]["start"]["character"] for l in locs)
-PYEOF
+"$TCHECK" cols26 "$D/locs.json"
 check "columns present in Location[]" $?
 
 }
@@ -1035,21 +1019,7 @@ RC=$?
 check "dump exit 0"                   $([ $RC -eq 0 ] && echo 0 || echo 1)
 DIR=$(sed -n 's/^dumps em: //p' "$D/dump.log")
 ( cd "$D" && "$HB_BIN/harbour" a.prg -n -q0 -i. -s '-p+' > /dev/null 2>&1 )
-python3 - "$D/a.ppt" "$DIR/a.ast.json" <<'PYEOF'
-import json, re, sys
-traces = []
-pend = None
-for line in open(sys.argv[1]):
-    m = re.match(r'^\S+\((\d+)\) >', line)
-    if m:
-        pend = int(m.group(1))
-    elif line.startswith('#') and pend is not None:
-        traces.append((pend, line[1:].split('>')[0].strip()))
-        pend = None
-d = json.load(open(sys.argv[2]))
-apps = [(a['line'], d['ppRules'][a['rule']]['kind']) for a in d['ppApplications']]
-sys.exit(0 if traces == apps and len(apps) > 0 else 1)
-PYEOF
+"$TCHECK" ppt42 "$D/a.ppt" "$DIR/a.ast.json"
 check "count, order, lines and kinds match the .ppt trace" $?
 
 }
@@ -1714,14 +1684,7 @@ check "cross-módulo: declared de r1 classifica send em r2" $?
 # --json (o que a extensão VSCode consome no find-references): excluded é
 # não-referência PROVADA e NÃO pode virar Location; confirmed/possible sim
 ( cd "$D" && "$BIN" usages fixrcv.hbp Caixa:Soma --json locs.json > /dev/null 2>&1 )
-python3 - "$D/locs.json" <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-r1 = [l['range']['start']['line'] for l in locs if l['uri'].endswith('r1.prg')]
-assert 38 in r1, 'confirmed g:Soma fora do json'   # r1.prg:39 (0-based 38)
-assert 43 in r1, 'possible r:Soma fora do json'    # r1.prg:44
-assert 39 not in r1, 'excluded a:Soma vazou para o json'  # r1.prg:40
-PYEOF
+"$TCHECK" json62 "$D/locs.json"
 check "--json: excluded fora das Locations, confirmed/possible dentro" $?
 
 }
@@ -1780,45 +1743,7 @@ D=$(freshrcv case65)
 DIR=$( cd "$D" && "$BIN" dump fixrcv.hbp 2>/dev/null | sed -n 's/^dumps em: //p' )
 test -n "$DIR" && test -f "$DIR/r1.ast.json"
 check "dump ast-4 gerado" $?
-python3 - "$DIR" > "$D/cons.log" 2>&1 <<'PYEOF'
-import json, sys, os
-d1 = json.load(open(os.path.join(sys.argv[1], 'r1.ast.json')))
-d2 = json.load(open(os.path.join(sys.argv[1], 'r2.ast.json')))
-assert d1['schema'] in ('ast-4', 'ast-5') and d2['schema'] in ('ast-4', 'ast-5')
-# Self tipado (S + classe) em toda função de método <CLASSE>_<MÉTODO>
-for d, cls in ((d1, 'CAIXA'), (d2, 'SEMCTOR')):
-    for f in d['functions']:
-        if f['name'].startswith(cls + '_'):
-            selfs = [x for x in f['declarations'] if x['sym'] == 'SELF']
-            assert selfs and selfs[0].get('type') == 'S' and selfs[0].get('class').upper() == cls, f['name']
-# declared de r1: função-classe auto-declarada + ctor com retorno declarado
-funcs1 = {x['name']: x for x in d1['declared']['functions']}
-assert funcs1['CAIXA'].get('type') == 'S' and funcs1['CAIXA'].get('class').upper() == 'CAIXA'
-assert funcs1['FABRICA'].get('type') == 'S' and funcs1['FABRICA'].get('class').upper() == 'CAIXA'
-cls1 = {c['name']: {m['name']: m for m in c['methods']} for c in d1['declared']['classes']}
-assert cls1['CAIXA']['NEW'].get('type') == 'S' and cls1['CAIXA']['NEW'].get('class').upper() == 'CAIXA'
-# declared de r2: o DSL inventado declarou classe, maker e método
-funcs2 = {x['name']: x for x in d2['declared']['functions']}
-assert funcs2['MAKEDUP'].get('class', '').upper() == 'DUPLICADOR'
-cls2 = {c['name']: {m['name']: m for m in c['methods']} for c in d2['declared']['classes']}
-assert cls2['DUPLICADOR']['ESPELHO'].get('class', '').upper() == 'DUPLICADOR'
-# re-derivação do binding único de G (o fato que o TypeOf consome):
-# exatamente 1 write em occurrences E exatamente 1 ASSIGN de topo
-cen = next(f for f in d1['functions'] if f['name'] == 'CENARIOS')
-writes = [o for o in cen['occurrences'] if o['sym'] == 'G' and o['access'] == 'write']
-refs = [o for o in cen['occurrences'] if o['sym'] == 'G' and o['access'] == 'ref']
-assigns = [s for s in cen['statements']
-           if isinstance(s.get('expr'), dict) and s['expr'].get('et') == 'ASSIGN'
-           and isinstance(s['expr'].get('left'), dict)
-           and s['expr']['left'].get('val') == 'G']
-assert len(writes) == 1 and len(refs) == 0 and len(assigns) == 1
-rhs = assigns[0]['expr']['right']
-assert rhs['et'] == 'SEND' and rhs['msg'] == 'NEW' and rhs['obj']['et'] == 'FUNCALL'
-# e o contraexemplo: M tem 2 writes (não classifica)
-mw = [o for o in cen['occurrences'] if o['sym'] == 'M' and o['access'] == 'write']
-assert len(mw) == 2
-print('consistente')
-PYEOF
+"$TCHECK" cons65 "$DIR" > "$D/cons.log" 2>&1
 grep -q "^consistente$" "$D/cons.log"
 check "invariantes do canal verificados sobre o dump real" $?
 
@@ -1855,18 +1780,7 @@ check "sem ctor declarado ambos ficam possible (idioma: declarar)" $?
 grep -q "excluded send (dispatches to UWMAIN:PAINT) in USA66  | oM:Paint()" "$D/ps.log" && \
    grep -q "confirmed send (receiver class UWSECONDARY via declared types) in USA66  | oS:Paint()" "$D/ps.log"
 check "a consulta espelhada inverte os vereditos" $?
-python3 - "$D/pm.json" "$D/d1.prg" > "$D/pj.log" 2>&1 <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-src = open(sys.argv[2]).read().splitlines()
-conf = src.index("   oM:Paint()") + 1
-excl = src.index("   oS:Paint()") + 1
-prom = src.index("   oP:Paint()") + 1
-lines = [l['range']['start']['line'] + 1 for l in locs if l['uri'].endswith('d1.prg')]
-assert conf in lines, "confirmed sumiu do --json"
-assert excl not in lines and prom not in lines, "excluded vazou para o --json"
-print('json ok')
-PYEOF
+"$TCHECK" json66 "$D/pm.json" "$D/d1.prg" > "$D/pj.log" 2>&1
 grep -q "^json ok$" "$D/pj.log"
 check "excluded (ambos os sabores) fora das Location[] do --json" $?
 
@@ -1940,15 +1854,7 @@ grep -q "d1.prg:41: excluded method definition (implements UWSECONDARY:PAINT)" "
 check "implementação homônima excluída no relato (antes: omitida em silêncio)" $?
 ! grep -q "possible reference in string" "$D/pm.log"
 check "nenhuma string de registro sobra na camada genérica de strings" $?
-python3 - "$D/pm.json" > "$D/pj.log" 2>&1 <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-d1 = sorted(l['range']['start']['line'] + 1 for l in locs if l['uri'].endswith('d1.prg'))
-assert 13 in d1 and 23 in d1, "declaração/definição da consultada sumiu do --json"
-for other in (31, 41, 47, 50, 56, 59):
-    assert other not in d1, "site homônimo %d vazou para o --json" % other
-print('json ok')
-PYEOF
+"$TCHECK" json70 "$D/pm.json" > "$D/pj.log" 2>&1
 grep -q "^json ok$" "$D/pj.log"
 check "Location[] só com os sites da consultada (o furo da extensão fecha)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp UWChild:Paint > ch.log 2>&1 )
@@ -2006,13 +1912,7 @@ grep -q "excluded send (dispatches to FAROL:BRILHO) in USARIG  | oF:Brilho()" "$
    grep -q "confirmed send (receiver class TOTEM via declared types) in USARIG  | oT:Brilho()" "$D/tb.log" && \
    grep -q "excluded send (dispatches to IDOLO:BRILHO) in USARIG  | oI:Brilho()" "$D/tb.log"
 check "sends decididos nas três direções (DSL própria, DSL homônima, classe)" $?
-python3 - "$D/tb.json" > "$D/tj.log" 2>&1 <<'PYEOF'
-import json, sys
-locs = json.load(open(sys.argv[1]))
-sites = sorted((l['uri'].rsplit('/', 1)[-1], l['range']['start']['line'] + 1) for l in locs)
-assert sites == [('m1.prg', 19), ('m1.prg', 23), ('m1.prg', 39)], sites
-print('json ok')
-PYEOF
+"$TCHECK" json72 "$D/tb.json" > "$D/tj.log" 2>&1
 grep -q "^json ok$" "$D/tj.log"
 check "Location[] só com os 3 sites do Totem (COG, FORGE, send)" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp Sol:Fulgor > sf.log 2>&1 )
@@ -2409,68 +2309,7 @@ DIR=$( cd "$D" && "$BIN" dump forja.hbp 2>/dev/null | sed -n 's/^dumps em: //p' 
 DIRM=$( cd "$D" && "$BIN" dump molde.hbp 2>/dev/null | sed -n 's/^dumps em: //p' )
 test -n "$DIR" && test -f "$DIR/forja.ast.json" && test -n "$DIRM" && test -f "$DIRM/molde.ast.json"
 check "dumps ast-5 gerados" $?
-python3 - "$DIR/forja.ast.json" "$DIRM/molde.ast.json" "$D" > "$D/b4g.log" 2>&1 <<'PYEOF'
-import json, sys, os
-forja = json.load(open(sys.argv[1])); molde = json.load(open(sys.argv[2]))
-assert forja['schema'] == 'ast-5' and molde['schema'] == 'ast-5'
-# 1. byte-exato: todo token posicionado de match[]/result[] soletra o texto
-#   no arquivo da regra (col emitida também para include - fato 8)
-ok = 0
-for ast in (forja, molde):
-    srcs = {}
-    for r in ast['ppRules']:
-        f = r.get('file')
-        for side in ('match', 'result'):
-            for t in r.get(side, []):
-                if f is None or 'text' not in t or t.get('col') is None:
-                    continue
-                if f not in srcs:
-                    srcs[f] = open(os.path.join(sys.argv[3], f), 'rb').read().split(b'\n')
-                line = srcs[f][t['line'] - 1]
-                assert line[t['col']:t['col'] + t['len']].decode() == t['text'], (f, t)
-                ok += 1
-assert ok > 60, ok
-rules = {r.get('head'): r for r in forja['ppRules'] if r.get('file') == 'forja.ch'}
-fj = rules['FORJA']
-# 2. diretiva continuada (P3): a regra registra a ÚLTIMA linha física, mas
-#   a cabeça é match[0] com linha/coluna físicas reais - a âncora é fato
-assert fj['line'] == 15 and fj['match'][0]['text'] == 'FORJA'
-assert fj['match'][0]['line'] == 12 and fj['match'][0]['col'] == 10
-assert [t['line'] for t in fj['match'] if 'line' in t and t['line']] == [12, 12, 12, 12, 13, 13, 14, 14, 14, 14, 14]
-# 3. papéis e mkinds: o vocabulário do próprio pp
-mk = {t['text']: t['mkind'] for t in fj['match'] if t.get('role') == 'marker'}
-assert mk == {'oIt': 'regular', 'nTam': 'regular', 'modo': 'restrict', 'cRot': 'regular'}
-rk = {(t['text'], t['mkind']) for t in fj['result'] if t.get('role') == 'marker'}
-assert ('modo', 'strstd') in rk and ('cRot', 'strsmart') in rk
-kinds = {t['mkind'] for r in rules.values() for t in r['match'] if t.get('role') == 'marker'}
-assert kinds >= {'regular', 'list', 'restrict', 'wild', 'extexp', 'name'}, kinds
-# 4. restrição com posição própria (renomeável) e marker do dono
-alts = [(t['text'], t['marker'], t['line'], t['col']) for t in fj['match'] if t.get('role') == 'restrict' and t.get('col') is not None]
-assert alts == [('RAPIDO', 3, 14, 18), ('LENTO', 3, 14, 26)], alts
-# 5. opcionais consecutivos REORDENADOS no registro (fato 12): o grupo com
-#   keyword (GRAU) fica ANTES do sem keyword no match ARMAZENADO
-tp = rules['TEMPERA']['match']
-texts = [t.get('text') for t in tp]
-assert texts.index('GRAU') < texts.index('n'), texts
-opens = sum(1 for t in tp if t.get('role') == 'opt-open')
-closes = sum(1 for t in tp if t.get('role') == 'opt-close')
-assert opens == 2 and closes == 2
-# 6. opcional ANINHADO no match (critério 2): o achatamento recursa -
-#   pares opt-open/close reconstroem a árvore por pilha
-pr = [(t['role'], t.get('text')) for t in rules['PRENSA']['match']]
-assert pr == [('literal', 'PRENSA'), ('marker', 'p'), ('opt-open', None),
-              ('literal', 'COM'), ('marker', 'f'), ('opt-open', None),
-              ('literal', 'EM'), ('marker', 't'), ('opt-close', None),
-              ('opt-close', None)], pr
-# 7. P5 (fato 13): regra nascida de expansão tem posições REAIS - a cabeça
-#   da regra interna aponta para DENTRO do result da diretiva-mãe
-cunho = [r for r in molde['ppRules'] if r.get('head') == 'CUNHO'][0]
-assert cunho['file'] == 'molde.prg' and cunho['line'] == 15   # site da aplicação
-assert cunho['match'][0]['line'] == 6 and cunho['match'][0]['col'] == 37
-# o recheio do marker externo aponta o site de USO (onde Ferro foi escrito)
-assert cunho['match'][1]['text'] == 'Ferro' and cunho['match'][1]['line'] == 15
-print('b4g-invariantes-ok')
-PYEOF
+"$TCHECK" b4g82 "$DIR/forja.ast.json" "$DIRM/molde.ast.json" "$D" > "$D/b4g.log" 2>&1
 grep -q "^b4g-invariantes-ok$" "$D/b4g.log"
 check "invariantes do ast-5 sobre o dump real (byte-exato, P3, mkinds, restrição, reordenação, P5)" $?
 ( cd "$D" && "$BIN" usages forja.hbp ForjaNova > fn.log 2>&1 )
@@ -2530,9 +2369,11 @@ check "régua do caso 64: nenhuma palavra da fixture na ferramenta nem no core" 
 ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82"
 
 # ---------------------------------------------------------------------------
-# B-infra: pool dinamico por-caso (docs/testes-paralelos.md, Etapa 1 bash).
-# JOBS=N controla o teto (default nproc); JOBS=1 roda em processo, na ordem,
-# com saida ao vivo (R7 - depuracao identica ao runner antigo).
+# B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -
+# despacho+join em Harbour). JOBS=N controla o teto (default nproc); JOBS=1
+# roda em processo, na ordem, com saida ao vivo (R7 - depuracao identica ao
+# runner antigo). JOBS>1 delega ao bin/parrun (hb_processOpen - toolchain
+# unica), que respawna este script no modo filho.
 # Modo filho (--unit N): TMPDIR proprio (R2 - hb_DirTemp() o respeita),
 # saida no artefato proprio (R5 - mata a intercalacao) e contadores
 # em-banda na ultima linha (@@counts) - o join imprime os logs NA ORDEM
@@ -2557,24 +2398,13 @@ if [ "$JOBS" -le 1 ]; then
    for u in $ALL_UNITS; do
       "unit_$u"
    done
+   echo
+   echo "passed: $PASS  failed: $FAIL"
+   [ "$FAIL" -eq 0 ]
 else
+   PARRUN="${PARRUN:-$HERE/../bin/parrun}"
+   [ -x "$PARRUN" ] || { echo "parrun ausente ($PARRUN) - rode via make test"; exit 1; }
    rm -rf "$PARDIR"
    mkdir -p "$PARDIR"
-   printf '%s\n' $ALL_UNITS | xargs -P "$JOBS" -I{} "$0" --unit {}
-   for u in $ALL_UNITS; do
-      log="$PARDIR/$u.log"
-      if [ ! -f "$log" ] || ! grep -q '^@@counts ' "$log"; then
-         [ -f "$log" ] && grep -v '^@@counts ' "$log"
-         note "FAIL: unidade $u morreu sem contadores (ver $log)"
-         FAIL=$((FAIL+1))
-         continue
-      fi
-      grep -v '^@@counts ' "$log"
-      read -r _ p f < <(grep '^@@counts ' "$log" | tail -1)
-      PASS=$((PASS+p))
-      FAIL=$((FAIL+f))
-   done
+   exec "$PARRUN" "$HERE/run.sh" "$PARDIR" "$JOBS" $ALL_UNITS
 fi
-echo
-echo "passed: $PASS  failed: $FAIL"
-[ "$FAIL" -eq 0 ]
