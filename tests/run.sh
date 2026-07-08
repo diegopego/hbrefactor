@@ -954,8 +954,8 @@ grep -q "w1.prg:11: method definition Paint (class UWMenu)" "$D/out.log"
 check "definition lifted to method/class vocabulary" $?
 ! grep -q "UWMENU_PAINT" "$D/out.log"
 check "generated name never leaks without --show-expansion" $?
-grep -q "w2.prg:7: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/out.log"
-check "send site found across modules (possible layer)" $?
+grep -q "w2.prg:7: confirmed send (receiver class UWMENU via construction chain, class graph as written) in MAIN" "$D/out.log"
+check "send site found across modules (confirmed by construction chain, B7)" $?
 ( cd "$D" && "$BIN" usages fixcls.hbp Paint --show-expansion > exp.log 2>&1 )
 grep -q "method definition Paint (class UWMenu) -> UWMENU_PAINT" "$D/exp.log"
 check "--show-expansion reveals the generated function" $?
@@ -1607,11 +1607,13 @@ check "execution identical after warned extract" $?
 
 unit_61() {
 echo "case 61: B4f fatia 0 - usages aceita Classe:Método + camada 'possible' nos sends"
-# Backlog 5 (dogfooding hbhttpd): send não carrega a classe do receptor no
-# ast-3, então TODO send é 'possible (dynamic dispatch, receiver unknown)' -
-# remove a mentira do rótulo 'uso' seco. A forma Classe:Método resolve pela
-# mesma via do PickFunc (rastro B4d) e filtra a DEFINIÇÃO pela classe; os
-# sends continuam listados por mensagem (o dispatch é dinâmico).
+# Backlog 5 (dogfooding hbhttpd): no ast-3 o send não carregava a classe do
+# receptor e TODO send era 'possible (dynamic dispatch, receiver unknown)' -
+# removia a mentira do rótulo 'uso' seco. Desde a B7 (rito D4, 2026-07-08) a
+# cadeia de construção tipa o receptor com fato: send rastreado sai
+# confirmed/excluded com a ressalva de mundo fechado no rótulo; sem fato,
+# possible continua. A forma Classe:Método resolve pela mesma via do
+# PickFunc (rastro B4d) e filtra a DEFINIÇÃO pela classe.
 D=$(freshcls case61)
 printf '\nPROCEDURE Solto()\n\n   LOCAL a := {}\n\n   a:Paint()\n\n   RETURN\n' >> "$D/w2.prg"
 "$HB_BIN/harbour" "$D/w2.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
@@ -1621,13 +1623,14 @@ RC=$?
 check "usages Classe:Método exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "w1.prg:11: method definition Paint (class UWMenu)" "$D/cm.log"
 check "definition resolved and filtered by class" $?
-grep -q "w2.prg:7: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/cm.log"
-check "legit send listed as possible, never as bare use" $?
+grep -q "w2.prg:7: confirmed send (receiver class UWMENU via construction chain, class graph as written) in MAIN" "$D/cm.log"
+check "legit send classified by construction chain (B7), never as bare use" $?
 grep -q "w2.prg:15: excluded send (receiver holds a value of kind array) in SOLTO" "$D/cm.log"
 check "a:Paint() with a := {} is excluded by the value fact (B4f fatia 1)" $?
 ! grep -q "UWMENU_PAINT" "$D/cm.log"
 check "generated name never leaks without --show-expansion" $?
-# homônimos: a definição é da classe pedida; sends (dinâmicos) permanecem
+# homônimos: a definição é da classe pedida; sends separados pelo fato do
+# receptor (B7): o da própria confirma, o do homônimo exclui nomeando o alvo
 D=$(freshmth case61b)
 ( cd "$D" && "$BIN" usages fixmth.hbp Caixa:Soma > ca.log 2>&1 )
 RC=$?
@@ -1636,8 +1639,9 @@ grep -q "c1.prg:11: method definition Soma (class Caixa)" "$D/ca.log"
 check "only the asked class's definition listed" $?
 ! grep -q "class Outra" "$D/ca.log"
 check "homonym method of the other class filtered out" $?
-grep -q "c2.prg:28: possible send" "$D/ca.log" && grep -q "c2.prg:30: possible send" "$D/ca.log"
-check "every send of the message stays possible (dispatch is dynamic)" $?
+grep -q "c2.prg:28: confirmed send (receiver class CAIXA via construction chain, class graph as written) in MAIN" "$D/ca.log" && \
+   grep -q "c2.prg:30: excluded send within the written class graph (receiver class OUTRA via construction chain, dispatches to OUTRA:SOMA) in MAIN" "$D/ca.log"
+check "sends separated by receiver fact: own confirmed, homonym excluded (B7)" $?
 ( cd "$D" && "$BIN" usages fixmth.hbp Outra:Soma > ou.log 2>&1 )
 grep -q "c2.prg:10: method definition Soma (class Outra)" "$D/ou.log" && \
    ! grep -q "class Caixa" "$D/ou.log"
@@ -1690,17 +1694,19 @@ check "--json: excluded fora das Locations, confirmed/possible dentro" $?
 }
 
 unit_63() {
-echo "case 63: B4f - honestidade preservada: sem declaração, camada possible"
-# classe SEM ctor declarado: Semctor():New() não tem retorno no canal ->
-# possible (o fato não existe em compilação); função desconhecida idem.
+echo "case 63: B4f/B7 - honestidade: fronteira movida pela cadeia; sem fato, possible"
+# classe SEM ctor declarado: desde a B7 (rito D4) Semctor():New() tipa pela
+# cadeia de construção + oráculo (New herdado devolve QSelf() - fato do
+# fonte da linguagem, tobject.prg com -x), com ressalva de mundo fechado no
+# rótulo; função desconhecida (Misterio()) segue sem fato -> possible.
 # A consulta por nome cru também recebe as camadas.
 D=$(freshrcv case63)
 ( cd "$D" && "$BIN" usages fixrcv.hbp Zap > zp.log 2>&1 )
 check "usages Zap exit 0" $?
 grep -q "method definition Zap (class Semctor)" "$D/zp.log"
 check "definição lifted no vocabulário de classe" $?
-grep -q "possible send (dynamic dispatch, receiver unknown) in USA  | s:Zap()" "$D/zp.log"
-check "classe sem ctor declarado: send fica possible (honesto)" $?
+grep -q "confirmed send (receiver class SEMCTOR via construction chain, class graph as written) in USA  | s:Zap()" "$D/zp.log"
+check "classe sem ctor declarado: cadeia de construção + oráculo tipam (B7)" $?
 grep -q "possible send (dynamic dispatch, receiver unknown) in USA  | t:Zap()" "$D/zp.log"
 check "função sem declaração: send fica possible (honesto)" $?
 ( cd "$D" && "$BIN" usages fixrcv.hbp Soma > sm.log 2>&1 )
@@ -1758,8 +1764,9 @@ echo "case 66: B4f-2 - o furo dos homônimos (caso do Diego): dispatch decide"
 # > pais na ordem do FROM, em profundidade. Receptor de classe EXATA (cadeia
 # de ctor declarada) exclui absoluto; receptor DECLARADO é promessa (pode
 # carregar descendente em runtime) e só exclui no MUNDO FECHADO do grafo do
-# projeto - o rótulo carrega a ressalva. Sem ctor declarado nada classifica
-# (possible) - o caso documenta o idioma: declarar.
+# projeto - o rótulo carrega a ressalva. Sem ctor declarado a cadeia de
+# construção + oráculo (B7, rito D4) classificam do mesmo jeito - declarar
+# virou reforço, não requisito.
 for f in d1.prg d2.prg d3.prg d4.prg; do
    "$HB_BIN/harbour" "$HERE/fixdis/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
    check "fixdis/$f clean under -w3 -es2" $?
@@ -1773,9 +1780,9 @@ grep -q "excluded send (dispatches to UWSECONDARY:PAINT) in USA66  | oS:Paint()"
 check "oS (instância exata de UWSecondary) EXCLUÍDO com o alvo nomeado - o furo fecha" $?
 grep -q "excluded send within the project's class graph (dispatches to UWSECONDARY:PAINT) in USA66PROM  | oP:Paint()" "$D/pm.log"
 check "receptor DECLARADO exclui só no mundo fechado (ressalva no rótulo)" $?
-grep -q "possible send (dynamic dispatch, receiver unknown) in USA66NC  | oNm:Paint()" "$D/pm.log" && \
-   grep -q "possible send (dynamic dispatch, receiver unknown) in USA66NC  | oNs:Paint()" "$D/pm.log"
-check "sem ctor declarado ambos ficam possible (idioma: declarar)" $?
+grep -q "excluded send within the written class graph (receiver class NCMAIN via construction chain, dispatches to NCMAIN:PAINT) in USA66NC  | oNm:Paint()" "$D/pm.log" && \
+   grep -q "excluded send within the written class graph (receiver class NCSECONDARY via construction chain, dispatches to NCSECONDARY:PAINT) in USA66NC  | oNs:Paint()" "$D/pm.log"
+check "sem ctor declarado: cadeia de construção exclui com alvo nomeado (B7)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp UWSecondary:Paint > ps.log 2>&1 )
 grep -q "excluded send (dispatches to UWMAIN:PAINT) in USA66  | oM:Paint()" "$D/ps.log" && \
    grep -q "confirmed send (receiver class UWSECONDARY via declared types) in USA66  | oS:Paint()" "$D/ps.log"
