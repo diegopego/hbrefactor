@@ -251,7 +251,44 @@ sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
 Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
 são dependências do alvo `test`).
 
-### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **PORTÃO ABERTO; DESBLOQUEADA (rito D4 da B7 concluído em 2026-07-08) — começa pelo M0**
+### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **PRONTA PARA EXECUÇÃO (portão fechado 2026-07-08, T1-T5 decididas)**
+
+Decisão do Diego (2026-07-08): seguir a recomendação da análise
+estratégica. **Enquadramento corrigido pelo Diego (O NORTE): a fase
+impõe o sistema de TIPOS da linguagem inteiro** (`AS NUMERIC/...`
+/ARRAY/BLOCK + `AS CLASS` — classe é SÓ UM CASO, o 'S'); o cheque
+genérico é de kind (`ValType`), classe é o ramo extra. Decisões:
+**T1** flag opt-in `-kt`, off = byte-idêntico, fluindo pelo hbmk2 sem
+mudanças nele (mecanismo do `-x`: `.hbp`/`-prgflag=`/
+`HB_USER_PRGFLAGS`); **T2** NIL FALHA (anotado = obrigatório e do
+tipo; rigidez em duplo opt-in — anotar + flag); **T3** is-a satisfaz;
+**T4** escopo = params + locals + retorno (retorno via canal
+`DECLARE`; FIELDs/MEMVARs/blocos registrados para fatias futuras);
+**T5** switch `-kt`. Origem: pergunta do Diego sobre os limites da abordagem
+só-fatos + medição **M-cov** (hbhttpd: 408 sends, 32% confirmed, 68%
+possible; baldes dominantes inalcançáveis por inferência — números e
+alavanca G no [limites-e-alavancas.md](limites-e-alavancas.md)). Spec
+com fatos arquivo:linha (a sintaxe existe no idioma INTEIRO —
+harbour.y:371/1145/1213/1224/1132/1228), desenho (cheques emitidos
+como pcode chamando helper de runtime, VM intocada), venenos e
+critério executável:
+**[spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md)**.
+Fatias: (1) cheques sob a flag + flag no dump (schema bump) + camada
+`guaranteed by checked annotation` no usages; (materialização) a
+ferramenta escreve os `AS <tipo>`/`AS CLASS` que a análise provou.
+Fase posterior da mesma família: alavanca D (funil `hb_vmSend` +
+gêmeo do macro.y — adendo verificado no mapa).
+
+### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
+
+Rebaixamento (decisão do Diego ao seguir a análise estratégica):
+a M-cov achou **zero receptor por macro** no corpus e o Diego
+despriorizou macros para refatoração. A spec fica pronta na gaveta;
+executa quando a fricção real pedir. Adendo verificado no mapa
+(alavanca D): a AST de toda macro existe completa em runtime
+(macro.y:257; gate único em vm/macro.c:798) — o dump de macro em
+runtime é o gêmeo do funil `hb_vmSend`, e viaja com a alavanca D,
+não com esta fase.
 
 Requisito do Diego (2026-07-08): macros como caso difícil + smoke test
 com `hb_compileFromBuf()` colhendo insights que generalizem. Spec com
@@ -306,9 +343,13 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
    excluir os sends de `oC` e confirmar o de `oV`, cada um com seu fato;
    receptor sem fato (parâmetro de fora, macro, `Self := oOutra` do
    próprio fixture) permanece possible — o contrato de 3 camadas fica.
-2. **Evidência de execução (funil `hb_vmSend`)**: gancho gated no VM
-   registrando despachos observados — terceiro nível epistêmico, nunca
-   misturado ao estático (alavanca D do mapa).
+2. **Evidência de execução (funil `hb_vmSend` + gêmeo do macro.y)**:
+   ganchos gated registrando despachos observados e ASTs de macros
+   realmente compiladas (fatos verificados 2026-07-08: macro.y:257 tem
+   a árvore inteira; gate único vm/macro.c:798; padrão macroa.c para
+   compartilhar o writer) — terceiro nível epistêmico, nunca misturado
+   ao estático (alavanca D do mapa, com adendo). Candidata a fase
+   após a B9.
 3. **Regra sem cabeça** (`head null`, hbcompat legado): dump já registra;
    candidata a fixture de RELATO se um projeto real trouxer o caso.
 4. Dedup pré/pós-decremento: não-fazer mantido (v2).

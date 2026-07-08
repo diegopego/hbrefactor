@@ -80,3 +80,72 @@ estaticamente conhecidos.
 Decidir o caso geral dependente de entrada; enumerar nomes que nascem de
 dados em runtime; equivalência estrita sob auto-observação. Para esses, o
 piso permanente é o da REGRA: recusa/relato honesto — nunca palpite.
+
+## M-cov — medição de cobertura em código real (2026-07-08, hbhttpd)
+
+Método: varredura das 53 mensagens distintas do corpus com `usages`
+(408 sites de send, cobertura 408/408); causa dos "possible"
+diagnosticada pelo nó receptor no dump. Números:
+
+| Camada | Sites | % |
+|---|---|---|
+| confirmed | 130 | 32% |
+| excluded / conjunto nomeado | 2 | 0,5% |
+| possible | 276 | 68% |
+
+Causas do possible: **local sem cadeia 132** (dominado pelo sistema de
+classes PRÓPRIO do hbhttpd montado em runtime — fronteira fixofi — e
+por objetos nascidos na VM, ex. `oErr` de RECOVER); **parâmetro cuja
+união não fecha 89** (hbhttpd é biblioteca: call sites fora do
+projeto — abertura ESTRUTURAL, não falha da análise); elemento de
+array/hash 18; retorno sem fato 15; memvar/field 11; outros 11.
+**Macro como receptor: ZERO** no corpus.
+
+Leitura: os baldes dominantes não são alcançáveis por mais inferência —
+o fato não existe em compilação. Cobrir mais exige FONTES NOVAS de
+fato (alavancas D e G). Caveats: um corpus só, e é biblioteca (infla o
+balde de parâmetros); diagnóstico por inspeção do nó (4 sites não
+localizados); repetir em código de produção quando liberado.
+
+## Alavanca G — tipo declarado IMPOSTO (extensão semântica, proposta do Diego)
+
+A sintaxe de anotação JÁ EXISTE na gramática **para o sistema de tipos
+inteiro** (`AS NUMERIC/CHARACTER/DATE/LOGICAL/BLOCK/ARRAY/OBJECT` +
+`AS CLASS <nome>` — classe é SÓ UM CASO, o 'S') e **no idioma inteiro**:
+parâmetros formais (harbour.y:371-372), locals (:1145), FIELDs (:1213),
+MEMVARs (:1224), parâmetros de codeblock (:1019), variável de macro
+(:1132) e retorno via `DECLARE ... AS` (:1228). Hoje o canal morre
+na compilação (warnings -w3 + transporte ast-4) — é promessa não
+verificada (caveat da alavanca A).
+
+A extensão é SEMÂNTICA, não sintática: sob flag opt-in do compilador
+(`-kt`, decidido T5), o compilador EMITE
+um cheque de runtime na entrada da função para cada parâmetro anotado
+com classe — pcode chamando helper de runtime (VM intocada); violação
+= erro nomeando site/esperado/recebido. A anotação vira INVARIANTE da
+linguagem (fail-fast): terceira fonte de fato, distinta do fato
+estático (incondicional) e da evidência de execução (presença).
+
+Alcance frente à M-cov: fecha o balde de parâmetros (89) e — porque o
+cheque é de RUNTIME — alcança receptores que a estática nunca verá:
+classes montadas dinamicamente (cheque por nome no objeto vivo) e
+objetos nascidos na VM (`oErr AS CLASS Error`). Não alcança: mensagem
+por macro, caso geral dependente de entrada (Rice fica). Fontes
+continuam compilando em QUALQUER Harbour (sintaxe padrão); só a flag
+muda comportamento — compatibilidade preservada (restrição do Diego,
+2026-07-08). Ciclo virtuoso com a ferramenta: materialização (a B7
+escreve os `AS CLASS` que provou) → flag os impõe → a análise confirma
+estaticamente nas âncoras. Fase: spec-b9-anotacoes-impostas.md.
+
+## Alavanca D — adendo verificado (2026-07-08): o gêmeo das macros
+
+A AST de TODA macro existe completa no momento em que ela compila em
+runtime: `Main : Expression` (macro.y:257-266) tem a árvore inteira em
+`$1` — construída pelo MESMO motor `hb_compExprNew*` do compilador
+principal — antes do pcode. O padrão de compartilhamento de fonte já
+existe (macroa.c: `#define HB_MACRO_SUPPORT` + `#include "hbexpra.c"`),
+e o ponto único de gate é `hb_macroCompile()` (vm/macro.c:798). Um
+gancho gated ali (dump de string + árvore + exprType + flags HB_SM +
+status) é o irmão do funil `hb_vmSend`: evidência de execução para
+macros — prova presença, nunca ausência. Mais simples que o dump do
+compilador (sem pp, sem from/ppRules).
