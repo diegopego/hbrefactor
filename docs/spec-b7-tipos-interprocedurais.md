@@ -1,5 +1,12 @@
 # Spec B7 — Tipos interprocedurais (alavanca B): receptor de send por fato
 
+**REBAIXADA NO RE.3 (portão do Diego, 2026-07-09, forma "a"; spec-re):
+a máquina desta spec saiu do veredito do `usages` — é INFERÊNCIA nos
+termos de R1 — e fica dormente no fonte como camada SUGERIDORA, insumo
+do materializador (fatia 2 da B9). Os casos 84/85/86 foram
+re-baselinados para o contrato só-fato. O texto abaixo é o registro
+histórico da entrega.**
+
 Status: **ENTREGUE (2026-07-08) — rito D4 concluído: flips aprovados
 caso a caso pelo Diego (casos 39/61×2/63/66, 6 sites; a previsão
 "unidades 62/63/66/72/73/75" errou parcialmente — vale o fato);

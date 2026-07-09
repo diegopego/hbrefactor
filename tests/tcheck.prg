@@ -319,6 +319,8 @@ STATIC FUNCTION OccOf( hFunc, cSym, cAccess )
 // unidade 66: --json com confirmed dentro e excluded (ambos os sabores) fora
 STATIC FUNCTION Json66( cJson, cPrg )
 
+   // RE.3: sem a exclusão por grafo, oS/oP degradam para possible - e
+   // possible É referência candidata: entra nas Location[] como o confirmed
    LOCAL aSrc := hb_ATokens( StrTran( hb_MemoRead( cPrg ), Chr( 13 ), "" ), Chr( 10 ) )
    LOCAL nConf := AScan( aSrc, {| c | c == "   oM:Paint()" } )
    LOCAL nExcl := AScan( aSrc, {| c | c == "   oS:Paint()" } )
@@ -331,8 +333,8 @@ STATIC FUNCTION Json66( cJson, cPrg )
    IF AScan( aLines, nConf ) == 0
       RETURN Fail( "confirmed sumiu do --json" )
    ENDIF
-   IF AScan( aLines, nExcl ) > 0 .OR. AScan( aLines, nProm ) > 0
-      RETURN Fail( "excluded vazou para o --json" )
+   IF AScan( aLines, nExcl ) == 0 .OR. AScan( aLines, nProm ) == 0
+      RETURN Fail( "possible (pós-RE.3) sumiu do --json" )
    ENDIF
    OutStd( "json ok" + hb_eol() )
 
@@ -356,7 +358,8 @@ STATIC FUNCTION Json70( cJson )
 
    RETURN .T.
 
-// unidade 72: Location[] só com os 3 sites do dono consultado
+// unidade 72: Location[] com os 3 sites do dono consultado + os sends
+// homônimos que o RE.3 degradou para possible (candidato entra no --json)
 STATIC FUNCTION Json72( cJson )
 
    LOCAL hLoc, aSites := {}
@@ -366,10 +369,12 @@ STATIC FUNCTION Json72( cJson )
                       hLoc[ "range" ][ "start" ][ "line" ] + 1 } )
    NEXT
    ASort( aSites,,, {| a, b | iif( a[ 1 ] == b[ 1 ], a[ 2 ] < b[ 2 ], a[ 1 ] < b[ 1 ] ) } )
-   IF ! ( Len( aSites ) == 3 .AND. ;
+   IF ! ( Len( aSites ) == 5 .AND. ;
           aSites[ 1 ][ 1 ] == "m1.prg" .AND. aSites[ 1 ][ 2 ] == 19 .AND. ;
           aSites[ 2 ][ 1 ] == "m1.prg" .AND. aSites[ 2 ][ 2 ] == 23 .AND. ;
-          aSites[ 3 ][ 1 ] == "m1.prg" .AND. aSites[ 3 ][ 2 ] == 39 )
+          aSites[ 3 ][ 1 ] == "m1.prg" .AND. aSites[ 3 ][ 2 ] == 38 .AND. ;
+          aSites[ 4 ][ 1 ] == "m1.prg" .AND. aSites[ 4 ][ 2 ] == 39 .AND. ;
+          aSites[ 5 ][ 1 ] == "m1.prg" .AND. aSites[ 5 ][ 2 ] == 41 )
       RETURN Fail( "sites divergentes (" + hb_ntos( Len( aSites ) ) + " Locations)" )
    ENDIF
    OutStd( "json ok" + hb_eol() )

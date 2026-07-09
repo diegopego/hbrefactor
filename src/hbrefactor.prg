@@ -402,16 +402,18 @@ STATIC FUNCTION Usages( aArgs )
    cUpMeth := Upper( cMethTok )
 
    hDecl := DeclTables( hAsts )
-   // grafo de classes do projeto (B4f-2): consumido pela resolução de
-   // dispatch dos sends; NIL degrada para as camadas B4f
+   // grafo de classes do projeto (B4f-2): desde o RE.3 os SENDS não o
+   // consomem (dispatch por travessia as-written saiu do veredito); os
+   // sites de DECLARAÇÃO seguem usando o acerto PRÓPRIO (members - fato
+   // de declaração) para classificar homônimos
    hGraph := iif( hDecl == NIL, NIL, ClassGraph( hAsts, hDecl ) )
-   // contexto interprocedural (B7): índice de funções, vínculos de
-   // construção por classe, registro (STRING, @F()) por classe e o teto de
-   // runtime pelo oráculo (D3). Só a TIPAGEM do receptor consome (D1:
-   // travessia de vínculo escrito vale para tipar, em mundo fechado, com a
-   // ressalva no rótulo); as camadas de dispatch da Q4 ficam como estão.
-   // NIL degrada para o TypeOf local de sempre
-   hInter := iif( hDecl == NIL, NIL, B7Ctx( hAsts, hDecl ) )
+   // RE.3 (fase RE, portão do Diego 2026-07-09, forma "a"): o veredito de
+   // PRODUTO não consome inferência - o contexto interprocedural (B7/B7b:
+   // uniões de call sites/retornos/Evals, cadeia de construção, Self de
+   // INLINE) fica fora do usages e converge para o MATERIALIZADOR de
+   // anotações (fatia 2 da B9). Sem hInter o TypeOf opera só sobre fatos
+   // do canal declarado (tipo do próprio símbolo, DECLARE, binding único)
+   hInter := NIL
    // resolução do dispatch da CLASSE CONSULTADA (B4f-2, sites de
    // declaração): a dona que Classe:Método alcança - decide os sites de
    // declaração/implementação homônimos; NIL = indecidível (classe fora
@@ -533,8 +535,7 @@ STATIC FUNCTION Usages( aArgs )
                Upper( hItem[ "sym" ] ) == "_" + cUpMeth
                nHits++
                aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl, hInter, hAst ), ;
-                                     cClass, cUpMeth, Upper( hItem[ "sym" ] ), ;
-                                     hGraph, hItem[ "block" ] )
+                                     cClass, hItem[ "block" ] )
                // excluded é não-referência PROVADA: fica no relato (com o
                // rótulo) mas fora das Location[] do --json - o editor
                // (find all references via extensão) não deve listá-lo
@@ -6275,9 +6276,15 @@ STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, xBlock, aNodes )
 // "via" e o rótulo do SendVerdict carrega a ressalva ("class graph as
 // written"). SÓ a tipagem consome isto - as camadas de dispatch da Q4
 // (DispatchVia etc.) ficam intocadas.
+// RE.3 (portão do Diego, 2026-07-09, forma "a"): a máquina inteira está
+// DORMENTE no produto - o usages não constrói hInter e o SendVerdict
+// degrada qualquer traço de inferência (via/clsset) para possible. Este
+// bloco é a camada SUGERIDORA: insumo do comando de materialização
+// (fatia 2 da B9), que a revive por B7Ctx. O W0034 do build (B7Ctx sem
+// chamador) é o marcador honesto do estado e morre na fatia 2.
 // ---------------------------------------------------------------------------
 
-// contexto interprocedural: índices e memos de um run de usages
+// contexto interprocedural: índices e memos da máquina sugeridora
 STATIC FUNCTION B7Ctx( hAsts, hDecl )
 
    LOCAL hInter := { "decl" => hDecl, "clsmap" => ClassFuncMap( hAsts ), ;
@@ -7629,108 +7636,36 @@ STATIC FUNCTION DeclOwnerProven( hGraph, cUpOwn, cUpMsg )
    RETURN hGraph != NIL .AND. hb_HHasKey( hGraph, cUpOwn ) .AND. ;
       hb_HHasKey( hGraph[ cUpOwn ][ "members" ], cUpMsg )
 
-// descendentes TRANSITIVOS de uma classe no grafo, por arestas DO PROJETO
-// (descendência que atravessa pai de fora é invisível - limite honesto,
-// coberto pela indecidibilidade do próprio ResolveDispatch nesses ramos)
-STATIC FUNCTION ClassDescendants( cUpClass, hGraph )
-
-   LOCAL aOut := {}, hSeen := { cUpClass => .T. }, aQueue := { cUpClass }
-   LOCAL cCur, cK, aPar
-
-   DO WHILE ! Empty( aQueue )
-      cCur := ATail( aQueue )
-      ASize( aQueue, Len( aQueue ) - 1 )
-      FOR EACH cK IN hb_HKeys( hGraph )
-         IF ! hb_HHasKey( hSeen, cK )
-            FOR EACH aPar IN hGraph[ cK ][ "parents" ]
-               IF aPar[ 2 ] .AND. aPar[ 1 ] == cCur
-                  hSeen[ cK ] := .T.
-                  AAdd( aOut, cK )
-                  AAdd( aQueue, cK )
-                  EXIT
-               ENDIF
-            NEXT
-         ENDIF
-      NEXT
-   ENDDO
-
-   RETURN aOut
-
-// descendentes do receptor que SEQUESTRARIAM o dispatch para a
-// implementação consultada (ou cuja resolução é indecidível - também
-// impede exclusão): receptor DECLARADO é promessa e pode carregar
-// qualquer um deles em runtime
-STATIC FUNCTION DispatchHijackers( cRcls, cUpSym, cUpBase, cOwnerQ, hGraph )
-
-   LOCAL aOut := {}, cD, xOwn
-
-   FOR EACH cD IN ClassDescendants( cRcls, hGraph )
-      xOwn := ResolveDispatchMsg( cD, cUpSym, cUpBase, hGraph )
-      // Q4: resolução do descendente que atravessa vínculo escrito é
-      // não-provada - também impede a exclusão (conservador)
-      IF xOwn == NIL .OR. xOwn == cOwnerQ .OR. DispatchVia( cD, xOwn )
-         AAdd( aOut, cD )
-      ENDIF
-   NEXT
-
-   RETURN aOut
-
-// resolução da MENSAGEM EFETIVA de um send: a escrita `o:x := v` envia
-// `_X` (fato 11); VAR registra o PAR leitura/escrita em runtime (X e _X,
-// provado no probe vprobe) mas o registro por stringify/declared carrega
-// só X - quando a forma de escrita não acha dona própria (ASSIGN
-// explícito registra _NOME e resolve direto), resolve pelo nome BASE (a
-// regra do par de dados da linguagem)
-STATIC FUNCTION ResolveDispatchMsg( cUpClass, cUpSym, cUpBase, hGraph )
-
-   LOCAL xOwn := ResolveDispatch( cUpClass, cUpSym, hGraph )
-
-   IF HB_ISSTRING( xOwn ) .AND. Len( xOwn ) == 0 .AND. !( cUpSym == cUpBase )
-      xOwn := ResolveDispatch( cUpClass, cUpBase, hGraph )
-   ENDIF
-
-   RETURN xOwn
-
-// veredito em camadas de um send para a consulta [Classe:]Método. Camadas
-// B4f (canal de tipos) decididas ALÉM quando a B4f-2 resolve: receptor de
-// classe conhecida DIFERENTE da consultada, com a implementação consultada
-// E o dispatch do receptor resolvíveis no grafo => mesmo dono = confirmed;
-// dono diferente com receptor de classe EXATA (cadeia declarada) =
-// excluded; com receptor DECLARADO (promessa - pode carregar descendente
-// em runtime) a exclusão só vale no MUNDO FECHADO do grafo do projeto
-// (rótulo carrega a ressalva) e um descendente que sequestre o dispatch a
-// impede (possible nomeando-o). Indecidível => camadas B4f de sempre.
+// veredito em camadas de um send para a consulta [Classe:]Método - SÓ
+// FATO (RE.3, portão do Diego 2026-07-09, forma "a"): guaranteed (-kt em
+// site coberto), confirmed/excluded pelo canal declarado do próprio
+// símbolo, possible para todo o resto. Inferência (B7/B7b/ClassGraph:
+// cadeia de construção, uniões, grafo as-written) não alcança o veredito
+// nem a nomeação do possible - é insumo do materializador (fatia 2 da
+// B9). A resolução de dispatch por grafo saiu com o RE.3 (os vereditos
+// "dispatches to"/"within the class graph" derivavam de travessia de
+// parents as-written - Q4 já os tinha gateado, o RE.3 os removeu).
 // Devolve { rótulo, fora-do-json? } - excluded fica fora das Location[]
-STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
+STATIC FUNCTION SendVerdict( hType, cClass, lBlock )
 
    LOCAL cSuf := iif( lBlock, ", codeblock", "" )
-   LOCAL cRcls, cOwnerQ, cOwnerR, aHij, lVia, aSet
+   LOCAL cRcls
 
    IF hType == NIL
+      RETURN { "possible send (dynamic dispatch, receiver unknown" + cSuf + ")", .F. }
+   ENDIF
+   // defesa do contrato RE.3: tipo que carrega traço de inferência
+   // (travessia de vínculo escrito, conjunto por união) não é fato -
+   // degrada para o possible pleno, sem nomear
+   IF hb_HGetDef( hType, "via", .F. ) .OR. hb_HHasKey( hType, "clsset" )
       RETURN { "possible send (dynamic dispatch, receiver unknown" + cSuf + ")", .F. }
    ENDIF
    IF hb_HHasKey( hType, "val" )
       RETURN { "excluded send (receiver holds a value of kind " + ;
                hType[ "val" ] + cSuf + ")", .T. }
    ENDIF
-   lVia := hb_HGetDef( hType, "via", .F. )
-   // conjunto finito >1 (B7): possible NOMEANDO os candidatos - nunca
-   // decide (a regra de consumo da spec)
-   IF hb_HHasKey( hType, "clsset" )
-      aSet := hb_HKeys( hType[ "clsset" ] )
-      ASort( aSet )
-      RETURN { "possible send (receiver one of " + B7JoinOr( aSet ) + ;
-               iif( lVia, " via construction chain, class graph as written", "" ) + ;
-               cSuf + ")", .F. }
-   ENDIF
    cRcls := hType[ "cls" ]
    IF Empty( cClass ) .OR. cRcls == cClass
-      // D1: tipagem que atravessou vínculo escrito confirma só em mundo
-      // fechado - o rótulo carrega a ressalva
-      IF lVia
-         RETURN { "confirmed send (receiver class " + cRcls + ;
-                  " via construction chain, class graph as written" + cSuf + ")", .F. }
-      ENDIF
       // B9: anotação em módulo -kt é INVARIANTE imposta em runtime
       // (fail-fast) - camada guaranteed, acima da promessa declarada
       IF hType[ "how" ] == "declared" .AND. hb_HGetDef( hType, "kt", .F. )
@@ -7741,72 +7676,11 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
                iif( hType[ "how" ] == "declared", "declared AS CLASS " + cRcls, ;
                     "class " + cRcls + " via declared types" ) + cSuf + ")", .F. }
    ENDIF
-   IF hGraph != NIL
-      cOwnerQ := ResolveDispatchMsg( cClass, cUpSym, cUpMeth, hGraph )
-      cOwnerR := ResolveDispatchMsg( cRcls, cUpSym, cUpMeth, hGraph )
-      IF cOwnerQ != NIL .AND. cOwnerR != NIL .AND. ;
-         Len( cOwnerQ ) > 0 .AND. Len( cOwnerR ) > 0
-         // Q4 (revisao-generalidade): alcance que ATRAVESSA vínculo
-         // escrito (leitura por forma da linha de declaração) não é fato
-         // de parentesco - nunca confirma nem exclui; camada possible
-         // NOMEANDO o candidato e o vínculo não-provado
-         IF DispatchVia( cRcls, cOwnerR )
-            RETURN { "possible send (receiver class " + cRcls + " may dispatch to " + ;
-                     cOwnerR + ":" + cUpMeth + " through written parents, unproven" + ;
-                     cSuf + ")", .F. }
-         ENDIF
-         IF DispatchVia( cClass, cOwnerQ )
-            RETURN { "possible send (" + cClass + ":" + cUpMeth + ;
-                     " resolves through written parents, unproven; receiver class " + ;
-                     cRcls + cSuf + ")", .F. }
-         ENDIF
-         IF cOwnerR == cOwnerQ
-            IF lVia
-               RETURN { "confirmed send (receiver class " + cRcls + ;
-                        " via construction chain dispatches to " + cOwnerQ + ":" + ;
-                        cUpMeth + ", class graph as written" + cSuf + ")", .F. }
-            ENDIF
-            RETURN { "confirmed send (receiver class " + cRcls + " dispatches to " + ;
-                     cOwnerQ + ":" + cUpMeth + cSuf + ")", .F. }
-         ENDIF
-         IF !( hType[ "how" ] == "declared" )
-            // instância EXATA (cadeia declarada): a resolução é absoluta;
-            // com travessia (D1) a exclusão vale no mundo fechado do grafo
-            // como-escrito - o rótulo nomeia o fato E a ressalva
-            IF lVia
-               RETURN { "excluded send within the written class graph (receiver class " + ;
-                        cRcls + " via construction chain, dispatches to " + ;
-                        cOwnerR + ":" + cUpMeth + cSuf + ")", .T. }
-            ENDIF
-            RETURN { "excluded send (dispatches to " + cOwnerR + ":" + cUpMeth + ;
-                     cSuf + ")", .T. }
-         ENDIF
-         aHij := DispatchHijackers( cRcls, cUpSym, cUpMeth, cOwnerQ, hGraph )
-         IF Empty( aHij )
-            RETURN { "excluded send within the project's class graph (dispatches to " + ;
-                     cOwnerR + ":" + cUpMeth + cSuf + ")", .T. }
-         ENDIF
-         RETURN { "possible send (descendant " + aHij[ 1 ] + " of " + cRcls + ;
-                  " may dispatch to " + cOwnerQ + ":" + cUpMeth + cSuf + ")", .F. }
-      ENDIF
-   ENDIF
 
-   // classe conhecida != consultada sem resolução NÃO exclui: promessa
-   // não verificada + cadeia indecidível (pai fora do projeto, classe
-   // desconhecida, runtime)
-   RETURN { "possible send (receiver class " + cRcls + ;
-            iif( lVia, " via construction chain", "" ) + ", relation to " + cClass + ;
+   // classe conhecida != consultada NÃO exclui: promessa não verificada +
+   // parentesco indecidível sem fato (pai fora do projeto, runtime)
+   RETURN { "possible send (receiver class " + cRcls + ", relation to " + cClass + ;
             " unknown" + cSuf + ")", .F. }
-
-STATIC FUNCTION B7JoinOr( aNames )
-
-   LOCAL cOut := "", cN
-
-   FOR EACH cN IN aNames
-      cOut += iif( cN:__enumIndex() == 1, "", " or " ) + cN
-   NEXT
-
-   RETURN cOut
 
 STATIC FUNCTION PairKey( nApp, nMarker )
    RETURN hb_ntos( nApp ) + "|" + hb_ntos( nMarker )

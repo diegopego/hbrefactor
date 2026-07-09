@@ -234,3 +234,34 @@ inferência entregue (B7/B7b) converge para MATERIALIZADORA de anotações
 (ciclo virtuoso desta seção), não fonte de veredito de longo prazo. A
 alavanca D na forma triagem (camada observed para priorizar conferência)
 foi RECUSADA; evidência de execução só volta com consumo 100% fato.
+
+## M-cov 3 — o retrato honesto pós-RE.3 (2026-07-09, mesmo corpus/harness)
+
+O RE.3 (portão do Diego, forma "a": inferência some do `usages`;
+possible sem nomes derivados de inferência) executado; medição
+`tests/mcov2.sh` no mesmo corpus work/tests (967 consultas, 6.249
+sites, zero falhas):
+
+| Camada | pós-B7b (pré-RE.3) | pós-RE.3 |
+|---|---|---|
+| confirmed | 1.715 (27,4%) | **545 (8,7%)** |
+| excluded | 10 (0,2%) | 10 (0,2%) |
+| possible fora de codeblock | 2.835 (45,4%) | 3.904 (62,5%) |
+| possible dentro de codeblock | 1.689 (27,0%) | 1.790 (28,6%) |
+| (confirmed dentro de bloco) | 101 | **0** |
+
+Proveniência do que ficou: TODO confirmed é canal declarado (`declared
+AS CLASS` do próprio símbolo ou cadeia de declarados `via declared
+types`); os 10 excluded são value-kind declarado. 1.170 sites que a
+inferência decidia (cadeia de construção, uniões, grafo as-written,
+Self de INLINE, pushes ret) degradaram para o possible pleno — a
+separação boa/veneno que a máquina fazia colapsou no MESMO rótulo, por
+decisão (a máquina virou SUGERIDORA: insumo do materializador, fatia 2
+da B9, onde essa separação renasce como anotação PROVADA e imposta).
+Consequência de produto notável: o furo dos homônimos (caso 66) volta
+a possible nos SENDS — a exclusão dependia de mundo fechado sobre
+parents as-written; os sites de DECLARAÇÃO homônimos seguem
+excluded/confirmed (fato do canal declarado). O caminho de volta do
+alcance é o ciclo virtuoso: materializar `AS CLASS` provados → `-kt`
+impõe → guaranteed/confirmed por FATO (alavanca G), não re-ligar a
+inferência.

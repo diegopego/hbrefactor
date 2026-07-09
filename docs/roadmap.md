@@ -99,13 +99,17 @@ convergiu com o julgamento interno de 2026-07-08: **manter** dump
 mas o consumo overclaima** (`guaranteed` para sites que o cheque não
 cobre); **B7/B7b são inferência** → rebaixar a sugeridora/
 materializadora. Plano vinculante com achados A1-A6, itens RE.1-RE.6,
-guarda de fase e critérios executáveis (RE.1 e RE.2 FECHADOS e RE.4
-EXECUTADO em 2026-07-09 — RE.1: A1/A2/A5 confirmados com probes,
-extras gap de `@ref` e A6, segfault upstream com `AS CLASS` em param
-de codeblock; RE.2: marca `kt` restrita a site coberto, caso 88,
-suíte 622/0; RE.4: `pPosTbl` limpo no reset, 460/460 byte-idêntico,
-commit do core sob portão. Aberto: RE.3 espera o portão da forma da
-camada rebaixada):
+guarda de fase e critérios executáveis (**RE.1-RE.4 FECHADOS em
+2026-07-09** — RE.1: A1/A2/A5 confirmados com probes, extras gap de
+`@ref` e A6, segfault upstream com `AS CLASS` em param de codeblock;
+RE.2: marca `kt` restrita a site coberto, caso 88; RE.3, portão
+aberto na forma "a" + possible sem nomes de inferência: máquina
+B7/B7b/dispatch-por-grafo DORMENTE, usages só-fato, M-cov 3 com
+confirmed 1.715→545 100% canal declarado, casos 39/61/63/66-69/72/75/
+84-86 re-baselinados — o furo dos homônimos degradou nos sends;
+RE.4: `pPosTbl` limpo no reset, 460/460 byte-idêntico, harbour-core
+`ef0abe3688`. Suíte 622/0 byte-idêntica. Gavetas RE.5/RE.6 sob
+portão):
 **[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
 — retomada de sessão COMEÇA por lá. Registro narrativo da sessão
 2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no
@@ -250,8 +254,14 @@ critérios na spec. **Atenção (fase RE)**: a auditoria externa alegou
 overclaim do `guaranteed` (achados A1/A2 — sites que o cheque não
 cobre); confirmado no RE.1 e CONSERTADO no RE.2 (2026-07-09:
 `B7KtCovered` restringe a marca aos sites cobertos; fixkt+t3, caso 88,
-suíte 622/0 byte-idêntica). A fatia 2 só abre depois do RE.3 decidir a
-forma da camada sugeridora.
+suíte 622/0 byte-idêntica). O RE.3 decidiu a forma da camada
+sugeridora (forma "a", 2026-07-09): a máquina B7/B7b está DORMENTE
+(entrada `B7Ctx`) e a fatia 2 (materialização) é quem a consome —
+espera escopo+critério e portão do Diego para abrir. As expectativas
+dos testes rebaixados estão SUSPENSAS em
+[testes-suspensos-re3.md](testes-suspensos-re3.md) (rótulo antigo
+verbatim + rota de fato por site); os itens [FATIA-2] de lá são a
+semente do critério de aceite da fatia 2.
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a

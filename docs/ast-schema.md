@@ -415,7 +415,12 @@ externa dentro de bloco resolve como `detached` (classifica);
 guarda classe).
 
 **Extensão B7 (spec-b7-tipos-interprocedurais.md, decisões D1-D3)** —
-só a TIPAGEM consome; as camadas de dispatch da Q4 ficam intocadas:
+**DORMENTE desde o RE.3 (portão do Diego, 2026-07-09, forma "a"): o
+usages de produto NÃO consome nada desta extensão nem da B7b — o
+veredito de send sai só do canal declarado, e o dispatch por grafo
+as-written saiu do SendVerdict. A máquina abaixo fica no fonte como
+camada SUGERIDORA, insumo do materializador (fatia 2 da B9); a
+descrição segue válida para ESSE consumidor:**
 
 - `FUNCALL` sem retorno declarado: união (com acordo) dos pushes
   ROTULADOS de RETURN (`"ret": true`, ast-6) da função do PROJETO;

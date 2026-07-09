@@ -1,5 +1,10 @@
 # Spec B7b — Inferência fatia 3: retorno de método, Self em INLINE, blocos
 
+**REBAIXADA NO RE.3 (portão do Diego, 2026-07-09, forma "a"; spec-re):
+toda a fatia saiu do veredito do `usages` e fica dormente como camada
+SUGERIDORA do materializador (fatia 2 da B9); o caso 86 foi
+re-baselinado para o contrato só-fato.**
+
 Status: **ENTREGUE (2026-07-08)** — registro integral no
 [roadmap-fases-entregues.md](roadmap-fases-entregues.md); regras de
 consumo na seção TypeOf do [ast-schema.md](ast-schema.md); delta da

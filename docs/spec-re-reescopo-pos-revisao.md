@@ -208,22 +208,49 @@ para param de bloco `AS CLASS` é INESCREVÍVEL hoje — classe no módulo
 segfaulta o compilador (A6) e classe fora do módulo cai em W0025 +
 `-es2`; coberto com value-kind.
 
-**RE.3 — B7/B7b fora do veredito de produto.**
+**RE.3 — B7/B7b fora do veredito de produto. — FECHADO (2026-07-09)**
 Escopo: `confirmed`/`excluded` derivados de inferência (cadeia de
 construção, união de call sites/retornos/Evals, ClassGraph "as
 written") deixam de ser veredito de produto; a máquina vira camada
 SUGERIDORA — insumo do comando de materialização (fatia 2 da B9), não
 resposta do `usages`.
-**[PORTÃO Diego]** a forma da camada rebaixada: (a) some do `usages` e
-só existe no materializador; (b) aparece atrás de flag explícita
-(ex.: `--inferred`) com rótulo `suggested`; (c) outra.
+**[PORTÃO Diego — ABERTO 2026-07-09]**: forma **(a)** — some do
+`usages` e só existe no materializador; decisão adicional do mesmo
+portão: o `possible` NOMEADO por inferência ("one of X or Y", "may
+dispatch through written parents", sufixos "via construction chain")
+some junto — degrade pleno.
 Critério: nenhum `confirmed`/`excluded` do `usages` de produto deriva
 de B7/B7b/ClassGraph (prova: casos 84/85/86 re-baselined para o novo
 contrato); M-cov re-rodada (`tests/mcov2.sh`) e o retrato honesto
 pós-rebaixamento registrado no limites-e-alavancas.md; suíte verde.
+Resultado: o `usages` não constrói `hInter` (a máquina B7/B7b fica
+DORMENTE no fonte, entrada `B7Ctx` — o W0034 do build é o marcador
+honesto até a fatia 2 consumi-la); `SendVerdict` reescrito só-fato,
+com defesa de contrato (tipo com traço `via`/`clsset` degrada para
+possible) e SEM o bloco de dispatch por grafo (helpers
+`ResolveDispatchMsg`/`DispatchHijackers`/`ClassDescendants`
+removidos); sites de DECLARAÇÃO seguem decidindo por members (fato do
+canal declarado — "homônimos por declaração" do "O que NÃO muda").
+Alcance REAL foi além dos casos 84/85/86: os vereditos por grafo
+as-written (B4f-2/Q4) também derivam de ClassGraph e saíram — casos
+39/61/63/66/67/68/69/72/75 re-baselinados. **Consequência de produto
+notável: o furo dos homônimos (caso 66, o caso original do Diego)
+degradou nos SENDS** — a exclusão exigia mundo fechado sobre parents
+as-written; declarações homônimas seguem excluded. Retrato M-cov 3
+(limites-e-alavancas.md): confirmed 1.715→545 (8,7%, 100% canal
+declarado), 1.170 sites degradados para possible pleno. `--json`:
+possible pós-RE.3 entra nas Location[] (Json66/Json72 re-baselinados).
+Specs B7/B7b e ast-schema §TypeOf com banner de rebaixamento. Suíte
+622/0 byte-idêntica paralelo × JOBS=1.
+Adendo (decisão do Diego, mesma data): as EXPECTATIVAS dos testes
+re-baselinados ficam SUSPENSAS, não mortas — catálogo versionado em
+[testes-suspensos-re3.md](testes-suspensos-re3.md) com o rótulo antigo
+verbatim e a rota de FATO de cada site (materializador+kt / RE.5 /
+RE.6; re-ligar inferência NÃO é rota). Os itens [FATIA-2] do catálogo
+são semente do critério de aceite da fatia 2 da B9.
 
 **RE.4 — Hardening `pPosTbl` (core; independente, pode intercalar). —
-EXECUTADO (2026-07-09; commit no harbour-core aguarda autorização)**
+FECHADO (2026-07-09; harbour-core `ef0abe3688`, autorizado)**
 Escopo: limpar `pPosTbl` em `hb_pp_reset()` (se A5 confirmar).
 Critério: zero impacto sem `-x` (byte-idêntico, protocolo padrão);
 `make lexdiff` limpo; suíte 616+/0. Commit no harbour-core só com
@@ -234,7 +261,6 @@ no destrutor (que perdeu o free inline). Provas: 460/460 `.hrb`
 byte-idênticos base × fix (corpus work/tests, 230 programas × `-w0` e
 `-w3`, sem `-x`, relink forçado dos DOIS binários); `make lexdiff`
 0 divergências reais; suíte 622/0 byte-idêntica paralelo × JOBS=1.
-Working tree do harbour-core carrega o diff — commit sob portão.
 
 **RE.5 — [GAVETA — PORTÃO Diego] cobertura completa do `-kt`.**
 Estender a emissão no core (`PARAMETERS`, params de bloco, detached)
