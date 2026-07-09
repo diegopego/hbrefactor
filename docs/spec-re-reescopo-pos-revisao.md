@@ -68,14 +68,52 @@ arquivo:linha (e probe executável quando couber). Status vive aqui.
   (hbmain.c:2873); ficam fora `PARAMETERS`, parâmetros de codeblock e
   escrita em local detached dentro de bloco — mas `B7KtMark`
   (hbrefactor.prg:6409) marca QUALQUER anotação de módulo `kt` e o
-  veredito sai `guaranteed` (hbrefactor.prg:7708). Quebra R1.
-  Status: **A VERIFICAR** (nota: o gap de codeblock estava registrado
-  como fora da fatia no ast-schema.md §B9; o furo NOVO alegado é o
-  consumidor não degradar por causa dele).
+  veredito sai `guaranteed` (hbrefactor.prg:7709). Quebra R1.
+  Status: **CONFIRMADO (RE.1, 2026-07-09)** — probes executáveis em
+  scratchpad/re1 (probe_re1.prg, probe2.prg, probe3.prg), protocolo da
+  suíte (`-w3 -es2 -kt`, build hbmk2 `-prgflag=-kt`, execução):
+  - Core emite cheque SÓ em (a) prólogo de parâmetro de assinatura —
+    harbour.y:332/334 são os ÚNICOS call sites de
+    `hb_compChkTypeParams` (grep no delta) — e (b) pós-store direto em
+    local de função nomeada — hbmain.c:2871-2875 exige
+    `HB_VS_LOCAL_VAR` E `functions.pLast->szName`.
+  - probe_re1 (execução): controle A0 dispara (`declared type check
+    failed: expected N, got C @ MAIN:NGUARD`); param de bloco anotado,
+    escrita em local dentro de bloco e `PARAMETERS x AS` deixam kind
+    errado passar EM SILÊNCIO. No pcode (`-gc2`) o módulo inteiro tem
+    UMA chamada `__HB_CHKTYPE` (o controle).
+  - **Gap EXTRA não alegado pela auditoria**: escrita por `@ref` em
+    local anotado também não é checada (probe3: o pop acontece no
+    parâmetro do callee, sem a anotação do caller — `local virou C`).
+  - Consumidor overclaima DE FATO: probe2 (local anotado cuja única
+    escrita vive num codeblock) sai no usages como `guaranteed send
+    (receiver AS CLASS CONTA imposed by -kt checks)` ENQUANTO a
+    execução prova receptor PEDRA (`Message not found
+    (PEDRA:CREDITA)`). A premissa "toda escrita é checada" do caso 87
+    (multi-write) é FALSA quando há escrita em bloco ou por @ref.
+  - Alcance REAL do overclaim hoje (fatos que escopam o RE.2): só o
+    LOCAL anotado atinge `guaranteed` indevido (escrita em bloco e/ou
+    @ref). Param de bloco `AS CLASS` NUNCA vira guaranteed — a
+    gramática descarta o nome da classe nesse caminho (harbour.y:1024
+    repassa só `cVarType`; o dump carrega `type:'S'` sem `class` e
+    DeclType degrada a NIL, hbrefactor.prg:5936). `PARAMETERS` não
+    vira guaranteed — occurrence com scope memvar barra antes
+    (hbrefactor.prg:5995). Mas `B7KtMark` (6409) segue keyed à FLAG DE
+    MÓDULO, não à cobertura do site — o conserto é o RE.2.
 - **A2 — `PARAMETERS x AS ...` está no canal e não é imposto.**
   Alegação: gramática aceita via `MemvarList` (harbour.y:1113 +
   AsType:1229); `hb_compChkTypeParams()` não passa por esse caminho.
-  Status: **A VERIFICAR**.
+  Status: **CONFIRMADO (RE.1, 2026-07-09)** — gramática aceita
+  (`PARAMETERS` → `MemvarList` com `AsType`, harbour.y:1113/1229);
+  `hb_compChkTypeParams` só roda na regra de assinatura
+  (harbour.y:332/334) e o pós-store de memvar gera `POPMEMVAR` sem
+  cheque (hbmain.c:2904). A anotação ENTRA no canal: o dump do probe
+  traz `COMPARAMS {sym:'NQUANTO', scope:'private', param:true,
+  type:'N'}` em módulo `kt:true`; em execução o kind errado passa em
+  silêncio (probe_re1: `A2 PARAMETERS: NAO checou`). O consumidor
+  atual NÃO overclaima aqui (gate memvar, hbrefactor.prg:5995) — o
+  furo é de CONTRATO do canal: anotação não imposta viaja num módulo
+  marcado `kt`; entra na matriz de cobertura do RE.2/RE.5.
 - **A3 — B7/B7b são inferência** (uniões: hbrefactor.prg:6500/7213/
   6690/6993). Status: **ACEITO SEM VERIFICAÇÃO ADICIONAL** — é o que a
   própria documentação diz; a consequência é o RE.3.
@@ -87,16 +125,62 @@ arquivo:linha (e probe executável quando couber). Status vive aqui.
 - **A5 — `pPosTbl` não é limpo em `hb_pp_reset()`** (ppcore.c:6665;
   só no destrutor, ppcore.c:2909) — risco de proveniência fantasma
   entre módulos por reuso de ponteiro com mesmo `value/len`.
-  Status: **A VERIFICAR**.
+  Status: **CONFIRMADO estruturalmente (RE.1, 2026-07-09)** —
+  `hb_pp_reset()` (ppcore.c:6665) limpa regras, tracking e a tabela de
+  DERIVAÇÃO (`hb_pp_drvTblFree`), mas não toca `pPosTbl`; o único free
+  é no destrutor `hb_pp_stateFree` (ppcore.c:2909-2912). O reset roda
+  POR MÓDULO no loop de compilação (hbmain.c:4403) e o guard de
+  identidade de `hb_pp_posFind` compara só ponteiro `value` + `len`
+  (ppcore.c:598) — o próprio comentário do código admite o reuso de
+  ponteiro; entre módulos a entrada velha sobrevive e um token
+  reciclado com mesmo `value/len` herdaria posição do módulo anterior.
+  Probe determinístico não cabe (depende do allocator reciclar os DOIS
+  ponteiros); a confirmação estrutural basta e o RE.4 (limpar no
+  reset) fica justificado. Nota: `pDrvTbl` tem o MESMO guard
+  (ppcore.c:694) mas É limpo no reset — o furo é só do `pPosTbl`.
+- **A6 (NOVO, achado pelos probes do RE.1) — segfault do COMPILADOR
+  com `AS CLASS` em parâmetro de codeblock quando o módulo conhece
+  classes.** Repro mínimo (scratchpad/re1/mini2.prg): `CREATE CLASS
+  Conta` + `{| oX AS CLASS Conta | ... }` no mesmo módulo → SIGSEGV
+  (exit 139). Mecanismo: o caminho de bloco só repassa a LETRA do tipo
+  (harbour.y:1024, `hb_compExprCBVarAdd` recebe `cVarType` e descarta
+  `szFromClass`); `hb_compVariableAdd` então chama
+  `hb_compClassFind( NULL )` (hbmain.c:476) e o
+  `strcmp( pClass->szName, NULL )` (hbmain.c:1083) estoura quando a
+  lista de classes NÃO está vazia. **Bug do upstream** (o harbour de
+  estoque em `/usr/local/bin` crasha igual sob `-w3`); o delta AMPLIA
+  a exposição porque `-x`/`-kt` mantêm a lista de classes viva em
+  qualquer nível de warning (mini2 com `-kt` ou `-x` sem `-w3` também
+  crasha; sem classe no módulo não crasha, mas W0025 imprime
+  `Class '(null)'` e degrada o tipo para 'O'). Consequências: (a)
+  fixture de RE.2/RE.5 com param de bloco `AS CLASS` + classe no
+  módulo derruba o compilador — desviar; (b) conserto no core é
+  candidato natural a intercalar com o RE.4 **[PORTÃO Diego]**.
+  Status: **CONFIRMADO com repro executável**.
 
 ## O plano (ordem de execução; critérios executáveis)
 
-**RE.1 — Verificar A1, A2 e A5 no fonte.**
+**RE.1 — Verificar A1, A2 e A5 no fonte. — FECHADO (2026-07-09)**
 Critério: cada um confirmado ou refutado com arquivo:linha e, para
 A1/A2, probe executável (fixture `-kt` com `PARAMETERS x AS`,
 parâmetro de bloco anotado e escrita em detached — o cheque dispara ou
 não dispara?); refutado = registrar aqui e fechar. Resultado atualiza
 o status acima na mesma sessão.
+Resultado: A1, A2 e A5 **CONFIRMADOS** (evidência arquivo:linha e
+saída dos probes coladas nos status acima; probes em scratchpad/re1,
+harbour-core `c1927dfcac`). A verificação produziu dois fatos ALÉM da
+alegação: o gap de `@ref` (quarta lacuna de cobertura do `-kt`) e o
+A6 (segfault upstream com `AS CLASS` em param de bloco). Matriz de
+cobertura REAL da fatia 1 (insumo direto do RE.2):
+
+| Site com anotação | Cheque emitido? | `guaranteed` hoje? |
+|---|---|---|
+| parâmetro de assinatura | SIM (prólogo, harbour.y:332/334) | sim — correto |
+| local, escrita direta no corpo | SIM (pós-store, hbmain.c:2871-2875) | sim — correto |
+| local, escrita dentro de bloco | NÃO | **sim — overclaim (probe2)** |
+| local, escrita via `@ref` | NÃO (probe3) | **sim — overclaim (sem gate de refs)** |
+| parâmetro de codeblock | NÃO | não (dump perde a classe; val-kinds não usam kt) |
+| `PARAMETERS x AS` | NÃO | não (gate memvar) — furo é do canal, não do usages |
 
 **RE.2 — `guaranteed` honesto (consumidor; curto prazo).**
 Escopo: restringir a marca `kt` (`B7KtMark`) aos sites que o `-kt` da

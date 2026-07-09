@@ -98,8 +98,10 @@ convergiu com o julgamento interno de 2026-07-08: **manter** dump
 `-x`/rastreamento PP/refatorações verificadas; **`-kt` é R1-legítimo
 mas o consumo overclaima** (`guaranteed` para sites que o cheque não
 cobre); **B7/B7b são inferência** → rebaixar a sugeridora/
-materializadora. Plano vinculante com achados A1-A5, itens RE.1-RE.6,
-guarda de fase e critérios executáveis:
+materializadora. Plano vinculante com achados A1-A6, itens RE.1-RE.6,
+guarda de fase e critérios executáveis (RE.1 FECHADO em 2026-07-09:
+A1/A2/A5 confirmados com probes; extras: gap de `@ref` e A6 —
+segfault upstream com `AS CLASS` em param de codeblock):
 **[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
 — retomada de sessão COMEÇA por lá. Registro narrativo da sessão
 2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no
