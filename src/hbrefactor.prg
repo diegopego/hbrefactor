@@ -6013,7 +6013,9 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
             RETURN NIL      // param de bloco sem atribuição única de bloco
          ENDIF
          IF ( hRes := DeclType( aBP[ 3 ], "declared" ) ) != NIL
-            RETURN B7KtMark( hRes, hAst )   // {|x AS CLASS Foo|...}: canal declarado
+            // {|x AS tipo|...}: canal declarado SEM marca kt - o -kt não
+            // checa o binding do Eval nem stores block-relative (RE.1)
+            RETURN hRes
          ENDIF
          // veneno: param reescrito/@ref dentro do bloco (regra sem ordem)
          IF nWrites > 0 .OR. nRefs > 0 .OR. hInter == NIL
@@ -6033,11 +6035,11 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
       ENDIF
       // 1) classe/tipo DECLARADO da própria variável (Self entra por aqui);
       //    em módulo -kt (ast-7) a anotação é INVARIANTE imposta - marca
-      //    "kt" para o rótulo guaranteed
+      //    "kt" para o rótulo guaranteed SE o site é coberto (RE.2)
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == cSym .AND. ;
             ( hRes := DeclType( hItem, "declared" ) ) != NIL
-            RETURN B7KtMark( hRes, hAst )
+            RETURN B7KtMark( hRes, hAst, hFunc, cSym )
          ENDIF
       NEXT
       // 2) binding único: exatamente 1 write, 0 refs e UM ASSIGN de topo
@@ -6088,7 +6090,7 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == "SELF" .AND. ;
             ( hRes := DeclType( hItem, "declared" ) ) != NIL
-            RETURN B7KtMark( hRes, hAst )
+            RETURN B7KtMark( hRes, hAst, hFunc, "SELF" )
          ENDIF
       NEXT
 
@@ -6405,14 +6407,40 @@ STATIC FUNCTION B7SelfWriteWalk( hExpr )
 
 // B9: em módulo compilado com -kt (ast-7), a anotação declarada é
 // INVARIANTE imposta em runtime (fail-fast) - o tipo carrega "kt" e o
-// veredito sai na camada guaranteed, distinta da promessa declarada
-STATIC FUNCTION B7KtMark( hType, hAst )
+// veredito sai na camada guaranteed, distinta da promessa declarada.
+// RE.2: a marca exige site COBERTO pela fatia 1 (matriz do RE.1) - a
+// flag do módulo sozinha não é prova de imposição
+STATIC FUNCTION B7KtMark( hType, hAst, hFunc, cSym )
 
-   IF hType != NIL .AND. hAst != NIL .AND. hb_HGetDef( hAst, "kt", .F. )
+   IF hType != NIL .AND. hAst != NIL .AND. hb_HGetDef( hAst, "kt", .F. ) .AND. ;
+      B7KtCovered( hFunc, cSym )
       hType[ "kt" ] := .T.
    ENDIF
 
    RETURN hType
+
+// RE.2 (fase RE): o -kt fatia 1 cobre prólogo de parâmetro de assinatura
+// e pós-store DIRETO em local de função nomeada (hbmain.c:2871). Escrita
+// dentro de codeblock (índice block-relative) e escrita via @ref (o pop
+// é do parâmetro do callee) NÃO são checadas - provas probe2/probe3 do
+// RE.1. Anotação com escrita não coberta fica no canal declared: a
+// promessa continua, sem o selo de invariante
+STATIC FUNCTION B7KtCovered( hFunc, cSym )
+
+   LOCAL hOcc
+
+   FOR EACH hOcc IN hFunc[ "occurrences" ]
+      IF Upper( hOcc[ "sym" ] ) == cSym
+         IF hOcc[ "access" ] == "ref"
+            RETURN .F.
+         ENDIF
+         IF hOcc[ "access" ] == "write" .AND. hOcc[ "block" ]
+            RETURN .F.
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN .T.
 
 // marca a travessia de vínculo escrito no tipo (D1)
 STATIC FUNCTION B7ViaMark( hType, lVia )

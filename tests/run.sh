@@ -2593,7 +2593,8 @@ echo "case 87: B9 -kt - tipos declarados IMPOSTOS (invariante de runtime)"
 # alcance novo - nada keyed a hbclass); forma DIMENSIONADA não é anotação
 # (reatribuir é legal). Consumo: camada "guaranteed" no usages (anotação
 # em módulo -kt é invariante, acima da promessa declarada - inclusive com
-# multi-write, porque TODA escrita é checada) e a marca "dim" do ast-7
+# multi-write DIRETO, porque toda escrita coberta é checada; a cobertura
+# de site é o caso 88/RE.2) e a marca "dim" do ast-7
 # (o 'A' interno da dimensionada não é promessa: o send que RODA saía
 # excluded ERRADO e agora é possible honesto). T1: fonte anotado compila
 # limpo TAMBÉM sem a flag; a flag flui por linha de .hbp E por -prgflag=.
@@ -2632,14 +2633,46 @@ check "usages Conta:Credita exit 0" $?
 grep -q "t2.prg:17: guaranteed send (receiver AS CLASS CONTA imposed by -kt checks) in FLUXO" "$D/cc.log"
 check "camada guaranteed: parâmetro anotado em módulo -kt é invariante" $?
 grep -q "t1.prg:72: guaranteed send (receiver AS CLASS CONTA imposed by -kt checks) in MAIN" "$D/cc.log"
-check "guaranteed no local anotado MULTI-write (toda escrita é checada)" $?
+check "guaranteed no local anotado MULTI-write (toda escrita DIRETA é checada; site coberto - RE.2)" $?
 grep -q "t2.prg:23: possible send (dynamic dispatch, receiver unknown) in FLUXO" "$D/cc.log" && \
    ! grep -q "t2.prg:23: excluded" "$D/cc.log"
 check "marca dim (ast-7): o 'A' da dimensionada não é promessa - possible honesto" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87"
+unit_88() {
+echo "case 88: RE.2 guaranteed honesto - marca kt só em site COBERTO"
+# spec-re (RE.1/RE.2): a fatia 1 do -kt cobre prólogo de parâmetro de
+# assinatura e pós-store DIRETO em local de função nomeada; escrita
+# dentro de codeblock (store block-relative) e escrita via @ref (o pop
+# é do parâmetro do callee) NÃO são checadas - provas probe2/probe3 do
+# RE.1. Anotação com escrita não coberta degrada para o canal da
+# promessa (declared), sem o selo de invariante; PARAMETERS AS está no
+# canal e nunca é imposto (A2 - o gate memvar responde possible); param
+# de bloco anotado fica no canal declared (o binding do Eval não é
+# checado). Sites cobertos seguem guaranteed - caso 87 intacto.
+D=$(freshkt case88)
+( cd "$D" && "$BIN" usages fixkt.hbp Conta:Credita > cc.log 2>&1 )
+check "usages Conta:Credita exit 0" $?
+grep -q "t3.prg:21: confirmed send (receiver declared AS CLASS CONTA) in SOMBRA" "$D/cc.log" && \
+   ! grep -q "t3.prg:21: guaranteed" "$D/cc.log"
+check "escrita só em codeblock: promessa declared, SEM selo kt" $?
+grep -q "t3.prg:33: confirmed send (receiver declared AS CLASS CONTA) in REFEM" "$D/cc.log" && \
+   ! grep -q "t3.prg:33: guaranteed" "$D/cc.log"
+check "escrita via @ref: promessa declared, SEM selo kt (gap extra do RE.1)" $?
+grep -q "t3.prg:45: possible send (dynamic dispatch, receiver unknown) in ANTIGA" "$D/cc.log" && \
+   ! grep -q "t3.prg:45: guaranteed" "$D/cc.log"
+check "PARAMETERS AS: anotação no canal, nunca imposta - possible honesto" $?
+grep -q "t3.prg:53: excluded send (receiver holds a value of kind numeric, codeblock) in MIUDA" "$D/cc.log" && \
+   ! grep -q "t3.prg:53: guaranteed" "$D/cc.log"
+check "param de bloco anotado: canal declared, SEM selo kt" $?
+grep -q "t1.prg:72: guaranteed send" "$D/cc.log" && \
+   grep -q "t2.prg:17: guaranteed send" "$D/cc.log"
+check "sites cobertos seguem guaranteed (caso 87 intacto)" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

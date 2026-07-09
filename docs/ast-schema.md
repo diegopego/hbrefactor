@@ -513,10 +513,18 @@ core `-kt` + consumo; a REGRA DO FATO é o portão)**:
   nível). Atribuição DENTRO de corpo de codeblock fica fora desta
   fatia (índice de local é relativo ao bloco); registrado.
 - **Camada `guaranteed` no usages**: anotação de classe em módulo com
-  `"kt": true` é INVARIANTE imposta — o veredito sai
+  `"kt": true` E site COBERTO pela fatia 1 (RE.2, fase RE) é INVARIANTE
+  imposta — o veredito sai
   `guaranteed send (receiver AS CLASS X imposed by -kt checks)`, acima
-  da promessa declarada; vale INCLUSIVE com multi-write (toda escrita é
-  checada). A marca morre ao virar cadeia (`how` chain) — a invariante
+  da promessa declarada; vale inclusive com multi-write DIRETO (toda
+  escrita coberta é checada). Cobertura (`B7KtCovered`, matriz do RE.1):
+  nenhuma occurrence do símbolo com `access:"ref"` nem com
+  `access:"write"` + `block:true` — escrita dentro de codeblock (store
+  block-relative) e via `@ref` (o pop é do parâmetro do callee) NÃO são
+  checadas; anotação não coberta fica no canal declared (promessa sem
+  selo). Param de codeblock nunca leva a marca (o binding do Eval não é
+  checado; a gramática nem transporta o nome da classe nesse caminho).
+  A marca morre ao virar cadeia (`how` chain) — a invariante
   é do símbolo anotado, não viaja por retorno/união.
 - **`dim` não é promessa**: `LOCAL a[n]` sempre carregou 'A' interno; o
   DeclType da ferramenta o consumia como promessa de array e EXCLUÍA

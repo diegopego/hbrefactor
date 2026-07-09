@@ -182,7 +182,8 @@ cobertura REAL da fatia 1 (insumo direto do RE.2):
 | parâmetro de codeblock | NÃO | não (dump perde a classe; val-kinds não usam kt) |
 | `PARAMETERS x AS` | NÃO | não (gate memvar) — furo é do canal, não do usages |
 
-**RE.2 — `guaranteed` honesto (consumidor; curto prazo).**
+**RE.2 — `guaranteed` honesto (consumidor; curto prazo). — FECHADO
+(2026-07-09)**
 Escopo: restringir a marca `kt` (`B7KtMark`) aos sites que o `-kt` da
 fatia 1 COBRE de fato (conforme RE.1): parâmetro de assinatura e local
 anotado com escrita coberta; anotação não coberta degrada para o canal
@@ -191,6 +192,21 @@ Critério: casos de suíte novos (fixkt estendido) provando que
 `PARAMETERS AS`/param de bloco/detached **não** saem `guaranteed`;
 caso 87 intacto nos sites cobertos; suíte verde byte-idêntica
 paralelo × JOBS=1.
+Resultado: `B7KtCovered` (hbrefactor.prg) implementa a matriz do RE.1
+sobre fatos do dump — a marca `kt` exige AUSÊNCIA de occurrence
+`access:"ref"` e de `access:"write"` com `block:true` para o símbolo;
+o site de param de bloco perdeu a marca (o binding do Eval não é
+checado). Prova: fixkt estendido com t3.prg (4 sites não cobertos) e
+caso 88 — escrita só em codeblock e escrita via `@ref` saem
+`confirmed send (receiver declared AS CLASS CONTA)` SEM selo;
+`PARAMETERS AS` sai `possible` (gate memvar); param de bloco anotado
+sai `excluded ... codeblock` pelo canal declared; t1.prg:72
+(multi-write DIRETO) e t2.prg:17 (assinatura) seguem `guaranteed`
+(caso 87 intacto, asserts inalterados). Suíte 622/0, saída
+byte-idêntica paralelo × JOBS=1 (cmp). Nota de fato: caso de suíte
+para param de bloco `AS CLASS` é INESCREVÍVEL hoje — classe no módulo
+segfaulta o compilador (A6) e classe fora do módulo cai em W0025 +
+`-es2`; coberto com value-kind.
 
 **RE.3 — B7/B7b fora do veredito de produto.**
 Escopo: `confirmed`/`excluded` derivados de inferência (cadeia de
@@ -206,11 +222,19 @@ de B7/B7b/ClassGraph (prova: casos 84/85/86 re-baselined para o novo
 contrato); M-cov re-rodada (`tests/mcov2.sh`) e o retrato honesto
 pós-rebaixamento registrado no limites-e-alavancas.md; suíte verde.
 
-**RE.4 — Hardening `pPosTbl` (core; independente, pode intercalar).**
+**RE.4 — Hardening `pPosTbl` (core; independente, pode intercalar). —
+EXECUTADO (2026-07-09; commit no harbour-core aguarda autorização)**
 Escopo: limpar `pPosTbl` em `hb_pp_reset()` (se A5 confirmar).
 Critério: zero impacto sem `-x` (byte-idêntico, protocolo padrão);
 `make lexdiff` limpo; suíte 616+/0. Commit no harbour-core só com
 autorização do Diego.
+Resultado: `hb_pp_posTblFree()` no estilo do `hb_pp_drvTblFree`,
+chamado em `hb_pp_reset()` (junto das tabelas de tracking/derivação) e
+no destrutor (que perdeu o free inline). Provas: 460/460 `.hrb`
+byte-idênticos base × fix (corpus work/tests, 230 programas × `-w0` e
+`-w3`, sem `-x`, relink forçado dos DOIS binários); `make lexdiff`
+0 divergências reais; suíte 622/0 byte-idêntica paralelo × JOBS=1.
+Working tree do harbour-core carrega o diff — commit sob portão.
 
 **RE.5 — [GAVETA — PORTÃO Diego] cobertura completa do `-kt`.**
 Estender a emissão no core (`PARAMETERS`, params de bloco, detached)

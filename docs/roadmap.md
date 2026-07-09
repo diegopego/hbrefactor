@@ -99,9 +99,13 @@ convergiu com o julgamento interno de 2026-07-08: **manter** dump
 mas o consumo overclaima** (`guaranteed` para sites que o cheque não
 cobre); **B7/B7b são inferência** → rebaixar a sugeridora/
 materializadora. Plano vinculante com achados A1-A6, itens RE.1-RE.6,
-guarda de fase e critérios executáveis (RE.1 FECHADO em 2026-07-09:
-A1/A2/A5 confirmados com probes; extras: gap de `@ref` e A6 —
-segfault upstream com `AS CLASS` em param de codeblock):
+guarda de fase e critérios executáveis (RE.1 e RE.2 FECHADOS e RE.4
+EXECUTADO em 2026-07-09 — RE.1: A1/A2/A5 confirmados com probes,
+extras gap de `@ref` e A6, segfault upstream com `AS CLASS` em param
+de codeblock; RE.2: marca `kt` restrita a site coberto, caso 88,
+suíte 622/0; RE.4: `pPosTbl` limpo no reset, 460/460 byte-idêntico,
+commit do core sob portão. Aberto: RE.3 espera o portão da forma da
+camada rebaixada):
 **[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
 — retomada de sessão COMEÇA por lá. Registro narrativo da sessão
 2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no
@@ -244,8 +248,10 @@ dimensionado (excluded errado fechado); fixture fixkt + caso 87 (17
 checks, execução real); suíte **616/0** byte-idêntica. Detalhes/
 critérios na spec. **Atenção (fase RE)**: a auditoria externa alegou
 overclaim do `guaranteed` (achados A1/A2 — sites que o cheque não
-cobre); consumo em conserto no RE.2, e a fatia 2 só abre depois do
-RE.3 decidir a forma da camada sugeridora.
+cobre); confirmado no RE.1 e CONSERTADO no RE.2 (2026-07-09:
+`B7KtCovered` restringe a marca aos sites cobertos; fixkt+t3, caso 88,
+suíte 622/0 byte-idêntica). A fatia 2 só abre depois do RE.3 decidir a
+forma da camada sugeridora.
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a
