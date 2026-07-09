@@ -1,9 +1,13 @@
-# Schema `ast-6` — o dump AST do compilador (spec)
+# Schema `ast-7` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-6` (fase B7) = `ast-5` + `"ret": true` no statement
+com `-x`. O `ast-7` (fase B9) = `ast-6` + `"kt"` no cabeçalho (o módulo
+foi compilado com `-kt`? — anotação vira INVARIANTE imposta) + `"dim"`
+em `declarations[]` (a forma dimensionada `LOCAL a[n]` carrega um 'A'
+INTERNO do compilador, não anotação escrita — ver a seção B9); o
+`ast-6` (fase B7) = `ast-5` + `"ret": true` no statement
 `push` que carrega o valor de RETURN (ver `statements[]`); o `ast-5`
 (fase B4g) = `ast-4` + A REGRA POR DENTRO
 (`match[]`/`result[]` em `ppRules[]` — ver lá); o `ast-4` (fase B4f) =
@@ -33,10 +37,12 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-6",           // versão emitida hoje (ast-1→...→ast-6)
+{ "schema": "ast-7",           // versão emitida hoje (ast-1→...→ast-7)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
+  "kt": false,                   // ast-7: compilado com -kt? (anotações
+                                 // impostas em runtime - camada guaranteed)
   "tokens": [...], "functions": [...] }
 ```
 
@@ -283,6 +289,9 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
     { "sym": "NTOTAL", "scope": "local"|"static"|"field"|"memvar"|
                         "private"|"public",
       "declLine": 7, "param": false,
+      "dim": true,             // ast-7: SÓ na forma dimensionada (a[n]);
+                               // o "type" 'A' que a acompanha é marca
+                               // interna do compilador, NÃO promessa
       "type": "S",             // só quando declarado (AS <tipo>): caractere
                                // do compilador - N C D L B A O S; minúscula
                                // = ARRAY do tipo ('s' = AS CLASS ARRAY)
@@ -483,6 +492,41 @@ só a TIPAGEM consome; as camadas de dispatch da Q4 ficam intocadas:
 - **A leitura de pares de registro (B7Regs) é em PROFUNDIDADE-0**: não
   desce em corpo de CODEBLOCK — registro dentro de bloco não roda na
   construção da classe (executaria por dispatch: fronteira de runtime).
+
+**Extensão B9 (spec-b9-anotacoes-impostas.md, fase ativa 2026-07-08 —
+core `-kt` + consumo; a REGRA DO FATO é o portão)**:
+
+- **`-kt` (HB_COMPFLAG_CHKTYPE)**: o compilador emite cheques de
+  runtime para as anotações `AS` da linguagem — prólogo da função (um
+  por parâmetro anotado, hb_compChkTypeParams), pós-atribuição a local
+  anotado (gancho no funil hb_compGenPopVar) e RETURN de função com
+  `DECLARE ... AS` (o valor é EMBRULHADO em `__HB_CHKTYPE( expr, spec,
+  site )` — helper em classes.c que devolve o 1º argumento). NIL falha
+  (T2); is-a passa pelo objeto VIVO (`hb_clsIsParent` — classe montada
+  em runtime passa por NOME, T3/veneno 3); violação = erro catchável
+  nomeando `site`, declarado e recebido. O cheque de local é
+  PÓS-armazenamento: quem RECOVERa segue com o valor gravado — a
+  âncora vale nos caminhos sem violação. Zero impacto sem a flag:
+  224/224 .hrb byte-idênticos; com a flag, fonte sem anotação é
+  byte-idêntico (a forma dimensionada NÃO conta — abaixo). Os gates do
+  subsistema DECLARE abrem também sob `-kt` (warnings seguem gated por
+  nível). Atribuição DENTRO de corpo de codeblock fica fora desta
+  fatia (índice de local é relativo ao bloco); registrado.
+- **Camada `guaranteed` no usages**: anotação de classe em módulo com
+  `"kt": true` é INVARIANTE imposta — o veredito sai
+  `guaranteed send (receiver AS CLASS X imposed by -kt checks)`, acima
+  da promessa declarada; vale INCLUSIVE com multi-write (toda escrita é
+  checada). A marca morre ao virar cadeia (`how` chain) — a invariante
+  é do símbolo anotado, não viaja por retorno/união.
+- **`dim` não é promessa**: `LOCAL a[n]` sempre carregou 'A' interno; o
+  DeclType da ferramenta o consumia como promessa de array e EXCLUÍA
+  sends que rodam (exposição pré-existente desde a B4f, fechada no
+  ast-7): com `"dim": true` a declaração não tipa — cai para
+  binding único/cadeia (a própria declaração dimensionada conta um
+  write, então reatribuída degrada honesto para possible).
+- **`__HB_CHKTYPE` é identidade**: nos dumps de módulo `-kt`, o push de
+  RETURN declarado aparece embrulhado; o TypeOf resolve pelo miolo
+  (fato do runtime: o helper devolve o 1º argumento).
 
 Estender a regra além disto = novo portão.
 
@@ -942,11 +986,14 @@ confirmed/excluded do usages (TypeOf). A regra POR DENTRO
 (`match[]`/`result[]` em `ppRules[]`) entregue no **ast-5** (fase B4g,
 2026-07-07; portão no ADR-001), consumida por usages (`RuleSiteHits`),
 rename-dsl (palavra do match por posição-fato), rename-function
-`--edit-rules` e resolve-at (posição dentro de diretiva). O leitor da
-ferramenta (`ReadAst`) aceita `ast-2`..`ast-5`; comandos que EXIGEM o
+`--edit-rules` e resolve-at (posição dentro de diretiva). O canal do `-kt`
+(`"kt"` no cabeçalho + `"dim"` nas declarations) entregue no **ast-7**
+(fase B9, 2026-07-08), consumido pela camada guaranteed do usages e
+pela correção do DeclType (dim não é promessa). O leitor da
+ferramenta (`ReadAst`) aceita `ast-2`..`ast-7`; comandos que EXIGEM o
 rastro usam `FromReady` (ast-3+), a classificação de receptor exige
-projeto inteiro em ast-4+ (`Ast4Ready`/`DeclTables`) e a regra por dentro
-usa `RuleToksReady` (ast-5) — em dump antigo degrada/recusa com o fato,
-sem quebrar. Próximo a avaliar: span original de string no posTrack
+projeto inteiro em ast-4+ (`Ast4Ready`/`DeclTables`), a regra por dentro
+usa `RuleToksReady` (ast-5) e o rótulo de RETURN `B7Ret6` (ast-6+) — em
+dump antigo degrada/recusa com o fato, sem quebrar. Próximo a avaliar: span original de string no posTrack
 (mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e atualizar este
 documento NO MESMO commit.

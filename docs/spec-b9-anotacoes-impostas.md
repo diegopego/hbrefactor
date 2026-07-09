@@ -1,15 +1,38 @@
 # Spec B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`)
 
-Status: **NA GAVETA (2026-07-08 — decisões T1-T5 do Diego PRESERVADAS
-para quando/se a fase reviver).** Rebaixada no portão da B7b: a
-**M-cov 2** (programas fechados) mostrou que os baldes dominantes do
-"possible" são lacunas de INFERÊNCIA (fecháveis sem extensão de
-linguagem — spec-b7b-inferencia.md) e dinamismo genuíno (alvo da
-alavanca D); a reticência do Diego sobre implementar tipagem estava
-certa — o dado que falta é a fricção real do dogfooding. Revive se a
-inferência + alavanca D não fecharem a fricção medida. Análise de
-origem e números: seções M-cov, M-cov 2 e Alavanca G do
-[limites-e-alavancas.md](limites-e-alavancas.md).
+Status: **FASE ATIVA — FATIA 1 (core `-kt` + consumo) ENTREGUE em
+2026-07-08; FATIA 2 (materialização + extensão VSCode) EM CURSO.**
+Fatia 1: flag `-kt` com emissão nos três pontos do T4 (prólogo de
+params, pós-atribuição a local anotado, RETURN via DECLARE embrulhado
+em `__HB_CHKTYPE`), helper de runtime em classes.c (is-a no objeto
+VIVO — classe montada em runtime passa por NOME), gates do DECLARE
+abertos sob `-kt`, distinção da forma DIMENSIONADA (`LOCAL a[n]` não é
+anotação — flag interno `HB_VSCOMP_DIMMED`), schema **ast-7** (`kt` no
+cabeçalho + `dim` nas declarations), camada `guaranteed` no usages e
+correção do DeclType (dim não é promessa — send que roda saía excluded
+errado). Parser regenerado com bison 3.8.2 (patch manual do yynerrs
+re-aplicado; o skeleton novo provou pcode idêntico no protocolo).
+Critérios (a)-(e) e (g) FECHADOS: zero impacto 224/224 (-w0 E -w3,
+relink duplo conferido); fixture fixkt executável (caso 87, 17
+checks); suíte 616/0 byte-idêntica paralelo × JOBS=1; flag por linha
+de `.hbp` E `-prgflag=` com execução byte-idêntica. Semântica
+registrada: cheque de local é PÓS-armazenamento (quem RECOVERa segue
+com o valor gravado — a âncora vale nos caminhos sem violação);
+atribuição em corpo de codeblock fora da fatia (índice relativo).
+Critério (f) (materialização round-trip) é a fatia 2.
+
+Portão: confirmado pelo Diego em 2026-07-08, pela REGRA DO FATO — meta
+zero inferência: fato ausente → estender o core para o fato EXISTIR;
+esta fase é o caminho canônico. A B7b fechou o que a inferência
+alcança; o que sobra (parâmetros estruturalmente abertos, classes
+montadas em runtime, objetos nascidos na VM) só vira FATO por
+invariante imposta. Decisões T1-T5 do Diego mantidas como decididas.
+Análise de origem e números: seções M-cov, M-cov 2 (com delta da B7b)
+e Alavanca G do [limites-e-alavancas.md](limites-e-alavancas.md).
+
+Histórico: esteve NA GAVETA entre o portão da B7b e a REGRA DO FATO
+(mesmo dia) — a escada "inferência antes de linguagem" foi revogada
+pelo Diego ao recusar triagem como produto.
 
 **Enquadramento (correção do Diego, 2026-07-08 — O NORTE)**: a fase
 impõe o **sistema de TIPOS declarados da linguagem inteiro** —
@@ -91,10 +114,28 @@ como tal; nunca confundida com confirmed estático. O dump já transporta
 os tipos (ast-4); falta transportar **a flag ativa** (campo no
 cabeçalho do módulo; bump de schema na fase).
 
-**Materialização (fatia da fase)**: comando da ferramenta que escreve
-`AS <tipo>`/`AS CLASS` onde a análise PROVOU o tipo (kind OU classe,
-conjunto unitário), com a verificação padrão-ouro (recompilar, compilar
-limpo, suíte). Anotação só paga se existir; ninguém anota legado à mão.
+**Materialização (fatia da fase — escopo detalhado no portão aberto,
+2026-07-08)**: comando `annotate <projeto> [<arq[:função]>] [--dry-run]`
+que escreve `AS <tipo>`/`AS CLASS` onde a análise PROVOU o tipo. Sob a
+REGRA DO FATO, a inferência B7/B7b passa a servir a ISTO: sugerir a
+anotação que transforma a propagação em fato imposto.
+
+- **Alvo da fatia**: LOCALs com tipo provado (site da declaração
+  `LOCAL x` — edição textual mínima, `x` → `x AS CLASS Foo`). Params
+  entram quando a união fecha em conjunto unitário; retorno via
+  `DECLARE` fica para fatia seguinte (síntese de linha nova, decisão
+  de estilo do Diego).
+- **"Provado" =** tipo único do TypeOf com fato de compilação; o que
+  carrega ressalva de mundo fechado (`via`) NÃO materializa sem
+  `--force` (a anotação imposta é quem fecha o mundo dali em diante —
+  mas a PRIMEIRA escrita tem que ser fato, não aposta).
+- **Recusas fato-based**: multi-write/⊤, conjunto >1, memvar/field,
+  posição sem byte-exato (linha de expansão), nome de classe fora do
+  projeto (anotação com classe não registrada degrada o canal — caveat
+  do ast-schema).
+- **Verificação padrão-ouro**: anotação não muda pcode SEM `-kt`
+  (.hrb byte-idêntico pós-edição) + compila limpa `-w3 -es2` + com
+  `-kt` o programa RODA (cheques passam) — rollback em qualquer falha.
 
 ## Zero impacto e compatibilidade (prova)
 

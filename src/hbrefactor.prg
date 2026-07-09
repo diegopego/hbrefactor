@@ -244,7 +244,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // comandos que exigem o rastro/o canal/a regra recusam ou degradam com
    // mensagem clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -5852,7 +5852,7 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION FromReady( hAst )
-   RETURN hb_AScan( { "ast-3", "ast-4", "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-3", "ast-4", "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // ---------------------------------------------------------------------------
 // B4f - canal de tipos da linguagem (schema ast-4). O compilador PARSEIA e
@@ -5867,7 +5867,7 @@ STATIC FUNCTION FromReady( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION Ast4Ready( hAst )
-   RETURN hb_AScan( { "ast-4", "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-4", "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // ---------------------------------------------------------------------------
 // B4g - a regra por dentro (schema ast-5): ppRules[] ganha match[]/result[],
@@ -5881,7 +5881,7 @@ STATIC FUNCTION Ast4Ready( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION RuleToksReady( hAst )
-   RETURN hb_AScan( { "ast-5", "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // tabelas DECLARE agregadas do PROJETO (as do dump são por módulo):
 // { "f" => { FUNÇÃO => item }, "c" => { CLASSE => { MÉTODO => item } } }.
@@ -5922,6 +5922,13 @@ STATIC FUNCTION DeclType( hItem, cHow )
    LOCAL cT
 
    IF hItem == NIL
+      RETURN NIL
+   ENDIF
+   // B9/ast-7: a forma DIMENSIONADA (LOCAL a[n]) carrega o 'A' interno do
+   // compilador, não promessa escrita - reatribuir é legal. Sem o fato
+   // "dim" (dumps antigos) esse 'A' era consumido como promessa de array
+   // (exposição pré-existente desde a B4f, fechada aqui)
+   IF hb_HGetDef( hItem, "dim", .F. )
       RETURN NIL
    ENDIF
    cT := hb_HGetDef( hItem, "type", "" )
@@ -6006,7 +6013,7 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
             RETURN NIL      // param de bloco sem atribuição única de bloco
          ENDIF
          IF ( hRes := DeclType( aBP[ 3 ], "declared" ) ) != NIL
-            RETURN hRes     // {|x AS CLASS Foo|...}: canal declarado
+            RETURN B7KtMark( hRes, hAst )   // {|x AS CLASS Foo|...}: canal declarado
          ENDIF
          // veneno: param reescrito/@ref dentro do bloco (regra sem ordem)
          IF nWrites > 0 .OR. nRefs > 0 .OR. hInter == NIL
@@ -6024,11 +6031,13 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
          ENDIF
          RETURN B7BlockEvalType( hFunc, hAst, aBP, cSym, hDecl, hSeen, hInter )
       ENDIF
-      // 1) classe/tipo DECLARADO da própria variável (Self entra por aqui)
+      // 1) classe/tipo DECLARADO da própria variável (Self entra por aqui);
+      //    em módulo -kt (ast-7) a anotação é INVARIANTE imposta - marca
+      //    "kt" para o rótulo guaranteed
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == cSym .AND. ;
             ( hRes := DeclType( hItem, "declared" ) ) != NIL
-            RETURN hRes
+            RETURN B7KtMark( hRes, hAst )
          ENDIF
       NEXT
       // 2) binding único: exatamente 1 write, 0 refs e UM ASSIGN de topo
@@ -6079,13 +6088,21 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == "SELF" .AND. ;
             ( hRes := DeclType( hItem, "declared" ) ) != NIL
-            RETURN hRes
+            RETURN B7KtMark( hRes, hAst )
          ENDIF
       NEXT
 
    CASE cEt == "FUNCALL"
       hFun := hb_HGetDef( hExpr, "fun", NIL )
       IF HB_ISHASH( hFun ) .AND. hb_HGetDef( hFun, "et", "" ) == "FUNNAME"
+         // B9/-kt: o compilador embrulha o valor de RETURN declarado em
+         // __HB_CHKTYPE( expr, spec, site ) - o helper devolve o 1º
+         // argumento (identidade, fato do runtime); o tipo é o do miolo
+         IF Upper( hb_HGetDef( hFun, "val", "" ) ) == "__HB_CHKTYPE" .AND. ;
+            ! Empty( hb_HGetDef( hb_HGetDef( hExpr, "parms", { => } ), "items", {} ) )
+            RETURN TypeOf( hExpr[ "parms" ][ "items" ][ 1 ], hFunc, hDecl, ;
+                           xBlock, hSeen, hInter, hAst )
+         ENDIF
          hRes := DeclType( hb_HGetDef( hDecl[ "f" ], ;
                            Upper( hb_HGetDef( hFun, "val", "" ) ), NIL ), "chain" )
          // B7: fábrica sem DECLARE - o retorno vem dos pushes ROTULADOS
@@ -6315,7 +6332,7 @@ STATIC FUNCTION B7Ctx( hAsts, hDecl )
 
 // o dump carrega o rótulo de RETURN? (ast-6+)
 STATIC FUNCTION B7Ret6( hAst )
-   RETURN hb_AScan( { "ast-6" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN hb_AScan( { "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
 
 // função por nome: STATIC/pública do MÓDULO primeiro, depois pública do
 // projeto (colisão de públicas = NIL). Fora do projeto => NIL
@@ -6385,6 +6402,17 @@ STATIC FUNCTION B7SelfWriteWalk( hExpr )
    NEXT
 
    RETURN .F.
+
+// B9: em módulo compilado com -kt (ast-7), a anotação declarada é
+// INVARIANTE imposta em runtime (fail-fast) - o tipo carrega "kt" e o
+// veredito sai na camada guaranteed, distinta da promessa declarada
+STATIC FUNCTION B7KtMark( hType, hAst )
+
+   IF hType != NIL .AND. hAst != NIL .AND. hb_HGetDef( hAst, "kt", .F. )
+      hType[ "kt" ] := .T.
+   ENDIF
+
+   RETURN hType
 
 // marca a travessia de vínculo escrito no tipo (D1)
 STATIC FUNCTION B7ViaMark( hType, lVia )
@@ -6502,11 +6530,12 @@ STATIC FUNCTION B7FunRet( cUpFun, hAst, hInter )
    ENDIF
    hb_HDel( hInter[ "active" ], cKey )
    // um retorno de classe vindo de OUTRA função é sempre cadeia (promessa
-   // herdada) - nunca "declared" do ponto de vista do chamador
+   // herdada) - nunca "declared"/"kt" do ponto de vista do chamador
    IF hOut != NIL .AND. hb_HHasKey( hOut, "cls" ) .AND. ;
       hb_HGetDef( hOut, "how", "" ) == "declared"
       hOut := hb_HClone( hOut )
       hOut[ "how" ] := "chain"
+      hb_HDel( hOut, "kt" )
    ENDIF
    hInter[ "rets" ][ cKey ] := hOut
 
@@ -6999,6 +7028,7 @@ STATIC FUNCTION B7BlockEvalType( hFunc, hAst, aBP, cSym, hDecl, hSeen, hInter )
    IF hOut != NIL .AND. hb_HGetDef( hOut, "how", "" ) == "declared"
       hOut := hb_HClone( hOut )
       hOut[ "how" ] := "chain"
+      hb_HDel( hOut, "kt" )
    ENDIF
    hInter[ "params" ][ cKey ] := hOut
 
@@ -7238,6 +7268,7 @@ STATIC FUNCTION B7ParamType( hFuncOwn, hAstOwn, cUpSym, hInter )
    IF hOut != NIL .AND. hb_HGetDef( hOut, "how", "" ) == "declared"
       hOut := hb_HClone( hOut )
       hOut[ "how" ] := "chain"
+      hb_HDel( hOut, "kt" )
    ENDIF
    hInter[ "params" ][ cKey ] := hOut
 
@@ -7671,6 +7702,12 @@ STATIC FUNCTION SendVerdict( hType, cClass, cUpMeth, cUpSym, hGraph, lBlock )
       IF lVia
          RETURN { "confirmed send (receiver class " + cRcls + ;
                   " via construction chain, class graph as written" + cSuf + ")", .F. }
+      ENDIF
+      // B9: anotação em módulo -kt é INVARIANTE imposta em runtime
+      // (fail-fast) - camada guaranteed, acima da promessa declarada
+      IF hType[ "how" ] == "declared" .AND. hb_HGetDef( hType, "kt", .F. )
+         RETURN { "guaranteed send (receiver AS CLASS " + cRcls + ;
+                  " imposed by -kt checks" + cSuf + ")", .F. }
       ENDIF
       RETURN { "confirmed send (receiver " + ;
                iif( hType[ "how" ] == "declared", "declared AS CLASS " + cRcls, ;

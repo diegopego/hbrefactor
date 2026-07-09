@@ -53,7 +53,7 @@ Compilador como oráculo (ganchos de 1 linha gated, `.hrb` byte-idêntico
 sem `-x`); editor ≠ verificador (recompilar, comparar, rollback); hbmk2
 como resolvedor de projeto; fixtures como contrato de comportamento;
 réplica sintática na ferramenta é proibida (a fonte da verdade é o
-compilador). Dump por módulo `.ast.json` (schema atual **ast-6**), specs
+compilador). Dump por módulo `.ast.json` (schema atual **ast-7**), specs
 de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 
 ## Fases entregues (registro completo no [arquivo](roadmap-fases-entregues.md))
@@ -81,6 +81,32 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
 `StrDelimsOk` (delimitadores de string — ideal: span original no dump);
 cheque textual de continuação `;` em 2 pontos (falso positivo só recusa).
+
+## PENDÊNCIAS DE SESSÃO (2026-07-09 — retomada em sessão nova)
+
+1. **Revisão externa Codex (pedido do Diego)**: segunda opinião
+   INDEPENDENTE sobre os dois repos, contra as réguas R1 (zero
+   inferência) e R2 (classes não são especiais — são construto de
+   diretivas do PP). Instrumento pronto:
+   **[revisao-codex-zero-inferencia.md](revisao-codex-zero-inferencia.md)**
+   — despachar com `/codex:rescue` apontando esse arquivo (Codex CLI
+   instalado e autenticado via ChatGPT em 2026-07-09). NÃO contaminar o
+   brief com o juízo do Claude. **Gotcha operacional (custou 1
+   tentativa)**: o modelo default do companion (`gpt-5-codex`) NÃO é
+   suportado em conta ChatGPT — a primeira tentativa falhou com
+   invalid_request_error em 3s; pedir modelo suportado (ex.:
+   `/codex:rescue --model spark ...`).
+2. **Fatia 1 da B9 SEM COMMIT nos dois repos** (aguarda decisão do
+   Diego, que pediu o parecer do Codex antes): harbour-core tem a
+   fatia `-kt` inteira na árvore de trabalho (8 arquivos, `git diff`);
+   hbrefactor tem consumo ast-7 + camada guaranteed + fixkt/caso 87 +
+   docs. Suíte 616/0 byte-idêntica. O destino (commitar/redesenhar/
+   descartar) sai da decisão pós-revisão.
+3. Contexto da decisão: julgamento honesto do Claude (2026-07-08, na
+   sessão anterior): para refatoração semântica de legado a linha não
+   compensa (teto medido — M-cov no mapa); vale manter renames
+   verificados + usages honesto; `-kt` é decisão de DIALETO, separada.
+   O Diego quer o contraponto do Codex antes de decidir.
 
 ## Fases ATIVAS (por prioridade)
 
@@ -277,7 +303,15 @@ por `pStack == NULL`):
 Evidência de execução só volta se tiver consumo 100% fato (ex.:
 alimentar cheques impostos), decisão do Diego.
 
-### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **SAI DA GAVETA pela REGRA DO FATO (2026-07-08): é o caminho canônico — aguarda portão do Diego para executar**
+### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **FASE ATIVA (portão confirmado 2026-07-08); FATIA 1 (core+consumo) ENTREGUE, FATIA 2 (materialização) EM CURSO**
+
+**Fatia 1 entregue (2026-07-08)**: `-kt` no core (emissão prólogo/
+local/RETURN + helper `__HB_CHKTYPE` com is-a no objeto vivo; zero
+impacto 224/224; dimensionada NÃO é anotação — `HB_VSCOMP_DIMMED`);
+schema **ast-7** (`kt` + `dim`); camada `guaranteed` no usages +
+DeclType sem a falsa promessa do 'A' dimensionado (excluded errado
+fechado); fixture fixkt + caso 87 (17 checks, execução real); suíte
+**616/0** byte-idêntica. Detalhes/critérios na spec.
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a
