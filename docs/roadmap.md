@@ -91,17 +91,22 @@ cheque textual de continuação `;` em 2 pontos (falso positivo só recusa).
    **[revisao-codex-zero-inferencia.md](revisao-codex-zero-inferencia.md)**
    — despachar com `/codex:rescue` apontando esse arquivo (Codex CLI
    instalado e autenticado via ChatGPT em 2026-07-09). NÃO contaminar o
-   brief com o juízo do Claude. **Gotcha operacional (custou 1
-   tentativa)**: o modelo default do companion (`gpt-5-codex`) NÃO é
-   suportado em conta ChatGPT — a primeira tentativa falhou com
-   invalid_request_error em 3s; pedir modelo suportado (ex.:
-   `/codex:rescue --model spark ...`).
-2. **Fatia 1 da B9 SEM COMMIT nos dois repos** (aguarda decisão do
-   Diego, que pediu o parecer do Codex antes): harbour-core tem a
-   fatia `-kt` inteira na árvore de trabalho (8 arquivos, `git diff`);
-   hbrefactor tem consumo ast-7 + camada guaranteed + fixkt/caso 87 +
-   docs. Suíte 616/0 byte-idêntica. O destino (commitar/redesenhar/
-   descartar) sai da decisão pós-revisão.
+   brief com o juízo do Claude. **1ª rodada FEITA (2026-07-09,
+   gpt-5.4-mini)**: achados de FORMA aplicados ao instrumento
+   (proveniência, glossário, R2 reescopada, medido ≠ interpretação);
+   falta a rodada de MÉRITO (Q1-Q5). **Gotcha operacional (custou 3
+   tentativas)**: em conta ChatGPT NÃO são suportados nem o default do
+   companion (`gpt-5-codex` — fixado em `~/.codex/config.toml`, vale
+   trocar) nem `spark` (`gpt-5.3-codex-spark`); válidos hoje (pelo
+   models_cache do CLI): `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5` — ex.:
+   `/codex:rescue --model gpt-5.4-mini ...`.
+2. **Fatia 1 da B9 COMMITADA nos dois repos** (decisão do Diego,
+   2026-07-09, após a 1ª rodada da revisão): harbour-core
+   `c1927dfcac` (a fatia `-kt`, 8 arquivos, schema ast-7); hbrefactor
+   `6584aa8` (consumo ast-7 + camada guaranteed + fixkt/caso 87 +
+   docs + o instrumento de revisão). Suíte 616/0 byte-idêntica. A
+   rodada de mérito (Q1-Q5) ainda pode recomendar re-desenhar ou
+   reverter.
 3. Contexto da decisão: julgamento honesto do Claude (2026-07-08, na
    sessão anterior): para refatoração semântica de legado a linha não
    compensa (teto medido — M-cov no mapa); vale manter renames
