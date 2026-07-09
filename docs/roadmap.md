@@ -262,15 +262,25 @@ dos testes rebaixados estão SUSPENSAS em
 [testes-suspensos-re3.md](testes-suspensos-re3.md) (rótulo antigo
 verbatim + rota de fato por site); os itens [FATIA-2] de lá são a
 semente do critério de aceite da fatia 2.
-**Spec da FATIA 2 REDIGIDA E NO PORTÃO (2026-07-09):
+**Spec da FATIA 2 redigida (2026-07-09):
 [spec-b9-fatia2-materializacao.md](spec-b9-fatia2-materializacao.md)**
 — comando `annotate` (revive a máquina dormente por `B7Ctx`, mata o
 W0034), rotas A (LOCAL/param) e B (retorno por `DECLARE`) DENTRO; rotas
 C (SEM ROTA — não promete), D (codeblock — A6+RE.5) e E (degrade) FORA;
-extensão VSCode na mesma fatia; verificação padrão-ouro + limite honesto
-declarado; critério executável semeado pelos itens [FATIA-2]. Portões
-abertos P1 (política de `via`), P2 (onde vive o `DECLARE`), P3 (nome do
-comando). **Não executar antes do portão do Diego.**
+extensão VSCode na mesma fatia.
+**PLANO VIGENTE (aprovado pelo Diego em 2026-07-09; EXECUÇÃO SOB
+PORTÃO): [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md)** — a
+discussão do P1 (argumento do Diego: "o compilador já sabe o tipo de
+`t := Cls():New()`") gerou investigação com probes que SUPERSEDE os
+portões P1/P2/P3 da spec: o cheque de tipos do core é vestigial (zero
+emissores), mas hbclass declara retorno de CONSTRUCTOR e **uma linha
+`DECLARE` fecha a cadeia no módulo do site** (probes smoke1-4). Nasce a
+ESCADA: nível 1 (fato declarado puro) e nível 2 (fecha materializando o
+DECLARE que falta) materializam; nível 3 (só inferência `via`) NÃO
+edita, só relata. Etapas F2.0-F2.5 com portão intermediário do Diego
+após a tabela de alcance do `annotate --dry-run` ("vermos o que
+conseguimos"); a spec v2 (F2.2) reescreve a spec acima quando a
+execução abrir. **Nenhuma etapa executa antes de o Diego abrir.**
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a
