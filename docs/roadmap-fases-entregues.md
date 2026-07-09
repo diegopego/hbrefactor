@@ -1612,3 +1612,108 @@ runtime por contador). Suíte **600/0**, byte-idêntica paralelo ×
 **M-cov 2 re-rodada no MESMO corpus** (harness `tests/mcov2.sh`, binário
 antigo × novo): delta registrado na seção M-cov 2 do
 [limites-e-alavancas.md](limites-e-alavancas.md).
+
+## Fase R — Revisão de generalidade ✅ (2026-07-07) — narrativa migrada do roadmap (arquivada 2026-07-09)
+
+**Escopo e checklist**: [revisao-generalidade.md](revisao-generalidade.md).
+**Q4 ✅ FECHADA (2026-07-07, caso 75)**: o veneno do pai falso era real
+(probe fixq4: forjador por `@ref` na linha da declaração virava pai e
+`t:Pintar()` saía confirmed para um send que seria ERRO em runtime);
+conserto `DispatchVia` — vínculo escrito nunca confirma/exclui, acerto
+próprio decide; 7 asserts de herança flipam para possible nomeado
+(**mudança de contrato, aguardava portão do Diego — absorvida pela
+fase RE em 2026-07-09**); suíte 474/0.
+**Q8 ✅ FECHADA (2026-07-07)**: auditoria commit a commit REFUTOU a
+suspeita — nenhuma lógica keyed a biblioteca no core do branch, só
+transporte 1:1 de canal da linguagem (gates fAst = tabelas vivas com
+warnings nível-3 gated na emissão; schema espelha a gramática; canal de
+tipos é write-only no core; evidência arquivo:linha no doc da revisão).
+Pendência cosmética opcional: comentário de compast.c:106 (→ B6).
+**Q1-Q3/Q7 ✅ FECHADAS (2026-07-07, casos 76-79, fixture fixofi)**: DSL
+inventada NÃO-espelho (colagem MENSAGEM-primeiro `Talha_na_Banca`,
+assinatura única sem par protótipo/impl, dispatch REAL
+`__clsNew`/`__clsAddMsg`). Q2 = prova pura (o açúcar é só política de
+unicidade sobre o motor genérico). Q1/Q3 = conserto `GenMsgPart`: a
+mensagem do composto é a parte que NÃO nomeia função-de-classe (fato da
+co-derivação) — eleger a última parte era forma-de-hbclass (call-graph
+respondia VAZIO; o reorder cru elegia a dona). Q7 = a síntese
+`METHOD ... CLASS` fica exclusiva da forma hbclass (portão = vocábulo da
+regra raiz via `PpMarkerLift`; DSL própria degrada para FUNÇÃO verificada
+com o fato relatado) + veneno novo morto: range com `QSelf()` extraído
+para função mudava comportamento EM SILÊNCIO (receptor não viaja) — nó
+`SELF` na árvore agora recusa limpo nomeando a exceção. Suíte 517/0.
+**Q6 ✅ FECHADA (2026-07-07, caso 72 atualizado + caso 80 novo)**: rótulo
+do DONO no vocabulário da DSL que o declarou (`cog declaration
+(rig TOTEM)`, `oficio definition Talha (tenda Banca)` — prova na DSL
+não-espelho). Semântica decidida por probe: a cabeça da regra cuja
+expansão LIGOU o nome ao canal de classe (o `from` do próprio nome), NÃO
+a regra raiz do site — `CREATE CLASS` tem raiz `create` e o hbclass segue
+`(class ...)` porque a regra `CLASS` é quem declara; dona sem derivação
+cai para "class" (o nome do canal da linguagem). Suíte 520/0.
+**Q5 ✅ FECHADA (2026-07-07, casos 81 + 71 novo; opção B do Diego)**: o
+`methodQuery` (regex hbclass da extensão, V1) morreu — a extensão manda a
+POSIÇÃO do cursor (`usages --at arq:linha:col`, UMA compilação) e o CLI
+resolve por fato (`ResolveAtQuery`, mesmo core do `resolve-at`
+standalone): co-derivação do site + aplicação-identidade (P1a) + canal
+declared. Homônimos pelo SITE; DSL qualquer promove (a regex só via
+hbclass); send/posição-vazia degradam honesto. Extensão 0.6.0.
+
+**A REVISÃO ESTÁ COMPLETA**: V1-V7 tratados, Q1-Q8 fechadas com prova
+executável (casos 75-81 + atualizações 64/72-74), régua do caso 64
+assertada nos casos novos, extensão sem regex de construto.
+
+## Fase B-infra Etapa 2 — runner em Harbour ✅ (2026-07-08) — narrativa migrada do roadmap (arquivada 2026-07-09)
+
+Mesma FORMA da Etapa 1 (pool por-caso, unidades bash intactas,
+protocolo filho `--unit N` + `@@counts` + logs impressos na ordem), só
+a tecnologia troca, em duas fatias independentes:
+
+- **(a) checker Harbour** — `tests/tcheck.prg` (compilado pelo
+  Makefile) substitui os **10 heredocs `python3`** das unidades
+  18/26/42/62/65/66/70/72/82 (o "18/26" do desenho original cresceu):
+  asserts sobre JSON via `hb_jsonDecode`, mesmos exit codes e mesmas
+  saídas assertadas ("json ok", "consistente").
+- **(b) despacho+join Harbour** — `tests/parrun.prg` via
+  `hb_processOpen`/`hb_processValue` (fato verificado no fonte:
+  `waitpid(WNOHANG)`, -1 enquanto roda) substitui o ramo `xargs -P`
+  do run.sh; `JOBS>1` delega ao binário, `JOBS=1` continua bash
+  sequencial com saída ao vivo (R7 preservado).
+
+Fora do escopo (decisão de menor arrependimento, mesma da Etapa 1):
+reescrever os 555 asserts em .prg (drift alto, valor novo nulo — as
+unidades bash JÁ são auto-contidas) e o `occ_ast_diff.py` do
+`make lexdiff` (fora do caminho do `make test`; morre quando o alvo
+legado morrer). Critério de pronto, TODO provado por execução no
+fechamento (2026-07-08): `python3` ausente do `run.sh` (resta 1 menção
+em comentário — história); saída do `make test` **byte-idêntica** nos
+dois modos (diff paralelo × `JOBS=1` limpo); 10/10 rodadas paralelas
+sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
+Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
+são dependências do alvo `test`).
+
+## Registro de sessão 2026-07-09 — revisão externa Codex, commit da B9 fatia 1, abertura da fase RE
+
+Sequência da sessão (pendências 1-3 do roadmap daquele dia, resolvidas):
+
+1. **Revisão externa despachada e concluída** (instrumento
+   [revisao-codex-zero-inferencia.md](revisao-codex-zero-inferencia.md),
+   sem contaminação pelo juízo do Claude). Três rodadas: forma
+   (gpt-5.4-mini; 6 achados aplicados), mérito Q1-Q5 (gpt-5.5) e
+   auditoria de código do delta + ferramenta (gpt-5.5; achados A1-A5).
+   Registro completo das rodadas e vereditos:
+   [spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md).
+2. **Fatia 1 da B9 commitada nos dois repos por decisão do Diego**
+   (após a 1ª rodada): harbour-core `c1927dfcac` (fatia `-kt`, 8
+   arquivos, schema ast-7); hbrefactor `6584aa8` (consumo ast-7 +
+   guaranteed + fixkt/caso 87 + docs); depois `590a4a5` (achados de
+   forma aplicados ao instrumento). Suíte 616/0 byte-idêntica.
+3. **Convergência e decisão**: o veredito externo convergiu com o
+   julgamento interno de 2026-07-08 (manter renames verificados +
+   usages honesto; rebaixar B7/B7b; `-kt` legítimo com consumo a
+   consertar). O Diego adotou o plano (2026-07-09) — fase RE aberta
+   como prioridade 1, plano vinculante na spec acima.
+
+Contexto pré-decisão preservado: o julgamento interno de 2026-07-08
+dizia que, para refatoração semântica de legado, a linha não compensa
+no teto medido (M-cov no mapa); vale manter renames verificados +
+usages honesto; `-kt` é decisão de DIALETO, separada.

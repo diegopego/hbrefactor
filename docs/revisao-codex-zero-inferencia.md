@@ -13,7 +13,9 @@ de revisão, 2026-07-09): harbour-core, branch
 `feature/compiler-ast-dump` @ `c1927dfcac` (a fatia `-kt` inclusa);
 hbrefactor, branch `master` @ `6584aa8` (consumo ast-7 + este
 documento). Medições M-cov/M-cov 2 de 2026-07-08 — comando, corpus e
-data por número na seção "Estado de fato".
+data por número na seção "Estado de fato". **Rodadas realizadas
+(2026-07-09: forma, mérito Q1-Q5, auditoria A1-A5) e o plano adotado:
+[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md).**
 
 ## Glossário operacional (os termos das réguas e dos vereditos)
 
@@ -41,6 +43,13 @@ data por número na seção "Estado de fato".
   diretiva.
 
 ## Os dois repositórios sob revisão
+
+**Delimitação do objeto (do dono, 2026-07-09):** no harbour-core, o
+objeto é SOMENTE o delta não-pushed deste branch — `git diff
+master..HEAD` (12 commits, 16 arquivos, ~6.000 inserções): é esse
+delta que o experimento usa; o resto da árvore é o Harbour upstream e
+NÃO está em julgamento. No hbrefactor, o objeto é o PROJETO INTEIRO
+(src + testes + docs).
 
 1. **~/devel/harbour-core/harbour** — fork do Harbour, branch
    `feature/compiler-ast-dump`. Contém: (a) commits do mecanismo de dump

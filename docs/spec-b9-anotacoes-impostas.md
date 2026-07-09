@@ -1,7 +1,13 @@
 # Spec B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`)
 
-Status: **FASE ATIVA — FATIA 1 (core `-kt` + consumo) ENTREGUE em
-2026-07-08; FATIA 2 (materialização + extensão VSCode) EM CURSO.**
+Status: **FATIA 1 (core `-kt` + consumo) ENTREGUE em 2026-07-08 e
+COMMITADA em 2026-07-09 (harbour-core `c1927dfcac`, hbrefactor
+`6584aa8`); FATIA 2 (materialização + extensão VSCode) SOB GUARDA DA
+FASE RE** — a auditoria externa alegou overclaim do `guaranteed`
+(achados A1/A2: sites que o cheque não cobre saem com o selo);
+verificação e conserto do consumo em RE.1/RE.2, e a fatia 2 só abre
+depois do RE.3 (forma da camada sugeridora):
+[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md).
 Fatia 1: flag `-kt` com emissão nos três pontos do T4 (prólogo de
 params, pós-atribuição a local anotado, RETURN via DECLARE embrulhado
 em `__HB_CHKTYPE`), helper de runtime em classes.c (is-a no objeto

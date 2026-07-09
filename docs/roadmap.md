@@ -5,6 +5,11 @@ verificação); decisões de produto e autorizações (commits, PR upstream):
 Diego. Regra de manutenção: **este documento é vivo** — fase futura só
 começa com escopo e critério de pronto escritos; fase concluída ganha UMA
 linha no índice de entregues e o registro completo vai para o arquivo.
+**Regra de arquivamento (2026-07-09)**: o mesmo vale para SEÇÕES já
+concluídas dentro deste arquivo e para pendências de sessão resolvidas —
+a narrativa migra para o [arquivo](roadmap-fases-entregues.md) na mesma
+sessão e aqui fica só o stub com os links; este documento carrega apenas
+estado atual + o que está por fazer.
 Fluxos definidos vivem em **Makefile**; hbmk2 direto é só experimentação.
 
 Histórico: [roadmap-v2-arquivado.md](roadmap-v2-arquivado.md) (smoke
@@ -82,86 +87,32 @@ Réplicas conservadoras remanescentes (da auditoria, não urgentes):
 `StrDelimsOk` (delimitadores de string — ideal: span original no dump);
 cheque textual de continuação `;` em 2 pontos (falso positivo só recusa).
 
-## PENDÊNCIAS DE SESSÃO (2026-07-09 — retomada em sessão nova)
-
-1. **Revisão externa Codex (pedido do Diego)**: segunda opinião
-   INDEPENDENTE sobre os dois repos, contra as réguas R1 (zero
-   inferência) e R2 (classes não são especiais — são construto de
-   diretivas do PP). Instrumento pronto:
-   **[revisao-codex-zero-inferencia.md](revisao-codex-zero-inferencia.md)**
-   — despachar com `/codex:rescue` apontando esse arquivo (Codex CLI
-   instalado e autenticado via ChatGPT em 2026-07-09). NÃO contaminar o
-   brief com o juízo do Claude. **1ª rodada FEITA (2026-07-09,
-   gpt-5.4-mini)**: achados de FORMA aplicados ao instrumento
-   (proveniência, glossário, R2 reescopada, medido ≠ interpretação);
-   falta a rodada de MÉRITO (Q1-Q5). **Gotcha operacional (custou 3
-   tentativas)**: em conta ChatGPT NÃO são suportados nem o default do
-   companion (`gpt-5-codex` — fixado em `~/.codex/config.toml`, vale
-   trocar) nem `spark` (`gpt-5.3-codex-spark`); válidos hoje (pelo
-   models_cache do CLI): `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5` — ex.:
-   `/codex:rescue --model gpt-5.4-mini ...`.
-2. **Fatia 1 da B9 COMMITADA nos dois repos** (decisão do Diego,
-   2026-07-09, após a 1ª rodada da revisão): harbour-core
-   `c1927dfcac` (a fatia `-kt`, 8 arquivos, schema ast-7); hbrefactor
-   `6584aa8` (consumo ast-7 + camada guaranteed + fixkt/caso 87 +
-   docs + o instrumento de revisão). Suíte 616/0 byte-idêntica. A
-   rodada de mérito (Q1-Q5) ainda pode recomendar re-desenhar ou
-   reverter.
-3. Contexto da decisão: julgamento honesto do Claude (2026-07-08, na
-   sessão anterior): para refatoração semântica de legado a linha não
-   compensa (teto medido — M-cov no mapa); vale manter renames
-   verificados + usages honesto; `-kt` é decisão de DIALETO, separada.
-   O Diego quer o contraponto do Codex antes de decidir.
-
 ## Fases ATIVAS (por prioridade)
 
-### R — Revisão de generalidade ✅ CONCLUÍDA (2026-07-07)
+### RE — Re-escopo pós-revisão externa — **PRIORIDADE 1 (portão aberto pelo Diego, 2026-07-09)**
 
-**Escopo e checklist**: [revisao-generalidade.md](revisao-generalidade.md).
-**Q4 ✅ FECHADA (2026-07-07, caso 75)**: o veneno do pai falso era real
-(probe fixq4: forjador por `@ref` na linha da declaração virava pai e
-`t:Pintar()` saía confirmed para um send que seria ERRO em runtime);
-conserto `DispatchVia` — vínculo escrito nunca confirma/exclui, acerto
-próprio decide; 7 asserts de herança flipam para possible nomeado
-(**mudança de contrato, aguarda portão do Diego**); suíte 474/0.
-**Q8 ✅ FECHADA (2026-07-07)**: auditoria commit a commit REFUTOU a
-suspeita — nenhuma lógica keyed a biblioteca no core do branch, só
-transporte 1:1 de canal da linguagem (gates fAst = tabelas vivas com
-warnings nível-3 gated na emissão; schema espelha a gramática; canal de
-tipos é write-only no core; evidência arquivo:linha no doc da revisão).
-Pendência cosmética opcional: comentário de compast.c:106 (→ B6).
-**Q1-Q3/Q7 ✅ FECHADAS (2026-07-07, casos 76-79, fixture fixofi)**: DSL
-inventada NÃO-espelho (colagem MENSAGEM-primeiro `Talha_na_Banca`,
-assinatura única sem par protótipo/impl, dispatch REAL
-`__clsNew`/`__clsAddMsg`). Q2 = prova pura (o açúcar é só política de
-unicidade sobre o motor genérico). Q1/Q3 = conserto `GenMsgPart`: a
-mensagem do composto é a parte que NÃO nomeia função-de-classe (fato da
-co-derivação) — eleger a última parte era forma-de-hbclass (call-graph
-respondia VAZIO; o reorder cru elegia a dona). Q7 = a síntese
-`METHOD ... CLASS` fica exclusiva da forma hbclass (portão = vocábulo da
-regra raiz via `PpMarkerLift`; DSL própria degrada para FUNÇÃO verificada
-com o fato relatado) + veneno novo morto: range com `QSelf()` extraído
-para função mudava comportamento EM SILÊNCIO (receptor não viaja) — nó
-`SELF` na árvore agora recusa limpo nomeando a exceção. Suíte 517/0.
-**Q6 ✅ FECHADA (2026-07-07, caso 72 atualizado + caso 80 novo)**: rótulo
-do DONO no vocabulário da DSL que o declarou (`cog declaration
-(rig TOTEM)`, `oficio definition Talha (tenda Banca)` — prova na DSL
-não-espelho). Semântica decidida por probe: a cabeça da regra cuja
-expansão LIGOU o nome ao canal de classe (o `from` do próprio nome), NÃO
-a regra raiz do site — `CREATE CLASS` tem raiz `create` e o hbclass segue
-`(class ...)` porque a regra `CLASS` é quem declara; dona sem derivação
-cai para "class" (o nome do canal da linguagem). Suíte 520/0.
-**Q5 ✅ FECHADA (2026-07-07, casos 81 + 71 novo; opção B do Diego)**: o
-`methodQuery` (regex hbclass da extensão, V1) morreu — a extensão manda a
-POSIÇÃO do cursor (`usages --at arq:linha:col`, UMA compilação) e o CLI
-resolve por fato (`ResolveAtQuery`, mesmo core do `resolve-at`
-standalone): co-derivação do site + aplicação-identidade (P1a) + canal
-declared. Homônimos pelo SITE; DSL qualquer promove (a regex só via
-hbclass); send/posição-vazia degradam honesto. Extensão 0.6.0.
+A revisão externa independente (Codex, 3 rodadas em 2026-07-09 —
+instrumento
+[revisao-codex-zero-inferencia.md](revisao-codex-zero-inferencia.md))
+convergiu com o julgamento interno de 2026-07-08: **manter** dump
+`-x`/rastreamento PP/refatorações verificadas; **`-kt` é R1-legítimo
+mas o consumo overclaima** (`guaranteed` para sites que o cheque não
+cobre); **B7/B7b são inferência** → rebaixar a sugeridora/
+materializadora. Plano vinculante com achados A1-A5, itens RE.1-RE.6,
+guarda de fase e critérios executáveis:
+**[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
+— retomada de sessão COMEÇA por lá. Registro narrativo da sessão
+2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no
+[arquivo](roadmap-fases-entregues.md).
 
-**A REVISÃO ESTÁ COMPLETA**: V1-V7 tratados, Q1-Q8 fechadas com prova
-executável (casos 75-81 + atualizações 64/72-74), régua do caso 64
-assertada nos casos novos, extensão sem regex de construto.
+### R — Revisão de generalidade ✅ CONCLUÍDA (2026-07-07) — narrativa no [arquivo](roadmap-fases-entregues.md)
+
+V1-V7 tratados, Q1-Q8 fechadas com prova executável (casos 75-81 +
+atualizações 64/72-74); checklist e achados:
+[revisao-generalidade.md](revisao-generalidade.md). Pendência viva que
+sobrou: os 7 asserts de herança flipados para possible nomeado (Q4)
+foram **mudança de contrato que aguardava portão do Diego** — absorvida
+pela fase RE (o rebaixamento de B7/B7b decide o contrato final).
 
 ### B4g ✅ ENTREGUE (2026-07-07) — registro no [arquivo](roadmap-fases-entregues.md)
 
@@ -259,42 +210,13 @@ adivinhação); capacidades por-flag preservadas sob o verbo; nomes antigos
 viram aliases OU a remoção fica registrada em ADR; `extract`/`reorder`
 recebem o mesmo tratamento se o fato os cobrir. Zero regressão na suíte.
 
-### B-infra — suíte paralela (pool dinâmico)
+### B-infra — suíte paralela ✅ ENTREGUE (Etapas 1 e 2) — narrativa no [arquivo](roadmap-fases-entregues.md)
 
-Racional: [testes-paralelos.md](testes-paralelos.md).
-**Etapa 1 ✅ ENTREGUE (2026-07-07)** — registro no
-[arquivo](roadmap-fases-entregues.md): pool bash `xargs -P` por-caso,
-`TMPDIR` por unidade, artefato + tally no join; asserts intactos (drift
-zero). Provas: saída BYTE-IDÊNTICA à sequencial (J1 e paralelo), 10/10
-rodadas sem flake, **109 s → 11-14 s (~8×)**; `make test` = paralelo
-default, `JOBS=1` sequencial com saída ao vivo para depurar.
-**Etapa 2 — runner em Harbour ✅ ENTREGUE (2026-07-08)**: mesma FORMA
-da Etapa 1 (pool por-caso, unidades bash intactas, protocolo filho
-`--unit N` + `@@counts` + logs impressos na ordem), só a tecnologia
-troca, em duas fatias independentes:
-
-- **(a) checker Harbour** — `tests/tcheck.prg` (compilado pelo
-  Makefile) substitui os **10 heredocs `python3`** das unidades
-  18/26/42/62/65/66/70/72/82 (o "18/26" do desenho original cresceu):
-  asserts sobre JSON via `hb_jsonDecode`, mesmos exit codes e mesmas
-  saídas assertadas ("json ok", "consistente").
-- **(b) despacho+join Harbour** — `tests/parrun.prg` via
-  `hb_processOpen`/`hb_processValue` (fato verificado no fonte:
-  `waitpid(WNOHANG)`, -1 enquanto roda) substitui o ramo `xargs -P`
-  do run.sh; `JOBS>1` delega ao binário, `JOBS=1` continua bash
-  sequencial com saída ao vivo (R7 preservado).
-
-Fora do escopo (decisão de menor arrependimento, mesma da Etapa 1):
-reescrever os 555 asserts em .prg (drift alto, valor novo nulo — as
-unidades bash JÁ são auto-contidas) e o `occ_ast_diff.py` do
-`make lexdiff` (fora do caminho do `make test`; morre quando o alvo
-legado morrer). Critério de pronto, TODO provado por execução no
-fechamento (2026-07-08): `python3` ausente do `run.sh` (resta 1 menção
-em comentário — história); saída do `make test` **byte-idêntica** nos
-dois modos (diff paralelo × `JOBS=1` limpo); 10/10 rodadas paralelas
-sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
-Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
-são dependências do alvo `test`).
+Racional: [testes-paralelos.md](testes-paralelos.md). Etapa 1
+(2026-07-07): pool bash por-caso, 109 s → 11-14 s (~8×). Etapa 2
+(2026-07-08): runner em Harbour (`tests/parrun.prg` +
+`tests/tcheck.prg`), python fora do `make test`, paridade
+byte-idêntica nos dois modos.
 
 ### D — Evidência de execução — **PORTÃO FECHADO NA FORMA PROPOSTA (Diego, 2026-07-08)**
 
@@ -308,15 +230,20 @@ por `pStack == NULL`):
 Evidência de execução só volta se tiver consumo 100% fato (ex.:
 alimentar cheques impostos), decisão do Diego.
 
-### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **FASE ATIVA (portão confirmado 2026-07-08); FATIA 1 (core+consumo) ENTREGUE, FATIA 2 (materialização) EM CURSO**
+### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **FATIA 1 ENTREGUE E COMMITADA; FATIA 2 (materialização) SOB GUARDA DA FASE RE**
 
-**Fatia 1 entregue (2026-07-08)**: `-kt` no core (emissão prólogo/
-local/RETURN + helper `__HB_CHKTYPE` com is-a no objeto vivo; zero
-impacto 224/224; dimensionada NÃO é anotação — `HB_VSCOMP_DIMMED`);
-schema **ast-7** (`kt` + `dim`); camada `guaranteed` no usages +
-DeclType sem a falsa promessa do 'A' dimensionado (excluded errado
-fechado); fixture fixkt + caso 87 (17 checks, execução real); suíte
-**616/0** byte-idêntica. Detalhes/critérios na spec.
+**Fatia 1 entregue (2026-07-08; commitada 2026-07-09 por decisão do
+Diego — harbour-core `c1927dfcac`, hbrefactor `6584aa8`)**: `-kt` no
+core (emissão prólogo/local/RETURN + helper `__HB_CHKTYPE` com is-a no
+objeto vivo; zero impacto 224/224; dimensionada NÃO é anotação —
+`HB_VSCOMP_DIMMED`); schema **ast-7** (`kt` + `dim`); camada
+`guaranteed` no usages + DeclType sem a falsa promessa do 'A'
+dimensionado (excluded errado fechado); fixture fixkt + caso 87 (17
+checks, execução real); suíte **616/0** byte-idêntica. Detalhes/
+critérios na spec. **Atenção (fase RE)**: a auditoria externa alegou
+overclaim do `guaranteed` (achados A1/A2 — sites que o cheque não
+cobre); consumo em conserto no RE.2, e a fatia 2 só abre depois do
+RE.3 decidir a forma da camada sugeridora.
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a

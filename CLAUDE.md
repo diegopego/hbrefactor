@@ -71,6 +71,13 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   entrega, não fase adiável (é o consumidor de uso diário do Diego).
 - smoketest/hbrefactor-occ.prg é a primeira encarnação, arquivada:
   só leitura, nunca editar.
+- **Revisão externa via Codex (`/codex:rescue`)**: o brief é instrumento
+  versionado em docs/ e NÃO se contamina com o juízo do Claude; em conta
+  ChatGPT valem só os modelos do models_cache do CLI (2026-07-09:
+  `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`; `gpt-5-codex` e `spark` falham
+  com invalid_request_error — custou 3 tentativas); achado externo é
+  HIPÓTESE até verificação no fonte com arquivo:linha (idioma da fase
+  RE) — nunca agir direto sobre o relato.
 - Commits só com autorização explícita do Diego **para AQUELE commit**;
   concluir/aprovar o trabalho não autoriza o commit. Um pedido por commit —
   não encadear. Sem push salvo pedido.
