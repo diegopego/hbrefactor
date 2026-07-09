@@ -262,6 +262,15 @@ dos testes rebaixados estão SUSPENSAS em
 [testes-suspensos-re3.md](testes-suspensos-re3.md) (rótulo antigo
 verbatim + rota de fato por site); os itens [FATIA-2] de lá são a
 semente do critério de aceite da fatia 2.
+**Spec da FATIA 2 REDIGIDA E NO PORTÃO (2026-07-09):
+[spec-b9-fatia2-materializacao.md](spec-b9-fatia2-materializacao.md)**
+— comando `annotate` (revive a máquina dormente por `B7Ctx`, mata o
+W0034), rotas A (LOCAL/param) e B (retorno por `DECLARE`) DENTRO; rotas
+C (SEM ROTA — não promete), D (codeblock — A6+RE.5) e E (degrade) FORA;
+extensão VSCode na mesma fatia; verificação padrão-ouro + limite honesto
+declarado; critério executável semeado pelos itens [FATIA-2]. Portões
+abertos P1 (política de `via`), P2 (onde vive o `DECLARE`), P3 (nome do
+comando). **Não executar antes do portão do Diego.**
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a

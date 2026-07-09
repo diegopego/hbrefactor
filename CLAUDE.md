@@ -6,6 +6,19 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 
 ## Regras de trabalho
 
+- **O hbrefactor CONSTRÓI a AST de que precisa — editar o harbour-core
+  não é só permitido, é DEVER (Diego, 2026-07-09)**: o preceito fundador
+  é que a ferramenta age só sobre FATO da AST do compilador; a AST é
+  produzida pelo core; logo *ser capaz de moldar a AST* — estendendo o
+  core para o fato passar a existir — é parte da definição da ferramenta,
+  não uma exceção tolerada. Uma ferramenta que não pode construir a AST
+  de que precisa está amputada do próprio princípio. Permissão TOTAL e
+  esperada de EDITAR a árvore do core em
+  `~/devel/harbour-core/harbour` (branch `feature/compiler-ast-dump`;
+  acesso concedido no `.claude/settings.json`) sempre que a REGRA DO FATO
+  pedir. O único freio é o de sempre: **commit no core continua sob
+  autorização por-commit do Diego** (não editar ≠ não commitar). É a
+  perna concreta da REGRA DO FATO ("estender o core para o fato existir").
 - **Compile todo .prg (fixture, exemplo, teste) ANTES de usá-lo em
   qualquer teste** — `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto
   via hbmk2. Fixture que não compila gera diagnóstico enganoso.
