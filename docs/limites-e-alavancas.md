@@ -222,3 +222,15 @@ Evals NA RTL, fora do projeto — ponto cego estrutural, degrade
 honesto; detached multi-write (1.284) permanece ⊤ por regra (sem
 ordem). O mecanismo está provado onde o fato existe (caso 86); a
 régua final segue sendo o dogfooding em código de produção.
+
+**ESCADA RE-REVISADA — A REGRA DO FATO (Diego, 2026-07-08, ao ver o
+portão da alavanca D; revoga a escada do início do dia)**: hbrefactor
+lida com FATOS; heurística e TRIAGEM não são produto; **meta = ZERO
+INFERÊNCIA**. Fato ausente → estender o CORE para o fato existir
+(caminho canônico: **alavanca G/B9**, anotação vira invariante imposta
+— fecha por RUNTIME os baldes que a estática nunca vê) ou usar
+ferramenta do core como oráculo — nunca construir inferência nova. A
+inferência entregue (B7/B7b) converge para MATERIALIZADORA de anotações
+(ciclo virtuoso desta seção), não fonte de veredito de longo prazo. A
+alavanca D na forma triagem (camada observed para priorizar conferência)
+foi RECUSADA; evidência de execução só volta com consumo 100% fato.

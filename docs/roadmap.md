@@ -26,6 +26,19 @@ por-caso. **Classes/hbclass são SÓ UM CASO**, jamais o alvo do desenho.
 Fato faltante → fato de compilação ou relato honesto; ajeito é
 inaceitável. Régua executável: casos 64 e 72-74.
 
+**A REGRA DO FATO — META: ZERO INFERÊNCIA (Diego, 2026-07-08; revoga a
+escada "inferência antes de linguagem" do mesmo dia).** O hbrefactor
+lida com fatos; heurística e TRIAGEM não são produto. Fato ausente →
+estender o CORE para o fato existir (canal/invariante novo — tipos
+impostos da spec-b9 são o exemplo canônico) ou usar ferramenta do core
+como oráculo — nunca construir inferência nova. **CORE = o projeto
+Harbour oficial INTEIRO** (Diego, 2026-07-08): não só o compilador —
+hbrun, hbmk2, hbpp, RTL/VM, utilitários e o resto da árvore oficial
+contam como core para estender ou usar. A inferência entregue
+(B7/B7b) converge para SUGERIDORA de anotações (ciclo virtuoso:
+materializar `AS CLASS` provados → core impõe → veredito vira fato), não
+para fonte de veredito de longo prazo. Regra completa no CLAUDE.md.
+
 **AVISO (Diego, 2026-07-07)**: commits das eras B4e/B4f-2/extensão foram
 feitos com enquadramento hbclass-cêntrico — há código, specs e testes a
 revisar. O instrumento é
@@ -252,17 +265,33 @@ sem flake e byte-idênticas entre si; wall-time 14 s (patamar da
 Etapa 1); binários construídos pelo Makefile (`bin/tcheck`/`bin/parrun`
 são dependências do alvo `test`).
 
-### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **NA GAVETA (2026-07-08; especificada, decisões T1-T5 preservadas)**
+### D — Evidência de execução — **PORTÃO FECHADO NA FORMA PROPOSTA (Diego, 2026-07-08)**
 
-Rebaixada no mesmo portão da B7b: a M-cov 2 mostrou que os baldes
-dominantes do "possible" são lacunas de inferência (fecháveis sem
-extensão de linguagem) e dinamismo genuíno (alvo da alavanca D); a
-reticência do Diego sobre implementar tipagem estava certa — o dado
-que faltava era a fricção real, e a inferência vem antes. A spec fica
-pronta ([spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md),
+A forma proposta (camada `observed` anotando sites `possible` para
+priorizar conferência manual) é TRIAGEM — e triagem não é produto
+(REGRA DO FATO, acima). A spec fica como registro dos fatos
+re-auditados (o funil real é `hb_objGetMethod`, classes.c:1802 — cobre
+`hb_vmSend`, `hb_vmDo` com Self objeto e `@obj:var`; HasMsg se filtra
+por `pStack == NULL`):
+**[spec-d-evidencia-execucao.md](spec-d-evidencia-execucao.md)**.
+Evidência de execução só volta se tiver consumo 100% fato (ex.:
+alimentar cheques impostos), decisão do Diego.
+
+### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **SAI DA GAVETA pela REGRA DO FATO (2026-07-08): é o caminho canônico — aguarda portão do Diego para executar**
+
+A REGRA DO FATO inverte a escada do início do dia: fato ausente →
+**estender o core para o fato existir**, e a B9 é exatamente isso — a
+anotação `AS <tipo>`/`AS CLASS` vira INVARIANTE imposta (fail-fast sob
+`-kt`), transformando promessa em fato e fechando os baldes que a
+estática nunca alcança (classes montadas em runtime, objetos nascidos
+na VM — cheque por nome no objeto VIVO). Ciclo virtuoso com a
+ferramenta: a análise B7/B7b vira MATERIALIZADORA (escreve os
+`AS CLASS` que provou) → a flag impõe → o veredito vira fato. A spec
+está pronta ([spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md),
 T1-T5 decididas: flag `-kt` opt-in fluindo pelo hbmk2, NIL falha,
-is-a satisfaz, escopo params+locals+retorno); revive se o dogfooding
-provar fricção que a inferência e a alavanca D não fecham.
+is-a satisfaz, escopo params+locals+retorno); a fatia de
+MATERIALIZAÇÃO (comando que escreve anotações provadas) precisa de
+escopo+critério antes de executar.
 
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 
@@ -328,13 +357,10 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
    excluir os sends de `oC` e confirmar o de `oV`, cada um com seu fato;
    receptor sem fato (parâmetro de fora, macro, `Self := oOutra` do
    próprio fixture) permanece possible — o contrato de 3 camadas fica.
-2. **Evidência de execução (funil `hb_vmSend` + gêmeo do macro.y)**:
-   ganchos gated registrando despachos observados e ASTs de macros
-   realmente compiladas (fatos verificados 2026-07-08: macro.y:257 tem
-   a árvore inteira; gate único vm/macro.c:798; padrão macroa.c para
-   compartilhar o writer) — terceiro nível epistêmico, nunca misturado
-   ao estático (alavanca D do mapa, com adendo). Candidata a fase
-   após a B9.
+2. **Evidência de execução — PROMOVIDA a fase D no portão
+   (2026-07-08)**: spec própria com fatos re-auditados
+   ([spec-d-evidencia-execucao.md](spec-d-evidencia-execucao.md));
+   ver a seção da fase acima.
 3. **Regra sem cabeça** (`head null`, hbcompat legado): dump já registra;
    candidata a fixture de RELATO se um projeto real trouxer o caso.
 4. Dedup pré/pós-decremento: não-fazer mantido (v2).

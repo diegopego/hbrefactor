@@ -28,7 +28,23 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 - **Genérico > específico**: comando dedicado só com razão forte (o
   `usages-dsl` foi absorvido pelo `usages`); ao consumir fatos de pp, operar
   sobre o genérico (cabeça/kind/marker), nunca por DSL/família conhecida.
-- **O PRINCÍPIO DA GENERALIDADE (Diego, 2026-07-07)**: o Harbour inteiro se
+- **A REGRA DO FATO — META: ZERO INFERÊNCIA (Diego, 2026-07-08; revoga a
+  escada "inferência antes de linguagem" do mesmo dia)**: o hbrefactor
+  lida com FATOS. Nada de heurística e nada de TRIAGEM (ajuda
+  probabilística para conferência manual não é produto). Quando o fato
+  não existe em compilação, o caminho é (a) **ESTENDER O CORE** para o
+  fato passar a existir (novo canal/invariante — ex.: tipos declarados
+  IMPOSTOS, spec-b9) ou (b) **usar ferramenta do core** como oráculo
+  (compilador-biblioteca, hbmk2, `.ppt`, tabelas DECLARE) — **nunca
+  construir inferência**. A inferência existente (B7/B7b) fica como
+  está e converge para SUGERIDORA de anotações (o ciclo virtuoso do
+  mapa: a análise materializa `AS CLASS` provados → o core os impõe →
+  o veredito vira fato), não como fonte de veredito de longo prazo.
+  **Definição de CORE (Diego, 2026-07-08)**: core = QUALQUER coisa que
+  exista oficialmente no projeto Harbour — não só o compilador. hbrun,
+  hbmk2, hbpp, RTL/VM, utilitários e o resto da árvore oficial contam;
+  estender ou usar qualquer um deles é o caminho preferido sobre
+  qualquer inferência na ferramenta.
   apoia em diretivas para criar açúcar sintático — DSLs e comandos novos,
   já existentes no core ou criados pelo desenvolvedor no PRÓPRIO aplicativo.
   O hbrefactor refatora QUALQUER código, com ou sem açúcar, SEM ajustes
