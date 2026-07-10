@@ -265,3 +265,19 @@ excluded/confirmed (fato do canal declarado). O caminho de volta do
 alcance é o ciclo virtuoso: materializar `AS CLASS` provados → `-kt`
 impõe → guaranteed/confirmed por FATO (alavanca G), não re-ligar a
 inferência.
+
+## M-annotate — alcance da escada de declarações (2026-07-09, F2.3 do plano da fatia 2)
+
+Primeiro snapshot do `annotate --dry-run` (estágio 1 — relatório;
+plano-b9-fatia2-escada.md, tabela completa lá). Sementes [FATIA-2]:
+TODAS as de Rota A/B fecham por **nível 2** (one-liners DECLARE/
+`_HB_MEMBER` nomeados, zero confiança em `via`); as de send encadeado
+(caso 86) dependem do candidato de core (g) — membro declarado sem
+tipo, merge já funciona, só o W0019 bloqueia. Corpus hbhttpd (322
+locais): nível1=7, nível2=0, nível3=1, sem-prova=284 (o balde aberto
+da M-cov), **retornos-declaráveis=13** (fábricas do DSL UW*, impostos
+sob -kt) e **métodos-(g)=18** — no corpus real a alavanca dominante é
+o candidato (g), e o ganho de locais vem da RE-ANÁLISE iterativa após
+materializar os retornos (pipeline do estágio 2). O relatório é o
+insumo do PORTÃO DO MEIO (decisões: candidatos (f)/(g) de core;
+abertura da edição F2.4).

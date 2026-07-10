@@ -279,8 +279,22 @@ ESCADA: nível 1 (fato declarado puro) e nível 2 (fecha materializando o
 DECLARE que falta) materializam; nível 3 (só inferência `via`) NÃO
 edita, só relata. Etapas F2.0-F2.5 com portão intermediário do Diego
 após a tabela de alcance do `annotate --dry-run` ("vermos o que
-conseguimos"); a spec v2 (F2.2) reescreve a spec acima quando a
-execução abrir. **Nenhuma etapa executa antes de o Diego abrir.**
+conseguimos"); a spec v2 (F2.2) reescreveu a spec acima.
+**Execução ABERTA pelo Diego em 2026-07-09 (mesma sessão) —
+F2.0/F2.1/F2.2/F2.3 ENTREGUES**: fatos no ast-schema (§ "O que o
+compilador FAZ e NÃO FAZ"); probes F2.1 (a)-(e)+(g) fechados
+(`_HB_MEMBER` avulso sem W0019; ordem DECLARE→FUNCTION é imposição;
+DECLARE cobre classe runtime-pura por nome; topologia (g) bloqueada só
+pelo W0019 — merge já é o comportamento projetado, hbmain.c:1178);
+spec v2 reescrita; comando `annotate` (estágio 1, só relatório) no
+CLI — a máquina dormente REVIVEU por `B7Ctx` e o W0034 morreu; suíte
+**622/0** byte-idêntica. Tabela de alcance no plano (§ F2.3) e
+M-annotate no limites-e-alavancas.md: TODAS as sementes Rota A/B
+fecham por nível 2; caso 86 depende do candidato (g); corpus hbhttpd
+= 13 fábricas declaráveis + 18 métodos presos no (g).
+**== PORTÃO DO MEIO (Diego): examinar a tabela; decidir candidatos de
+core (f) New implícito / (g) merge silencioso; abrir F2.4 (edição +
+extensão) ==**
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a

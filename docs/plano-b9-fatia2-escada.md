@@ -221,6 +221,39 @@ portão do meio.
 **Critério**: tabela "topologia do site → one-liner que fecha", cada
 linha com probe compilado E executado.
 
+**RESULTADO — (a)-(e) FECHADOS (2026-07-09; probes em scratchpad/f21,
+protocolo `-w3 -es2`, build hbmk2 `-prgflag=-kt`, execução real):**
+
+| Topologia do site | One-liner que fecha | Prova |
+|---|---|---|
+| classe hbclass no MESMO módulo, membro faltante (fixrcv r2, fixext e1) | `_HB_MEMBER <M>() AS CLASS <Cls>` avulso após a classe — **sem W0019**; gruda na ÚLTIMA classe declarada (`pLastClass`): módulo multi-classe exige posição entre a classe-alvo e a próxima (determinístico) | proba/proba2: dump `NEW S SEMCTOR` / `CONTA`+`CONTAVIP` cada um com seu NEW; execução `-kt` ok |
+| classe em OUTRO módulo ou runtime-pura, site consumidor (fixcls w2, fixdis, fixmth, fixb7b q2-like) | `DECLARE <Cls> <M>() AS CLASS <Cls>` no módulo do SITE — registra classe (mata W0025) + membro + auto-declara `<Cls>()` | probc: classe `__clsNew`/`__clsAddMsg` SEM `_HB_CLASS`; dump completo; `-kt` checa por NOME no objeto VIVO (uso certo passa `aquece = 42`, violação `expected S:FORNO, got N`); pós-store confirmado |
+| fábrica/retorno de função (fixb7 b1) | `DECLARE <F>() AS CLASS <Cls>` ANTES da definição, no módulo DEFINIDOR — **a ordem é imposição, não estilo**: DECLARE DEPOIS da definição NÃO embrulha (mentira passa em silêncio) | probb: `MenteA` (antes) dispara `expected S:PECA, got N`; `MenteB` (depois) NÃO dispara; `CriaA` honesta roda |
+| classe citada em `AS CLASS` sem registro no módulo | recusa mecânica: W0025 + o DUMP PERDE a classe (`type O, class None`) — anotar sem registrar é auto-sabotagem | probd |
+
+**Achado (g) — topologia SEM one-liner limpo hoje (probes probg/probg2,
+2026-07-09)**: membro JÁ declarado ganhando tipo de retorno (sementes
+`Pega`/`Soma` do fixb7b q1). `_HB_MEMBER <M>() AS CLASS <C>` repetido
+FAZ o merge na tabela (dump: `PEGA S MOEDA`; o override é projetado —
+hbmain.c:1178) mas emite `W0019 Duplicate declaration of method` (sob
+`-es2` falha); `METHOD <M>() AS CLASS <C>` no CREATE CLASS é E0030 (o
+pp do hbclass não casa `AS CLASS` no slot `<type>`). **Candidato de
+core (g)**: silenciar o W0019 quando a re-declaração COMPLETA tipo
+ausente (`pMethod->cType == ' '` → tipo novo; assinatura preservada) —
+condição de uma linha em hbmain.c:1174-1176; conflito REAL (tipo
+conhecido → tipo diferente) continua warnando. Adoção no portão do
+meio, junto com o (f). Até lá, os sites dessa topologia são
+classificados no relatório como "nível 2-BLOQUEADO (candidato g)".
+
+Pendente da etapa: **(f)** — protótipo ADIADO para DEPOIS do F2.3
+(decisão de sequência, 2026-07-09): o relatório de alcance deve medir o
+core COMO ESTÁ; o protótipo do New implícito entra como coluna-delta na
+tabela do portão do meio ("quantos sites o (f) tornaria nível 1 sem
+materialização"), que é a forma mais informativa para a decisão de
+adoção. Nota de produto: o (f) sozinho re-tipa sites de `New` herdado
+no canal declared SEM materialização — mexe em baselines da suíte;
+mais um motivo para prototipar como delta medido, não como default.
+
 ### F2.2 — Spec v2
 Reescrever `docs/spec-b9-fatia2-materializacao.md`: escada no lugar de
 P1-a/P1-b; pipeline bottom-up; P2 por fato; recusas mecânicas
@@ -239,6 +272,47 @@ de fixtures, work/hbhttpd.
 **Critério**: tabela de alcance reproduzível registrada no roadmap
 (e delta no limites-e-alavancas.md); suíte 622/0 byte-idêntica (o
 comando novo não muda nada existente); build sem W0034.
+
+**RESULTADO — F2.3 ENTREGUE (2026-07-09).** Comando
+`annotate <projeto> [<arq[:função]>] [--json <out>] [--dry-run]` em
+src/hbrefactor.prg (`Annotate`/`AnnOne`/`AnnLinks` + helpers): TypeOf
+duas vezes (fato puro × máquina) + caminhante de elos que NOMEIA os
+one-liners com a topologia certa (DECLARE no módulo do site ×
+`_HB_MEMBER` in-module × DECLARE de fábrica antes da definição), três
+listagens (locais, Rota B com filtro factual de impls registradas via
+`B7Regs`, topologia (g)) e resumo. O W0034 morreu (B7Ctx tem
+consumidor); build limpo `-w3 -es2`; suíte 622/0.
+
+**TABELA DE ALCANCE (o "vermos o que conseguimos") — insumo do PORTÃO
+DO MEIO:**
+
+*Sementes (cada site [FATIA-2] classificado):*
+
+| Fixture | Site | Escada | One-liner |
+|---|---|---|---|
+| fixcls | w2 MAIN oMenu | **nível 2** | `DECLARE UWMENU NEW() AS CLASS UWMENU` [w2, antes de MAIN] |
+| fixmth | c2 MAIN oC | **nível 2** | `DECLARE CAIXA NEW()...` [c2 — classe noutro módulo] |
+| fixmth | c2 MAIN oO | **nível 2** | `_HB_MEMBER NEW() AS CLASS OUTRA` [c2 — mesma-módulo] |
+| fixrcv | r2 USA s | **nível 2** | `_HB_MEMBER NEW() AS CLASS SEMCTOR` [r2] |
+| fixdis | d1 USA66NC oNm/oNs | **nível 2** | `_HB_MEMBER NEW()...` NCMAIN/NCSECONDARY |
+| fixext | e1 MAIN oC/oV | **nível 2** | `_HB_MEMBER NEW()...` CONTA/CONTAVIP (multi-classe posicionado) |
+| fixb7 | b1 MAIN p | **nível 2** | `DECLARE NOVAPECA() AS CLASS PECA` [antes da definição] |
+| fixb7 | b1 oCoisa/o | **nível 3** (conjunto PECA\|DISCO) — NÃO edita ✓ honesto |
+| fixb7b | q1 MAIN oC/oM/oDet | **nível 2** | `_HB_MEMBER NEW()...` CARTEIRA/MOEDA |
+| fixb7b | q1:73/75 (Pega/Soma) | **(g)-BLOQUEADO** | `_HB_MEMBER SOMA()/PEGA() AS CLASS MOEDA` — só o W0019 impede |
+
+Todas as sementes de Rota A/B fecham por nível 2; as de send encadeado
+(caso 86) dependem do candidato (g). Nenhuma exigiu confiar em `via`.
+
+*Corpus real (work/hbhttpd, 1,2 s):* 322 locais varridas → nível1=7,
+nível2=0, nível3=1, kind-fora=30, **sem-prova=284** (multi-write/
+parâmetros/sem binding único — o balde estruturalmente aberto da
+M-cov); **retornos-declaráveis=13** (fábricas do DSL UW* — DECLAREs
+prontos, IMPOSTOS sob -kt) e **métodos-bloqueados-(g)=18** (PAINT/ADD
+que retornam Self — presos SÓ no W0019). Leitura honesta: no corpus o
+ganho imediato de LOCAIS é modesto; o valor está nos 13+18 retornos
+(que alimentam a re-análise iterativa do estágio 2) e o candidato (g)
+é a alavanca dominante do corpus.
 
 ### == PORTÃO DIEGO ==
 O Diego examina a tabela ("o que conseguimos"), reavalia a Decisão 1

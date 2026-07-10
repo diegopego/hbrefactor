@@ -402,6 +402,59 @@ emissão — zero impacto sem `-x` provado por `.hrb` byte-idênticos em -w0 E
 subsistema; a decodificação no writer é best-effort (faixas se sobrepõem)
 — consumidores atuais só usam RETORNOS.
 
+### O que o compilador FAZ e NÃO FAZ com as tabelas (investigação P1, 2026-07-09)
+
+Fatos verificados no fonte + probes executáveis (smoke1-4, sessão do
+plano da fatia 2 — [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md)):
+
+- **O compilador REGISTRA e nunca CONFERE**: a família inteira de
+  warnings de cheque forte existe na tabela (hbgenerr.c:114-150 —
+  "Incompatible type in assignment" W0008, "Message '%s' not known in
+  class '%s'" W0026, "Incompatible return type" W0014...) mas com ZERO
+  emissores no fonte (`HB_COMP_WARN_MESSAGE_NOT_FOUND` só existe como
+  `#define`, hberrors.h:161). Probe: `-w3` cala até no controle positivo
+  (`u AS CLASS X; u:Bogus()`). Não há cheque de send, de atribuição nem
+  inferência var-like — a propagação sobre as tabelas é 100% do
+  consumidor (TypeOf da ferramenta). Warnings VIVOS do subsistema:
+  W0019 (dup de declaração) e W0025 (classe não conhecida, só em SÍTIO
+  DE DECLARAÇÃO). **Correção (revisão Codex da fatia 2, 2026-07-09)**:
+  W0016/W0017 (contagem/tipo de parâmetro) NÃO são do subsistema
+  DECLARE — os únicos emissores vivem no tratamento dos builtins i18n
+  (hbexprb.c:1951-2034, família `hb_i18n_gettext`); chamada com
+  assinatura divergente do DECLARE **não warna** (o cheque genérico
+  também está morto). A assinatura fiel no DECLARE materializado é
+  exigência de FIDELIDADE da tabela, não de compilação.
+- **`AS CLASS X` com X desconhecida no módulo DEGRADA**: variável
+  (hbmain.c:471-481), retorno de DECLARE (harbour.y:1239-1246) e método
+  (harbour.y:1274-1281) caem para 'O'/'o' com W0025 — a anotação PERDE a
+  classe (nem o dump a carrega). Regra mecânica de quem materializa:
+  garantir a classe registrada no módulo ANTES da anotação.
+- **UMA linha fecha a cadeia no módulo consumidor**:
+  `DECLARE <Cls> <Mth>() AS CLASS <Cls>` (forma harbour.y:1252) registra
+  a classe no módulo (mata o W0025), declara o membro E auto-declara a
+  função-classe `<Cls>()` devolvendo a classe — probe smoke3: dump com
+  `classes[{CLS, methods[{MTH, S, CLS}]}]` + `functions[{CLS, S, CLS}]`;
+  compile-time puro (zero pcode). **Re-declarar classe que o módulo JÁ
+  tem dá W0019** (probe smoke4) — sob `-es2` falha; para sítio no mesmo
+  módulo da classe, a rota é `_HB_MEMBER` avulso (harbour.y:1255) —
+  **CONFIRMADA por probe (F2.1, proba/proba2)**: sem W0019, gruda na
+  ÚLTIMA classe declarada (`pLastClass`), então módulo multi-classe
+  exige posição entre a classe-alvo e a próxima (determinístico);
+  execução `-kt` aceita a local anotada. A forma DECLARE funciona
+  igual para classe 100% runtime (`__clsNew`/`__clsAddMsg`, zero
+  `_HB_CLASS`): o cheque é por NOME no objeto VIVO (probe probc).
+- **O `-kt` impõe SÓ o que vê na tabela na ordem do parse — provado por
+  execução (F2.1, probb)**: o embrulho de RETURN (harbour.y:433,
+  `hb_compChkTypeRetWrap`) consulta o DECLARE da própria função no
+  momento do parse do RETURN — DECLARE ANTES da definição embrulha
+  (fábrica mentirosa dispara `expected S:PECA, got N`); DECLARE DEPOIS
+  da definição NÃO embrulha (a mentira passa em silêncio). DECLARE de
+  FUNÇÃO materializado (antes) vira invariante checada; DECLARE de
+  MEMBRO não é imposto (a impl pode viver fora do módulo/projeto —
+  ex.: `New` herdado na RTL) e permanece PROMESSA cujo papel é tipar o
+  consumidor; a invariante reportável é a da variável anotada no site
+  (coberta, RE.2).
+
 ### TypeOf — propagação na ferramenta (regra FECHADA; extensões B7 e B7b pelos portões de 2026-07-08)
 
 Regra local: a ferramenta classifica o receptor de send propagando tipos
