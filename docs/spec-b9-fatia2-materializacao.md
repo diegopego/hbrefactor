@@ -197,12 +197,39 @@ os fixtures-semente não são `-kt`, e o `-kt`-project cai numa fatia
 futura (strip de `-kt` no baseline). (2) Anotação de PARÂMETRO
 (assinatura) fica de fora — só LOCAL puro; a assinatura colapsa em
 `tokens[]` (fato B4) e pede o idioma de `SigParamHits`, fatia futura.
-(3) O caso de ROLLBACK PROVOCADO por mentira de runtime não tem
-fixture próprio ainda: o mecanismo de rollback está exercido (uma
-falha real de build sob `-kt` restaurou os fontes byte-a-byte durante
-o desenvolvimento), mas fabricar uma mentira que a análise (conservadora
-por RE.3) ESCREVERIA e o `-kt` PEGARIA é trabalho de fixture à parte —
-próxima sessão. (4) As demais sementes da tabela de aceite (fixcls,
-fixmth, fixrcv, fixdis, fixext, fixb7) têm o `--apply` implementado e
-genérico, mas só a fixb7b virou caso de suíte nesta fatia; as outras
-entram como casos incrementais.
+(3) ~~rollback provocado~~ e (4) ~~demais sementes~~ — **FECHADOS no
+complemento abaixo (2026-07-10)**; (1) e (2) seguem em aberto, sob
+portão de escopo do Diego.
+
+## Entregue (F2.4-complemento + F2.5, 2026-07-10)
+
+- **Caso 90 — rollback provocado** (fixture `fixrbk`): mentira num
+  fato DECLARADO — `_HB_MEMBER ACHA() AS CLASS MOEDA` promete que o
+  método `Acha()` de BAU (pertencimento por POSIÇÃO/pLastClass)
+  DEVOLVE MOEDA (o `AS CLASS` do `_HB_MEMBER` é tipo de RETORNO,
+  hbclass.ch:282 — dona e retorno distintas de propósito, precisão do
+  Diego); o runtime devolve N. Pristino compila e RODA limpo sob `-kt`
+  (promessa de membro não imposta — fato 6: a mentira é INVISÍVEL sem
+  o materializador); `--apply` escreve por fato declarado, o cheque
+  pós-store pega EM EXECUÇÃO, rollback restaura BYTE A BYTE (cmp) e a
+  recusa nomeia o motivo com o BASE/3012 verbatim (`AnnChkLine`).
+- **Casos 91-96 — round-trip por semente** (fixcls/fixmth/fixrcv/
+  fixdis/fixext/fixb7): tabela de aceite cumprida — cada site decide
+  `confirmed send (receiver declared AS CLASS <X>)` na cópia
+  materializada e **sobe a `guaranteed ... imposed by -kt checks`**
+  com `-prgflag=-kt` no projeto (o rótulo-alvo da tabela). Recusas
+  honestas assertadas: nível 3 NÃO editado (fixb7 `oCoisa`/`o`);
+  espelho/cruzado segue `possible` com relação nomeada (Rota C sem
+  rota — casos 92/94/95). Fixtures originais intocados.
+- **Correções que as sementes provocaram**: (i) nível 1 com classe
+  fora do módulo do site → nível 2 com **registro puro `_HB_CLASS
+  <Cls>`** (harbour.y:1253; sem promessa de membro — substituiu também
+  o regtext `DECLARE ... New()`); (ii) **atribuição honesta**: pristino
+  roda sob `-kt` ANTES da edição; se já falha, o passo `-kt` degrada
+  para "pulado" nomeando a falha pré-existente (fixb7) em vez de
+  culpar a edição; (iii) recusa do padrão-ouro nomeia site/tipos do
+  próprio erro (`expected S:X, got Y @ FUNC:VAR`).
+- F2.5: testes-suspensos-re3 Rotas A/B **RECONQUISTADAS**; M-annotate
+  re-medida com o ciclo completo no corpus (31 declarações + 7
+  anotações; re-relatório drena — limites-e-alavancas.md); suíte
+  **692/0** byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.

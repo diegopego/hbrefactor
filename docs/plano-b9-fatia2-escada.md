@@ -382,6 +382,42 @@ guardas no harness 71; `package.json` 0.9.0. Suíte **636/0**.
 provocado e as demais sementes como casos incrementais — próxima
 sessão.
 
+**COMPLEMENTO ENTREGUE (2026-07-10)** — resíduos (3) e (4) fechados
+como casos incrementais; (1) e (2) seguem fatia futura (portão do
+Diego):
+- **Caso 90 — ROLLBACK PROVOCADO** (fixture nova `fixrbk`): a mentira
+  vive num fato DECLARADO (`_HB_MEMBER ACHA() AS CLASS MOEDA` com
+  runtime devolvendo N — dona BAU e retorno MOEDA são classes
+  DISTINTAS de propósito, precisão do Diego sobre a leitura do
+  `AS CLASS`: pertencimento vem da POSIÇÃO/pLastClass, o sufixo é o
+  tipo de RETORNO, hbclass.ch:282). O pristino compila E RODA limpo
+  sob `-kt` (promessa de membro não é imposta — mentira dormente); o
+  `--apply` materializa, o cheque pós-store pega em EXECUÇÃO, os
+  fontes voltam BYTE A BYTE (cmp) e a recusa NOMEIA o motivo com o
+  próprio BASE/3012 (`expected S:MOEDA, got N: MAIN:X` — idioma novo
+  `AnnChkLine`).
+- **Casos 91-96 — round-trip por semente** (fixcls, fixmth, fixrcv,
+  fixdis, fixext, fixb7; molde do caso 89): `--apply` → site decide
+  `confirmed declared` → `-prgflag=-kt` no projeto → `guaranteed ...
+  imposed by -kt checks` no MESMO site; originais intocados; recusas
+  honestas assertadas (nível 3 não editado no fixb7; espelho/cruzado
+  segue `possible` — Rota C sem rota).
+- **Duas correções de ferramenta que as sementes provocaram**:
+  (i) local nível 1 com classe NÃO registrada no módulo do site
+  (fixrcv `x AS CLASS CAIXA` em r2) reclassifica para nível 2 com o
+  **registro PURO `_HB_CLASS <Cls>`** (harbour.y:1253 — classe sem
+  promessa de membro; o idioma substituiu também o regtext
+  `DECLARE ... New()`, que prometia membro inventado); antes, o
+  `--apply` anotava sem registro e recuava no W0025. (ii) **atribuição
+  honesta de falha pré-existente**: o `AnnApply` roda o projeto
+  pristino sob `-kt` ANTES de editar; se JÁ falha (fixb7: `Mexe(@q)`
+  põe NIL e `q:Gira()` estoura — veneno intencional da fixture), o
+  passo `-kt` é pulado nomeando "execução já falhava SEM edição" —
+  falha do projeto nunca vira culpa da edição, nem bloqueia a
+  materialização (efeito colateral bom: projeto-servidor com Main
+  infinito degrada honesto em vez de recusar por timeout).
+- Suíte **692/0** byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.
+
 ### F2.5 — Fechamento
 Roadmap: fase fechada com uma linha + narrativa no arquivo;
 testes-suspensos-re3: itens reconquistados marcados (SÓ os que a
@@ -389,6 +425,15 @@ escada fechou de fato — honestidade sobre o resíduo); M-cov re-rodada
 com delta registrado.
 **Critério**: regra de arquivamento do roadmap cumprida na mesma
 sessão.
+
+**EXECUTADA (2026-07-10)**: testes-suspensos-re3 — Rotas A e B
+marcadas RECONQUISTADAS com o caso de suíte de cada semente (Rotas
+C/D/E intocadas; a honestidade da não-exclusão agora é ASSERTADA nos
+casos 92/94/95); M-annotate re-rodada (delta zero no relatório; ciclo
+completo medido: 31 declarações + 7 anotações no hbhttpd, re-relatório
+drena 13/18/7 → 0 — registro no limites-e-alavancas.md); roadmap
+atualizado e narrativa arquivada; CHANGELOG.md com a entrada para o
+programador final.
 
 ## Arquivos a tocar
 

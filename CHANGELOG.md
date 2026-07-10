@@ -5,6 +5,79 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — `annotate --apply`: a garantia de rollback agora tem prova de fogo
+
+### O problema de todo dia
+
+Toda ferramenta que edita seu fonte promete "se der errado, eu desfaço".
+A pergunta que importa: **e se a mentira estiver nas suas declarações,
+não no código?** Um `_HB_MEMBER Acha() AS CLASS Moeda` escrito há anos
+promete que o método devolve uma `Moeda` — mas a implementação devolve
+um número. Isso compila limpo, roda limpo, e nenhuma análise estática
+do mundo distingue a promessa do fato. Se o `annotate` confiar nela (e
+deve — declaração É o canal de fatos da linguagem), a anotação que ele
+escrever estará errada.
+
+### O que mudou
+
+Agora a suíte contém exatamente esse cenário, fabricado de propósito
+(fixture nova): a declaração mente, o `annotate --apply` escreve a
+anotação que a mentira justifica, e o passo de **execução com `-kt`**
+— o único oráculo capaz de pegar isso — estoura no lugar certo. O que
+você vê:
+
+```
+hbrefactor: padrão-ouro FALHOU após anotar locais: cheque de tipo
+declarado FALHOU na execução sob -kt: Error BASE/3012  declared type
+check failed: expected S:MOEDA, got N: MAIN:X
+```
+
+E os seus fontes voltam **byte a byte** ao que eram — provado por
+comparação binária no teste, não prometido. A recusa nomeia variável,
+tipo esperado e tipo recebido, tirados do próprio erro de runtime: você
+descobre de graça que aquela declaração antiga mente.
+
+Um esclarecimento de leitura que este trabalho rendeu (e vale para o
+seu código): em `_HB_MEMBER Acha() AS CLASS Moeda`, o *pertencimento*
+do método vem da POSIÇÃO da linha (ela gruda na última classe
+declarada acima); o `AS CLASS` é o **tipo de RETORNO** do método — o
+mesmo `AS <tipo>` que você escreveria no `METHOD Acha() AS ...` dentro
+da classe.
+
+### Também nesta entrega
+
+- **Todas as topologias de classe provadas em suíte** (uma por
+  fixture): classe noutro módulo, classe no mesmo módulo, módulo
+  multi-classe (cada declaração gruda na classe certa), fábrica com
+  `DECLARE` antes da definição, e DSL que monta classe só em runtime.
+  Em todas, o site que era "talvez" termina `guaranteed` quando o
+  projeto compila com `-kt`.
+- **Registro puro de classe**: quando só falta *registrar* a classe no
+  módulo (para o `AS CLASS` não degradar), a ferramenta agora escreve
+  `_HB_CLASS <Classe>` — registra sem prometer nenhum método. Antes ela
+  escreveria um `DECLARE <Classe> New() ...` que promete um `New` que
+  talvez não exista.
+- **Falha sua não vira culpa da edição**: se o seu projeto JÁ quebra em
+  execução (ou é um servidor que nunca termina), o `--apply` detecta
+  isso ANTES de editar e pula o passo de execução avisando "execução já
+  falhava SEM edição" — em vez de recusar o trabalho culpando a própria
+  anotação. As demais verificações (binário idêntico, compilação limpa)
+  continuam valendo.
+- Num projeto real (hbhttpd, 14 classes): `--apply` escreveu **31
+  declarações + 7 anotações** verificadas em ~3 segundos, e o
+  re-relatório zera — tudo que era declarável foi declarado; o que
+  sobra é o que só inferência alcançaria, e esse a ferramenta não
+  escreve.
+
+### Limites que continuam (honestos, declarados)
+
+- Parâmetros de função ainda não são anotados — só locais.
+- Projeto que **já** compila com `-kt`: fica para a fatia do strip no
+  baseline.
+
+Detalhes internos: [docs/spec-b9-fatia2-materializacao.md](docs/spec-b9-fatia2-materializacao.md)
+§ "Entregue (F2.4-complemento + F2.5)".
+
 ## 2026-07-09 — `annotate`: seu código sem tipos vira código tipado, com prova
 
 ### O problema de todo dia
@@ -129,7 +202,8 @@ projeto inteiro, e caiu com essa condição.
 - Projeto que **já** compila com `-kt` fica para a fatia do strip no
   baseline (a prova de byte-idêntico exige compilar sem `-kt`).
 - O rollback está exercido por falha real de build, mas o caso provocado
-  ("anotação que mente e o `-kt` pega") ainda vira fixture própria.
+  ("anotação que mente e o `-kt` pega") ainda vira fixture própria —
+  **entregue em 2026-07-10 (entrada acima)**.
 
 Detalhes internos: [docs/spec-b9-fatia2-materializacao.md](docs/spec-b9-fatia2-materializacao.md)
 § "Entregue (F2.4)" e [docs/plano-b9-fatia2-escada.md](docs/plano-b9-fatia2-escada.md).

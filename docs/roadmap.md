@@ -81,6 +81,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B-infra Etapa 2 (2026-07-08) | Runner em Harbour: despacho+join `tests/parrun.prg` (`hb_processOpen`) + checker `tests/tcheck.prg` (`hb_jsonDecode`) — python fora do `make test`; paridade byte-idêntica nos dois modos, 10/10 sem flake, 14 s |
 | B7 (2026-07-08) | Tipos interprocedurais: cadeia de construção + oráculo QSelf (ast-6 `ret`); rito D4 (5 checks/6 sites aprovados caso a caso); homônimos separados por receptor; união de call sites/IIF; casos 84/85; suíte 582/0 |
 | B7b (2026-07-08) | Inferência fatia 3 (zero core): retorno de MÉTODO pelos pushes `ret` (send encadeado, identidade em cadeia); 1º param de bloco INLINE = receptor (fato classes.c:4554, provado em DSL não-espelho); param de bloco pela união dos Evals rastreáveis; venenos honestos; furos latentes fechados (B7AllRetsSelf envenenado, índice do B7ParamType); caso 86; suíte 600/0; delta M-cov 2 no mapa |
+| B9 fatias 1+2 (2026-07-08→10) | Tipos declarados IMPOSTOS: `-kt` no core (ast-7) + camada `guaranteed` honesta (RE.2) + materializador `annotate`/`--apply` (escada de declarações, padrão-ouro inerte/compila/roda-`-kt` com rollback byte a byte); candidato (g) de core adotado; casos 87-96; Rotas A/B dos testes-suspensos RECONQUISTADAS; extensão 0.9.0; suíte 692/0 |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -240,90 +241,36 @@ por `pStack == NULL`):
 Evidência de execução só volta se tiver consumo 100% fato (ex.:
 alimentar cheques impostos), decisão do Diego.
 
-### B9 — Tipos declarados impostos: cheque de runtime para `AS <tipo>` (flag `-kt`) — **FATIA 1 ENTREGUE E COMMITADA; FATIA 2 (materialização) SOB GUARDA DA FASE RE**
+### B9 — Tipos declarados impostos (`-kt`) + materializador `annotate` — ✅ ENTREGUE (fatias 1 e 2, 2026-07-08→10) — narrativa no [arquivo](roadmap-fases-entregues.md)
 
-**Fatia 1 entregue (2026-07-08; commitada 2026-07-09 por decisão do
-Diego — harbour-core `c1927dfcac`, hbrefactor `6584aa8`)**: `-kt` no
-core (emissão prólogo/local/RETURN + helper `__HB_CHKTYPE` com is-a no
-objeto vivo; zero impacto 224/224; dimensionada NÃO é anotação —
-`HB_VSCOMP_DIMMED`); schema **ast-7** (`kt` + `dim`); camada
-`guaranteed` no usages + DeclType sem a falsa promessa do 'A'
-dimensionado (excluded errado fechado); fixture fixkt + caso 87 (17
-checks, execução real); suíte **616/0** byte-idêntica. Detalhes/
-critérios na spec. **Atenção (fase RE)**: a auditoria externa alegou
-overclaim do `guaranteed` (achados A1/A2 — sites que o cheque não
-cobre); confirmado no RE.1 e CONSERTADO no RE.2 (2026-07-09:
-`B7KtCovered` restringe a marca aos sites cobertos; fixkt+t3, caso 88,
-suíte 622/0 byte-idêntica). O RE.3 decidiu a forma da camada
-sugeridora (forma "a", 2026-07-09): a máquina B7/B7b está DORMENTE
-(entrada `B7Ctx`) e a fatia 2 (materialização) é quem a consome —
-espera escopo+critério e portão do Diego para abrir. As expectativas
-dos testes rebaixados estão SUSPENSAS em
-[testes-suspensos-re3.md](testes-suspensos-re3.md) (rótulo antigo
-verbatim + rota de fato por site); os itens [FATIA-2] de lá são a
-semente do critério de aceite da fatia 2.
-**Spec da FATIA 2 redigida (2026-07-09):
-[spec-b9-fatia2-materializacao.md](spec-b9-fatia2-materializacao.md)**
-— comando `annotate` (revive a máquina dormente por `B7Ctx`, mata o
-W0034), rotas A (LOCAL/param) e B (retorno por `DECLARE`) DENTRO; rotas
-C (SEM ROTA — não promete), D (codeblock — A6+RE.5) e E (degrade) FORA;
-extensão VSCode na mesma fatia.
-**PLANO VIGENTE (aprovado pelo Diego em 2026-07-09; EXECUÇÃO SOB
-PORTÃO): [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md)** — a
-discussão do P1 (argumento do Diego: "o compilador já sabe o tipo de
-`t := Cls():New()`") gerou investigação com probes que SUPERSEDE os
-portões P1/P2/P3 da spec: o cheque de tipos do core é vestigial (zero
-emissores), mas hbclass declara retorno de CONSTRUCTOR e **uma linha
-`DECLARE` fecha a cadeia no módulo do site** (probes smoke1-4). Nasce a
-ESCADA: nível 1 (fato declarado puro) e nível 2 (fecha materializando o
-DECLARE que falta) materializam; nível 3 (só inferência `via`) NÃO
-edita, só relata. Etapas F2.0-F2.5 com portão intermediário do Diego
-após a tabela de alcance do `annotate --dry-run` ("vermos o que
-conseguimos"); a spec v2 (F2.2) reescreveu a spec acima.
-**Execução ABERTA pelo Diego em 2026-07-09 (mesma sessão) —
-F2.0/F2.1/F2.2/F2.3 ENTREGUES**: fatos no ast-schema (§ "O que o
-compilador FAZ e NÃO FAZ"); probes F2.1 (a)-(e)+(g) fechados
-(`_HB_MEMBER` avulso sem W0019; ordem DECLARE→FUNCTION é imposição;
-DECLARE cobre classe runtime-pura por nome; topologia (g) bloqueada só
-pelo W0019 — merge já é o comportamento projetado, hbmain.c:1178);
-spec v2 reescrita; comando `annotate` (estágio 1, só relatório) no
-CLI — a máquina dormente REVIVEU por `B7Ctx` e o W0034 morreu; suíte
-**622/0** byte-idêntica. Tabela de alcance no plano (§ F2.3) e
-M-annotate no limites-e-alavancas.md: TODAS as sementes Rota A/B
-fecham por nível 2; caso 86 depende do candidato (g); corpus hbhttpd
-= 13 fábricas declaráveis + 18 métodos presos no (g).
-**PORTÃO DO MEIO DECIDIDO (Diego, 2026-07-09, mesma sessão)**:
-candidato **(g) ADOTADO** — protótipo executado e provado nas seis
-pontas (complemento silencioso; conflito real segue W0019; vizinhos
-função/classe intactos; imposição -kt no store; resíduo declarado;
-suíte 622/0 com o core@(g)) e re-medição nos clones: fixb7b
-`metodos-bloqueados-g 2→0` com execução -kt byte-igual, hbhttpd
-`18→0` com build limpo — bloco "PROTÓTIPO (g) EXECUTADO" no plano
-§ F2.1 e fato novo no ast-schema (§ FAZ/NÃO FAZ, W0019 condicional);
-commit no core autorizado. Candidato **(f) ADIADO** (não bloqueia
-mais nenhuma semente). **F2.4 ENTREGUE (núcleo, 2026-07-09)**:
-`annotate --apply` (pipeline bottom-up + padrão-ouro inerte/compila/
-roda-`-kt` + re-análise + rollback), **caso 89** round-trip na fixb7b
-(sends de `possible` do caso 86 → `confirmed via declared types`;
-original intocado), extensão VSCode `annotate`/`annotateApply`
-(confirmação modal) + guardas 71, `package.json` 0.9.0; suíte
-**636/0**. Resíduos declarados na spec § "Entregue (F2.4)" (projeto
-já-`-kt`, parâmetro, rollback provocado, demais sementes) — casos
-incrementais.
+A fase-modelo da REGRA DO FATO: fato ausente → **estender o core** —
+a anotação `AS <tipo>`/`AS CLASS` virou INVARIANTE imposta (fail-fast
+sob `-kt`, cheque por NOME no objeto VIVO: cobre classes de runtime
+que a estática nunca alcança) e o `annotate` fechou o ciclo virtuoso:
+a máquina B7/B7b (dormente, RE.3) SUGERE → o comando ESCREVE
+declarações da linguagem pela ESCADA (nível 1 fato puro; nível 2
+one-liner `DECLARE`/`_HB_MEMBER`/`_HB_CLASS`; nível 3 SÓ relata) com
+padrão-ouro por edição (inerte byte-idêntico sem `-kt` + compila limpo
++ roda sob `-kt`) e rollback → o `-kt` IMPÕE → o site decide por fato
+(`confirmed declared` → `guaranteed`). Specs:
+[spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md) (fatia
+1) e [spec-b9-fatia2-materializacao.md](spec-b9-fatia2-materializacao.md)
+(fatia 2); plano executado F2.0-F2.5:
+[plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md); candidato (g)
+de core ADOTADO (`00ccbc20b3`). Casos 87-96 (execução real; round-trip
+por semente [FATIA-2]; ROLLBACK PROVOCADO com recusa nomeando o
+BASE/3012); [testes-suspensos-re3.md](testes-suspensos-re3.md) Rotas
+A/B **RECONQUISTADAS**; extensão VSCode 0.9.0; corpus hbhttpd: 31
+declarações + 7 anotações verificadas, re-relatório DRENA (M-annotate
+no [limites-e-alavancas.md](limites-e-alavancas.md)). Suíte **692/0**
+byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.
 
-A REGRA DO FATO inverte a escada do início do dia: fato ausente →
-**estender o core para o fato existir**, e a B9 é exatamente isso — a
-anotação `AS <tipo>`/`AS CLASS` vira INVARIANTE imposta (fail-fast sob
-`-kt`), transformando promessa em fato e fechando os baldes que a
-estática nunca alcança (classes montadas em runtime, objetos nascidos
-na VM — cheque por nome no objeto VIVO). Ciclo virtuoso com a
-ferramenta: a análise B7/B7b vira MATERIALIZADORA (escreve os
-`AS CLASS` que provou) → a flag impõe → o veredito vira fato. A spec
-está pronta ([spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md),
-T1-T5 decididas: flag `-kt` opt-in fluindo pelo hbmk2, NIL falha,
-is-a satisfaz, escopo params+locals+retorno); a fatia de
-MATERIALIZAÇÃO (comando que escreve anotações provadas) precisa de
-escopo+critério antes de executar.
+**Resíduos em aberto (fatia futura da B9, portão de ESCOPO do
+Diego)**: (1) projeto que JÁ compila com `-kt` — o teste inerte
+compara `.hrb` sem `-kt`; falta o strip da flag no baseline; (2)
+anotação de PARÂMETRO (assinatura colapsa em `tokens[]`, pede o idioma
+`SigParamHits`); (3) candidato (f) de core ADIADO (New implícito —
+protótipo como coluna-delta quando reabrir).
 
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 

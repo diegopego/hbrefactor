@@ -6454,8 +6454,7 @@ STATIC FUNCTION AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
                                 " AS CLASS " + hRet[ "cls" ], ;
                       "needreg" => ! AnnClsInMod( hAst, hRet[ "cls" ] ), ;
                       "regtext" => iif( AnnClsInMod( hAst, hRet[ "cls" ] ), "", ;
-                                        "DECLARE " + hRet[ "cls" ] + ;
-                                        " New() AS CLASS " + hRet[ "cls" ] ) } )
+                                        "_HB_CLASS " + hRet[ "cls" ] ) } )
       NEXT
    NEXT
 
@@ -6554,8 +6553,21 @@ STATIC FUNCTION AnnOne( hItem, hFunc, hAst, hDecl, hInter )
    // fato declarado puro (o mesmo canal do usages de produto)
    hFato := TypeOf( hVar, hFunc, hDecl, .F., NIL, NIL, hAst )
    IF hFato != NIL .AND. hb_HHasKey( hFato, "cls" )
+      IF AnnClsInMod( hAst, hFato[ "cls" ] )
+         RETURN { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
+                  "level" => "n1", "cls" => hFato[ "cls" ], "lines" => {} }
+      ENDIF
+      // fato puro, mas a classe NÃO está registrada no módulo do SITE:
+      // anotar sem registro é auto-sabotagem (W0025 + o dump perde a
+      // classe, probe probd) - fecha com o registro PURO de uma linha,
+      // _HB_CLASS <Cls> (harbour.y:1253), que registra a classe sem
+      // prometer nenhum membro
       RETURN { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
-               "level" => "n1", "cls" => hFato[ "cls" ], "lines" => {} }
+               "level" => "n2", "cls" => hFato[ "cls" ], ;
+               "lines" => { { "text" => "_HB_CLASS " + hFato[ "cls" ], ;
+                              "module" => hb_FNameNameExt( hb_HGetDef( hAst, "module", "" ) ), ;
+                              "pos" => "registro puro da classe, antes de " + hFunc[ "name" ], ;
+                              "anchor" => { "kind" => "beforeFunc", "func" => hFunc[ "name" ] } } } }
    ENDIF
    IF hFato != NIL .AND. hb_HHasKey( hFato, "val" )
       RETURN { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
@@ -6720,8 +6732,10 @@ STATIC FUNCTION AnnLinks( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst, hCtx
                RETURN NIL
             ENDIF
             IF ! AnnClsInMod( aFA[ 1 ], hRet[ "cls" ] )
-               AnnAddLine( hCtx, "DECLARE " + hRet[ "cls" ] + " New() AS CLASS " + ;
-                           hRet[ "cls" ], ;
+               // registro PURO (_HB_CLASS: classe sem promessa de membro) -
+               // o DECLARE da função abaixo cita a classe e exige o
+               // registro ANTES no módulo (W0025, probe probd)
+               AnnAddLine( hCtx, "_HB_CLASS " + hRet[ "cls" ], ;
                            hb_FNameNameExt( hb_HGetDef( aFA[ 1 ], "module", "" ) ), ;
                            "registro da classe, antes da definição de " + ;
                            aFA[ 2 ][ "name" ], ;
@@ -6934,7 +6948,7 @@ STATIC FUNCTION AnnSetTxt( hType )
 STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
 
    LOCAL hOrig := { => }, aIns := {}, hModAst := { => }
-   LOCAL hCand, hLn, hEntry, cPath, cWhy := "", cKt := "skipped"
+   LOCAL hCand, hLn, hEntry, cPath, cWhy := "", cKt := "skipped", cKtBase := ""
    LOCAL lRunnable, hLoad2, hPlan2, aAnn := {}, nCol, hAst
 
    HB_SYMBOL_UNUSED( cFuncFil )
@@ -6950,6 +6964,14 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    // 1. baseline .hrb (estado de referência, sem -kt)
    IF ! CompileHrbAll( hProj, cTmp, "annb4" )
       RETURN Refuse( "falha ao compilar o estado de referência" )
+   ENDIF
+
+   // 1b. o oráculo de execução só vale se o projeto RODA sob -kt ANTES de
+   // qualquer edição: falha aqui é do PROJETO, não da edição - atribuir ao
+   // cheque seria mentira. O passo -kt degrada para "pulado" com motivo
+   // nomeado (fixture fixb7: veneno de runtime pré-existente no Main)
+   IF lRunnable .AND. ! AnnKtRun( hProj[ "spec" ], cTmp, @cKtBase )
+      lRunnable := .F.
    ENDIF
 
    // 2. one-liners de habilitação: elos do nível 2 + Rota B + topologia (g)
@@ -7039,7 +7061,9 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
            " declaração(ões) + " + hb_ntos( Len( aAnn ) ) + " anotação(ões) AS CLASS" + hb_eol() )
    OutStd( "verificado: .hrb byte-idêntico sem -kt; compila limpo -w3 -es2; " + ;
            iif( cKt == "ran", "roda sob -kt (cheques passam)", ;
-                "projeto não-executável - passo -kt pulado (declared, não imposto)" ) + hb_eol() )
+           iif( Empty( cKtBase ), ;
+                "projeto não-executável - passo -kt pulado (declared, não imposto)", ;
+                "execução já falhava SEM edição - passo -kt pulado (declared, não imposto)" ) ) + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -7321,17 +7345,32 @@ STATIC FUNCTION AnnKtRun( cSpec, cTmp, cWhy )
    ENDIF
    cOut := cErr := ""
    nRet := hb_processRun( "timeout 30 " + cExe + " //GT:CGI",, @cOut, @cErr )
-   IF nRet != 0
-      cWhy := "execução sob -kt terminou com código " + hb_ntos( nRet ) + ;
-              " (cheque de tipo declarado pode ter disparado)"
+   IF "declared type check failed" $ ( cOut + cErr )
+      // a recusa NOMEIA o motivo: site e tipos vêm do próprio erro BASE/3012
+      cWhy := "cheque de tipo declarado FALHOU na execução sob -kt: " + ;
+              AnnChkLine( cOut + cErr )
       RETURN .F.
    ENDIF
-   IF "declared type check failed" $ ( cOut + cErr )
-      cWhy := "cheque de tipo declarado FALHOU na execução sob -kt"
+   IF nRet != 0
+      cWhy := "execução sob -kt terminou com código " + hb_ntos( nRet )
       RETURN .F.
    ENDIF
 
    RETURN .T.
+
+// primeira linha da saída que carrega o erro do cheque (BASE/3012) -
+// nomeia expected/got e o site (FUNÇÃO:VAR) na recusa
+STATIC FUNCTION AnnChkLine( cText )
+
+   LOCAL cL
+
+   FOR EACH cL IN hb_ATokens( StrTran( cText, Chr( 13 ), "" ), Chr( 10 ) )
+      IF "declared type check failed" $ cL
+         RETURN AllTrim( cL )
+      ENDIF
+   NEXT
+
+   RETURN ""
 
 // ---------------------------------------------------------------------------
 // B7 - tipos interprocedurais (spec-b7-tipos-interprocedurais.md, portão

@@ -158,6 +158,13 @@ freshofi() { # freshofi <case-name> -> fixture with a NON-mirror user DSL (revis
    echo "$d"
 }
 
+freshrbk() { # freshrbk <case-name> -> fixture da mentira declarada (rollback provocado, F2.4)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixrbk/*.prg "$HERE"/fixrbk/*.hbp "$d"/
+   echo "$d"
+}
+
 extrun() { # extrun <dir> <out-file> -> build fixext copy and run it
    ( cd "$1" && rm -rf .hbmk && "$HB_BIN/hbmk2" e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > "$2" 2>/dev/null )
 }
@@ -2708,7 +2715,231 @@ check "fixture ORIGINAL intocado (edição só na cópia em WorkDir)" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89"
+unit_90() {
+echo "case 90: B9 fatia 2 - ROLLBACK PROVOCADO: mentira declarada, -kt pega, fontes voltam byte a byte"
+# resíduo 3 da F2.4 (spec § Entregue): o fato DECLARADO mente - o
+# _HB_MEMBER promete que Acha() (método de BAU, pertencimento por
+# POSIÇÃO/pLastClass) DEVOLVE uma MOEDA (o sufixo AS CLASS é o tipo de
+# RETORNO - hbclass.ch:282), mas o runtime devolve N. Promessa de membro
+# NÃO é imposta (fato 6), então o fixture pristino compila E RODA limpo
+# sob -kt: a mentira fica dormente e é INVISÍVEL sem o materializador.
+# A análise decide por fato declarado (honestamente) e escreve a
+# anotação; o cheque pós-store da local anotada pega a contradição EM
+# EXECUÇÃO; o --apply desfaz TUDO byte a byte e a recusa NOMEIA site e
+# tipos (idioma AnnChkLine: expected/got do próprio BASE/3012).
+"$HB_BIN/harbour" "$HERE/fixrbk/rbk.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixrbk/rbk.prg clean under -w3 -es2 (baseline)" $?
+D=$(freshrbk case90)
+( cd "$D" && "$HB_BIN/hbmk2" fixrbk.hbp -q0 -gtcgi -prgflag=-kt -orbk0 > /dev/null 2>&1 && ./rbk0 //GT:CGI > /dev/null 2>&1 )
+check "pristino RODA limpo sob -kt: promessa de membro não é imposta, a mentira fica dormente" $?
+( cd "$D" && "$BIN" annotate fixrbk.hbp > rep.log 2>&1 )
+check "annotate relatório exit 0" $?
+grep -q "nível2=2 " "$D/rep.log"
+check "análise honesta sobre o fato declarado: b e x são nível 2 (a mentira é indistinguível em compilação)" $?
+! ( cd "$D" && "$BIN" annotate fixrbk.hbp --apply > app.log 2>&1 )
+check "annotate --apply RECUSA (exit != 0)" $?
+grep -q "padrão-ouro FALHOU após anotar locais" "$D/app.log" && \
+   grep -q "declared type check failed: expected S:MOEDA, got N: MAIN:X" "$D/app.log"
+check "recusa NOMEIA o motivo: cheque -kt disparou no store da local anotada (expected S:MOEDA, got N @ MAIN:X)" $?
+cmp -s "$D/rbk.prg" "$HERE/fixrbk/rbk.prg"
+check "rollback: fonte da cópia restaurado BYTE A BYTE (nenhum resíduo de edição)" $?
+( cd "$D" && "$HB_BIN/hbmk2" fixrbk.hbp -q0 -gtcgi -prgflag=-kt -orbk1 > /dev/null 2>&1 && ./rbk1 //GT:CGI > /dev/null 2>&1 )
+check "pós-rollback: a cópia volta a compilar e rodar limpa sob -kt" $?
+
+}
+
+unit_91() {
+echo "case 91: B9 fatia 2 - round-trip fixcls: semente 39/61 (w2 oMenu:Paint) reconquistada por FATO"
+# testes-suspensos-re3 Rota A: o assert antigo era 'confirmed ... via
+# construction chain' (inferência, morta no RE.3). O ciclo da escada:
+# --apply materializa (DECLARE UWMENU NEW() no módulo do SITE - classe
+# noutro módulo, smoke3/probc - + AS CLASS na local) -> o site decide
+# por fato declarado; com -kt no projeto o veredito sobe a guaranteed
+# (invariante imposta). Fixture original intocado.
+D=$(freshcls case91)
+( cd "$D" && "$BIN" annotate fixcls.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "3 declaração(ões) + 1 anotação(ões) AS CLASS" "$D/app.log" && \
+   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+check "materializou e verificou (padrão-ouro completo com execução -kt)" $?
+grep -q "DECLARE UWMENU NEW() AS CLASS UWMENU" "$D/w2.prg" && \
+   grep -q "LOCAL oMenu AS CLASS UWMENU := UWMenu():New()" "$D/w2.prg"
+check "DECLARE no módulo do site (registra classe+membro+função-classe) + AS CLASS na local" $?
+( cd "$D" && "$BIN" usages fixcls.hbp UWMenu:Paint > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "w2.prg:8: confirmed send (receiver declared AS CLASS UWMENU) in MAIN  | oMenu:Paint()" "$D/u1.log"
+check "o site da semente decide por FATO declarado (era 'via construction chain')" $?
+echo "-prgflag=-kt" >> "$D/fixcls.hbp"
+( cd "$D" && "$BIN" usages fixcls.hbp UWMenu:Paint > u2.log 2>&1 )
+grep -q "w2.prg:8: guaranteed send (receiver AS CLASS UWMENU imposed by -kt checks) in MAIN" "$D/u2.log"
+check "com -kt no projeto: o mesmo site sobe a guaranteed (ciclo materializa->impõe->fato)" $?
+! grep -q "AS CLASS" "$HERE/fixcls/w2.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_92() {
+echo "case 92: B9 fatia 2 - round-trip fixmth: semente 61 (c2 oC:Soma) por FATO; homônimo segue honesto"
+# Rota A da semente 61: oC (CAIXA, classe noutro módulo -> DECLARE no
+# site) e oO (OUTRA, mesma-módulo -> _HB_MEMBER avulso) - as DUAS
+# topologias de one-liner num caso. A exclusão do homônimo (oO:Soma vs
+# consulta Caixa:Soma) é Rota C - SEM ROTA: segue possible, honesto.
+D=$(freshmth case92)
+( cd "$D" && "$BIN" annotate fixmth.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "6 declaração(ões) + 2 anotação(ões) AS CLASS" "$D/app.log" && \
+   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+check "materializou e verificou (padrão-ouro completo com execução -kt)" $?
+grep -q "DECLARE CAIXA NEW() AS CLASS CAIXA" "$D/c2.prg" && \
+   grep -q "_HB_MEMBER NEW() AS CLASS OUTRA" "$D/c2.prg"
+check "as duas topologias: DECLARE (classe noutro módulo) + _HB_MEMBER avulso (mesma-módulo)" $?
+( cd "$D" && "$BIN" usages fixmth.hbp Caixa:Soma > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "c2.prg:32: confirmed send (receiver declared AS CLASS CAIXA) in MAIN  | oC:Soma( 5 )" "$D/u1.log"
+check "site da semente 61 decide por FATO declarado" $?
+grep -q "c2.prg:34: possible send (receiver class OUTRA, relation to CAIXA unknown) in MAIN  | oO:Soma( 2 )" "$D/u1.log"
+check "homônimo NÃO vira exclusão (Rota C sem rota): possible honesto com a relação nomeada" $?
+echo "-prgflag=-kt" >> "$D/fixmth.hbp"
+( cd "$D" && "$BIN" usages fixmth.hbp Caixa:Soma > u2.log 2>&1 )
+grep -q "c2.prg:32: guaranteed send (receiver AS CLASS CAIXA imposed by -kt checks) in MAIN" "$D/u2.log"
+check "com -kt: guaranteed no mesmo site" $?
+! grep -q "AS CLASS" "$HERE/fixmth/c2.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_93() {
+echo "case 93: B9 fatia 2 - round-trip fixrcv: semente 63 (r2 s:Zap) por FATO; registro PURO _HB_CLASS"
+# Rota A da semente 63 (SEMCTOR sem ctor: _HB_MEMBER avulso, probe
+# proba) + a correção que este caso PROVA: local nível 1 cuja classe
+# não está registrada no módulo do site (x AS CLASS CAIXA em r2) vira
+# nível 2 com o registro PURO '_HB_CLASS CAIXA' (harbour.y:1253 -
+# classe sem promessa de membro; antes da correção o --apply escrevia
+# a anotação sem registro e recuava no W0025). Projeto sem Main:
+# passo -kt pulado com relato honesto.
+D=$(freshrcv case93)
+( cd "$D" && "$BIN" annotate fixrcv.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "5 declaração(ões) + 5 anotação(ões) AS CLASS" "$D/app.log" && \
+   grep -q "projeto não-executável - passo -kt pulado (declared, não imposto)" "$D/app.log"
+check "materializou; sem Main o passo -kt é pulado com relato honesto" $?
+grep -q "_HB_CLASS CAIXA" "$D/r2.prg" && \
+   grep -q "LOCAL x AS CLASS CAIXA := Caixa():New( 9 )" "$D/r2.prg"
+check "registro PURO da classe no módulo do site (_HB_CLASS, sem promessa de membro) + anotação" $?
+grep -q "_HB_MEMBER NEW() AS CLASS SEMCTOR" "$D/r2.prg" && \
+   grep -q "LOCAL s AS CLASS SEMCTOR := Semctor():New()" "$D/r2.prg"
+check "semente 63: _HB_MEMBER avulso completa o New herdado + anotação" $?
+( cd "$D" && "$BIN" usages fixrcv.hbp Semctor:Zap > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "r2.prg:31: confirmed send (receiver declared AS CLASS SEMCTOR) in USA  | s:Zap()" "$D/u1.log"
+check "site da semente 63 decide por FATO declarado (era 'via construction chain')" $?
+echo "-prgflag=-kt" >> "$D/fixrcv.hbp"
+( cd "$D" && "$BIN" usages fixrcv.hbp Semctor:Zap > u2.log 2>&1 )
+grep -q "r2.prg:31: guaranteed send (receiver AS CLASS SEMCTOR imposed by -kt checks) in USA" "$D/u2.log"
+check "com -kt: guaranteed no mesmo site" $?
+! grep -q "_HB_CLASS CAIXA" "$HERE/fixrcv/r2.prg" && ! grep -q "AS CLASS SEMCTOR" "$HERE/fixrcv/r2.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_94() {
+echo "case 94: B9 fatia 2 - round-trip fixdis: semente 66 (d1 oNm/oNs:Paint) - a TIPAGEM volta por fato"
+# Rota A da semente 66: só a PARTE de tipagem volta (oNm/oNs decidem
+# confirmed/guaranteed); a EXCLUSÃO do espelho (o furo dos homônimos,
+# caso original do Diego) é Rota C - SEM ROTA: o cruzado segue
+# possible com a relação nomeada, honesto. Projeto sem Main.
+D=$(freshdis case94)
+( cd "$D" && "$BIN" annotate fixdis.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "12 declaração(ões) + 9 anotação(ões) AS CLASS" "$D/app.log"
+check "materializou (12 one-liners + 9 anotações no módulo de 4 DSLs)" $?
+( cd "$D" && "$BIN" usages fixdis.hbp NCMain:Paint > u1.log 2>&1 && "$BIN" usages fixdis.hbp NCSecondary:Paint > u2.log 2>&1 )
+check "usages exit 0" $?
+grep -q "d1.prg:95: confirmed send (receiver declared AS CLASS NCMAIN) in USA66NC  | oNm:Paint()" "$D/u1.log" && \
+   grep -q "d1.prg:96: confirmed send (receiver declared AS CLASS NCSECONDARY) in USA66NC  | oNs:Paint()" "$D/u2.log"
+check "sites da semente 66 decidem por FATO declarado (eram 'via construction chain')" $?
+grep -q "d1.prg:95: possible send (receiver class NCMAIN, relation to NCSECONDARY unknown) in USA66NC" "$D/u2.log"
+check "espelho NÃO vira exclusão (Rota C sem rota): possible honesto - o furo dos homônimos segue aberto" $?
+echo "-prgflag=-kt" >> "$D/fixdis.hbp"
+( cd "$D" && "$BIN" usages fixdis.hbp NCMain:Paint > u3.log 2>&1 )
+grep -q "d1.prg:95: guaranteed send (receiver AS CLASS NCMAIN imposed by -kt checks) in USA66NC" "$D/u3.log"
+check "com -kt: guaranteed no mesmo site" $?
+! grep -q "AS CLASS NCMAIN" "$HERE/fixdis/d1.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_95() {
+echo "case 95: B9 fatia 2 - round-trip fixext: semente 84 (e1 oC/oV:Deposita) - multi-classe posicionado"
+# Rota A da semente 84: módulo MULTI-classe - o _HB_MEMBER de cada
+# classe tem que grudar na classe CERTA (pLastClass, probe proba2):
+# CONTA e CONTAVIP cada uma com seu NEW. Consulta cruzada segue
+# possible (Rota C).
+D=$(freshext case95)
+( cd "$D" && "$BIN" annotate fixext.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "2 declaração(ões) + 2 anotação(ões) AS CLASS" "$D/app.log" && \
+   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+check "materializou e verificou (padrão-ouro completo com execução -kt)" $?
+grep -q "_HB_MEMBER NEW() AS CLASS CONTA" "$D/e1.prg" && \
+   grep -q "_HB_MEMBER NEW() AS CLASS CONTAVIP" "$D/e1.prg"
+check "multi-classe: cada _HB_MEMBER posicionado na SUA classe (pLastClass)" $?
+( cd "$D" && "$BIN" usages fixext.hbp Conta:Deposita > u1.log 2>&1 && "$BIN" usages fixext.hbp ContaVip:Deposita > u2.log 2>&1 )
+check "usages exit 0" $?
+grep -q "e1.prg:73: confirmed send (receiver declared AS CLASS CONTA) in MAIN  | oC:Deposita( 100 )" "$D/u1.log" && \
+   grep -q "e1.prg:75: confirmed send (receiver declared AS CLASS CONTA) in MAIN  | oC:Deposita( 30 )" "$D/u1.log" && \
+   grep -q "e1.prg:76: confirmed send (receiver declared AS CLASS CONTAVIP) in MAIN  | oV:Deposita( 100 )" "$D/u2.log"
+check "sites da semente 84 decidem por FATO declarado (consulta da própria classe)" $?
+grep -q "e1.prg:73: possible send (receiver class CONTA, relation to CONTAVIP unknown) in MAIN" "$D/u2.log"
+check "consulta cruzada NÃO vira exclusão (Rota C sem rota): possible honesto" $?
+echo "-prgflag=-kt" >> "$D/fixext.hbp"
+( cd "$D" && "$BIN" usages fixext.hbp Conta:Deposita > u3.log 2>&1 )
+grep -q "e1.prg:73: guaranteed send (receiver AS CLASS CONTA imposed by -kt checks) in MAIN" "$D/u3.log"
+check "com -kt: guaranteed no mesmo site" $?
+! grep -q "_HB_MEMBER NEW" "$HERE/fixext/e1.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_96() {
+echo "case 96: B9 fatia 2 - round-trip fixb7: semente 85 (b1 p:Gira) - fábrica DECLARE; nível 3 não edita"
+# Rotas A+B da semente 85: a fábrica NovaPeca() ganha DECLARE ANTES da
+# definição (ordem = imposição, probe probb) e p decide por fato. Os
+# nível 3 (oCoisa por união de call sites; o por IIF de runtime) NÃO
+# são editados - conjunto PECA|DISCO nunca decide. O Main do fixture
+# tem veneno de runtime PRÉ-EXISTENTE (Mexe(@q) põe NIL; q:Gira()
+# estoura): a atribuição honesta pula o passo -kt nomeando que a
+# execução JÁ falhava sem edição - falha do projeto nunca vira culpa
+# da edição (nem a edição fica bloqueada por falha que não é dela).
+D=$(freshb7 case96)
+( cd "$D" && "$BIN" annotate fixb7.hbp > rep.log 2>&1 )
+check "annotate relatório exit 0" $?
+grep -q "nível2=1 nível3=2" "$D/rep.log"
+check "relatório: p nível 2; oCoisa e o nível 3 (só inferência - recusa nomeada)" $?
+( cd "$D" && "$BIN" annotate fixb7.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "1 declaração(ões) + 1 anotação(ões) AS CLASS" "$D/app.log" && \
+   grep -q "execução já falhava SEM edição - passo -kt pulado (declared, não imposto)" "$D/app.log"
+check "atribuição honesta: veneno de runtime pré-existente NÃO vira culpa da edição" $?
+grep -q "DECLARE NOVAPECA() AS CLASS PECA" "$D/b1.prg" && \
+   grep -q "LOCAL p AS CLASS PECA := NovaPeca()" "$D/b1.prg"
+check "DECLARE da fábrica ANTES da definição (imposto sob -kt) + AS CLASS na local" $?
+! grep -q "oCoisa AS CLASS" "$D/b1.prg" && grep -q "LOCAL o := iif( UmaCondicao()" "$D/b1.prg"
+check "nível 3 NÃO editado: união de call sites e IIF de runtime seguem sem anotação" $?
+( cd "$D" && "$BIN" usages fixb7.hbp Peca:Gira > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "b1.prg:54: confirmed send (receiver declared AS CLASS PECA) in MAIN  | p:Gira()" "$D/u1.log"
+check "site da semente 85 decide por FATO declarado (era 'via construction chain')" $?
+echo "-prgflag=-kt" >> "$D/fixb7.hbp"
+( cd "$D" && "$BIN" usages fixb7.hbp Peca:Gira > u2.log 2>&1 )
+grep -q "b1.prg:54: guaranteed send (receiver AS CLASS PECA imposed by -kt checks) in MAIN" "$D/u2.log"
+check "com -kt: guaranteed no mesmo site" $?
+! grep -q "DECLARE NOVAPECA" "$HERE/fixb7/b1.prg" && ! grep -q "AS CLASS PECA" "$HERE/fixb7/b1.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

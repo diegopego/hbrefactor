@@ -1717,3 +1717,77 @@ Contexto pré-decisão preservado: o julgamento interno de 2026-07-08
 dizia que, para refatoração semântica de legado, a linha não compensa
 no teto medido (M-cov no mapa); vale manter renames verificados +
 usages honesto; `-kt` é decisão de DIALETO, separada.
+
+## Fase B9 — Tipos declarados impostos (`-kt`) + materializador `annotate` ✅ (fatias 1 e 2, 2026-07-08→10) — narrativa migrada do roadmap (arquivada 2026-07-10)
+
+**Fatia 1 (2026-07-08; commitada 2026-07-09 — harbour-core
+`c1927dfcac`, hbrefactor `6584aa8`)**: `-kt` no core (emissão
+prólogo/local/RETURN + helper `__HB_CHKTYPE` com is-a no objeto vivo;
+zero impacto 224/224; dimensionada NÃO é anotação — `HB_VSCOMP_DIMMED`);
+schema **ast-7** (`kt` + `dim`); camada `guaranteed` no usages +
+DeclType sem a falsa promessa do 'A' dimensionado; fixture fixkt +
+caso 87 (17 checks, execução real); suíte 616/0. A auditoria externa
+alegou overclaim do `guaranteed` (A1/A2); confirmado no RE.1 e
+consertado no RE.2 (`B7KtCovered` restringe a marca aos sites
+cobertos; caso 88). O RE.3 pôs a máquina B7/B7b DORMENTE (entrada
+`B7Ctx`) e suspendeu as expectativas dos testes rebaixados em
+testes-suspensos-re3.md — os itens [FATIA-2] viraram a semente do
+critério de aceite da fatia 2.
+
+**Fatia 2 — a escada de declarações (2026-07-09→10)**: a discussão do
+P1 (argumento do Diego: "o compilador já sabe o tipo de
+`t := Cls():New()`") gerou a investigação que dissolveu os portões
+P1/P2/P3 da spec v1: o cheque de tipos do core é vestigial (zero
+emissores), mas hbclass declara retorno de CONSTRUCTOR e UMA linha
+`DECLARE` fecha a cadeia no módulo do site (probes smoke1-4). Nasceu a
+ESCADA (nível 1 fato puro / nível 2 one-liner que falta / nível 3 só
+relata — decisão do Diego: nunca edita) e o plano
+plano-b9-fatia2-escada.md, executado F2.0-F2.5:
+
+- **F2.0-F2.3 (2026-07-09)**: fatos no ast-schema (§ FAZ/NÃO FAZ);
+  probes (a)-(e)+(g) — `_HB_MEMBER` avulso sem W0019, ordem
+  DECLARE→FUNCTION é imposição, DECLARE cobre classe runtime-pura,
+  topologia (g) presa só no W0019; spec v2; comando `annotate`
+  (relatório) revive a máquina por `B7Ctx` (W0034 morto); tabela de
+  alcance: TODAS as sementes Rota A/B fecham por nível 2; corpus
+  hbhttpd = 13 fábricas declaráveis + 18 métodos presos no (g).
+- **PORTÃO DO MEIO (Diego, 2026-07-09)**: candidato **(g) ADOTADO** —
+  W0019 de método silenciado SÓ quando a re-declaração COMPLETA tipo
+  ausente (hbmain.c:1174-1180; conflito real segue warnando), provado
+  nas seis pontas + re-medição (fixb7b 2→0, hbhttpd 18→0); core
+  `00ccbc20b3`. Candidato (f) ADIADO.
+- **F2.4 núcleo (2026-07-09)**: `annotate --apply` — pipeline
+  bottom-up (baseline → one-liners → padrão-ouro → re-análise →
+  AS CLASS → padrão-ouro), âncoras ESTRUTURAIS resolvidas por fato do
+  dump, padrão-ouro = inerte byte-idêntico sem `-kt` (compilação `-l`)
+  + compila limpo `-w3 -es2` + roda sob `-kt`; `RollbackAll` + recusa
+  nomeada. Caso 89 (fixb7b round-trip: os sends do caso 86 degradados
+  no RE.3 voltam a `confirmed via declared types`); extensão VSCode
+  `annotate`/`annotateApply` (0.9.0); suíte 636/0.
+- **F2.4 complemento (2026-07-10)**: caso 90 — ROLLBACK PROVOCADO
+  (fixture fixrbk: `_HB_MEMBER ACHA() AS CLASS MOEDA` com runtime
+  devolvendo N; pertencimento por posição/pLastClass, o `AS CLASS` do
+  `_HB_MEMBER` é tipo de RETORNO — hbclass.ch:282, precisão do Diego;
+  pristino roda limpo sob `-kt` porque promessa de membro não é
+  imposta; o `--apply` materializa, o cheque pós-store pega EM
+  EXECUÇÃO, fontes voltam BYTE A BYTE e a recusa nomeia o BASE/3012 —
+  idioma `AnnChkLine`); casos 91-96 — round-trip por semente
+  (fixcls/fixmth/fixrcv/fixdis/fixext/fixb7): `confirmed declared` →
+  `guaranteed ... imposed by -kt checks` no MESMO site, originais
+  intocados, recusas honestas assertadas (nível 3 não edita; espelho
+  segue `possible` — Rota C sem rota). Duas correções que as sementes
+  provocaram: registro PURO `_HB_CLASS <Cls>` para nível 1 com classe
+  fora do módulo do site (substituiu o regtext `DECLARE ... New()` que
+  prometia membro inventado) e atribuição HONESTA de falha
+  pré-existente (pristino roda sob `-kt` antes da edição; se já falha,
+  o passo é pulado nomeando — falha do projeto nunca vira culpa da
+  edição; destrava projeto-servidor). Suíte **692/0**.
+- **F2.5 (2026-07-10)**: testes-suspensos-re3 Rotas A/B RECONQUISTADAS
+  (caso a caso na tabela); M-annotate re-medida — relatório delta zero
+  e ciclo completo no corpus: 31 declarações + 7 anotações verificadas
+  em ~3 s, re-relatório DRENA (13/18/7 → 0; resíduo estrutural 284
+  sem-prova + 1 nível 3); CHANGELOG.md para o programador final.
+
+Resíduos em aberto (fatia futura, portão de ESCOPO do Diego): projeto
+já-`-kt` (strip no baseline inerte), anotação de PARÂMETRO
+(`SigParamHits`), candidato (f) como coluna-delta.

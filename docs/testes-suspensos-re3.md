@@ -1,5 +1,12 @@
 # Testes suspensos no RE.3 — alvos de reconquista por FATO
 
+> **Status (2026-07-10, F2.5)**: as Rotas A e B (`[FATIA-2]`) estão
+> **RECONQUISTADAS** — casos 89 e 91-96 provam o ciclo materializa →
+> impõe → o site decide (`confirmed declared` → `guaranteed`) em cada
+> semente, fixtures originais intocados. Rotas C (sem rota), D
+> (RE.5+A6) e E (RE.6/degrade) seguem como estavam — nada delas foi
+> prometido nem entregue.
+
 **O que é isto (decisão do Diego, 2026-07-09, mesma sessão do portão
 do RE.3)**: o RE.3 tirou a inferência do veredito do `usages` e os
 casos 39/61/63/66-69/72/75/84/85/86 foram re-baselinados para o
@@ -27,34 +34,48 @@ Verbatim de referência: os asserts antigos completos vivem em
 `git show 1aa95a8:tests/run.sh` (estado pré-RE.3); abaixo vai o rótulo
 essencial de cada um.
 
-## Rota A — anotação materializável em LOCAL/parâmetro `[FATIA-2]`
+## Rota A — anotação materializável em LOCAL/parâmetro `[FATIA-2]` — ✅ RECONQUISTADA (2026-07-10, casos 91-96)
 
 A sugeridora (B7 dormente) prova a classe; o materializador escreve o
 `AS CLASS`; `-kt` impõe (site coberto — RE.2); o send sai `guaranteed`.
 
-| Caso | Site | Assert antigo (essencial) |
-|---|---|---|
-| 39/61 | fixcls w2.prg:7 `oMenu:Paint()` | `confirmed send (receiver class UWMENU via construction chain, class graph as written) in MAIN` |
-| 61 | fixmth c2.prg:28 `oC:Soma( 5 )` | `confirmed send (receiver class CAIXA via construction chain, ...) in MAIN` |
-| 63 | fixrcv r2.prg:28 `s:Zap()` | `confirmed send (receiver class SEMCTOR via construction chain, ...) in USA` |
-| 66 | fixdis d1.prg:87/88 `oNm:`/`oNs:Paint()` | `excluded send within the written class graph (receiver class NCMAIN/NCSECONDARY via construction chain, dispatches to ...)` — a PARTE de tipagem volta por esta rota; a EXCLUSÃO é Rota C |
-| 84 | fixext e1.prg:71/73/74 `oC:`/`oV:Deposita` | `confirmed send (receiver class CONTA/CONTAVIP via construction chain, ...) in MAIN` (consulta da própria classe) |
-| 85 | fixb7 b1.prg:53 `p:Gira()` | `confirmed send (receiver class PECA via construction chain, ...) in MAIN` (fábrica — ver também Rota B) |
+**Reconquista provada em suíte (F2.4-complemento)**: cada site abaixo
+decide `confirmed send (receiver declared AS CLASS <X>)` na cópia
+materializada pelo `annotate --apply` e sobe a `guaranteed ... imposed
+by -kt checks` com `-prgflag=-kt` no projeto — o ciclo completo
+materializa → impõe → fato. As linhas dos sites nas cópias deslocam
+pelos one-liners inseridos (fixture original intocado). SÓ locais:
+anotação de PARÂMETRO segue fatia futura (resíduo 2 da F2.4).
 
-## Rota B — retorno por `DECLARE ... AS CLASS` materializado `[FATIA-2]`
+| Caso | Site | Assert antigo (essencial) | Reconquista |
+|---|---|---|---|
+| 39/61 | fixcls w2.prg:7 `oMenu:Paint()` | `confirmed send (receiver class UWMENU via construction chain, class graph as written) in MAIN` | ✅ caso 91 (w2:8 na cópia) |
+| 61 | fixmth c2.prg:28 `oC:Soma( 5 )` | `confirmed send (receiver class CAIXA via construction chain, ...) in MAIN` | ✅ caso 92 (c2:32) |
+| 63 | fixrcv r2.prg:28 `s:Zap()` | `confirmed send (receiver class SEMCTOR via construction chain, ...) in USA` | ✅ caso 93 (r2:31) |
+| 66 | fixdis d1.prg:87/88 `oNm:`/`oNs:Paint()` | `excluded send within the written class graph (receiver class NCMAIN/NCSECONDARY via construction chain, dispatches to ...)` — a PARTE de tipagem volta por esta rota; a EXCLUSÃO é Rota C | ✅ caso 94 (d1:95/96) — SÓ a tipagem; o espelho segue `possible` honesto |
+| 84 | fixext e1.prg:71/73/74 `oC:`/`oV:Deposita` | `confirmed send (receiver class CONTA/CONTAVIP via construction chain, ...) in MAIN` (consulta da própria classe) | ✅ caso 95 (e1:73/75/76) |
+| 85 | fixb7 b1.prg:53 `p:Gira()` | `confirmed send (receiver class PECA via construction chain, ...) in MAIN` (fábrica — ver também Rota B) | ✅ caso 96 (b1:54) |
+
+## Rota B — retorno por `DECLARE ... AS CLASS` materializado `[FATIA-2]` — ✅ RECONQUISTADA (casos 89 e 96)
 
 O canal de retorno JÁ existe na linguagem (`DECLARE F() AS CLASS X`) e
 o `-kt` JÁ o impõe (embrulho `__HB_CHKTYPE` no RETURN — spec-b9). A
 sugeridora prova o retorno (pushes `ret`, identidade `QSelf()`); o
 materializador escreve o DECLARE; o send encadeado decide por fato.
 
-| Caso | Site | Assert antigo (essencial) |
-|---|---|---|
-| 85 | fixb7 b1.prg:53 (fábrica `Cria()` sem DECLARE) | `confirmed ... via construction chain` — DECLARE materializado dá o mesmo site por fato |
-| 86 | fixb7b q1.prg:73 `oC:Pega():Soma( 5 )` | `confirmed send (receiver class MOEDA via construction chain, ...) in MAIN` (retorno não-Self pelos pushes ret) |
-| 86 | fixb7b q1.prg:75 `oM:Soma( 1 ):Soma( 2 )` (2 sends) | `confirmed ...` ×2 (identidade RETURN Self em cadeia) |
+| Caso | Site | Assert antigo (essencial) | Reconquista |
+|---|---|---|---|
+| 85 | fixb7 b1.prg:53 (fábrica `Cria()` sem DECLARE) | `confirmed ... via construction chain` — DECLARE materializado dá o mesmo site por fato | ✅ caso 96 (`DECLARE NOVAPECA() AS CLASS PECA` antes da definição — imposto) |
+| 86 | fixb7b q1.prg:73 `oC:Pega():Soma( 5 )` | `confirmed send (receiver class MOEDA via construction chain, ...) in MAIN` (retorno não-Self pelos pushes ret) | ✅ caso 89 (2026-07-09, F2.4-núcleo) — `confirmed ... via declared types` |
+| 86 | fixb7b q1.prg:75 `oM:Soma( 1 ):Soma( 2 )` (2 sends) | `confirmed ...` ×2 (identidade RETURN Self em cadeia) | ✅ caso 89 — completadores (g) `_HB_MEMBER SOMA()/PEGA()` |
 
 ## Rota C — exclusão de homônimo em SEND `[SEM-ROTA hoje; candidata: RE.6/canal novo]`
+
+> Honestidade agora ASSERTADA em suíte (2026-07-10): nos round-trips
+> materializados, o cruzado/espelho segue `possible send (receiver
+> class X, relation to Y unknown)` — casos 92 (fixmth), 94 (fixdis,
+> o furo dos homônimos) e 95 (fixext). A exclusão NÃO voltou e não
+> volta por esta rota.
 
 A exclusão ("este send NUNCA é da classe consultada") exigia mundo
 fechado sobre parents as-written — mesmo com `guaranteed` (is-a X), a

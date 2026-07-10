@@ -281,3 +281,17 @@ o candidato (g), e o ganho de locais vem da RE-ANÁLISE iterativa após
 materializar os retornos (pipeline do estágio 2). O relatório é o
 insumo do PORTÃO DO MEIO (decisões: candidatos (f)/(g) de core;
 abertura da edição F2.4).
+
+**Re-medição F2.5 (2026-07-10, ferramenta pós-F2.4-complemento,
+core@(g))**: relatório idêntico ao snapshot acima (delta ZERO — a
+reclassificação nível1→nível2 por classe-fora-do-módulo não atinge o
+corpus: os 7 nível-1 têm classe no próprio módulo). O ciclo COMPLETO
+do estágio 2, que a F2.3 só podia estimar, agora medido no clone:
+`annotate --apply` escreve **31 declarações + 7 anotações AS CLASS**
+(13 DECLAREs de fábrica UW* + 18 completadores (g), zero registros
+extras) verificadas em ~3 s (inerte byte-idêntico + compila limpo
+`-w3 -es2`; sem `MAIN` no projeto o passo de execução `-kt` é pulado
+com relato honesto), e o re-relatório DRENA: retornos-fun 13→0,
+métodos-(g) 18→0, nível1 7→0 (anotadas saem da varredura, 322→315).
+Resíduo estrutural honesto e inalterado: sem-prova=284 (multi-write/
+parâmetros/sem binding único — o balde aberto da M-cov) + 1 nível 3.
