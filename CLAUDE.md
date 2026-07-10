@@ -90,7 +90,12 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`; `gpt-5-codex` e `spark` falham
   com invalid_request_error — custou 3 tentativas); achado externo é
   HIPÓTESE até verificação no fonte com arquivo:linha (idioma da fase
-  RE) — nunca agir direto sobre o relato.
+  RE) — nunca agir direto sobre o relato. **Tarefa Codex pode morrer em
+  SILÊNCIO** (2026-07-09: log congelado + PID sumido com status
+  "running" órfão no broker — custou 13 min de espera morta): antes de
+  esperar conclusão, conferir `ps -p <pid>` do task; morto = cancelar
+  (`codex-companion.mjs cancel <id>`) e re-executar com modelo
+  explícito (`--model gpt-5.5`).
 - Commits só com autorização explícita do Diego **para AQUELE commit**;
   concluir/aprovar o trabalho não autoriza o commit. Um pedido por commit —
   não encadear. Sem push salvo pedido.
