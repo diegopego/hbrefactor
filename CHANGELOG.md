@@ -5,6 +5,63 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — `.hbp` complexo (container, sub-projetos) reconhecido por inteiro
+
+### O problema de todo dia
+
+Seu `.hbp` não é um projeto simples de um alvo só. Ele é um **container**
+(`-hbcontainer`) que junta vários sub-projetos, ou referencia outro
+`.hbp`, ou usa `-target=` para gerar mais de um binário. Você abre um
+`.prg` que pertence ao **segundo** (ou terceiro) desses alvos, roda um
+comando na extensão e a ferramenta age como se aquele `.hbp` não fosse o
+dono do seu arquivo — ou o picker nem oferece o projeto certo.
+
+Exemplo:
+
+```
+# app.hbp
+-hbcontainer
+gui/gui.hbp      <- 1º alvo
+srv/srv.hbp      <- 2º alvo
+```
+
+Abrindo um `.prg` de `srv/`, o `app.hbp` era ignorado como dono.
+
+### O que mudou
+
+A ferramenta agora lê **todos os alvos** que o seu `.hbp` produz, não só
+o primeiro. Ela continua sem ler o `.hbp` na unha: pergunta ao **hbmk2**
+(o builder oficial) qual é a linha de compilação de **cada** alvo e junta
+as fontes de todos. Resultado: um `.prg` que pertence a qualquer alvo do
+projeto é reconhecido como fonte daquele `.hbp`.
+
+De quebra, tudo que o hbmk2 já resolvia por baixo continua valendo de
+graça, porque a ferramenta lê o comando **já resolvido**:
+
+- `.hbm` (coleção de opções incluída no projeto),
+- `.hbc` (pacote/lib),
+- `-i<path>` de include, variáveis `${hb_name}`/`${hb_targetname}`,
+- filtros de plataforma `{win}` / `{!win}`.
+
+Antes: só o primeiro alvo do `.hbp` era enxergado; o resto sumia.
+Depois: todos os alvos contam; o `.hbp` é reconhecido como dono de
+qualquer fonte sua.
+
+### O que a ferramenta NUNCA faz aqui
+
+Não interpreta o `.hbp`/`.hbm`/`.hbc` por conta própria e não adivinha
+flags: quem resolve macros, filtros, includes e sub-projetos é o hbmk2. A
+ferramenta só usa o que o builder oficial reportou.
+
+### Limite honesto
+
+Se dois alvos do mesmo `.hbp` compilam módulos com o **mesmo nome de
+arquivo** em pastas diferentes (ex.: `gui/util.prg` e `srv/util.prg`), a
+posse funciona, mas a análise fina (usages/rename) pode confundir os dois
+na hora de casar o dump — some no `-hbcontainer` com nomes repetidos. Caso
+apareça no seu uso, avise. Detalhe interno: B5.1 em
+[docs/roadmap.md](docs/roadmap.md).
+
 ## 2026-07-10 — O picker acha o `.hbp` certo sozinho (o mais próximo primeiro)
 
 ### O problema de todo dia

@@ -215,6 +215,30 @@ Restante, por fricção do uso diário:
 
 **Critério**: Diego usa no dia a dia; sem regressão.
 
+#### B5.1 — `.hbp` multi-alvo reconhecido por inteiro ✅ ENTREGUE (2026-07-10)
+
+Sintoma do Diego: `.hbp` com estrutura/flags mais complexa "não era
+reconhecido". Raiz: um `.hbp` pode resolver para **vários alvos de build**
+— `-hbcontainer` referenciando sub-`.hbp`, referência direta a outro
+`.hbp`, ou `-target=` — e o `hbmk2 -traceonly` imprime **uma linha
+"Harbour compiler command" por alvo**. O `LoadProject` lia só a PRIMEIRA;
+as fontes dos demais alvos ficavam invisíveis e o `.hbp` deixava de ser
+reconhecido como dono delas (owners vazio no `projects-of`). Fix:
+`LoadProject` captura TODAS as linhas de comando e **une** fontes/includes/
+flags/hbx com dedup (`AddUniq`). Fiel à REGRA DO FATO — `.hbm` (coleção de
+opções), `.hbc` (pacote), `-i`, `${macros}` e filtros `{...}` já vêm
+**resolvidos DENTRO de cada comando** pelo hbmk2; a ferramenta nunca
+parseia `.hbp`, só lê o comando do compilador que o builder oficial
+emitiu. Prova: caso 103 novo (4 checks: fixtures limpas, dono do 1º alvo,
+dono do 2º alvo — a regressão —, descoberta do container). A API de plugin
+do hbmk2 foi avaliada como canal alternativo e DESCARTADA: expõe
+`hbmk_AddInput_*` (escrita) e vars como `cTARGETNAME`, mas **não** a lista
+de fontes resolvida (leitura) — o comando do `-traceonly` continua sendo o
+canal de fato mais completo.
+Limite conhecido (não do escopo deste fix): se dois alvos compilam módulos
+de MESMO nome-base em diretórios distintos, o dump `.ast.json` é chaveado
+só pelo nome-base (`ReadAst`) e colidiria — só afeta análise, não a posse.
+
 ### U — Verbos de refatoração unificados (`rename`/`extract`/`reorder`) — **PORTÃO: decisão do Diego**
 
 **A pergunta, firme**: por que a CLI expõe OITO comandos de rename

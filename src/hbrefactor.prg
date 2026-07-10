@@ -120,8 +120,8 @@ STATIC PROCEDURE Usage()
 
 STATIC FUNCTION LoadProject( cSpec )
 
-   LOCAL cOut := "", cErr := "", cCmdLine := "", cTok, cDir, aLines, nI
-   LOCAL hProj, lNext := .F.
+   LOCAL cOut := "", cErr := "", cCmdLine, cTok, cDir, aLines, nI
+   LOCAL hProj, lNext := .F., aCmdLines := {}
 
    // -rebuild: sem ele, projeto com -inc e alvo em dia não mostra comando
    IF hb_processRun( HbMk2Bin() + " " + StrTran( cSpec, ",", " " ) + ;
@@ -130,15 +130,22 @@ STATIC FUNCTION LoadProject( cSpec )
       RETURN NIL
    ENDIF
 
+   // um .hbp pode resolver para VÁRIOS alvos (sub-projetos via -hbcontainer/
+   // referência a outro .hbp, ou -target=): o hbmk2 imprime uma linha
+   // "Harbour compiler command" POR alvo. Capturar TODAS e unir as fontes -
+   // pegar só a primeira torna invisíveis os .prg dos demais alvos e o .hbp
+   // deixa de ser reconhecido como dono deles. (.hbm/.hbc/-i/macros/filtros
+   // já vêm resolvidos DENTRO de cada comando - fato do hbmk2, sem parse nosso)
    aLines := hb_ATokens( StrTran( cOut, Chr( 13 ), "" ), Chr( 10 ) )
    FOR nI := 1 TO Len( aLines )
       IF lNext
-         cCmdLine := aLines[ nI ]
-         EXIT
+         AAdd( aCmdLines, aLines[ nI ] )
+         lNext := .F.
+      ELSEIF "Harbour compiler command" $ aLines[ nI ]
+         lNext := .T.
       ENDIF
-      lNext := "Harbour compiler command" $ aLines[ nI ]
    NEXT
-   IF Empty( cCmdLine )
+   IF Empty( aCmdLines )
       OutErr( "hbrefactor: hbmk2 não produziu comando do compilador para '" + ;
               cSpec + "'" + hb_eol() )
       RETURN NIL
@@ -146,23 +153,25 @@ STATIC FUNCTION LoadProject( cSpec )
 
    hProj := { "spec" => cSpec, "files" => {}, "hbx" => {}, "inc" => {}, "flags" => {} }
 
-   FOR EACH cTok IN CmdTokens( cCmdLine )
-      DO CASE
-      CASE cTok:__enumIndex() == 1              // o binário harbour
-      CASE ! Left( cTok, 1 ) == "-"
+   FOR EACH cCmdLine IN aCmdLines
+      FOR EACH cTok IN CmdTokens( cCmdLine )
          DO CASE
-         CASE Lower( hb_FNameExt( cTok ) ) == ".prg"
-            AAdd( hProj[ "files" ], cTok )
-         CASE Lower( hb_FNameExt( cTok ) ) == ".hbx"
-            AAdd( hProj[ "hbx" ], cTok )
+         CASE cTok:__enumIndex() == 1           // o binário harbour (por alvo)
+         CASE ! Left( cTok, 1 ) == "-"
+            DO CASE
+            CASE Lower( hb_FNameExt( cTok ) ) == ".prg"
+               AddUniq( hProj[ "files" ], cTok )
+            CASE Lower( hb_FNameExt( cTok ) ) == ".hbx"
+               AddUniq( hProj[ "hbx" ], cTok )
+            ENDCASE
+         CASE Left( cTok, 2 ) == "-o" .OR. Left( cTok, 2 ) == "-q"
+         CASE Left( cTok, 2 ) == "-i"
+            AddUniq( hProj[ "inc" ], SubStr( cTok, 3 ) )
+            AddUniq( hProj[ "flags" ], cTok )
+         OTHERWISE
+            AddUniq( hProj[ "flags" ], cTok )
          ENDCASE
-      CASE Left( cTok, 2 ) == "-o" .OR. Left( cTok, 2 ) == "-q"
-      CASE Left( cTok, 2 ) == "-i"
-         AAdd( hProj[ "inc" ], SubStr( cTok, 3 ) )
-         AAdd( hProj[ "flags" ], cTok )
-      OTHERWISE
-         AAdd( hProj[ "flags" ], cTok )
-      ENDCASE
+      NEXT
    NEXT
 
    IF Empty( hProj[ "files" ] )
@@ -180,6 +189,17 @@ STATIC FUNCTION LoadProject( cSpec )
    NEXT
 
    RETURN hProj
+
+// acrescenta cValor à lista só se ainda não estiver lá (== exato): ao unir
+// as fontes/includes/flags de VÁRIOS alvos de um mesmo .hbp, o include do
+// próprio Harbour e flags comuns repetem em cada comando - dedup evita inchar
+STATIC PROCEDURE AddUniq( aList, cValue )
+
+   IF hb_AScan( aList, cValue,,, .T. ) == 0
+      AAdd( aList, cValue )
+   ENDIF
+
+   RETURN
 
 // hbmk2 cita tokens com '...' no unix e o argv[0] vem entre parênteses
 STATIC FUNCTION CmdTokens( cLine )

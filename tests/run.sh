@@ -3187,7 +3187,48 @@ check "--json: objeto {owners,candidates}; candidato mais próximo (decoy) no to
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102"
+unit_103() {
+echo "case 103: projects-of - .hbp MULTI-ALVO (-hbcontainer + sub-.hbp): as fontes de TODOS os alvos contam como do .hbp"
+# Sintoma (Diego): um .hbp com flags/estrutura mais complexa "não era
+# reconhecido". Raiz: um .hbp pode resolver para VÁRIOS alvos - container
+# referenciando sub-projetos, ou -target= - e o hbmk2 -traceonly imprime uma
+# linha "Harbour compiler command" POR alvo. O LoadProject lia só a PRIMEIRA;
+# os .prg dos demais alvos ficavam invisíveis e o .hbp NÃO era reconhecido
+# como dono deles. Agora capturamos TODAS as linhas e unimos as fontes (fato
+# do hbmk2; .hbm/.hbc/-i/macros/filtros já vêm resolvidos DENTRO de cada
+# comando - nada de parse de .hbp na ferramenta).
+D="$HERE/tmp/case103"; rm -rf "$D"; mkdir -p "$D/subA" "$D/subB"
+cat > "$D/subA/a.prg" <<'EOF'
+PROCEDURE MainA()
+
+   RETURN
+EOF
+cat > "$D/subB/b.prg" <<'EOF'
+PROCEDURE MainB()
+
+   RETURN
+EOF
+printf -- '-hbexe\na.prg\n' > "$D/subA/a.hbp"
+printf -- '-hbexe\nb.prg\n' > "$D/subB/b.hbp"
+printf -- '-hbcontainer\nsubA/a.hbp\nsubB/b.hbp\n' > "$D/all.hbp"
+( cd "$D" && for f in subA/a.prg subB/b.prg; do \
+   "$HB_BIN/harbour" $f -n -q0 -w3 -es2 -s > /dev/null 2>&1 || exit 1; done )
+check "fixtures do caso 103 clean under -w3 -es2" $?
+# 1º alvo: a.prg sempre foi reconhecido (o comando lido era o primeiro)
+( cd "$D" && "$BIN" projects-of "$D/subA/a.prg" "$D/all.hbp" > m1.log 2>&1 )
+[ "$(cat "$D/m1.log")" = "$D/all.hbp" ]
+check "all.hbp dono de subA/a.prg (1º alvo)" $?
+# 2º alvo: b.prg - A REGRESSÃO. Antes do fix a saída vinha VAZIA (invisível)
+( cd "$D" && "$BIN" projects-of "$D/subB/b.prg" "$D/all.hbp" > m2.log 2>&1 )
+[ "$(cat "$D/m2.log")" = "$D/all.hbp" ]
+check "all.hbp dono de subB/b.prg (2º alvo) - fontes de todos os alvos unidas" $?
+# descoberta: partindo de b.prg, o container aparece entre os donos por FATO
+( cd "$D" && "$BIN" projects-of "$D/subB/b.prg" --root "$D" > m3.log 2>&1 )
+grep -q "all.hbp$" "$D/m3.log"
+check "descoberta de b.prg: container all.hbp entre os donos" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -
