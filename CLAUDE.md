@@ -130,3 +130,8 @@ Os fixtures da suíte são `.prg` idiomático (o "caso 0" exige saída limpa sob
 - **Verificar comportamento no fonte do Harbour ANTES de afirmar** (não
   teorizar): ler/grep o `src/` relevante. `Empty(" ")` é `.T.` — usar
   `Len(c) == 0` para "vazia".
+- **Diagnóstico do IDE ≠ veredito**: o lint do VSCode usa o harbour do
+  SISTEMA (`/usr/local/bin`, sem os patches do branch — ex.: acusa
+  W0019 em `_HB_MEMBER` que completa tipo, silenciado pelo candidato
+  (g) no core do projeto). A régua é sempre o toolchain de `HB_BIN`
+  (2026-07-10: quase derrubou a fixture fixrbk por falso positivo).

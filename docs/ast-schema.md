@@ -466,6 +466,43 @@ plano da fatia 2 — [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md)):
   sem-tipo→sem-tipo também silencia (nenhuma informação perdida).
   Probes pg1-pg5b + re-medição em
   [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md) § F2.1.
+- **Semântica do `AS CLASS` — leitura da documentação do hbclass.ch
+  (2026-07-10, questão do Diego)**: `AS CLASS <X>` descreve sempre o
+  VALOR de um slot ("o que mora/sai aqui é-um X"), nunca pertencimento
+  — pertencimento de membro é POSICIONAL (`pLastClass`). Os autores
+  chamam a maquinaria inteira de **"value type declarations"**
+  (hbclass.ch:85) e o switch `HB_CLS_NO_DECLARATIONS` a traduz TODA
+  para nada (hbclass.ch:137-144: `_HB_CLASS`/`_HB_MEMBER`/`DECLARE`/
+  `AS <type>`/`AS CLASS <name>` → vazio) — prova autoral da inércia
+  que o padrão-ouro do `annotate` verifica byte a byte. O mapeamento
+  usuário→tabela é literal: `METHOD <m> [CONSTRUCTOR] [AS <type>]`
+  vira `_HB_MEMBER <m>() [<-ctor-> AS CLASS <própria>] [AS <type>]`
+  (hbclass.ch:282 — CONSTRUCTOR = retorno da instância);
+  `VAR`/`DATA`/`CLASSDATA`/`EXPORT ... AS <type>` viram
+  `_HB_MEMBER { [AS <type>] nomes }`. Confirmação autoral do checker
+  vestigial: o DECLARE de exemplo do próprio HBClass vive em `#if 0`
+  para "not generate **ignored by compiler** noise in .ppo files"
+  (hbclass.ch:176-189).
+- **`AS CLASS` em EXPRESSÃO é cast parseado e DESCARTADO**
+  (harbour.y:845-875: sufixo `StrongType` aceito em `Self`, funcall,
+  send, variável e lista parentetizada, com ação `{ $$ = $1; }`).
+  O hbclass o usa em toda impl de método (`DECLARED METHOD` expande
+  `local Self AS CLASS <C> := QSelf() AS CLASS <C>`, hbclass.ch:
+  261-263) e no `ENDCLASS` (`RETURN s_oClass:Instance() AS CLASS ...`,
+  hbclass.ch:257). O fato que FICA em tabela (e no dump) é o da LOCAL
+  `Self AS CLASS <C>` — a fonte do canal de receptor para `::`; o
+  cast da expressão não deixa rastro em tabela nenhuma.
+- **`MESSAGE <M> AS <tipo> VIRTUAL` PERDE o tipo declarado — provado
+  em dump** (probe pv2, 2026-07-10): hbclass.ch:368-370 casa
+  `[ AS <type> ]` mas emite `_HB_MEMBER <M>` SEM ele (idem
+  `DEFERRED`) — `MESSAGE Rende AS Numeric VIRTUAL` entra na tabela
+  sem tipo enquanto `METHOD Conta() AS Numeric` entra com `'N'`.
+  Nota: isso vale para tipos SIMPLES; `AS CLASS <X>` nem casa no slot
+  `<type>` dessas regras de pp (E0030 — o fato F2.1 da topologia (g)),
+  então retorno-classe de membro SÓ se escreve pela linha `_HB_MEMBER`
+  avulsa. O membro sem-tipo resultante é completável pela rota (g)
+  APENAS onde houver prova de retorno (virtual puro não tem impl na
+  classe — sem prova, sem completador; relato honesto).
 
 ### TypeOf — propagação na ferramenta (regra FECHADA; extensões B7 e B7b pelos portões de 2026-07-08)
 
