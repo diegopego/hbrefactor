@@ -245,11 +245,13 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // tipadas parse-time + tabelas DECLARE em "declared", fase B4f);
    // ast-5 = ast-4 + a regra por dentro (match[]/result[] em ppRules,
    // fase B4g); ast-6 = ast-5 + "ret": true no push que carrega o valor
-   // de RETURN (fase B7). O leitor usa só seções presentes em todos -
-   // comandos que exigem o rastro/o canal/a regra recusam ou degradam com
-   // mensagem clara (FromReady/Ast4Ready/RuleToksReady)
+   // de RETURN (fase B7); ast-9 = posição do token ESCRITO do nome nas
+   // declarations (nameLine/nameCol, âncora do materializador - B9
+   // fatia 3). O leitor usa só seções presentes em todos - comandos que
+   // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
+   // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -6377,8 +6379,8 @@ STATIC FUNCTION AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
 
    LOCAL hAsts := hLoad[ "asts" ], hDecl := hLoad[ "decl" ], hInter := hLoad[ "inter" ]
    LOCAL cPath, hAst, hFunc, hItem, cMod, hCand, cUpF, hEntry, hRet, cTag
-   LOCAL aRep := {}, aFR := {}, aMR := {}, nScan := 0, nSem := 0
-   LOCAL hSeenFR := { => }, hImpls, xImpl
+   LOCAL aRep := {}, aFR := {}, aMR := {}, aBP := {}, nScan := 0, nSem := 0
+   LOCAL hSeenFR := { => }, hImpls, xImpl, hBlk
    LOCAL hSum := { "n1" => 0, "n2" => 0, "n3" => 0, "kind" => 0, "semprova" => 0 }
 
    FOR EACH cPath IN hProj[ "files" ]
@@ -6399,16 +6401,27 @@ STATIC FUNCTION AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
                hb_HGetDef( hItem, "dim", .F. )
                LOOP
             ENDIF
+            // fatia 3: param de BLOCO (declLine fora da linha da dona)
+            // sai do caminho de locais - a sugeridora própria decide
+            // no balde bp abaixo
+            IF hb_HGetDef( hItem, "param", .F. ) .AND. ;
+               !( hItem[ "declLine" ] == hFunc[ "line" ] )
+               LOOP
+            ENDIF
             nScan++
             hCand := AnnOne( hItem, hFunc, hAst, hDecl, hInter )
             IF hCand == NIL
                nSem++
                LOOP
             ENDIF
-            hCand[ "module" ] := cMod
-            hCand[ "path" ]   := cPath
-            hCand[ "func" ]   := hFunc[ "name" ]
-            hCand[ "param" ]  := hb_HGetDef( hItem, "param", .F. )
+            hCand[ "module" ]   := cMod
+            hCand[ "path" ]     := cPath
+            hCand[ "func" ]     := hFunc[ "name" ]
+            hCand[ "param" ]    := hb_HGetDef( hItem, "param", .F. )
+            // âncora de escrita (ast-9): posição do token ESCRITO do
+            // nome - a régua de unicidade do AnnNameCol vira degrade
+            hCand[ "nameLine" ] := hb_HGetDef( hItem, "nameLine", 0 )
+            hCand[ "nameCol" ]  := hb_HGetDef( hItem, "nameCol", -1 )
             hSum[ hCand[ "level" ] ]++
             AAdd( aRep, hCand )
          NEXT
@@ -6491,7 +6504,61 @@ STATIC FUNCTION AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
       NEXT
    NEXT
 
-   RETURN { "rep" => aRep, "fr" => aFR, "mr" => aMR, "sum" => hSum, "scan" => nScan }
+   // fatia 3 (spec-b9-fatia3, D1/D3): params de BLOCO anotáveis - a
+   // sugeridora consulta o caminho de bloco da máquina dormente
+   // (B7InlineSelfType/B7BlockEvalType via TypeOf com o nó do bloco).
+   // Candidato = classe ÚNICA provada + âncora de escrita presente
+   // (nameLine/nameCol, fato ast-9; ausente = param gerado por diretiva,
+   // inescrevível). Veneno/união divergente/bloco ambíguo/conjunto =>
+   // fica de fora (o usages segue relatando possible honesto). O
+   // registro _HB_CLASS acompanha quando a classe não é conhecida do
+   // módulo (mesma auto-sabotagem do W0025 das locais)
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      cMod := hb_FNameNameExt( hb_HGetDef( hAst, "module", cPath ) )
+      IF ! Empty( cFileFil ) .AND. ;
+         !( Lower( cMod ) == Lower( hb_FNameNameExt( cFileFil ) ) )
+         LOOP
+      ENDIF
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ] .OR. ;
+            ( ! Empty( cFuncFil ) .AND. !( Upper( hFunc[ "name" ] ) == cFuncFil ) )
+            LOOP
+         ENDIF
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF ! hb_HGetDef( hItem, "param", .F. ) .OR. ;
+               hItem[ "declLine" ] == hFunc[ "line" ] .OR. ;
+               !( hItem[ "scope" ] == "local" ) .OR. ;
+               ! Empty( hb_HGetDef( hItem, "type", "" ) )
+               LOOP
+            ENDIF
+            hBlk := AnnBlkAt( hFunc, hItem[ "declLine" ] )
+            IF hBlk == NIL
+               LOOP                 // bloco ambíguo/não localizado: degrada
+            ENDIF
+            hRet := TypeOf( { "et" => "VARIABLE", "val" => hItem[ "sym" ] }, ;
+                            hFunc, hDecl, hBlk, NIL, hInter, hAst )
+            IF hRet == NIL .OR. ! hb_HHasKey( hRet, "cls" )
+               LOOP                 // sem prova/veneno: relato honesto fica
+            ENDIF
+            IF hb_HGetDef( hItem, "nameCol", -1 ) < 0
+               LOOP                 // sem token escrito: inescrevível
+            ENDIF
+            AAdd( aBP, { "module" => cMod, "path" => cPath, ;
+                         "func" => hFunc[ "name" ], "sym" => hItem[ "sym" ], ;
+                         "cls" => hRet[ "cls" ], ;
+                         "declLine" => hItem[ "declLine" ], ;
+                         "nameLine" => hItem[ "nameLine" ], ;
+                         "nameCol" => hItem[ "nameCol" ], ;
+                         "needreg" => ! AnnClsInMod( hAst, hRet[ "cls" ] ), ;
+                         "regtext" => iif( AnnClsInMod( hAst, hRet[ "cls" ] ), ;
+                                           "", "_HB_CLASS " + hRet[ "cls" ] ) } )
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN { "rep" => aRep, "fr" => aFR, "mr" => aMR, "bp" => aBP, ;
+            "sum" => hSum, "scan" => nScan }
 
 // relato humano (+ JSON). lApplied controla o banner (relatório × pós-edição)
 STATIC PROCEDURE AnnReport( hPlan, cJsonOut, lApplied )
@@ -6538,6 +6605,16 @@ STATIC PROCEDURE AnnReport( hPlan, cJsonOut, lApplied )
          OutStd( "    + " + hEntry[ "cls" ] + ": " + hEntry[ "text" ] + hb_eol() )
       NEXT
    ENDIF
+   IF ! Empty( hPlan[ "bp" ] )
+      OutStd( "params de BLOCO anotáveis (fatia 3 - AS CLASS imposto por Eval sob -kt):" + hb_eol() )
+      FOR EACH hEntry IN hPlan[ "bp" ]
+         OutStd( "    + " + hEntry[ "func" ] + " {| " + hEntry[ "sym" ] + ;
+                 " AS CLASS " + hEntry[ "cls" ] + " |   [" + hEntry[ "module" ] + ;
+                 ":" + hb_ntos( hEntry[ "nameLine" ] ) + ;
+                 iif( hEntry[ "needreg" ], " + registro antes: " + ;
+                      hEntry[ "regtext" ], "" ) + "]" + hb_eol() )
+      NEXT
+   ENDIF
    OutStd( "resumo: locais-varridas=" + hb_ntos( hPlan[ "scan" ] ) + ;
            " nível1=" + hb_ntos( hSum[ "n1" ] ) + ;
            " nível2=" + hb_ntos( hSum[ "n2" ] ) + ;
@@ -6545,10 +6622,12 @@ STATIC PROCEDURE AnnReport( hPlan, cJsonOut, lApplied )
            " kind-fora=" + hb_ntos( hSum[ "kind" ] ) + ;
            " sem-prova=" + hb_ntos( hSum[ "semprova" ] ) + ;
            " retornos-fun-declaráveis=" + hb_ntos( Len( aFR ) ) + ;
-           " retornos-metodo-declaráveis=" + hb_ntos( Len( aMR ) ) + hb_eol() )
+           " retornos-metodo-declaráveis=" + hb_ntos( Len( aMR ) ) + ;
+           " params-bloco-anotáveis=" + hb_ntos( Len( hPlan[ "bp" ] ) ) + hb_eol() )
    IF ! Empty( cJsonOut )
       hb_MemoWrit( cJsonOut, hb_jsonEncode( { "candidates" => aRep, ;
                    "funrets" => aFR, "methodrets" => aMR, ;
+                   "blockparams" => hPlan[ "bp" ], ;
                    "summary" => hSum } ) )
    ENDIF
 
@@ -7016,8 +7095,21 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
          RETURN Refuse( "não posicionei '" + hEntry[ "text" ] + "': " + cWhy )
       ENDIF
    NEXT
+   // fatia 3: registro _HB_CLASS que habilita a anotação de param de
+   // bloco quando a classe não é conhecida do módulo (anotar sem
+   // registro é auto-sabotagem - W0025 + o dump perde a classe)
+   FOR EACH hEntry IN hPlan[ "bp" ]
+      IF hEntry[ "needreg" ]
+         AnnQueueIns( aIns, hModAst, hEntry[ "module" ], ;
+            { "kind" => "beforeFunc", "func" => hEntry[ "func" ] }, ;
+            hEntry[ "regtext" ], @cWhy )
+         IF ! Empty( cWhy )
+            RETURN Refuse( "não posicionei '" + hEntry[ "regtext" ] + "': " + cWhy )
+         ENDIF
+      ENDIF
+   NEXT
 
-   IF Empty( aIns ) .AND. AnnCountN1( hPlan ) == 0
+   IF Empty( aIns ) .AND. AnnCountN1( hPlan ) == 0 .AND. Empty( hPlan[ "bp" ] )
       OutStd( "annotate --apply: nada a materializar (nenhum nível 1/2 no escopo)" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
@@ -7042,10 +7134,19 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    ENDIF
    hPlan2 := AnnPlan( hProj, hLoad2, cFileFil, cFuncFil )
 
-   // 5. AS CLASS nas locais AGORA nível 1 (fato declarado puro; nunca via)
+   // 5. AS CLASS nas locais AGORA nível 1 (fato declarado puro; nunca
+   // via). Âncora: desde o ast-9 a posição do token ESCRITO é FATO da
+   // declaração (nameLine/nameCol) - a régua de unicidade do AnnNameCol
+   // fica só como degrade de dump antigo
    FOR EACH hCand IN hPlan2[ "rep" ]
       IF !( hCand[ "level" ] == "n1" ) .OR. hCand[ "param" ]
          LOOP                    // param = assinatura (fatia futura); só n1
+      ENDIF
+      IF hb_HGetDef( hCand, "nameCol", -1 ) >= 0
+         AAdd( aAnn, { "path" => hCand[ "path" ], "line" => hCand[ "nameLine" ], ;
+                       "col" => hCand[ "nameCol" ] + 1 + Len( hCand[ "sym" ] ), ;
+                       "text" => " AS CLASS " + hCand[ "cls" ] } )
+         LOOP
       ENDIF
       hAst := hLoad2[ "asts" ][ hCand[ "path" ] ]
       nCol := AnnNameCol( hAst, hCand[ "declLine" ], hCand[ "sym" ] )
@@ -7055,6 +7156,16 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
       AAdd( aAnn, { "path" => hCand[ "path" ], "line" => hCand[ "declLine" ], ;
                     "col" => nCol + Len( hCand[ "sym" ] ), ;
                     "text" => " AS CLASS " + hCand[ "cls" ] } )
+   NEXT
+   // 5b. fatia 3: AS CLASS nos params de BLOCO do plano re-analisado
+   // (o registro _HB_CLASS do passo 2 já entrou; as linhas deslocadas
+   // pelos one-liners vêm FRESCAS do fato ast-9 do re-dump). O vínculo
+   // do param é o site de Eval - nunca vira nível 1: a escrita é direta
+   // (contrato D1, espelho da Rota B) e o padrão-ouro + -kt verificam
+   FOR EACH hEntry IN hPlan2[ "bp" ]
+      AAdd( aAnn, { "path" => hEntry[ "path" ], "line" => hEntry[ "nameLine" ], ;
+                    "col" => hEntry[ "nameCol" ] + 1 + Len( hEntry[ "sym" ] ), ;
+                    "text" => " AS CLASS " + hEntry[ "cls" ] } )
    NEXT
 
    IF ! Empty( aAnn )
@@ -8046,6 +8157,51 @@ STATIC PROCEDURE B7BlkCountWalk( hExpr, hCnt )
    NEXT
 
    RETURN
+
+// fatia 3: o ÚNICO nó CODEBLOCK da função naquela linha - NIL se 0 ou
+// >1 (dois blocos na linha tornam as declarações da linha inatribuíveis
+// a um só bloco, mesma régua do B7BlockParam)
+STATIC FUNCTION AnnBlkAt( hFunc, nLine )
+
+   LOCAL hStmt, hHit
+
+   IF B7BlkLineCount( hFunc, nLine ) != 1
+      RETURN NIL
+   ENDIF
+   FOR EACH hStmt IN hFunc[ "statements" ]
+      IF ( hHit := AnnBlkAtWalk( hb_HGetDef( hStmt, "expr", NIL ), nLine ) ) != NIL
+         RETURN hHit
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+STATIC FUNCTION AnnBlkAtWalk( hExpr, nLine )
+
+   LOCAL xVal, hItem, hHit
+
+   IF ! HB_ISHASH( hExpr )
+      RETURN NIL
+   ENDIF
+   IF hb_HGetDef( hExpr, "et", "" ) == "CODEBLOCK" .AND. ;
+      hb_HGetDef( hExpr, "line", -1 ) == nLine
+      RETURN hExpr
+   ENDIF
+   FOR EACH xVal IN hExpr
+      IF HB_ISHASH( xVal ) .AND. hb_HHasKey( xVal, "et" )
+         IF ( hHit := AnnBlkAtWalk( xVal, nLine ) ) != NIL
+            RETURN hHit
+         ENDIF
+      ELSEIF HB_ISARRAY( xVal )
+         FOR EACH hItem IN xVal
+            IF ( hHit := AnnBlkAtWalk( hItem, nLine ) ) != NIL
+               RETURN hHit
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN NIL
 
 // pilha de blocos que envolvem hBlk (do mais externo ao próprio hBlk),
 // achada nas árvores de statements; NIL = não localizado

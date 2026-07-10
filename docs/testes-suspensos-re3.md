@@ -1,11 +1,11 @@
 # Testes suspensos no RE.3 — alvos de reconquista por FATO
 
-> **Status (2026-07-10, F2.5)**: as Rotas A e B (`[FATIA-2]`) estão
-> **RECONQUISTADAS** — casos 89 e 91-96 provam o ciclo materializa →
-> impõe → o site decide (`confirmed declared` → `guaranteed`) em cada
-> semente, fixtures originais intocados. Rotas C (sem rota), D
-> (RE.5+A6) e E (RE.6/degrade) seguem como estavam — nada delas foi
-> prometido nem entregue.
+> **Status (2026-07-10, F2.5 + B9 fatia 3)**: as Rotas A e B
+> (`[FATIA-2]`) estão **RECONQUISTADAS** (casos 89 e 91-96) e a
+> **Rota D fechou nos itens escrevíveis** (casos 98-100, B9 fatia 3 —
+> só q1:13/14 seguem suspensos: param gerado por diretiva, sem token
+> escrito). Rotas C (sem rota) e E (RE.6/degrade) seguem como estavam
+> — nada delas foi prometido nem entregue.
 
 **O que é isto (decisão do Diego, 2026-07-09, mesma sessão do portão
 do RE.3)**: o RE.3 tirou a inferência do veredito do `usages` e os
@@ -98,24 +98,28 @@ Os sites de DECLARAÇÃO homônimos seguem excluded (fato, nunca saíram).
 | 85 | fixb7 b1.prg:53 (consulta Disco:Gira) | `excluded send within the written class graph (..., dispatches to PECA:GIRA)` |
 | — | json66/json72 (pré-RE.3) | excluded fora das Location[] — volta junto com a exclusão |
 
-## Rota D — sites de codeblock `[RE.5 + A6]` — ⚙️ CORE PRONTO (RE.5, 2026-07-10); falta o materializador
+## Rota D — sites de codeblock `[RE.5 + A6]` — ✅ RECONQUISTADA nos itens escrevíveis (B9 fatia 3, 2026-07-10; casos 98-100)
 
 O `-kt` fatia 1 não cobria blocos (matriz do RE.1) e a anotação
 `AS CLASS` em param de bloco era inescrevível (A6 segfault; a
-gramática descartava o nome). **A primeira perna FECHOU no RE.5**: A6
-morto, a anotação existe e é imposta por Eval, escrita em bloco é
-checada, e `guaranteed` em bloco é REAL (caso 88 sites 1 e 5 — fato
-`chk`/ast-8). O que falta para reconquistar os itens ABAIXO: o
-MATERIALIZADOR aprender a escrever anotação em param de bloco
-(parente do resíduo "parâmetro" da B9 fatia 2, portão próprio) — os
-sites do catálogo continuam suspensos até lá.
+gramática descartava o nome). **A primeira perna FECHOU no RE.5** (A6
+morto, imposição por Eval, fato `chk`/ast-8; caso 88) e **a segunda
+na B9 fatia 3**
+([spec-b9-fatia3-param-bloco.md](spec-b9-fatia3-param-bloco.md)): o
+materializador escreve `AS CLASS` em param de bloco na âncora do fato
+ast-9 (`nameLine`/`nameCol`) e o ciclo materializa → impõe → decide
+fecha em suíte. Única exceção honesta: q1:13/14 (bloco GERADO pela
+diretiva INLINE — o param não tem token escrito no fonte do app; a
+posição vem AUSENTE no ast-9, prov de include). Rotas futuras
+registradas: anotação na REGRA da DSL do usuário; para hbclass,
+extensão do hbclass.ch no core (candidato sob portão).
 
-| Caso | Site | Assert antigo (essencial) |
-|---|---|---|
-| 86 | fixb7b q1.prg:13/14 (INLINE/OPERATOR — money) | `confirmed send (receiver class MOEDA via construction chain, ..., codeblock) in MOEDA` (1º param do bloco inline é o receptor) |
-| 86 | fixb7b q1.prg:82 (bloco lê detached de binding único) | `confirmed ... codeblock` |
-| 86 | fixb7b q1.prg:85/90 (param de bloco pela união dos Evals) | `confirmed ... codeblock` |
-| 86 | fixb7b q2.prg:9 (DSL não-espelho — tigela) | `confirmed send (receiver class FORNALHA ..., codeblock) in FORNALHA` — a generalidade tem que voltar JUNTO |
+| Caso | Site | Assert antigo (essencial) | Reconquista |
+|---|---|---|---|
+| 86 | fixb7b q1.prg:13/14 (INLINE/OPERATOR — money) | `confirmed send (receiver class MOEDA via construction chain, ..., codeblock) in MOEDA` (1º param do bloco inline é o receptor) | ⏸ SUSPENSO (param gerado por diretiva — sem site escrevível; caso 99 asserta o possible honesto) |
+| 86 | fixb7b q1.prg:82 (bloco lê detached de binding único) | `confirmed ... codeblock` | ✅ caso 98 (LOCAL da dona anotada; leitura detached decide por fato; `guaranteed` com -kt) |
+| 86 | fixb7b q1.prg:85/90 (param de bloco pela união dos Evals) | `confirmed ... codeblock` | ✅ caso 99 (anotação no token do param — inclusive o statement CONTINUADO; `guaranteed`) |
+| 86 | fixb7b q2.prg:9 (DSL não-espelho — tigela) | `confirmed send (receiver class FORNALHA ..., codeblock) in FORNALHA` — a generalidade tem que voltar JUNTO | ✅ caso 100 (registro `_HB_CLASS` + anotação; `guaranteed`; morna/oExtra possible honesto) |
 
 ## Rota E — possible NOMEADO (contexto, não decisão) `[RE.6 ou aceitar o degrade]`
 

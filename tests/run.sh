@@ -2692,8 +2692,11 @@ check "relatório NÃO tocou a cópia (nenhuma edição)" $?
 # --apply: materializa e verifica
 ( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "declaração(ões) + 3 anotação(ões) AS CLASS" "$D/app.log"
-check "materializou declarações + 3 anotações AS CLASS" $?
+# re-baseline fatia 3 (era 4+3): +1 declaração (_HB_CLASS FORNALHA do
+# balde bp em q2) e +5 anotações (oPar/oCont em q1, 2 tigela em q2 -
+# params de bloco - e oFor em q2, destravada pelo registro)
+grep -q "5 declaração(ões) + 8 anotação(ões) AS CLASS" "$D/app.log"
+check "materializou declarações + anotações AS CLASS (inclui params de bloco - fatia 3)" $?
 grep -q "byte-idêntico sem -kt; compila limpo -w3 -es2; roda sob -kt" "$D/app.log"
 check "padrão-ouro completo: inerte + compila limpo + roda sob -kt" $?
 grep -q "_HB_MEMBER SOMA() AS CLASS MOEDA" "$D/q1.prg" && \
@@ -2954,7 +2957,8 @@ D=$(freshb7b case97)
 echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
 ( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0 em projeto já--kt" $?
-grep -q "4 declaração(ões) + 3 anotação(ões) AS CLASS" "$D/app.log" && \
+# re-baseline fatia 3 (era 4+3): mesmos deltas do caso 89
+grep -q "5 declaração(ões) + 8 anotação(ões) AS CLASS" "$D/app.log" && \
    grep -q "roda sob -kt (cheques passam)" "$D/app.log"
 check "padrão-ouro completo: inerte (baseline SEM a flag) + compila limpo + roda sob -kt" $?
 grep -q "LOCAL oM AS CLASS MOEDA" "$D/q1.prg" && grep -q "_HB_MEMBER SOMA() AS CLASS MOEDA" "$D/q1.prg"
@@ -2970,7 +2974,113 @@ check "fixture ORIGINAL intocado" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97"
+unit_98() {
+echo "case 98: B9 fatia 3 - Rota D semente 86 q1:82 (bloco lê detached de binding único) reconquistada"
+# testes-suspensos Rota D: o assert antigo era 'confirmed ... codeblock'
+# (união dos Evals/detached - inferência, morta no RE.3). O ciclo:
+# --apply anota a LOCAL da dona (caminho de locais JÁ existente); a
+# occurrence detached do bloco resolve pela declaração da dona (fato) e
+# a cobertura pós-RE.5 (K3/K4, fato chk) fecha o selo. Nenhum código
+# novo da fatia 3 é necessário AQUI - o caso registra a reconquista.
+D=$(freshb7b case98)
+( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "LOCAL oDet AS CLASS MOEDA" "$D/q1.prg"
+check "LOCAL do detached anotada (binding único, caminho de locais)" $?
+( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "confirmed send (receiver declared AS CLASS MOEDA, codeblock) in MAIN  | bLe := {|| oDet:Soma( 1 ) }" "$D/u1.log"
+check "site q1:82 (semente 86) decide por FATO declarado dentro do bloco" $?
+echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
+( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > u2.log 2>&1 )
+grep -q "guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN  | bLe := {|| oDet:Soma( 1 ) }" "$D/u2.log"
+check "com -kt: guaranteed (leitura detached; escritas da dona cobertas - fato chk)" $?
+! grep -q "AS CLASS MOEDA" "$HERE/fixb7b/q1.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_99() {
+echo "case 99: B9 fatia 3 - materializador de PARAM DE BLOCO: q1:85 e q1:89-90 (continuado) + venenos"
+# spec-b9-fatia3 F3.2/F3.3: a sugeridora consulta o caminho de bloco da
+# máquina dormente (união dos Evals convergente - D3) e o --apply
+# escreve ' AS CLASS X' na âncora do FATO ast-9 (nameLine/nameCol - o
+# token escrito; a linha 85 tem o símbolo DUAS vezes e o statement
+# continuado desloca o declLine, os dois modos de quebra da régua de
+# unicidade). Venenos NUNCA anotados: bSolto (bloco atravessa função),
+# bMulti (detached multi-write), Self dos INLINE 13/14 (param gerado
+# por diretiva - sem token escrito, fora da fatia com registro).
+D=$(freshb7b case99)
+( cd "$D" && "$BIN" annotate fixb7b.hbp > rep.log 2>&1 )
+check "annotate relatório exit 0" $?
+grep -q "MAIN {| OPAR AS CLASS MOEDA |   \[q1.prg:85\]" "$D/rep.log" && \
+   grep -q "MAIN {| OCONT AS CLASS MOEDA |   \[q1.prg:89\]" "$D/rep.log"
+check "relatório nomeia oPar (85) e oCont (89 - a linha ESCRITA, não a do declLine)" $?
+! grep -q "OQEM" "$D/rep.log" && ! grep -q "OMUDA" "$D/rep.log" && ! grep -q "{| SELF" "$D/rep.log"
+check "venenos e param de diretiva FORA do relatório de anotáveis" $?
+( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "bPar := {| oPar AS CLASS MOEDA | oPar:Soma( 2 ) }" "$D/q1.prg"
+check "anotação escrita no TOKEN DO PARAM (não no uso homônimo da mesma linha)" $?
+grep -q "bCont := {| oCont AS CLASS MOEDA | oCont:Soma( 6 ), ;" "$D/q1.prg"
+check "statement CONTINUADO: anotação na linha escrita, continuação intacta" $?
+! grep -q "oQem AS CLASS" "$D/q1.prg" && ! grep -q "oMuda AS CLASS" "$D/q1.prg"
+check "venenos NÃO anotados (bloco que sai da função; detached multi-write)" $?
+echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
+( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN  | bPar := {| oPar AS CLASS MOEDA | oPar:Soma( 2 ) }" "$D/u1.log"
+check "q1:85 (semente 86): param de bloco anotado, imposto por Eval - guaranteed" $?
+grep -q "guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN  | .T. }" "$D/u1.log"
+check "q1:89-90 (semente 86, continuado): guaranteed no site da última linha física" $?
+grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bSolto" "$D/u1.log" && \
+   grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bMulti" "$D/u1.log"
+check "venenos seguem possible honesto" $?
+grep -q "q1.prg:13: possible send (dynamic dispatch, receiver unknown, codeblock) in MOEDA" "$D/u1.log" && \
+   grep -q "q1.prg:14: possible send (dynamic dispatch, receiver unknown, codeblock) in MOEDA" "$D/u1.log"
+check "INLINE/OPERATOR (13/14): param de diretiva segue possible - fora da fatia, com registro" $?
+! grep -q "oPar AS CLASS" "$HERE/fixb7b/q1.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+unit_100() {
+echo "case 100: B9 fatia 3 - generalidade JUNTO: param de bloco da DSL não-espelho (q2:9, tigela)"
+# régua dos casos 64/72-74: a capacidade só conta como genérica provada
+# em DSL inventada NÃO-espelho. O bloco de q2:9 é LITERAL no fonte (a
+# DSL o registra como membro inline); a sugeridora tipa o 1º param como
+# RECEPTOR (fato do VM classes.c:4554, via registro - D3) e o --apply
+# escreve a anotação + o registro puro _HB_CLASS (classe de RUNTIME da
+# DSL não é conhecida do -w3 - sem ele, W0025 e o dump perde a classe).
+# oExtra (2º param) não tem fato de dispatch - nunca anotado; o send de
+# morna é do RECEPTOR oExtra - segue possible honesto.
+D=$(freshb7b case100)
+( cd "$D" && "$BIN" annotate fixb7b.hbp > rep.log 2>&1 )
+check "annotate relatório exit 0" $?
+grep -q "FORNALHA {| TIGELA AS CLASS FORNALHA |   \[q2.prg:9 + registro antes: _HB_CLASS FORNALHA\]" "$D/rep.log"
+check "relatório: tigela anotável com o registro nomeado" $?
+( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+[ "$(grep -c '^_HB_CLASS FORNALHA$' "$D/q2.prg")" = "1" ]
+check "registro puro _HB_CLASS escrito UMA vez (dedup entre os dois candidatos)" $?
+grep -q "BRASA quente COM {| tigela AS CLASS FORNALHA | tigela:mexe( 2 ) }" "$D/q2.prg" && \
+   grep -q "BRASA morna COM {| tigela AS CLASS FORNALHA, oExtra | oExtra:mexe( tigela ) }" "$D/q2.prg"
+check "os DOIS params tigela anotados; oExtra (sem fato) intacto" $?
+( cd "$D" && "$HB_BIN/hbmk2" fixb7b.hbp -q0 -gtcgi -prgflag=-kt -oq2run > /dev/null 2>&1 && ./q2run //GT:CGI > /dev/null 2>&1 )
+check "cópia materializada RODA sob -kt (cheque do prólogo por Eval passa no dispatch real)" $?
+echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
+( cd "$D" && "$BIN" usages fixb7b.hbp Fornalha:mexe > u1.log 2>&1 )
+check "usages exit 0" $?
+grep -q "guaranteed send (receiver AS CLASS FORNALHA imposed by -kt checks, codeblock) in FORNALHA  | BRASA quente COM {| tigela AS CLASS FORNALHA | tigela:mexe( 2 ) }" "$D/u1.log"
+check "q2:9 (semente 86, DSL não-espelho): guaranteed - a generalidade voltou JUNTO" $?
+grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in FORNALHA  | BRASA morna" "$D/u1.log"
+check "send de morna (receptor oExtra, sem fato) segue possible honesto" $?
+! grep -q "_HB_CLASS FORNALHA" "$HERE/fixb7b/q2.prg" && ! grep -q "tigela AS CLASS" "$HERE/fixb7b/q2.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

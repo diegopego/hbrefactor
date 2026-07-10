@@ -5,6 +5,67 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — o `annotate` aprendeu a anotar parâmetro de codeblock
+
+### O problema de todo dia
+
+A entrega anterior fez o `-kt` conferir parâmetros de codeblock — mas
+quem ESCREVIA a anotação era você, à mão. E o lugar mais valioso para
+ela é justamente o menos óbvio de anotar:
+
+```harbour
+bPar := {| oPar | oPar:Soma( 2 ) }     // que classe é oPar?
+Eval( bPar, Moeda():New() )
+```
+
+### O que mudou
+
+`annotate --apply` agora escreve `AS CLASS` também em parâmetro de
+bloco, no ponto exato do nome:
+
+```harbour
+bPar := {| oPar AS CLASS MOEDA | oPar:Soma( 2 ) }
+```
+
+- **Onde ele prova, ele escreve**: o bloco registrado como membro
+  inline de uma classe (o primeiro parâmetro é o receptor — vale para
+  hbclass e para QUALQUER DSL sua) e o bloco cujos `Eval` visíveis
+  concordam na classe. A verificação continua a mesma tripla de sempre:
+  a edição é inerte sem `-kt` (bytecode idêntico), compila limpa, e o
+  projeto RODA sob `-kt` com os cheques passando — qualquer falha
+  desfaz tudo byte a byte.
+- **Classe criada em runtime não é obstáculo**: se a classe da sua DSL
+  não existe em compilação, o `annotate` insere junto o registro puro
+  de uma linha (`_HB_CLASS MinhaClasse`) que a torna conhecida do
+  módulo — sem prometer nenhum membro.
+- **A escrita acerta o alvo mesmo nos casos traiçoeiros**: nome do
+  parâmetro repetido na mesma linha (declaração + uso), statement
+  continuado com `;`, variável com o mesmo nome da classe. Isso porque
+  o compilador agora informa no dump a posição exata do token escrito
+  de CADA declaração — a ferramenta não adivinha posição, lê.
+- Depois de anotado, o `usages` decide por fato: os sends dentro do
+  bloco saem `confirmed`/`guaranteed` em vez de "possible (receiver
+  unknown)".
+
+### O que a ferramenta NUNCA faz
+
+- Anotar sem prova: bloco que sai da função, parâmetro reescrito no
+  corpo, `Eval` que divergem de classe, segundo parâmetro sem fato de
+  dispatch — nada disso recebe anotação; o relato honesto fica.
+- Editar o que não foi escrito por você: o corpo que uma diretiva
+  gera (ex.: `METHOD x INLINE ...` do hbclass, cujo `Self` é criado
+  pela regra) não tem onde receber anotação no SEU fonte — a
+  ferramenta reconhece e deixa em paz.
+
+### Limites honestos
+
+- A sugestão nasce de análise; a VERDADE é do cheque imposto: se o
+  retrato estiver errado, o programa aborta nomeando o ponto
+  (`BASE/3012`) — e o `--apply` já desfez edições assim no passado
+  (é o comportamento desenhado, não um acidente).
+- O cheque de parâmetro de bloco roda a cada `Eval` — em laço muito
+  quente isso tem custo; `-kt` continua opt-in por projeto.
+
 ## 2026-07-10 — `-kt` alcança codeblocks (e um segfault de 20 anos morre no caminho)
 
 ### O problema de todo dia

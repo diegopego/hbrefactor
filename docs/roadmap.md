@@ -283,11 +283,36 @@ anotação sob `-kt` muda pcode por DESIGN (emite os cheques); caso 97:
 quem já adotou `-kt` anota e o site coberto sai `guaranteed` direto.
 Suíte **699/0** byte-idêntica paralelo × `JOBS=1`.
 
-**Resíduos em aberto (fatia futura da B9, portão de ESCOPO do
-Diego)**: (1) anotação de PARÂMETRO (assinatura colapsa em `tokens[]`,
-pede o idioma `SigParamHits`; rendimento auto-escrevível baixo hoje —
-param quase sempre é nível 3); (2) candidato (f) de core ADIADO (New
-implícito — protótipo como coluna-delta quando reabrir).
+**Fatia 3 — materializador de param de bloco (2ª perna da Rota D) —
+✅ EXECUTADA (2026-07-10, mesma sessão do portão; decisões do Diego:
+D1 contrato espelho da Rota B, D2 fato de posição para TODAS as
+declarações, D3 ambas as fontes)**:
+**[spec-b9-fatia3-param-bloco.md](spec-b9-fatia3-param-bloco.md)** §
+Executado — F3.1: âncora de escrita como FATO do dump (**ast-9**:
+`nameLine`/`nameCol` = posição do token ESCRITO do nome; param de
+bloco captura no parse via `HB_CBVAR`, padrão K1; ausente = param de
+diretiva, inescrevível — honesto), zero impacto 230/230, adversarial
+`LOCAL conta AS CLASS Conta` provado; F3.2/F3.3: balde `bp` do
+`annotate` (sugestão pelo caminho de bloco da máquina dormente:
+receptor-inline + união de Evals convergente) + escrita na âncora do
+fato com registro `_HB_CLASS` quando a classe de runtime não é
+conhecida do módulo; `AnnNameCol` (régua de unicidade) rebaixado a
+degrade de dump antigo; F3.4: casos 98-100 fecham a Rota D nos itens
+escrevíveis (detached, params q1 inclusive CONTINUADO, DSL
+não-espelho JUNTO), venenos assertados, 89/97 re-baselinados só nas
+contagens. Suíte **729/0** byte-idêntica paralelo × `JOBS=1`; lexdiff
+limpo. q1:13/14 seguem suspensos com rota futura registrada
+(anotação na regra da DSL / hbclass.ch no core). Commits do core sob
+autorização.
+
+**Resíduos em aberto (fatias futuras da B9, portão de ESCOPO do
+Diego)**: (1) anotação de PARÂMETRO de assinatura (colapsa em
+`tokens[]`, pede o idioma `SigParamHits`; rendimento auto-escrevível
+baixo hoje — param quase sempre é nível 3; o fato de posição da
+fatia 3/D2 destrava a âncora se emitido para assinaturas); (2)
+candidato (f) de core ADIADO (New implícito — protótipo como
+coluna-delta quando reabrir); (3) execução controlada como 2ª FONTE
+da sugeridora (spec-d § adendo, registrado 2026-07-10).
 
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 

@@ -1,10 +1,13 @@
-# Schema `ast-8` — o dump AST do compilador (spec)
+# Schema `ast-9` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-8` (RE.5) = `ast-7` + `"chk"` (fato de cobertura do
-`-kt`); o `ast-7` (fase B9) = `ast-6` + `"kt"` no cabeçalho (o módulo
+com `-x`. O `ast-9` (B9 fatia 3) = `ast-8` + `"nameLine"`/`"nameCol"` em
+`declarations[]` (posição do token ESCRITO do nome — a âncora do
+materializador; ausente quando o nome não tem token de fonte, ex.: param
+gerado por diretiva); o `ast-8` (RE.5) = `ast-7` + `"chk"` (fato de
+cobertura do `-kt`); o `ast-7` (fase B9) = `ast-6` + `"kt"` no cabeçalho (o módulo
 foi compilado com `-kt`? — anotação vira INVARIANTE imposta) + `"dim"`
 em `declarations[]` (a forma dimensionada `LOCAL a[n]` carrega um 'A'
 INTERNO do compilador, não anotação escrita — ver a seção B9); o
@@ -38,7 +41,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-8",           // versão emitida hoje (ast-1→...→ast-8)
+{ "schema": "ast-9",           // versão emitida hoje (ast-1→...→ast-9)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -293,6 +296,15 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
       "dim": true,             // ast-7: SÓ na forma dimensionada (a[n]);
                                // o "type" 'A' que a acompanha é marca
                                // interna do compilador, NÃO promessa
+      "nameLine": 7,           // ast-9: posição do token ESCRITO do nome
+      "nameCol": 9,            // (linha física + col 0-based em bytes, como
+                               // tokens[]) - a ÂNCORA do materializador.
+                               // AUSENTE quando o nome não tem token de
+                               // fonte (param gerado por diretiva, Self de
+                               // INLINE, ~1 de SETGET). Em statement
+                               // CONTINUADO nameLine é a linha ESCRITA
+                               // (declLine de param de bloco = linha da
+                               // MATERIALIZAÇÃO, a última física do bloco)
       "type": "S",             // só quando declarado (AS <tipo>): caractere
                                // do compilador - N C D L B A O S; minúscula
                                // = ARRAY do tipo ('s' = AS CLASS ARRAY)
@@ -583,8 +595,14 @@ descrição segue válida para ESSE consumidor:**
   união.
 - **PARÂMETRO DE BLOCO é decidido por FATO da declaração**, não por
   linha de occurrence: o dump registra os params do bloco em
-  `declarations[]` com `param: true` e `declLine` na linha do `{|`, em
-  ordem (param da FUNÇÃO tem `declLine` na linha da função). O binder
+  `declarations[]` com `param: true` e `declLine` na linha da
+  MATERIALIZAÇÃO do bloco, em ordem (param da FUNÇÃO tem `declLine` na
+  linha da função). **Precisão provada na fatia 3 (ast-9)**: em
+  statement CONTINUADO a materialização acontece no FIM do bloco —
+  `declLine` cai na ÚLTIMA linha física (igual ao nó CODEBLOCK, por
+  isso o binder continua consistente), enquanto o token escrito do
+  param está na linha do `{|`; `nameLine`/`nameCol` carregam a posição
+  ESCRITA (capturada no parse via `HB_CBVAR`, padrão K1). O binder
   léxico é o bloco mais interno da pilha do uso cuja linha declara o
   nome; duas CODEBLOCK na mesma linha = inatribuível (degrada). O
   `B7ParamType` (união de call sites) passou a aceitar SÓ parâmetro de
@@ -1124,8 +1142,20 @@ BLOCO — cujo prólogo ele emitiu; compast.c `hb_compAstUseChk`/
 cobertura do selo `guaranteed` é LEITURA de fato, não matriz replicada
 (site coberto = toda escrita write/ref com `chk` + param com `chk` na
 declaração; dump antigo sem `chk` degrada para não-coberto, nunca
-overclaim). O leitor da
-ferramenta (`ReadAst`) aceita `ast-2`..`ast-8`; comandos que EXIGEM o
+overclaim). A ÂNCORA DE ESCRITA (`"nameLine"`/`"nameCol"` nas
+declarations — posição do token ESCRITO do nome) entregue no **ast-9**
+(B9 fatia 3, 2026-07-10; decisão D2 do Diego: TODAS as declarações),
+consumida pelo materializador do `annotate` — a régua de unicidade de
+token do `AnnNameCol` virou degrade de dump antigo. Mecanismo no core:
+back-scan limitado no stream capturado (o parser consumiu o nome há no
+máximo o lookahead; o match mais próximo É o token da declaração;
+variável homônima da própria classe do `AS CLASS` é pulada UMA vez —
+adversarial provado), e para param de BLOCO a posição é capturada no
+PARSE (`BlockVarList` → `HB_CBVAR.iPosLine/iPosCol`, padrão K1) porque
+a materialização acontece no fim do bloco, com o stream já além do
+corpo. Nome sem token de fonte (prov ≠ 's': diretiva, include) = campo
+AUSENTE, honesto. O leitor da
+ferramenta (`ReadAst`) aceita `ast-2`..`ast-9`; comandos que EXIGEM o
 rastro usam `FromReady` (ast-3+), a classificação de receptor exige
 projeto inteiro em ast-4+ (`Ast4Ready`/`DeclTables`), a regra por dentro
 usa `RuleToksReady` (ast-5) e o rótulo de RETURN `B7Ret6` (ast-6+) — em
