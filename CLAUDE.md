@@ -34,6 +34,14 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   repassa `-prgflag=`. Todo parsing paralelo é cópia degradada que diverge —
   reescrever só o estritamente necessário.
 - Contrato executável: `make test` (deve permanecer verde).
+- **Drift em teste PRÉ-EXISTENTE → consultar o Diego (2026-07-10)**: o
+  projeto é um experimento VIVO — quando uma mudança faz testes que já
+  existiam divergirem, há motivos legítimos tanto para adaptar o código
+  aos testes quanto para RE-BASELINAR os testes (contrato que evoluiu,
+  ex.: caso 88 no RE.5). A decisão de qual lado cede é do Diego:
+  apresentar o drift site a site (o que mudou, por quê, qual contrato
+  está em jogo) ANTES de escolher o lado. Teste novo da própria entrega
+  não precisa de consulta; re-rotular/mover expectativa antiga, sim.
 - **roadmap.md é minha responsabilidade e vive preenchido**: fases futuras com
   escopo + critério de pronto ANTES de executá-las; concluída uma fase,
   atualizar o status na mesma sessão; trabalho novo entra como fase/item.
