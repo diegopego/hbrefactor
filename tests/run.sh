@@ -3125,7 +3125,69 @@ check "a ferramenta não menciona NENHUMA palavra da DSL fixreg (régua do caso 
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101"
+unit_102() {
+echo "case 102: projects-of modo DESCOBERTA - a ferramenta acha o projeto por FATO, mais próximo primeiro"
+# O sintoma reportado pelo Diego: o picker mostrava vários .hbp e o do
+# diretório do arquivo sumia (teto de 32 no findFiles + zero ordenação).
+# Agora, SEM candidatos, o CLI caminha os diretórios ANCESTRAIS do arquivo,
+# sonda o hbmk2 do mais próximo ao mais distante e devolve donos (FATO) +
+# candidatos (para o picker) ordenados por proximidade. Árvore: proj.hbp e
+# proj2.hbp (raiz) compartilham sub/deep/leaf.prg; sub/decoy.hbp está MAIS
+# PERTO de leaf mas NÃO é dono (referencia other/x.prg) - prova que
+# proximidade só ORDENA, o hbmk2 DECIDE a posse.
+D="$HERE/tmp/case102"; rm -rf "$D"; mkdir -p "$D/sub/deep" "$D/other"
+cat > "$D/main.prg" <<'EOF'
+PROCEDURE Main()
+
+   RETURN
+EOF
+cat > "$D/sub/deep/leaf.prg" <<'EOF'
+FUNCTION Leaf()
+
+   RETURN 1
+EOF
+cat > "$D/other/x.prg" <<'EOF'
+FUNCTION X()
+
+   RETURN 2
+EOF
+cat > "$D/orphan.prg" <<'EOF'
+PROCEDURE Main()
+
+   RETURN
+EOF
+printf -- '-w3\n-es2\nmain.prg\nsub/deep/leaf.prg\n' > "$D/proj.hbp"
+printf -- '-w3\n-es2\nsub/deep/leaf.prg\n' > "$D/proj2.hbp"
+printf -- '-w3\n-es2\n../other/x.prg\n' > "$D/sub/decoy.hbp"
+( cd "$D" && for f in main.prg sub/deep/leaf.prg other/x.prg orphan.prg; do \
+   "$HB_BIN/harbour" $f -n -q0 -w3 -es2 -s > /dev/null 2>&1 || exit 1; done )
+check "fixtures do caso 102 clean under -w3 -es2" $?
+# 1) fonte compartilhada: os DOIS donos por FATO, mais próximo/alfabético
+# primeiro; o decoy (mais perto) NÃO entra por não ser dono
+( cd "$D" && "$BIN" projects-of "$D/sub/deep/leaf.prg" --root "$D" > d1.log 2>&1 )
+check "discover leaf.prg exit 0" $?
+[ "$(printf '%s\n%s' "$D/proj.hbp" "$D/proj2.hbp")" = "$(cat "$D/d1.log")" ]
+check "leaf: donos proj.hbp + proj2.hbp por FATO (decoy mais perto NÃO é dono)" $?
+# 2) dono único quando só um projeto lista o arquivo
+( cd "$D" && "$BIN" projects-of "$D/main.prg" --root "$D" > d2.log 2>&1 )
+[ "$(cat "$D/d2.log")" = "$D/proj.hbp" ]
+check "main: só proj.hbp (proj2 não lista main)" $?
+# 3) órfão: owners vazio, exit 0 (o picker cai para os candidatos)
+( cd "$D" && "$BIN" projects-of "$D/orphan.prg" --root "$D" > d3.log 2>&1 )
+RC=$?
+[ $RC -eq 0 ] && [ ! -s "$D/d3.log" ]
+check "órfão: donos vazios com exit 0 (busca ampla não achou dono)" $?
+# 4) JSON do modo descoberta: objeto { owners, candidates } por proximidade -
+# candidates[1] é o decoy (mais perto), owners são os donos de FATO
+( cd "$D" && "$BIN" projects-of "$D/sub/deep/leaf.prg" --root "$D" --json d1.json > /dev/null 2>&1 )
+"$TCHECK" pof102 "$D/d1.json"
+check "--json: objeto {owners,candidates}; candidato mais próximo (decoy) no topo" $?
+# as guardas do lado da extensão (ownerOf/--root/dedup/rótulos) vivem no
+# harness do caso 71 (vscode/test-resolveat.js)
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

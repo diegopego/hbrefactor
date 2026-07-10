@@ -20,25 +20,39 @@ function out() {
 function cfg() { return vscode.workspace.getConfiguration('hbrefactor'); }
 
 // o CLI aceita qualquer alvo que o hbmk2 entenda: .hbp, .hbc com sources=,
-// ou lista de .prg. Com vários candidatos e um arquivo em foco, o picker é
-// CIENTE DO ARQUIVO (B5): pergunta ao CLI de quais projetos o arquivo é
-// fonte (fato do hbmk2 - nada de parsear .hbp aqui) e só oferece esses;
-// dono único nem pergunta. Arquivo órfão ou pergunta falhada degrada para
-// o comportamento antigo (todos os candidatos).
+// ou lista de .prg. Com um arquivo em foco, a DESCOBERTA é fato do CLI
+// (projects-of modo descoberta, B5+): ele caminha os diretórios ANCESTRAIS
+// do arquivo, sonda o hbmk2 do mais próximo ao mais distante e devolve donos
+// + candidatos JÁ ordenados por proximidade - a extensão nunca parseia .hbp
+// nem ranqueia, só passa o arquivo + as raízes do workspace e renderiza.
+// Dono único (fato) entra sem perguntar; um único projeto ao redor também
+// (resposta única); órfão/fonte compartilhada oferece a lista com o mais
+// próximo no topo. Sem arquivo (relatórios de projeto inteiro) ou descoberta
+// indisponível: varredura do workspace, SEM teto, deduplicada.
 async function projectSpec(forFile) {
   const fixed = cfg().get('project');
   if (fixed) return fixed;
-  const files = await vscode.workspace.findFiles('**/*.{hbp,hbc}', '**/{node_modules,.git,.hbmk}/**', 32);
+
+  if (forFile) {
+    const disc = await ownerOf(forFile);
+    if (disc && (disc.owners.length || disc.candidates.length)) {
+      const pick = pickerChoices(disc.candidates, disc.owners);
+      if (pick.auto) return pick.auto;
+      if (disc.owners.length === 0 && disc.candidates.length === 1) return disc.candidates[0];
+      return await askProject(pick.ask, 'Projeto (.hbp/.hbc) - mais próximo primeiro');
+    }
+    // disc null (CLI/hbmk2 indisponível) ou nada perto do arquivo: cai para
+    // a varredura do workspace abaixo
+  }
+
+  const files = dedupFsPaths(await vscode.workspace.findFiles(
+    '**/*.{hbp,hbc}', '**/{node_modules,.git,.hbmk}/**'));
   if (files.length === 0) {
     vscode.window.showErrorMessage('hbrefactor: nenhum .hbp/.hbc no workspace (configure hbrefactor.project).');
     return null;
   }
-  if (files.length === 1) return files[0].fsPath;
-  const candidates = files.map(f => f.fsPath);
-  const owners = forFile ? await projectsOf(forFile, candidates) : null;
-  const pick = pickerChoices(candidates, owners);
-  if (pick.auto) return pick.auto;
-  return await vscode.window.showQuickPick(pick.ask, { placeHolder: 'Projeto (.hbp/.hbc)' }) || null;
+  if (files.length === 1) return files[0];
+  return await askProject(files.slice().sort());
 }
 
 // decisão pura do picker: donos vindos do CLI; null (pergunta falhou) ou
@@ -50,19 +64,45 @@ function pickerChoices(all, owners) {
   return { auto: null, ask: owners };
 }
 
-// pergunta de FATO ao CLI: `projects-of` resolve cada candidato no hbmk2
-// (-traceonly, ~3 ms por candidato - sem compilar) e responde quais têm o
-// arquivo como fonte. null = a pergunta em si falhou (CLI/hbmk2
-// indisponível), distinto de resposta vazia (órfão legítimo)
-async function projectsOf(file, candidates) {
+// descoberta de FATO pelo CLI (projects-of modo descoberta): passa o arquivo
+// e as raízes do workspace; o CLI caminha os ancestrais, sonda o hbmk2 do
+// mais próximo ao mais distante e devolve { owners, candidates } JÁ ordenados
+// por proximidade (a extensão nunca parseia .hbp nem ranqueia). null = a
+// pergunta falhou (CLI/hbmk2 indisponível), distinto de owners vazio (órfão)
+async function ownerOf(file) {
   const json = tmpJson();
-  const res = await run(['projects-of', file].concat(candidates, ['--json', json]), path.dirname(file));
+  const roots = (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath);
+  const args = ['projects-of', file];
+  roots.forEach(r => args.push('--root', r));
+  args.push('--json', json);
+  const res = await run(args, path.dirname(file));
   if (res.code !== 0) return null;
   try {
-    const owners = JSON.parse(fs.readFileSync(json, 'utf8'));
+    const out = JSON.parse(fs.readFileSync(json, 'utf8'));
     fs.unlinkSync(json);
-    return owners;
+    return { owners: out.owners || [], candidates: out.candidates || [] };
   } catch (e) { return null; }
+}
+
+// QuickPick legível: rótulo = nome do .hbp, descrição = diretório; o item
+// carrega o caminho completo (o CLI já entrega o mais próximo no topo).
+// Devolve o fsPath escolhido ou null
+async function askProject(specs, placeHolder) {
+  const items = specs.map(s => ({ label: path.basename(s), description: path.dirname(s), spec: s }));
+  const chosen = await vscode.window.showQuickPick(items,
+    { placeHolder: placeHolder || 'Projeto (.hbp/.hbc)' });
+  return chosen ? chosen.spec : null;
+}
+
+// dedup de URIs por caminho canônico (raízes sobrepostas/symlink davam o
+// mesmo projeto repetido no picker); devolve fsPaths na ordem de chegada
+function dedupFsPaths(uris) {
+  const seen = new Set(), out = [];
+  uris.forEach(u => {
+    const key = path.resolve(u.fsPath);
+    if (!seen.has(key)) { seen.add(key); out.push(u.fsPath); }
+  });
+  return out;
 }
 
 // resolve o executável: caminho explícito na config vence; senão o binário

@@ -62,9 +62,10 @@ check('hbrefactor.hbBin tem default não-vazio (bin do fork, layout do repo)',
 check('run() repassa hbBin como env HB_BIN com ~ expandido',
   /env\.HB_BIN = hb\.replace\(\/\^~\/, os\.homedir\(\)\)/.test(src));
 
-// 6. picker ciente do arquivo (B5): a DECISÃO é pura (pickerChoices,
-// extraída e executada aqui) e a PERGUNTA é fato do CLI (projects-of) -
-// a extensão nunca parseia .hbp (réplica proibida). Degradações: pergunta
+// 6. picker ciente do arquivo (B5+, proximidade): a DECISÃO é pura
+// (pickerChoices, extraída e executada aqui) e a DESCOBERTA é fato do CLI
+// (projects-of modo descoberta, walk-up ancestral) - a extensão nunca
+// parseia .hbp nem ranqueia (réplica proibida). Degradações: pergunta
 // falhada (null) e arquivo órfão ([]) caem para a lista completa, nunca
 // escondem projeto.
 const mp = src.match(/function pickerChoices\(all, owners\) \{[\s\S]*?\n\}/);
@@ -84,8 +85,24 @@ if (mp) {
   check('fonte compartilhada -> pergunta só entre os donos',
     r.auto === null && JSON.stringify(r.ask) === '["x.hbp","z.hbp"]');
 }
-check('a pergunta é fato do CLI: run projects-of com arquivo + candidatos + --json',
-  /run\(\s*\[\s*'projects-of',\s*file\]\.concat\(candidates,\s*\['--json',\s*json\]\)/.test(src));
+// a DESCOBERTA é fato do CLI: ownerOf chama `projects-of <arquivo> --root
+// <raízes> --json` (modo descoberta, sem candidatos) - o CLI faz o walk-up
+// e a ordenação por proximidade, a extensão só passa raízes e lê owners/candidates
+check('ownerOf chama projects-of com o arquivo e --json (modo descoberta)',
+  /run\(\s*args\s*,\s*path\.dirname\(file\)\s*\)/.test(src) &&
+  /const args = \[\s*'projects-of',\s*file\s*\]/.test(src) &&
+  /args\.push\(\s*'--json',\s*json\s*\)/.test(src));
+check('ownerOf passa as RAÍZES do workspace ao CLI (walk-up é do CLI)',
+  /workspaceFolders[\s\S]*?args\.push\(\s*'--root',\s*r\s*\)/.test(src));
+check('ownerOf lê { owners, candidates } do JSON (contrato do modo descoberta)',
+  /out\.owners\s*\|\|\s*\[\]/.test(src) && /out\.candidates\s*\|\|\s*\[\]/.test(src));
+check('projectSpec sem teto de resultados no findFiles (o 32 sumiu)',
+  /findFiles\(\s*\n?\s*'\*\*\/\*\.\{hbp,hbc\}',\s*'\*\*\/\{node_modules,\.git,\.hbmk\}\/\*\*'\s*\)\)/.test(src) &&
+  !/findFiles\([^)]*,\s*32\s*\)/.test(src));
+check('picker deduplica candidatos (dedupFsPaths por caminho canônico)',
+  /function dedupFsPaths\(uris\)/.test(src) && /path\.resolve\(u\.fsPath\)/.test(src));
+check('QuickPick legível: rótulo = basename, descrição = dir (askProject)',
+  /label:\s*path\.basename\(s\),\s*description:\s*path\.dirname\(s\)/.test(src));
 check('ctx passa o arquivo do editor ao picker (untitled fica de fora)',
   /projectSpec\(\s*editor\.document\.isUntitled\s*\?\s*null\s*:\s*editor\.document\.fileName\s*\)/.test(src));
 check('relatórios de projeto inteiro não mudam: projCtx pergunta sem arquivo',

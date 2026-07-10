@@ -98,6 +98,10 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor dump <projeto>          (gera os .ast.json e informa o diretório)" + hb_eol() )
    OutStd( "  hbrefactor projects-of <arq.prg> <projeto1> [<projeto2> ...] [--json <out>]" + hb_eol() )
    OutStd( "                                     (quais destes projetos têm o arquivo como fonte)" + hb_eol() )
+   OutStd( "  hbrefactor projects-of <arq.prg> [--root <dir>]... [--json <out>]" + hb_eol() )
+   OutStd( "                                     (sem candidatos: ACHA os projetos por fato -" + hb_eol() )
+   OutStd( "                                      corredor ancestral, mais próximo primeiro;" + hb_eol() )
+   OutStd( "                                      JSON = { owners:[...], candidates:[...] })" + hb_eol() )
    OutStd( "  hbrefactor annotate <projeto> [<arq[:função]>] [--json <out>] [--apply]" + hb_eol() )
    OutStd( "                                     (escada de anotações; RELATÓRIO por padrão, --apply escreve" + hb_eol() )
    OutStd( "                                      DECLAREs + AS CLASS com verificação padrão-ouro e rollback)" + hb_eol() )
@@ -723,42 +727,82 @@ STATIC FUNCTION DumpOnly( aArgs )
    RETURN EXIT_OK
 
 // ---------------------------------------------------------------------------
-// projects-of - de quais destes projetos o arquivo é fonte (picker ciente
-// do arquivo na extensão): pertencer = o hbmk2 resolve o arquivo como
-// fonte na linha de comando do compilador (-traceonly, ~3 ms por
-// candidato) - fato do builder oficial, nunca parse de .hbp. Identidade
-// por caminho canônico COMPLETO (o ProjectMember do --at compara só
-// nome+ext, que entre projetos daria falso positivo com main.prg em
-// diretórios distintos). Candidato que o hbmk2 não resolve não pode
-// reivindicar o arquivo: sai do páreo com nota no stderr; se NENHUM
-// resolver a pergunta não foi respondida (exit != 0) - diferente de
-// arquivo órfão, que é resposta válida: lista vazia com exit 0.
+// projects-of - de qual(is) projeto(s) o arquivo é fonte (picker ciente do
+// arquivo na extensão): pertencer = o hbmk2 resolve o arquivo como fonte na
+// linha de comando do compilador (-traceonly, ~3 ms por candidato) - fato do
+// builder oficial, nunca parse de .hbp. Identidade por caminho canônico
+// COMPLETO (o ProjectMember do --at compara só nome+ext, que entre projetos
+// daria falso positivo com main.prg em diretórios distintos). Dois modos:
+//   FILTRO   projects-of <arq> <cand1> [<cand2> ...] [--json]
+//            de QUAIS destes o arquivo é fonte (contrato B5 preservado:
+//            saída = lista/array na ORDEM dos candidatos).
+//   DESCOBRE projects-of <arq> [--root <dir>]... [--json]
+//            sem candidatos: a ferramenta acha os projetos por FATO -
+//            caminha os diretórios ANCESTRAIS (dir do arquivo -> raiz que o
+//            contém) listando .hbp/.hbc, sonda cada um do mais PRÓXIMO ao
+//            mais distante e, só se nenhum ancestral for dono, amplia
+//            varrendo a(s) raiz(es). Devolve donos (fato) e candidatos
+//            (para o picker degradado) JÁ ordenados por proximidade - a
+//            proximidade é só APRESENTAÇÃO; o veredito de posse é do hbmk2.
+//            JSON = objeto { "owners": [...], "candidates": [...] }.
+// Em ambos: candidato que o hbmk2 não resolve sai do páreo com nota no
+// stderr; se havia candidatos e NENHUM resolveu, a pergunta ficou sem
+// resposta (exit != 0) - diferente de órfão (owners vazio, exit 0).
 // ---------------------------------------------------------------------------
+
+// teto de sondagem da busca ampla (só disparada quando nenhum ancestral é
+// dono - caso raro): guarda contra árvore patológica; alto o bastante para
+// ser "todos" em projeto real. Truncar avisa no stderr (nunca em silêncio).
+#define OWNER_BROADEN_CAP 256
+
+// posse por FATO: algum arquivo-fonte que o hbmk2 resolveu para o projeto
+// tem o mesmo caminho canônico COMPLETO do alvo. Fatorado para os dois modos
+// e para a busca ampla reusarem a mesma régua.
+STATIC FUNCTION FileOwnedBy( hProj, cAbs, cCwd )
+
+   LOCAL cPath
+
+   FOR EACH cPath IN hProj[ "files" ]
+      IF hb_PathNormalize( hb_PathJoin( cCwd, cPath ) ) == cAbs
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
 
 STATIC FUNCTION ProjectsOf( aArgs )
 
-   LOCAL cFile, cAbs, cCwd, cJsonOut := "", aCand := {}, aOwn := {}
-   LOCAL cSpec, hProj, cPath, nResolved := 0, nI
+   LOCAL cFile, cAbs, cCwd, cJsonOut := "", aCand := {}, aRoots := {}, nI
 
-   IF Len( aArgs ) < 3
+   IF Len( aArgs ) < 2
       Usage()
       RETURN EXIT_USAGE
    ENDIF
    cFile := aArgs[ 2 ]
    FOR nI := 3 TO Len( aArgs )
-      IF Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
          cJsonOut := aArgs[ ++nI ]
-      ELSE
+      CASE Lower( aArgs[ nI ] ) == "--root" .AND. nI < Len( aArgs )
+         AAdd( aRoots, aArgs[ ++nI ] )
+      OTHERWISE
          AAdd( aCand, aArgs[ nI ] )
-      ENDIF
+      ENDCASE
    NEXT
-   IF Empty( aCand )
-      Usage()
-      RETURN EXIT_USAGE
-   ENDIF
 
    cCwd := hb_DirSepAdd( hb_cwd() )
    cAbs := hb_PathNormalize( hb_PathJoin( cCwd, cFile ) )
+
+   IF ! Empty( aCand )                       // modo FILTRO (contrato B5)
+      RETURN ProjectsOfFilter( aCand, cAbs, cCwd, cJsonOut )
+   ENDIF
+   RETURN ProjectsOfDiscover( cAbs, aRoots, cCwd, cJsonOut )   // modo DESCOBRE
+
+// modo FILTRO - de QUAIS destes candidatos o arquivo é fonte, na ORDEM dos
+// candidatos (contrato B5 intacto: stdout = uma linha por dono, JSON = array)
+STATIC FUNCTION ProjectsOfFilter( aCand, cAbs, cCwd, cJsonOut )
+
+   LOCAL cSpec, hProj, aOwn := {}, nResolved := 0
 
    FOR EACH cSpec IN aCand
       hProj := LoadProject( cSpec )
@@ -768,12 +812,9 @@ STATIC FUNCTION ProjectsOf( aArgs )
          LOOP
       ENDIF
       nResolved++
-      FOR EACH cPath IN hProj[ "files" ]
-         IF hb_PathNormalize( hb_PathJoin( cCwd, cPath ) ) == cAbs
-            AAdd( aOwn, cSpec )
-            EXIT
-         ENDIF
-      NEXT
+      IF FileOwnedBy( hProj, cAbs, cCwd )
+         AAdd( aOwn, cSpec )
+      ENDIF
    NEXT
 
    IF nResolved == 0
@@ -788,6 +829,219 @@ STATIC FUNCTION ProjectsOf( aArgs )
    ENDIF
 
    RETURN EXIT_OK
+
+// modo DESCOBRE - a ferramenta acha o projeto por fato (o Diego não passa
+// candidatos): corredor ancestral primeiro, busca ampla só na falta de dono.
+// Donos e candidatos saem ordenados por proximidade (apresentação); o veredito
+// de posse continua sendo fato do hbmk2 (FileOwnedBy sobre LoadProject).
+STATIC FUNCTION ProjectsOfDiscover( cAbs, aRoots, cCwd, cJsonOut )
+
+   LOCAL cFileDir, aRootsAbs := {}, aCand, aWide, aOwn := {}
+   LOCAL cSpec, hProj, nResolved := 0, cRoot, nProbed, hOut
+
+   cFileDir := hb_FNameDir( cAbs )
+   FOR EACH cRoot IN aRoots
+      AAdd( aRootsAbs, hb_DirSepAdd( hb_PathNormalize( hb_PathJoin( cCwd, cRoot ) ) ) )
+   NEXT
+
+   // corredor ancestral: dir do arquivo subindo até a raiz que o contém
+   aCand := WalkUpProjects( cFileDir, aRootsAbs )
+   FOR EACH cSpec IN aCand
+      hProj := LoadProject( cSpec )
+      IF hProj == NIL
+         OutErr( "hbrefactor: projeto '" + cSpec + ;
+                 "' não resolveu no hbmk2 - fora do picker" + hb_eol() )
+         LOOP
+      ENDIF
+      nResolved++
+      IF FileOwnedBy( hProj, cAbs, cCwd )
+         AAdd( aOwn, cSpec )
+      ENDIF
+   NEXT
+
+   // busca ampla: só quando NENHUM ancestral é dono (adaptativo)
+   IF Empty( aOwn )
+      aWide := RankByProximity( ScanRootsProjects( aRootsAbs, aCand ), cFileDir )
+      nProbed := 0
+      FOR EACH cSpec IN aWide
+         IF ++nProbed > OWNER_BROADEN_CAP
+            OutErr( "hbrefactor: busca ampla truncada em " + ;
+                    hb_ntos( OWNER_BROADEN_CAP ) + " projetos (o resto entra só na " + ;
+                    "lista para escolha manual)" + hb_eol() )
+            EXIT
+         ENDIF
+         hProj := LoadProject( cSpec )
+         IF hProj == NIL
+            LOOP
+         ENDIF
+         nResolved++
+         IF FileOwnedBy( hProj, cAbs, cCwd )
+            AAdd( aOwn, cSpec )
+         ENDIF
+      NEXT
+      FOR EACH cSpec IN aWide
+         AAdd( aCand, cSpec )
+      NEXT
+   ENDIF
+
+   // zero projetos perto do arquivo: resposta válida vazia (a extensão cai
+   // para o findFiles/erro do workspace); achou projetos mas o hbmk2 não
+   // resolveu nenhum: a pergunta ficou sem resposta (exit != 0)
+   IF ! Empty( aCand ) .AND. nResolved == 0
+      RETURN Refuse( "nenhum projeto próximo resolveu no hbmk2 - a pergunta ficou sem resposta" )
+   ENDIF
+
+   aOwn := RankByProximity( aOwn, cFileDir )
+   aCand := RankByProximity( aCand, cFileDir )
+
+   FOR EACH cSpec IN aOwn
+      OutStd( cSpec + hb_eol() )
+   NEXT
+   IF ! Empty( cJsonOut )
+      hOut := { "owners" => aOwn, "candidates" => aCand }
+      hb_MemoWrit( cJsonOut, hb_jsonEncode( hOut ) )
+   ENDIF
+
+   RETURN EXIT_OK
+
+// corredor ancestral: do dir do arquivo subindo, lista .hbp/.hbc de cada
+// nível ATÉ a raiz que contém o arquivo (raízes = pastas do workspace). Sem
+// raiz, sobe até a raiz do FS com teto de níveis. Só LISTA nome por extensão
+// (hb_Directory) - nunca lê conteúdo de .hbp: a resolução é do hbmk2.
+STATIC FUNCTION WalkUpProjects( cFileDir, aRootsAbs )
+
+   LOCAL aOut := {}, cDir := cFileDir, nLevel := 0, cParent
+
+   DO WHILE .T.
+      DirListProjects( cDir, aOut )
+      IF AScan( aRootsAbs, {| r | r == cDir } ) > 0
+         EXIT
+      ENDIF
+      cParent := ParentDir( cDir )
+      IF Empty( cParent ) .OR. cParent == cDir .OR. ++nLevel > 40
+         EXIT
+      ENDIF
+      cDir := cParent
+   ENDDO
+
+   RETURN aOut
+
+STATIC PROCEDURE DirListProjects( cDir, aOut )
+
+   LOCAL cExt, aFile
+
+   FOR EACH cExt IN { "*.hbp", "*.hbc" }
+      FOR EACH aFile IN hb_Directory( cDir + cExt )
+         AAdd( aOut, cDir + aFile[ 1 ] )
+      NEXT
+   NEXT
+
+   RETURN
+
+// busca ampla: varre a(s) raiz(es) recursivamente por .hbp/.hbc (absolutos),
+// pulando diretórios de ruído e o que o corredor já viu
+STATIC FUNCTION ScanRootsProjects( aRootsAbs, aSeen )
+
+   LOCAL aOut := {}, cRoot, cExt, aFile, cFull
+
+   FOR EACH cRoot IN aRootsAbs
+      FOR EACH cExt IN { "*.hbp", "*.hbc" }
+         FOR EACH aFile IN hb_DirScan( cRoot, cExt )
+            cFull := hb_PathNormalize( cRoot + aFile[ 1 ] )
+            IF NoiseDir( cFull )
+               LOOP
+            ENDIF
+            IF hb_AScan( aSeen, cFull,,, .T. ) == 0 .AND. ;
+               hb_AScan( aOut, cFull,,, .T. ) == 0
+               AAdd( aOut, cFull )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN aOut
+
+STATIC FUNCTION NoiseDir( cPath )
+
+   LOCAL c := StrTran( cPath, "\", "/" )
+
+   RETURN "/.hbmk/" $ c .OR. "/.git/" $ c .OR. "/node_modules/" $ c
+
+// dir pai (mantém a barra final); vazio na raiz do FS
+STATIC FUNCTION ParentDir( cDir )
+   RETURN hb_FNameDir( hb_DirSepDel( cDir ) )
+
+// ordena caminhos do mais PRÓXIMO ao mais distante do dir do arquivo
+// (apresentação, nunca veredito), com desempate alfabético determinístico e
+// dedup por caminho exato. Ancestral/igual vem antes de não-ancestral; entre
+// ancestrais o mais profundo (mais perto do arquivo) primeiro.
+STATIC FUNCTION RankByProximity( aPaths, cFileDir )
+
+   LOCAL aKeyed := {}, cPath, aSeen := {}, aOut := {}
+   LOCAL aFileSegs := PathSegs( cFileDir ), aPair
+
+   FOR EACH cPath IN aPaths
+      IF hb_AScan( aSeen, cPath,,, .T. ) > 0
+         LOOP
+      ENDIF
+      AAdd( aSeen, cPath )
+      AAdd( aKeyed, { ProximityKey( hb_FNameDir( cPath ), aFileSegs ) + Lower( cPath ), cPath } )
+   NEXT
+
+   ASort( aKeyed,,, {| x, y | x[ 1 ] < y[ 1 ] } )
+
+   FOR EACH aPair IN aKeyed
+      AAdd( aOut, aPair[ 2 ] )
+   NEXT
+
+   RETURN aOut
+
+// chave de ordenação (string comparável): tier 0 = dir ancestral/igual ao do
+// arquivo, distância crescente (0 = mesmo dir); tier 1 = demais, mais prefixo
+// comum primeiro (9999 - comuns)
+STATIC FUNCTION ProximityKey( cDir, aFileSegs )
+
+   LOCAL aSegs := PathSegs( cDir ), nCommon := 0, nI, nMax
+
+   IF Len( aSegs ) <= Len( aFileSegs ) .AND. ;
+      SegsPrefix( aSegs, aFileSegs )                 // ancestral/igual
+      RETURN "0" + PadL( hb_ntos( Len( aFileSegs ) - Len( aSegs ) ), 5, "0" )
+   ENDIF
+   nMax := Min( Len( aSegs ), Len( aFileSegs ) )
+   FOR nI := 1 TO nMax
+      IF aSegs[ nI ] == aFileSegs[ nI ]
+         nCommon++
+      ELSE
+         EXIT
+      ENDIF
+   NEXT
+   RETURN "1" + PadL( hb_ntos( 9999 - nCommon ), 5, "0" )
+
+// aPre é prefixo de aFull (mesmos segmentos iniciais)?
+STATIC FUNCTION SegsPrefix( aPre, aFull )
+
+   LOCAL nI
+
+   FOR nI := 1 TO Len( aPre )
+      IF nI > Len( aFull ) .OR. !( aPre[ nI ] == aFull[ nI ] )
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
+// segmentos não-vazios de um dir normalizado (barras / ou \)
+STATIC FUNCTION PathSegs( cDir )
+
+   LOCAL aOut := {}, c
+
+   FOR EACH c IN hb_ATokens( StrTran( cDir, "\", "/" ), "/" )
+      IF ! Empty( c )
+         AAdd( aOut, c )
+      ENDIF
+   NEXT
+
+   RETURN aOut
 
 // ---------------------------------------------------------------------------
 // resolve-at - "o que está sob o cursor" como pergunta de FATO (revisão

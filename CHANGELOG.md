@@ -5,6 +5,64 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — O picker acha o `.hbp` certo sozinho (o mais próximo primeiro)
+
+### O problema de todo dia
+
+Você abre um `.prg`, roda **Find usages** (ou qualquer comando) na
+extensão e cai numa lista de vários `.hbp` — às vezes o mesmo repetido —
+e, pior, o `.hbp` que está no **próprio diretório do seu arquivo** nem
+aparece. Num projeto grande (o hbrefactor tem 158 `.hbp`/`.hbc`) isso
+era regra, não exceção.
+
+### O que mudou
+
+Agora, com um arquivo em foco, a extensão **descobre o projeto sozinha**:
+ela pergunta ao CLI, que **caminha do diretório do seu arquivo para cima**
+(o `.hbp` de um projeto lista as fontes por caminho relativo, então o
+dono está quase sempre ali ou logo acima), pergunta ao **hbmk2** qual
+projeto de fato compila o seu arquivo, e responde com o dono.
+
+- **Dono único → entra direto, sem perguntar.** Era esse o objetivo do
+  picker desde sempre; o teto de 32 resultados é que sabotava (cortava o
+  `.hbp` certo antes de decidir). O teto morreu.
+- **Precisou perguntar? O mais próximo vem no topo.** Quando um arquivo é
+  fonte de mais de um projeto (fonte compartilhada), ou quando ele ainda
+  não está em nenhum, a lista sai **ordenada por proximidade**, com nome
+  do `.hbp` + diretório legíveis — nada de caminho absoluto cru repetido.
+- **Sem duplicatas.**
+
+Antes: lista de 32 `.hbp` fora de ordem, o do seu diretório sumido.
+Depois: entra no projeto certo sem perguntar — ou, no máximo, escolhe
+entre os donos reais com o mais perto em primeiro.
+
+### O que a ferramenta NUNCA faz aqui
+
+- **Não adivinha o dono pela proximidade.** Quem decide "este projeto
+  compila este arquivo" é o hbmk2, por fato. A proximidade só **ordena**
+  a lista e a ordem de busca; o `.hbp` mais próximo do arquivo **não** é
+  escolhido automaticamente se o hbmk2 não confirmar que ele é o dono
+  (um `.hbp` vizinho que não lista o seu arquivo aparece na lista, mas
+  não é auto-selecionado).
+- **Não lê o conteúdo do `.hbp`.** Ele só lista os nomes dos arquivos de
+  projeto nos diretórios; quem expande e resolve é o hbmk2.
+- **`.ch` não é alvo.** Um header é dependência `#include`-ada, controlada
+  pelo `.prg`/`.hbp`/`.hbc` — não um projeto ao qual um arquivo "pertence".
+
+### Limites honestos
+
+- Se o seu arquivo não é dono de nenhum projeto ancestral, a ferramenta
+  amplia a busca varrendo a raiz do workspace (caso raro; um teto de
+  segurança avisa no log se a árvore for enorme).
+- Se você fixou `hbrefactor.project` nas configurações, nada disso roda —
+  a sua escolha manda.
+
+### Detalhes técnicos
+
+Modo DESCOBERTA do `projects-of` (walk-up ancestral + `RankByProximity`,
+proximidade só como apresentação) — [docs/roadmap.md](docs/roadmap.md),
+seção B5; provas no caso 102 da suíte e no harness do caso 71.
+
 ## 2026-07-10 — `exec-registry`: o retrato das classes que só existem em runtime
 
 ### O problema de todo dia

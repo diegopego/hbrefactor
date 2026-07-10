@@ -181,6 +181,34 @@ pergunta só entre os donos, órfão/falha degrada para a lista completa;
 novo (10 checks, inclui a armadilha do basename e a forma absoluta da
 extensão) + 9 guardas novas no harness do caso 71 (22 pass); suíte
 **565/0**.
+**Descoberta por proximidade entregue (0.11.0, 2026-07-10)**: o Diego
+relatou que no dia a dia o picker mostrava vários `.hbp` (às vezes o
+mesmo repetido) e o `.hbp` do próprio diretório do arquivo SUMIA.
+Diagnóstico (três raízes, todas na extensão): (1) `findFiles` com teto
+de **32** truncava a lista em ordem indefinida ANTES da lógica de dono
+rodar — neste workspace há 158 `.hbp`/`.hbc`, então o do diretório caía
+fora; (2) zero ordenação (a `fsPath` crua na ordem de varredura); (3)
+zero dedup. Conserto **no CLI** (fiel à extensão fina — o walk-up e a
+ordenação são inteligência, não podem morar na extensão): o
+`projects-of` ganha um **modo DESCOBERTA** — `projects-of <arq> [--root
+<dir>]... [--json]` sem candidatos. A ferramenta ACHA o projeto por
+FATO: caminha os diretórios ANCESTRAIS (dir do arquivo → raiz que o
+contém) listando `.hbp/.hbc` (só nome por extensão — nunca parse de
+`.hbp`), sonda o hbmk2 do mais PRÓXIMO ao mais distante (`FileOwnedBy`
+fatorado de `ProjectsOf`) e, só se nenhum ancestral for dono, amplia
+varrendo a(s) raiz(es) (adaptativo; teto `OWNER_BROADEN_CAP` avisa se
+truncar). Devolve `{ owners, candidates }` JÁ ordenados por proximidade
+(`RankByProximity`, matemática de caminho pura). **A proximidade é só
+APRESENTAÇÃO; o veredito de posse continua sendo fato do hbmk2** — o
+auto-select ainda exige dono ÚNICO de fato, nunca "o mais próximo". Na
+extensão: `ownerOf` passa o arquivo + as raízes do workspace e renderiza
+(rótulos legíveis: nome do `.hbp` + diretório); `findFiles` perde o teto
+e deduplica (só usado no caminho SEM arquivo/degradado); `pickerChoices`
+intacto. Modo FILTRO legado (candidatos explícitos, array JSON, ordem
+dos candidatos) preservado byte-a-byte → caso 83 inalterado. Provas:
+caso 102 novo (6 checks: dono único, fonte compartilhada nearest-first,
+decoy mais perto que NÃO é dono, órfão, objeto JSON) + 6 guardas novas
+no harness do caso 71 (32 pass).
 Restante, por fricção do uso diário:
 
 - preview `--dry-run --json` se a fricção pedir.

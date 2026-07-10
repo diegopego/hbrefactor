@@ -23,6 +23,7 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "json72"  ; lOk := Json72( cA1 )            ; EXIT
    CASE "b4g82"   ; lOk := B4g82( cA1, cA2, cA3 )   ; EXIT
    CASE "pof83"   ; lOk := Pof83( cA1 )             ; EXIT
+   CASE "pof102"  ; lOk := Pof102( cA1 )            ; EXIT
    CASE "rtr101"  ; lOk := Rtr101( cA1 )            ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
@@ -596,6 +597,37 @@ STATIC FUNCTION Pof83( cJson )
    ENDIF
    IF !( xVal[ 1 ] == "p1.hbp" .AND. xVal[ 2 ] == "p2.hbp" )
       RETURN Fail( "pof83: donos errados: " + hb_jsonEncode( xVal ) )
+   ENDIF
+   OutStd( "json ok" + hb_eol() )
+
+   RETURN .T.
+
+// unidade 102: modo DESCOBERTA do projects-of - o JSON é um OBJETO
+// { owners, candidates }, não mais um array. owners = donos por FATO
+// (proj.hbp, proj2.hbp) ordenados por proximidade; candidates = tudo
+// descoberto com o mais PRÓXIMO no topo (o decoy em sub/ vem antes dos
+// projetos da raiz, provando que a proximidade ordena a apresentação)
+STATIC FUNCTION Pof102( cJson )
+
+   LOCAL xVal := JLoad( cJson ), aOwn, aCand
+
+   IF ! HB_ISHASH( xVal )
+      RETURN Fail( "pof102: não é objeto JSON { owners, candidates }" )
+   ENDIF
+   aOwn := hb_HGetDef( xVal, "owners", NIL )
+   aCand := hb_HGetDef( xVal, "candidates", NIL )
+   IF ! HB_ISARRAY( aOwn ) .OR. ! HB_ISARRAY( aCand )
+      RETURN Fail( "pof102: owners/candidates ausentes ou não-array" )
+   ENDIF
+   IF Len( aOwn ) != 2
+      RETURN Fail( "pof102: esperava 2 donos, veio " + hb_ntos( Len( aOwn ) ) )
+   ENDIF
+   IF !( EndsW( aOwn[ 1 ], "proj.hbp" ) .AND. EndsW( aOwn[ 2 ], "proj2.hbp" ) )
+      RETURN Fail( "pof102: donos/ordem errados: " + hb_jsonEncode( aOwn ) )
+   ENDIF
+   IF Len( aCand ) < 1 .OR. ! EndsW( aCand[ 1 ], "decoy.hbp" )
+      RETURN Fail( "pof102: candidato mais próximo (decoy) não veio no topo: " + ;
+                   hb_jsonEncode( aCand ) )
    ENDIF
    OutStd( "json ok" + hb_eol() )
 
