@@ -110,7 +110,9 @@ confirmed 1.715→545 100% canal declarado, casos 39/61/63/66-69/72/75/
 84-86 re-baselinados — o furo dos homônimos degradou nos sends;
 RE.4: `pPosTbl` limpo no reset, 460/460 byte-idêntico, harbour-core
 `ef0abe3688`. Suíte 622/0 byte-idêntica. Gavetas RE.5/RE.6 sob
-portão):
+portão; **RE.5 com escopo+critério ESCRITOS para o portão
+(2026-07-10): [spec-re5-cobertura-kt.md](spec-re5-cobertura-kt.md)** —
+fatias K1-K4 propostas + decisões K5/K6):
 **[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
 — retomada de sessão COMEÇA por lá. Registro narrativo da sessão
 2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no
