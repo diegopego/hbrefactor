@@ -1,0 +1,4 @@
+# fora do pacote publicado: harness de desenvolvimento e artefatos de build
+test-resolveat.js
+.vscodeignore
+*.vsix

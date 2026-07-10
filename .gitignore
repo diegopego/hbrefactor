@@ -5,6 +5,7 @@ tests/tmp/
 *.ppt
 *.occ.json
 *.ast.json
+*.vsix
 
 # settings de teste com caminhos da máquina (binPath/hbBin) — não versionar
 tests/fix01/.vscode/

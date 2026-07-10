@@ -1,0 +1,14 @@
+#!/bin/sh
+# pre-commit: barra binários no índice (segurança). Artefato de build NUNCA
+# versiona - o .gitignore já cobre bin/, *.vsix, *.hrb etc., mas 'git add -f'
+# fura o ignore. Detecção pela PRÓPRIA heurística do git (git diff --numstat
+# marca binário com '-' nas duas colunas), só em arquivos Adicionados ou
+# Modificados (remover binário é permitido). Escape consciente: --no-verify.
+found=$(git diff --cached --numstat --diff-filter=AM | awk -F'\t' '$1 == "-" && $2 == "-" { print $3 }')
+if [ -n "$found" ]; then
+  printf 'pre-commit BLOQUEOU binario(s) no commit (build/artefato nao versiona):\n' >&2
+  printf '%s\n' "$found" | sed 's/^/  /' >&2
+  printf 'se for intencional: git commit --no-verify\n' >&2
+  exit 1
+fi
+exit 0
