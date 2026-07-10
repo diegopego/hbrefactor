@@ -249,7 +249,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // comandos que exigem o rastro/o canal/a regra recusam ou degradam com
    // mensagem clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -5857,8 +5857,16 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
 // diretiva que venha a ser criada no mesmo funil.
 // ---------------------------------------------------------------------------
 
+// portão de capacidade por VERSÃO MÍNIMA do schema ("ast-N" com N >=
+// nMin). A forma antiga enumerava versões e MORRIA em silêncio a cada
+// bump (o ast-8/RE.5 apagou lifting/canal/regras até esta lição);
+// o teto de aceitação continua fechado no ReadAst
+STATIC FUNCTION AstAtLeast( hAst, nMin )
+   LOCAL cSchema := hb_HGetDef( hAst, "schema", "" )
+   RETURN hb_LeftEq( cSchema, "ast-" ) .AND. Val( SubStr( cSchema, 5 ) ) >= nMin
+
 STATIC FUNCTION FromReady( hAst )
-   RETURN hb_AScan( { "ast-3", "ast-4", "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN AstAtLeast( hAst, 3 )
 
 // ---------------------------------------------------------------------------
 // B4f - canal de tipos da linguagem (schema ast-4). O compilador PARSEIA e
@@ -5873,7 +5881,7 @@ STATIC FUNCTION FromReady( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION Ast4Ready( hAst )
-   RETURN hb_AScan( { "ast-4", "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN AstAtLeast( hAst, 4 )
 
 // ---------------------------------------------------------------------------
 // B4g - a regra por dentro (schema ast-5): ppRules[] ganha match[]/result[],
@@ -5887,7 +5895,7 @@ STATIC FUNCTION Ast4Ready( hAst )
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION RuleToksReady( hAst )
-   RETURN hb_AScan( { "ast-5", "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN AstAtLeast( hAst, 5 )
 
 // tabelas DECLARE agregadas do PROJETO (as do dump são por módulo):
 // { "f" => { FUNÇÃO => item }, "c" => { CLASSE => { MÉTODO => item } } }.
@@ -6019,9 +6027,11 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
             RETURN NIL      // param de bloco sem atribuição única de bloco
          ENDIF
          IF ( hRes := DeclType( aBP[ 3 ], "declared" ) ) != NIL
-            // {|x AS tipo|...}: canal declarado SEM marca kt - o -kt não
-            // checa o binding do Eval nem stores block-relative (RE.1)
-            RETURN hRes
+            // {|x AS tipo|...}: canal declarado; desde o RE.5 K2 o
+            // prólogo do BLOCO impõe o param a cada Eval e o fato chega
+            // como chk na declaração (ast-8) - a marca kt sai do fato,
+            // não de regra (dump antigo degrada para declared)
+            RETURN B7KtMark( hRes, hAst, hFunc, cSym )
          ENDIF
          // veneno: param reescrito/@ref dentro do bloco (regra sem ordem)
          IF nWrites > 0 .OR. nRefs > 0 .OR. hInter == NIL
@@ -7471,7 +7481,7 @@ STATIC FUNCTION B7Ctx( hAsts, hDecl )
 
 // o dump carrega o rótulo de RETURN? (ast-6+)
 STATIC FUNCTION B7Ret6( hAst )
-   RETURN hb_AScan( { "ast-6", "ast-7" }, hb_HGetDef( hAst, "schema", "" ) ) > 0
+   RETURN AstAtLeast( hAst, 6 )
 
 // função por nome: STATIC/pública do MÓDULO primeiro, depois pública do
 // projeto (colisão de públicas = NIL). Fora do projeto => NIL
@@ -7556,24 +7566,31 @@ STATIC FUNCTION B7KtMark( hType, hAst, hFunc, cSym )
 
    RETURN hType
 
-// RE.2 (fase RE): o -kt fatia 1 cobre prólogo de parâmetro de assinatura
-// e pós-store DIRETO em local de função nomeada (hbmain.c:2871). Escrita
-// dentro de codeblock (índice block-relative) e escrita via @ref (o pop
-// é do parâmetro do callee) NÃO são checadas - provas probe2/probe3 do
-// RE.1. Anotação com escrita não coberta fica no canal declared: a
-// promessa continua, sem o selo de invariante
+// RE.5 K4 (ast-8): cobertura decidida por FATO do dump - o próprio
+// emissor do core marca "chk": true na escrita cujo pós-store ele
+// checou e na declaração de parâmetro cujo prólogo ele emitiu
+// (compast.c hb_compAstUseChk/hb_compAstDeclChk). Site coberto = toda
+// escrita (write e ref) carrega chk E, se o símbolo é parâmetro, a
+// declaração carrega chk. A matriz replicada do RE.2 morreu: @ref
+// segue descoberto porque a escrita 'ref' NÃO tem chk (fato), não por
+// regra da ferramenta; dump antigo (sem chk) degrada para não-coberto
+// - nunca overclaim
 STATIC FUNCTION B7KtCovered( hFunc, cSym )
 
-   LOCAL hOcc
+   LOCAL hOcc, hItem
 
    FOR EACH hOcc IN hFunc[ "occurrences" ]
-      IF Upper( hOcc[ "sym" ] ) == cSym
-         IF hOcc[ "access" ] == "ref"
-            RETURN .F.
-         ENDIF
-         IF hOcc[ "access" ] == "write" .AND. hOcc[ "block" ]
-            RETURN .F.
-         ENDIF
+      IF Upper( hOcc[ "sym" ] ) == cSym .AND. ;
+         ( hOcc[ "access" ] == "write" .OR. hOcc[ "access" ] == "ref" ) .AND. ;
+         ! hb_HGetDef( hOcc, "chk", .F. )
+         RETURN .F.
+      ENDIF
+   NEXT
+   FOR EACH hItem IN hFunc[ "declarations" ]
+      IF Upper( hItem[ "sym" ] ) == cSym .AND. ;
+         hb_HGetDef( hItem, "param", .F. ) .AND. ;
+         ! hb_HGetDef( hItem, "chk", .F. )
+         RETURN .F.
       ENDIF
    NEXT
 

@@ -58,7 +58,7 @@ Compilador como oráculo (ganchos de 1 linha gated, `.hrb` byte-idêntico
 sem `-x`); editor ≠ verificador (recompilar, comparar, rollback); hbmk2
 como resolvedor de projeto; fixtures como contrato de comportamento;
 réplica sintática na ferramenta é proibida (a fonte da verdade é o
-compilador). Dump por módulo `.ast.json` (schema atual **ast-7**), specs
+compilador). Dump por módulo `.ast.json` (schema atual **ast-8**), specs
 de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 
 ## Fases entregues (registro completo no [arquivo](roadmap-fases-entregues.md))
@@ -109,10 +109,20 @@ B7/B7b/dispatch-por-grafo DORMENTE, usages só-fato, M-cov 3 com
 confirmed 1.715→545 100% canal declarado, casos 39/61/63/66-69/72/75/
 84-86 re-baselinados — o furo dos homônimos degradou nos sends;
 RE.4: `pPosTbl` limpo no reset, 460/460 byte-idêntico, harbour-core
-`ef0abe3688`. Suíte 622/0 byte-idêntica. Gavetas RE.5/RE.6 sob
-portão; **RE.5 com escopo+critério ESCRITOS para o portão
-(2026-07-10): [spec-re5-cobertura-kt.md](spec-re5-cobertura-kt.md)** —
-fatias K1-K4 propostas + decisões K5/K6):
+`ef0abe3688`. Suíte 622/0 byte-idêntica. **RE.5 EXECUTADO
+(2026-07-10, portão aberto pelo Diego na mesma sessão da spec):
+[spec-re5-cobertura-kt.md](spec-re5-cobertura-kt.md)** — K1 (A6 morto:
+classe de param de bloco EXISTE e chega ao dump), K2 (prólogo de bloco
+impõe por Eval), K3 (pós-store de detached em bloco), K4 (fato `chk`
+no dump, **ast-8**; `B7KtCovered` virou LEITOR — a matriz replicada
+morreu; portões de capacidade convertidos a `AstAtLeast`, lição do
+bump); K5 MEDIDO (zero receptores-objeto em @ref no corpus → FORA
+com registro), K6 FORA. Caso 88 re-baselinado como matriz por FATO
+(escrita em bloco e param de bloco AS CLASS RECONQUISTADOS →
+`guaranteed`; site 5 era INESCREVÍVEL antes do A6). Zero impacto
+1085/1085 (+3 = o próprio A6 no compilador base); suíte **700/0**
+byte-idêntica paralelo × `JOBS=1`; lexdiff limpo. Commits do core sob
+autorização. Gaveta RE.6 segue sob portão):
 **[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
 — retomada de sessão COMEÇA por lá. Registro narrativo da sessão
 2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no

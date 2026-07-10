@@ -5,6 +5,52 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — `-kt` alcança codeblocks (e um segfault de 20 anos morre no caminho)
+
+### O problema de todo dia
+
+Codeblock é onde o Harbour vive — callbacks, `AEval`, `dbEval`, filtros.
+E era exatamente onde o fail-fast do `-kt` parava:
+
+```harbour
+LOCAL oConta AS CLASS Conta := Conta():New()
+LOCAL bPaga  := {|| oConta := PegaDeAlgumLugar() }   // mentira aqui PASSAVA
+Eval( bPaga )
+```
+
+A escrita dentro do bloco não era checada — a anotação prometia, o
+runtime não conferia. E pior: anotar o *parâmetro* do bloco
+(`{| oX AS CLASS Conta | ... }`) **derrubava o compilador** — um
+segfault que está no Harbour de estoque até hoje (o upstream crasha
+igual). Ou seja: a forma mais idiomática da linguagem era um ponto cego
+do cheque.
+
+### O que mudou
+
+- **`{| oX AS CLASS Conta | ... }` agora compila** (o segfault morreu) e
+  a anotação vale: a cada `Eval`, o valor recebido é conferido — classe
+  errada, kind errado ou NIL aborta na hora nomeando função e parâmetro
+  (`MAIN:OX`). Subclasse passa (é-um), classe montada em runtime passa
+  pelo nome.
+- **Escrita dentro de bloco a uma local anotada é checada** — o exemplo
+  acima aborta no ponto da mentira (`expected S:CONTA, got C: MAIN:OCONTA`)
+  em vez de estourar três telas depois.
+- **O selo `guaranteed` do `usages` agora vem de FATO do compilador**:
+  o próprio compilador marca no dump cada escrita que ele checou e cada
+  parâmetro cujo prólogo ele emitiu. A ferramenta parou de deduzir
+  cobertura por regra própria — ela lê a marca. Sites de bloco que eram
+  "confirmed (promessa)" viram `guaranteed` porque SÃO.
+
+### O que continua fora (medido, não chutado)
+
+- Passagem por referência (`F( @x )`): o cheque não cobre — e a medição
+  no corpus real mostrou **zero** variáveis-objeto passadas por `@`
+  (tudo string/número/array). Fica fora com o registro; o rótulo nunca
+  diz `guaranteed` nesses sites.
+- `PARAMETERS x AS ...` (estilo legado): segue promessa não imposta.
+- Cheque em bloco roda a cada `Eval` — em laço muito quente é custo;
+  `-kt` continua opt-in.
+
 ## 2026-07-10 — `annotate --apply`: a garantia de rollback agora tem prova de fogo
 
 ### O problema de todo dia

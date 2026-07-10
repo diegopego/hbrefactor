@@ -1,17 +1,17 @@
-// fixture RE.2 - modulo 3: anotacoes em sites que a fatia 1 do -kt NAO
-// cobre (matriz do RE.1 na spec-re): a marca kt nao pode sair - o
-// veredito degrada para o canal da promessa (declared/possible), sem o
-// selo de invariante. Nada daqui e chamado em runtime (o run.log do
-// caso 87 nao muda); os sends existem para o usages classificar.
-// Param de bloco AS CLASS ficou de fora POR FATO: com classe conhecida
-// no modulo o compilador segfaulta (A6); em modulo sem a classe, W0025
-// derruba o build sob -es2 - o site e inescrevivel ate o A6 fechar.
+// fixture RE.2/RE.5 - modulo 3: a matriz de cobertura do -kt em sites
+// vivos. Pos-RE.5 (K1-K4) a cobertura e FATO do dump (chk, ast-8):
+// escrita em bloco e param de bloco AS CLASS viraram sites COBERTOS
+// (o selo guaranteed sai do fato); @ref segue descoberto (K5 sob
+// medicao) e PARAMETERS segue fora (K6) - sem selo, canal da promessa.
+// Nada daqui e chamado em runtime (o run.log do caso 87 nao muda);
+// os sends existem para o usages classificar. O site 5 (param de
+// bloco AS CLASS) era INESCREVIVEL antes do RE.5 K1 (segfault A6).
 _HB_CLASS Conta
 
 MEMVAR oSaco
 
-// site 1 (A1b): local anotado cuja UNICA escrita vive em codeblock -
-// store block-relative nao e checado; guaranteed aqui e overclaim
+// site 1 (A1b -> RE.5 K3): local anotado com escrita em codeblock -
+// o pos-store detached agora e checado: guaranteed aqui e FATO (chk)
 PROCEDURE Sombra( oFonte )
 
    LOCAL oGuarda AS CLASS Conta
@@ -45,13 +45,25 @@ PROCEDURE Antiga
    oSaco:Credita( 5 )
    RETURN
 
-// site 4 (A1a): parametro de codeblock anotado com value-kind - o
-// binding do Eval nao e checado; o veredito fica no canal declared
-// (excluded pela promessa), sem selo kt
+// site 4 (A1a -> RE.5 K2): param de bloco value-kind - o prologo do
+// bloco AGORA checa a cada Eval (chk na declaracao); o veredito segue
+// excluded pela promessa de KIND (N nunca recebe send de Conta)
 PROCEDURE Miuda()
 
    LOCAL bConta := {| nQtd AS NUMERIC | nQtd:Credita( 6 ) }
 
    Eval( bConta, 1 )
+
+   RETURN
+
+// site 5 (RE.5 K1+K2): parametro de codeblock AS CLASS - antes do K1
+// era INESCREVIVEL (A6: segfault com classe no modulo); hoje a
+// anotacao existe no dump (classe transportada), o prologo do bloco a
+// impoe a cada Eval e o selo guaranteed sai do fato chk da declaracao
+PROCEDURE Nova()
+
+   LOCAL bPaga := {| oQuem AS CLASS Conta | oQuem:Credita( 7 ) }
+
+   Eval( bPaga, Conta():New( 1 ) )
 
    RETURN

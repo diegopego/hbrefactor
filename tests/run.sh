@@ -2638,34 +2638,34 @@ check "marca dim (ast-7): o 'A' da dimensionada não é promessa - possible hone
 }
 
 unit_88() {
-echo "case 88: RE.2 guaranteed honesto - marca kt só em site COBERTO"
-# spec-re (RE.1/RE.2): a fatia 1 do -kt cobre prólogo de parâmetro de
-# assinatura e pós-store DIRETO em local de função nomeada; escrita
-# dentro de codeblock (store block-relative) e escrita via @ref (o pop
-# é do parâmetro do callee) NÃO são checadas - provas probe2/probe3 do
-# RE.1. Anotação com escrita não coberta degrada para o canal da
-# promessa (declared), sem o selo de invariante; PARAMETERS AS está no
-# canal e nunca é imposto (A2 - o gate memvar responde possible); param
-# de bloco anotado fica no canal declared (o binding do Eval não é
-# checado). Sites cobertos seguem guaranteed - caso 87 intacto.
+echo "case 88: RE.2/RE.5 - matriz de cobertura do -kt decidida por FATO (chk, ast-8)"
+# RE.2 parou o overclaim com a matriz replicada; o RE.5 (K1-K4) fechou
+# os furos de BLOCO no core e trocou a réplica pelo FATO: o próprio
+# emissor marca chk na escrita checada (pós-store, K3) e na declaração
+# de parâmetro com prólogo (assinatura e BLOCO, K2); B7KtCovered é só
+# leitor. Reconquistas: escrita em codeblock (site 1) e param de bloco
+# AS CLASS (site 5, inescrevível antes do K1/A6) saem guaranteed.
+# Honestidades que ficam: @ref segue SEM selo (K5 sob medição - a
+# escrita 'ref' não tem chk) e PARAMETERS AS segue possible (K6 fora).
 D=$(freshkt case88)
 ( cd "$D" && "$BIN" usages fixkt.hbp Conta:Credita > cc.log 2>&1 )
 check "usages Conta:Credita exit 0" $?
-grep -q "t3.prg:21: confirmed send (receiver declared AS CLASS CONTA) in SOMBRA" "$D/cc.log" && \
-   ! grep -q "t3.prg:21: guaranteed" "$D/cc.log"
-check "escrita só em codeblock: promessa declared, SEM selo kt" $?
+grep -q "t3.prg:21: guaranteed send (receiver AS CLASS CONTA imposed by -kt checks) in SOMBRA" "$D/cc.log"
+check "RECONQUISTA (K3): escrita só em codeblock agora é coberta - guaranteed por fato chk" $?
 grep -q "t3.prg:33: confirmed send (receiver declared AS CLASS CONTA) in REFEM" "$D/cc.log" && \
    ! grep -q "t3.prg:33: guaranteed" "$D/cc.log"
-check "escrita via @ref: promessa declared, SEM selo kt (gap extra do RE.1)" $?
+check "escrita via @ref: SEM selo (a escrita 'ref' não tem chk - K5 sob medição)" $?
 grep -q "t3.prg:45: possible send (dynamic dispatch, receiver unknown) in ANTIGA" "$D/cc.log" && \
    ! grep -q "t3.prg:45: guaranteed" "$D/cc.log"
-check "PARAMETERS AS: anotação no canal, nunca imposta - possible honesto" $?
+check "PARAMETERS AS: anotação no canal, nunca imposta - possible honesto (K6 fora)" $?
 grep -q "t3.prg:53: excluded send (receiver holds a value of kind numeric, codeblock) in MIUDA" "$D/cc.log" && \
    ! grep -q "t3.prg:53: guaranteed" "$D/cc.log"
-check "param de bloco anotado: canal declared, SEM selo kt" $?
+check "param de bloco value-kind: excluded pela promessa de KIND segue (prólogo checa, veredito de kind não muda)" $?
+grep -q "t3.prg:65: guaranteed send (receiver AS CLASS CONTA imposed by -kt checks, codeblock) in NOVA" "$D/cc.log"
+check "RECONQUISTA (K1+K2): param de bloco AS CLASS existe, é imposto por Eval e sai guaranteed" $?
 grep -q "t1.prg:72: guaranteed send" "$D/cc.log" && \
    grep -q "t2.prg:17: guaranteed send" "$D/cc.log"
-check "sites cobertos seguem guaranteed (caso 87 intacto)" $?
+check "sites cobertos da fatia 1 seguem guaranteed (caso 87 intacto)" $?
 
 }
 

@@ -98,12 +98,17 @@ Os sites de DECLARAÇÃO homônimos seguem excluded (fato, nunca saíram).
 | 85 | fixb7 b1.prg:53 (consulta Disco:Gira) | `excluded send within the written class graph (..., dispatches to PECA:GIRA)` |
 | — | json66/json72 (pré-RE.3) | excluded fora das Location[] — volta junto com a exclusão |
 
-## Rota D — sites de codeblock `[RE.5 + A6]`
+## Rota D — sites de codeblock `[RE.5 + A6]` — ⚙️ CORE PRONTO (RE.5, 2026-07-10); falta o materializador
 
-O `-kt` fatia 1 não cobre blocos (matriz do RE.1) e a anotação
-`AS CLASS` em param de bloco é inescrevível (A6 segfault; a gramática
-descarta o nome). Rota: consertar A6 + estender emissão (RE.5) →
-materializador anota → `guaranteed` em bloco.
+O `-kt` fatia 1 não cobria blocos (matriz do RE.1) e a anotação
+`AS CLASS` em param de bloco era inescrevível (A6 segfault; a
+gramática descartava o nome). **A primeira perna FECHOU no RE.5**: A6
+morto, a anotação existe e é imposta por Eval, escrita em bloco é
+checada, e `guaranteed` em bloco é REAL (caso 88 sites 1 e 5 — fato
+`chk`/ast-8). O que falta para reconquistar os itens ABAIXO: o
+MATERIALIZADOR aprender a escrever anotação em param de bloco
+(parente do resíduo "parâmetro" da B9 fatia 2, portão próprio) — os
+sites do catálogo continuam suspensos até lá.
 
 | Caso | Site | Assert antigo (essencial) |
 |---|---|---|

@@ -267,12 +267,11 @@ Estender a emissão no core (`PARAMETERS`, params de bloco, detached)
 E/OU matriz explícita "o que é imposto" no dump. RE.2 remove a
 urgência (o consumidor para de overclaimar); esta fatia devolve
 alcance. Abrir só com escopo+critério escritos, depois de RE.1-RE.3.
-**Escopo+critério ESCRITOS (2026-07-10, preparação por ordem de
-"continue" do Diego): [spec-re5-cobertura-kt.md](spec-re5-cobertura-kt.md)**
-— fatias K1 (A6/classe de param de bloco existe), K2 (prólogo de
-bloco), K3 (pós-store detached), K4 (fato de cobertura no dump, ast-8
-— mata a réplica do `B7KtCovered`), K5/K6 (decisões: @ref pós-call e
-PARAMETERS — recomendação medir/fora). Execução aguarda o portão.
+**EXECUTADO (2026-07-10; portão aberto pelo Diego, K1-K4):
+[spec-re5-cobertura-kt.md](spec-re5-cobertura-kt.md)** — A6 morto,
+prólogo de bloco, pós-store detached, fato `chk` no dump (ast-8) com
+`B7KtCovered` leitor; K5 medido (zero receptores-objeto → FORA com
+registro), K6 FORA. Caso 88 = matriz por FATO; suíte 700/0.
 
 **RE.6 — [GAVETA — PORTÃO Diego] contratos genéricos de diretiva.**
 A resposta de Q3 da revisão: invariantes genéricas por construto de

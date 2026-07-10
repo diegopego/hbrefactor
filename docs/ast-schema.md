@@ -1,9 +1,10 @@
-# Schema `ast-7` — o dump AST do compilador (spec)
+# Schema `ast-8` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-7` (fase B9) = `ast-6` + `"kt"` no cabeçalho (o módulo
+com `-x`. O `ast-8` (RE.5) = `ast-7` + `"chk"` (fato de cobertura do
+`-kt`); o `ast-7` (fase B9) = `ast-6` + `"kt"` no cabeçalho (o módulo
 foi compilado com `-kt`? — anotação vira INVARIANTE imposta) + `"dim"`
 em `declarations[]` (a forma dimensionada `LOCAL a[n]` carrega um 'A'
 INTERNO do compilador, não anotação escrita — ver a seção B9); o
@@ -37,7 +38,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-7",           // versão emitida hoje (ast-1→...→ast-7)
+{ "schema": "ast-8",           // versão emitida hoje (ast-1→...→ast-8)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -453,7 +454,17 @@ plano da fatia 2 — [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md)):
   MEMBRO não é imposto (a impl pode viver fora do módulo/projeto —
   ex.: `New` herdado na RTL) e permanece PROMESSA cujo papel é tipar o
   consumidor; a invariante reportável é a da variável anotada no site
-  (coberta, RE.2).
+  (coberta — RE.2, e desde o RE.5 a cobertura é FATO `chk` do ast-8).
+- **Cobertura do `-kt` PÓS-RE.5 (K1-K3, 2026-07-10, provas pgb1/pgb2 +
+  caso 88)**: param de bloco `AS CLASS` EXISTE (a classe atravessa o
+  parse — antes morria em harbour.y:1024 e segfaultava o A6) e é
+  IMPOSTO por prólogo de bloco a cada `Eval` (site nomeado pela função
+  DONA: `MAIN:OX`); escrita a local anotada DENTRO de bloco (detached)
+  é checada no pós-store (o registro `pDetached` carrega o tipo da
+  declaração da dona). Seguem NÃO cobertos, por fato e com registro:
+  escrita via `@ref` (K5 medido no corpus: zero receptores-objeto —
+  fora) e `PARAMETERS AS` (K6 fora). Blocos compilados pelo MACRO
+  compiler em runtime nunca têm cheque (declarações não existem lá).
 - **W0019 de MÉTODO é condicional — candidato (g) ADOTADO (portão do
   meio da fatia 2, Diego, 2026-07-09)**: re-declarar método cujo tipo
   era desconhecido (`pMethod->cType == ' '`, hbmain.c:1193) NÃO warna —
@@ -1104,11 +1115,24 @@ rename-dsl (palavra do match por posição-fato), rename-function
 `--edit-rules` e resolve-at (posição dentro de diretiva). O canal do `-kt`
 (`"kt"` no cabeçalho + `"dim"` nas declarations) entregue no **ast-7**
 (fase B9, 2026-07-08), consumido pela camada guaranteed do usages e
-pela correção do DeclType (dim não é promessa). O leitor da
-ferramenta (`ReadAst`) aceita `ast-2`..`ast-7`; comandos que EXIGEM o
+pela correção do DeclType (dim não é promessa). O fato de COBERTURA
+do `-kt` (`"chk": true` na occurrence de escrita cujo pós-store o
+próprio emissor checou e na declaração de parâmetro — de FUNÇÃO ou de
+BLOCO — cujo prólogo ele emitiu; compast.c `hb_compAstUseChk`/
+`hb_compAstDeclChk`, padrão retro-tag do `hb_compAstTag`) entregue no
+**ast-8** (RE.5 K4, 2026-07-10), consumido pelo `B7KtCovered` — a
+cobertura do selo `guaranteed` é LEITURA de fato, não matriz replicada
+(site coberto = toda escrita write/ref com `chk` + param com `chk` na
+declaração; dump antigo sem `chk` degrada para não-coberto, nunca
+overclaim). O leitor da
+ferramenta (`ReadAst`) aceita `ast-2`..`ast-8`; comandos que EXIGEM o
 rastro usam `FromReady` (ast-3+), a classificação de receptor exige
 projeto inteiro em ast-4+ (`Ast4Ready`/`DeclTables`), a regra por dentro
 usa `RuleToksReady` (ast-5) e o rótulo de RETURN `B7Ret6` (ast-6+) — em
-dump antigo degrada/recusa com o fato, sem quebrar. Próximo a avaliar: span original de string no posTrack
+dump antigo degrada/recusa com o fato, sem quebrar. **Regra aprendida
+no bump ast-8 (custou uma bissecção): portão de capacidade usa VERSÃO
+MÍNIMA (`AstAtLeast( hAst, n )`), NUNCA lista enumerada de versões —
+a lista morria em silêncio a cada bump (lifting/canal/regras apagados
+até o tcheck); o teto fechado vive só no `ReadAst`. Próximo a avaliar: span original de string no posTrack
 (mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e atualizar este
 documento NO MESMO commit.

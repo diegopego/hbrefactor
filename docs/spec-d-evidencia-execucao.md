@@ -121,3 +121,39 @@ dominante NÃO é alcançável por compilação:
 - Árvore de macro / ast-7 / `.astc.json` (spec-b8, na gaveta dela).
 - Alavanca G / B9 (gaveta, decisões T1-T5 preservadas).
 - Qualquer mistura estático × observado num veredito só.
+
+## Adendo — observação do Diego (2026-07-10): debugger + `hb_compileFromBuf` como coletores
+
+Registro da proposta (sessão do RE.5): *"se numa sessão de debug dá
+para inspecionar tanta coisa, por que não usar essas ferramentas para
+criar a AST? compilar com debug e navegar com hb_compileFromBuf
+coletando a mesma informação; macro, é só avaliar/compilar em
+runtime"*. Mapeamento honesto sobre os fatos já auditados:
+
+- **O que a ideia acerta em cheio**: os DOIS coletores citados são
+  CORE — usá-los é a REGRA DO FATO por definição ("usar ferramenta do
+  core como oráculo"), não inferência. E a parte de MACRO é
+  exatamente o gêmeo já registrado no mapa/B8: a AST de toda macro
+  existe COMPLETA em runtime (macro.y:257; gate único vm/macro.c:798)
+  e `hb_compileFromBuf` é o instrumento da fatia 2 da spec-b8 (sondar
+  conteúdo rastreável). A intuição converge com duas gavetas que já
+  têm spec: B8 (macros) e esta (alavanca D).
+- **O que o debugger acrescenta de NOVO**: a dimensão dos VALORES — o
+  gancho de debug (`hbdbginf.c`/entry points HB_DBG_*) vê a classe do
+  objeto VIVO em cada linha executada, sem canal novo no core. É um
+  candidato de IMPLEMENTAÇÃO para esta alavanca melhor que gancho
+  inventado: infraestrutura oficial, gated por build, zero impacto
+  sem `-b`. Fica registrado como candidato para QUANDO o portão
+  reabrir.
+- **O limite que não muda (o motivo do portão fechado)**: evidência de
+  runtime é verdade CONDICIONAL — prova o que RODOU, com aqueles
+  dados; nunca prova ausência nem cobre caminho não exercitado. Para
+  ESTRUTURA em compile-time, o dump `-x` já colhe no único lugar onde
+  a derivação de pp existe (dentro da compilação real, com os
+  includes/defines que o hbmk2 resolveu) — navegar fonte com
+  `hb_compileFromBuf` reproduziria essa colheita por fora, com o
+  mesmo compilador mas sem o contexto de projeto, e é por isso que o
+  dump continua sendo o canal da estrutura. O consumo de runtime que a
+  REGRA DO FATO aceita segue o decidido aqui: alimentar FATO imposto
+  (ex.: sugerir anotações que o `-kt` passa a checar — o ciclo
+  virtuoso), jamais veredito estático.

@@ -1,10 +1,10 @@
 # Spec RE.5 — cobertura completa do `-kt` (blocos, detached, fato de cobertura no dump)
 
-Status: **PORTÃO ABERTO (Diego, 2026-07-10): K1-K4 autorizadas em
-ordem de dependência; K5 = MEDIR @ref no corpus antes de decidir;
-K6 = FORA (registro honesto na matriz).** Commits no core seguem
-um-a-um sob autorização. Regra do roadmap cumprida: escopo + critério
-escritos ANTES da execução. Origem: matriz de cobertura do RE.1
+Status: **K1-K4 EXECUTADAS (2026-07-10, mesma sessão do portão);
+K5 MEDIDO → recomendação FORA; K6 FORA.** Resultados por fatia no fim
+desta spec. Commits no core seguem um-a-um sob autorização. Regra do
+roadmap cumprida: escopo + critério escritos ANTES da execução.
+Origem: matriz de cobertura do RE.1
 ([spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)) e
 Rota D de [testes-suspensos-re3.md](testes-suspensos-re3.md).
 
@@ -155,3 +155,71 @@ da Rota D abre depois, com as duas pernas em pé.
   compast), compast.c (ast-8).
 - hbrefactor: `B7KtCovered` (K4), fixtures fixkt/casos novos,
   ast-schema.md, roadmap.
+
+## Executado (2026-07-10 — provas por fatia)
+
+**K1 (A6/classe existe)**: `HB_CBVAR.szFromClass` + grammar
+(harbour.y:1024-1025) + as DUAS materializações (harbour.y ext-block;
+hbexprb.c inline) + guarda NULL em `hb_compClassFind`. Provas: mini2
+exit 139→0 nos 4 modos; dump carrega `type S + class` em bloco inline
+E estendido; W0025 nomeia a classe REAL (`FANTASMA`, não `(null)`) e
+degrada limpo. Regeneração de parser: `HB_REBUILD_PARSER=yes` + sync
+dos `.yyc`/`.yyh` (o build COPIA os pré-gerados — wart documentado).
+
+**K2 (prólogo de bloco)**: `hb_compChkTypeParams` chamado nos dois
+pontos de materialização; site nomeado pela DONA (caminhada `pOwner`
+no `hb_compChkTypeGenCall`). Prova pgb1: valor certo passa, subclasse
+(is-a) passa, mentira aborta `expected S:CONTA, got N: MAIN:OX` vindo
+de `(b)MAIN`. Cheque roda a cada Eval (custo declarado, opt-in).
+
+**K3 (pós-store detached)**: o registro da lista `pDetached` agora
+COPIA `cType`/`pClass`/`uiFlags` da declaração da dona (era hardwired
+`' '` — e `uiFlags` nem era inicializado); guard do pós-store cobre
+`HB_VS_CBLOCAL_VAR` e blocos (pseudo-função `szName NULL`). Prova
+pgb2: o cenário do probe2 do RE.1 (escrita em bloco que passava em
+silêncio) agora aborta `expected S:CONTA, got C: MAIN:OC`; sem `-kt`
+comportamento intacto. Armadilha de build que custou o diagnóstico:
+hbmk2 usa o compilador EMBUTIDO ("built-in") — binário de hbmk2 STALE
+roda o core velho mesmo com libhbcplr nova; relink manual obrigatório.
+
+**K4 (fato `chk`, ast-8)**: `HB_ASTUSE.fChk`/`HB_ASTDECL.fChk` +
+retro-taggers (`hb_compAstUseChk`/`hb_compAstDeclChk`, padrão do
+`hb_compAstTag`); `hb_compChkTypeGenCall` devolve se emitiu e os DOIS
+chamadores marcam o fato; schema **ast-8** (aditivo). Ferramenta:
+`B7KtCovered` virou LEITOR (site coberto = toda escrita write/ref com
+`chk` + declaração de param com `chk`) — a matriz replicada do RE.2
+morreu; caminho de param de bloco declarado ganhou a marca kt (o fato
+existe). Caso 88 re-baselinado como "matriz por FATO": site 1 (escrita
+em bloco) RECONQUISTADO → `guaranteed`; site 5 NOVO (param de bloco
+`AS CLASS`, inescrevível antes do K1) → `guaranteed ... codeblock`;
+@ref e PARAMETERS seguem sem selo, honestos. Suíte **700/0**
+byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.
+
+**Incidente que virou regra (custou ~1 h de bissecção)**: o bump para
+ast-8 apagou em silêncio lifting/canal/regras — os portões de
+capacidade da ferramenta (`FromReady`/`Ast4Ready`/`RuleToksReady`/
+`B7Ret6` e 2 gates do tcheck) ENUMERAVAM versões de schema em vez de
+exigir mínimo. Todos convertidos para `AstAtLeast( hAst, nMin )`
+(prefixo `ast-` + `Val() >= nMin`); o teto fechado continua só no
+`ReadAst`. Regra: portão de capacidade NUNCA enumera versões.
+
+**K5 (@ref) — MEDIDO, recomendação FORA**: no corpus hbhttpd há 122
+escritas `@ref` em locais, 36 símbolos distintos — TODOS value-kind
+(`c*`/`n*`/`a*`/`t*`/handle/xValue); **zero receptores-objeto**. O
+selo de classe não perde nada; o re-cheque pós-call mudaria o ponto de
+falha (pós-fato) por benefício zero medido. Fica FORA com este
+registro; reabre se o corpus real mudar.
+
+**K6 (PARAMETERS) — FORA** (decisão do portão; legado, gate memvar já
+responde `possible` honesto).
+
+**Zero impacto (pacote completo)**: base × fix sobre o corpus, sem
+flags novas: 1085/1085 `.hrb` byte-idênticos; as 3 "divergências" são
+o próprio A6 — o compilador BASE segfaulta no t3.prg novo (site 5),
+o corrigido compila; 28 programas não compilam igual nos dois lados
+(fixtures que pedem contexto de projeto).
+
+**Downstream aberto (inalterado)**: a Rota D do catálogo (sites do
+fixb7b q1/q2) espera o MATERIALIZADOR aprender param de bloco
+(parente do resíduo "parâmetro" da B9) — a cobertura do core está
+pronta; a reconquista dos itens do catálogo abre com as duas pernas.
