@@ -12,9 +12,18 @@ HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
-.PHONY: build test clean
+.PHONY: build test clean hooks
 
-build: $(BIN)
+build: hooks $(BIN)
+
+# ativa o pre-commit anti-binário (.githooks/pre-commit) sem exigir alvo
+# próprio: todo `make`/`make test` garante o core.hooksPath. Idempotente e
+# silencioso quando já está ligado; no-op fora de um clone git (tarball).
+hooks:
+	@if [ -d .git ] && [ "$$(git config --get core.hooksPath)" != ".githooks" ]; then \
+		git config core.hooksPath .githooks && \
+		echo "hooks: pre-commit anti-binário ativado (core.hooksPath=.githooks)"; \
+	fi
 
 $(BIN): src/hbrefactor.prg
 	@mkdir -p bin
