@@ -273,11 +273,18 @@ prólogo de bloco, pós-store detached, fato `chk` no dump (ast-8) com
 `B7KtCovered` leitor; K5 medido (zero receptores-objeto → FORA com
 registro), K6 FORA. Caso 88 = matriz por FATO; suíte 700/0.
 
-**RE.6 — [GAVETA — PORTÃO Diego] contratos genéricos de diretiva.**
-A resposta de Q3 da revisão: invariantes genéricas por construto de
-diretiva (papéis de marker, relações owner/member/generated-symbol no
-dump), sem "classe" como modelo universal. Spec separada quando o
-Diego abrir o portão.
+**RE.6 — [PORTÃO DE ESCOPO ABERTO pelo Diego, 2026-07-10; rota A
+escolhida; spec em RASCUNHO no portão de EXECUÇÃO] contratos genéricos
+de diretiva.** A resposta de Q3 da revisão: invariantes genéricas por
+construto de diretiva (papéis de marker, relações owner/member/
+generated-symbol no dump), sem "classe" como modelo universal. A perna
+concreta é o parentesco: **[spec-re6-parentesco-declarado.md](spec-re6-parentesco-declarado.md)**
+— `_HB_SUPER` (parentesco DECLARADO como fato do core, irmão de
+`_HB_CLASS`/`_HB_MEMBER`; hbclass primeiro cliente) reconquista a
+exclusão de SEND da Rota C do
+[testes-suspensos-re3.md](testes-suspensos-re3.md) (furo dos homônimos,
+caso 66) sobre arestas de FATO, degrade honesto, rótulo novo. Decisões
+D1-D6 aguardam o portão de execução do Diego.
 
 ## O que NÃO muda nesta fase
 

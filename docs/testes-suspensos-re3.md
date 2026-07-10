@@ -69,9 +69,16 @@ materializador escreve o DECLARE; o send encadeado decide por fato.
 | 86 | fixb7b q1.prg:73 `oC:Pega():Soma( 5 )` | `confirmed send (receiver class MOEDA via construction chain, ...) in MAIN` (retorno não-Self pelos pushes ret) | ✅ caso 89 (2026-07-09, F2.4-núcleo) — `confirmed ... via declared types` |
 | 86 | fixb7b q1.prg:75 `oM:Soma( 1 ):Soma( 2 )` (2 sends) | `confirmed ...` ×2 (identidade RETURN Self em cadeia) | ✅ caso 89 — completadores (g) `_HB_MEMBER SOMA()/PEGA()` |
 
-## Rota C — exclusão de homônimo em SEND `[SEM-ROTA hoje; candidata: RE.6/canal novo]`
+## Rota C — exclusão de homônimo em SEND `[RE.6 — spec em rascunho, portão de execução do Diego]`
 
-> Honestidade agora ASSERTADA em suíte (2026-07-10): nos round-trips
+> **Rota aberta (2026-07-10)**: a candidata virou spec —
+> [spec-re6-parentesco-declarado.md](spec-re6-parentesco-declarado.md)
+> (`_HB_SUPER` = parentesco DECLARADO como fato do core; a exclusão de
+> send fecha sobre arestas de fato, degrade honesto). Aguarda o portão
+> de execução (D1-D6). Os sites abaixo são o esqueleto do critério de
+> pronto da F6.3.
+
+> Honestidade ASSERTADA em suíte (2026-07-10, pré-RE.6): nos round-trips
 > materializados, o cruzado/espelho segue `possible send (receiver
 > class X, relation to Y unknown)` — casos 92 (fixmth), 94 (fixdis,
 > o furo dos homônimos) e 95 (fixext). A exclusão NÃO voltou e não

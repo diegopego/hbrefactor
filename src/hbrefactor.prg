@@ -276,11 +276,13 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // fase B4g); ast-6 = ast-5 + "ret": true no push que carrega o valor
    // de RETURN (fase B7); ast-9 = posição do token ESCRITO do nome nas
    // declarations (nameLine/nameCol, âncora do materializador - B9
-   // fatia 3). O leitor usa só seções presentes em todos - comandos que
+   // fatia 3); ast-10 = canal de parentesco DECLARADO no stream
+   // (_HB_SUPER, RE.6/F6.1 - o gate do fato de exclusão de send).
+   // O leitor usa só seções presentes em todos - comandos que
    // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
    // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -571,7 +573,7 @@ STATIC FUNCTION Usages( aArgs )
                Upper( hItem[ "sym" ] ) == "_" + cUpMeth
                nHits++
                aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl, hInter, hAst ), ;
-                                     cClass, hItem[ "block" ] )
+                                     cClass, hItem[ "block" ], cUpMeth, hGraph )
                // excluded é não-referência PROVADA: fica no relato (com o
                // rótulo) mas fora das Location[] do --json - o editor
                // (find all references via extensão) não deve listá-lo
@@ -9433,7 +9435,8 @@ STATIC PROCEDURE B7RegSelfScan( hFunc, hRegs, cCls )
 STATIC FUNCTION ClassGraph( hAsts, hDecl )
 
    LOCAL hGraph := { => }, hClassMap := ClassFuncMap( hAsts )
-   LOCAL cUp, aCF, hMembers, cM
+   LOCAL hSuper := ClassSuperFacts( hAsts )
+   LOCAL cUp, aCF, hMembers, cM, aPar
 
    FOR EACH cUp IN hb_HKeys( hClassMap )
       aCF := hClassMap[ cUp ]
@@ -9443,14 +9446,18 @@ STATIC FUNCTION ClassGraph( hAsts, hDecl )
             hMembers[ cM ] := .T.
          NEXT
       ENDIF
+      // "parents" = leitura POR FORMA (Q4, gateada por DispatchVia - nunca
+      // decide); "super" = parentesco de FATO do canal _HB_SUPER (ast-10,
+      // RE.6): o que a exclusão de send consome. lInProject resolvido abaixo
       hGraph[ cUp ] := { "parents" => ClassParentsSeq( aCF[ 2 ], cUp, aCF[ 3 ], hClassMap ), ;
+                         "super"   => hb_HGetDef( hSuper, cUp, {} ), ;
                          "members" => hMembers }
    NEXT
 
    // classes SÓ do canal declared (B4f-3: DSL declarativa pura -
    // _HB_CLASS/_HB_MEMBER por #xcommand próprio, sem função geradora): a
-   // interface declarada é a PROMESSA fechada do autor - o canal não
-   // carrega superclasse (fato 4), então pais vazios e membros = declared.
+   // interface declarada é a PROMESSA fechada do autor. O parentesco vem
+   // do FATO _HB_SUPER se a DSL o declarar (ast-10); senão vazio.
    // Mesma natureza de promessa de todo tipo declarado (caveat no
    // ast-schema)
    FOR EACH cUp IN hb_HKeys( hDecl[ "c" ] )
@@ -9459,8 +9466,17 @@ STATIC FUNCTION ClassGraph( hAsts, hDecl )
          FOR EACH cM IN hb_HKeys( hDecl[ "c" ][ cUp ] )
             hMembers[ cM ] := .T.
          NEXT
-         hGraph[ cUp ] := { "parents" => {}, "members" => hMembers }
+         hGraph[ cUp ] := { "parents" => {}, "super" => hb_HGetDef( hSuper, cUp, {} ), ;
+                            "members" => hMembers }
       ENDIF
+   NEXT
+
+   // 2º passo: marcar cada pai de FATO como noProjeto? (nó no grafo) - o
+   // pai fora do fecho declarado abre a cadeia (ResolveDispatchSuper => NIL)
+   FOR EACH cUp IN hb_HKeys( hGraph )
+      FOR EACH aPar IN hGraph[ cUp ][ "super" ]
+         aPar[ 2 ] := hb_HHasKey( hGraph, aPar[ 1 ] )
+      NEXT
    NEXT
 
    RETURN hGraph
@@ -9525,6 +9541,158 @@ STATIC FUNCTION DeclOwnerProven( hGraph, cUpOwn, cUpMsg )
    RETURN hGraph != NIL .AND. hb_HHasKey( hGraph, cUpOwn ) .AND. ;
       hb_HHasKey( hGraph[ cUpOwn ][ "members" ], cUpMsg )
 
+// parentesco DECLARADO por FATO (RE.6/ast-10): { CLASSE => [ {PAI, noProj?} ] }
+// lido do canal _HB_SUPER no stream de tokens. Sequencial como o compilador:
+// _HB_CLASS <nome> muda a classe corrente (o 1º nome é a classe; o 2º é a
+// função gerada); _HB_SUPER <pai>[, <paiN>] declara os pais DELA na ordem
+// da cláusula FROM/INHERIT (a ordem que o VM resolve - fato 4). O pai chega
+// posicionado (prov 's') mas aqui só o NOME importa. noProj? é resolvido no
+// 2º passo do ClassGraph. Módulo pré-ast-10 não tem o canal - fica de fora
+// (o gate honesto: sem o fato, a exclusão não decide)
+STATIC FUNCTION ClassSuperFacts( hAsts )
+
+   LOCAL hFacts := { => }, hAst, aToks, hTok, cUp
+   LOCAL cCur, lExpectCls, lInSuper
+
+   FOR EACH hAst IN hAsts
+      IF ! AstAtLeast( hAst, 10 )
+         LOOP
+      ENDIF
+      aToks := hb_HGetDef( hAst, "tokens", {} )
+      cCur := ""
+      lExpectCls := .F.
+      lInSuper := .F.
+      FOR EACH hTok IN aToks
+         cUp := Upper( hb_HGetDef( hTok, "text", "" ) )
+         IF lExpectCls
+            // o 1º identificador após _HB_CLASS é a classe corrente
+            IF hTok[ "type" ] == 21
+               cCur := cUp
+               lExpectCls := .F.
+            ENDIF
+         ELSEIF cUp == "_HB_CLASS"
+            lExpectCls := .T.
+            lInSuper := .F.
+         ELSEIF cUp == "_HB_SUPER"
+            lInSuper := .T.
+            IF !( cCur == "" ) .AND. ! hb_HHasKey( hFacts, cCur )
+               hFacts[ cCur ] := {}
+            ENDIF
+         ELSEIF lInSuper
+            IF hTok[ "type" ] == 21 .AND. hb_HGetDef( hTok, "prov", "" ) == "s"
+               IF !( cCur == "" )
+                  AAdd( hFacts[ cCur ], { cUp, .F. } )
+               ENDIF
+            ELSEIF hTok[ "type" ] == 30   // ';' encerra a lista de pais
+               lInSuper := .F.
+            ENDIF
+            // type 29 (vírgula) segue coletando
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN hFacts
+
+// dono da mensagem cUpMsg sobre cUpClass pelo FATO de parentesco (_HB_SUPER):
+// próprio > super na ordem da cláusula, em profundidade, 1º hit vence (regra
+// do VM sobre arestas de FATO, não por forma). cUpClass se acerto PRÓPRIO;
+// dono se alcança por super provados; "" se ausente da cadeia COMPLETA; NIL
+// se a cadeia ABRE (pai fora do fecho declarado) - o degrade honesto
+STATIC FUNCTION ResolveDispatchSuper( cUpClass, cUpMsg, hGraph, hSeen )
+
+   LOCAL hNode, aPar, xOwn
+
+   IF ! hb_HHasKey( hGraph, cUpClass )
+      RETURN NIL
+   ENDIF
+   IF hSeen == NIL
+      hSeen := { => }
+   ENDIF
+   IF hb_HHasKey( hSeen, cUpClass )
+      RETURN ""
+   ENDIF
+   hSeen[ cUpClass ] := .T.
+   hNode := hGraph[ cUpClass ]
+   IF hb_HHasKey( hNode[ "members" ], cUpMsg )
+      RETURN cUpClass
+   ENDIF
+   FOR EACH aPar IN hNode[ "super" ]
+      IF ! aPar[ 2 ]
+         RETURN NIL
+      ENDIF
+      xOwn := ResolveDispatchSuper( aPar[ 1 ], cUpMsg, hGraph, hSeen )
+      IF xOwn == NIL
+         RETURN NIL
+      ENDIF
+      IF Len( xOwn ) > 0
+         RETURN xOwn
+      ENDIF
+   NEXT
+
+   RETURN ""
+
+// cTarget está na cadeia de super-ancestrais de FATO de cC?
+STATIC FUNCTION SuperReaches( hGraph, cC, cTarget, hSeen )
+
+   LOCAL aPar
+
+   IF ! hb_HHasKey( hGraph, cC ) .OR. hb_HHasKey( hSeen, cC )
+      RETURN .F.
+   ENDIF
+   hSeen[ cC ] := .T.
+   FOR EACH aPar IN hGraph[ cC ][ "super" ]
+      IF aPar[ 1 ] == cTarget
+         RETURN .T.
+      ENDIF
+      IF aPar[ 2 ] .AND. SuperReaches( hGraph, aPar[ 1 ], cTarget, hSeen )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// descendentes DECLARADOS de cUpClass (fecho de FATO): classes cujo super
+// alcança cUpClass. is-a: o receptor declarado admite qualquer descendente,
+// então a exclusão tem de valer para TODOS eles
+STATIC FUNCTION SuperDescendants( hGraph, cUpClass )
+
+   LOCAL hDesc := { => }, cC
+
+   FOR EACH cC IN hb_HKeys( hGraph )
+      IF !( cC == cUpClass ) .AND. SuperReaches( hGraph, cC, cUpClass, { => } )
+         hDesc[ cC ] := .T.
+      ENDIF
+   NEXT
+
+   RETURN hDesc
+
+// exclusão de send por FATO de parentesco (RE.6/ast-10): o send oR:M com
+// receptor cRcls != consultada cClass NUNCA despacha para cClass:M quando,
+// no fecho DECLARADO, cRcls E todo descendente declarado resolvem M num dono
+// CONCRETO decidível != cClass. is-a: descendente que ABRE a cadeia (NIL) ou
+// alcança cClass impede a exclusão. Só dono concreto decide - NIL (fecho
+// aberto) e "" (M ausente da cadeia completa) degradam para possible honesto.
+// Devolve o dono para o rótulo, ou NIL quando não exclui por fato
+STATIC FUNCTION KinshipExcludes( cRcls, cClass, cUpMsg, hGraph )
+
+   LOCAL xOwn, cD, xD
+
+   IF hGraph == NIL .OR. ! hb_HHasKey( hGraph, cRcls )
+      RETURN NIL
+   ENDIF
+   xOwn := ResolveDispatchSuper( cRcls, cUpMsg, hGraph )
+   IF ! HB_ISSTRING( xOwn ) .OR. Len( xOwn ) == 0 .OR. xOwn == cClass
+      RETURN NIL
+   ENDIF
+   FOR EACH cD IN hb_HKeys( SuperDescendants( hGraph, cRcls ) )
+      xD := ResolveDispatchSuper( cD, cUpMsg, hGraph )
+      IF xD == NIL .OR. xD == cClass
+         RETURN NIL
+      ENDIF
+   NEXT
+
+   RETURN xOwn
+
 // veredito em camadas de um send para a consulta [Classe:]Método - SÓ
 // FATO (RE.3, portão do Diego 2026-07-09, forma "a"): guaranteed (-kt em
 // site coberto), confirmed/excluded pelo canal declarado do próprio
@@ -9535,10 +9703,10 @@ STATIC FUNCTION DeclOwnerProven( hGraph, cUpOwn, cUpMsg )
 // "dispatches to"/"within the class graph" derivavam de travessia de
 // parents as-written - Q4 já os tinha gateado, o RE.3 os removeu).
 // Devolve { rótulo, fora-do-json? } - excluded fica fora das Location[]
-STATIC FUNCTION SendVerdict( hType, cClass, lBlock )
+STATIC FUNCTION SendVerdict( hType, cClass, lBlock, cUpMsg, hGraph )
 
    LOCAL cSuf := iif( lBlock, ", codeblock", "" )
-   LOCAL cRcls
+   LOCAL cRcls, cOwn
 
    IF hType == NIL
       RETURN { "possible send (dynamic dispatch, receiver unknown" + cSuf + ")", .F. }
@@ -9566,8 +9734,17 @@ STATIC FUNCTION SendVerdict( hType, cClass, lBlock )
                     "class " + cRcls + " via declared types" ) + cSuf + ")", .F. }
    ENDIF
 
-   // classe conhecida != consultada NÃO exclui: promessa não verificada +
-   // parentesco indecidível sem fato (pai fora do projeto, runtime)
+   // classe conhecida != consultada: a exclusão volta por FATO de parentesco
+   // (RE.6/ast-10) quando o fecho DECLARADO prova que oR:M nunca despacha
+   // para cClass:M (dono concreto != consultada + nenhum descendente que
+   // sequestre); o rótulo carrega a ressalva do mundo fechado DECLARADO -
+   // mesma natureza de promessa do confirmed. Sem o fato (dump pré-ast-10,
+   // pai fora do fecho, is-a que abre): possible honesto, como antes
+   cOwn := KinshipExcludes( cRcls, cClass, cUpMsg, hGraph )
+   IF cOwn != NIL
+      RETURN { "excluded send within the declared class graph (dispatches to " + ;
+               cOwn + ":" + cUpMsg + cSuf + ")", .T. }
+   ENDIF
    RETURN { "possible send (receiver class " + cRcls + ", relation to " + cClass + ;
             " unknown" + cSuf + ")", .F. }
 

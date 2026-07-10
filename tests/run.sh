@@ -1808,20 +1808,20 @@ D=$(freshdis case66)
 check "usages UWMain:Paint exit 0" $?
 grep -q "confirmed send (receiver class UWMAIN via declared types) in USA66  | oM:Paint()" "$D/pm.log"
 check "oM (instância exata de UWMain) segue confirmed" $?
-grep -q "possible send (receiver class UWSECONDARY, relation to UWMAIN unknown) in USA66  | oS:Paint()" "$D/pm.log"
-check "oS (classe conhecida != consultada): possible nomeando o fato (RE.3)" $?
-grep -q "possible send (receiver class UWSECONDARY, relation to UWMAIN unknown) in USA66PROM  | oP:Paint()" "$D/pm.log"
-check "receptor DECLARADO de outra classe: mesmo possible (promessa não exclui)" $?
+grep -q "excluded send within the declared class graph (dispatches to UWSECONDARY:PAINT) in USA66  | oS:Paint()" "$D/pm.log"
+check "oS (UWSecondary own-hit): EXCLUÍDO por FATO de parentesco (RE.6)" $?
+grep -q "excluded send within the declared class graph (dispatches to UWSECONDARY:PAINT) in USA66PROM  | oP:Paint()" "$D/pm.log"
+check "receptor DECLARADO de outra classe: excluído por fato (RE.6 - o -kt impõe o is-a)" $?
 grep -q "possible send (dynamic dispatch, receiver unknown) in USA66NC  | oNm:Paint()" "$D/pm.log" && \
    grep -q "possible send (dynamic dispatch, receiver unknown) in USA66NC  | oNs:Paint()" "$D/pm.log"
-check "sem ctor declarado: possible pleno (cadeia de construção era inferência)" $?
+check "sem ctor declarado: possible pleno (sem tipo de receptor, nada a excluir)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp UWSecondary:Paint > ps.log 2>&1 )
-grep -q "possible send (receiver class UWMAIN, relation to UWSECONDARY unknown) in USA66  | oM:Paint()" "$D/ps.log" && \
+grep -q "excluded send within the declared class graph (dispatches to UWMAIN:PAINT) in USA66  | oM:Paint()" "$D/ps.log" && \
    grep -q "confirmed send (receiver class UWSECONDARY via declared types) in USA66  | oS:Paint()" "$D/ps.log"
-check "a consulta espelhada inverte o confirmed; o resto fica possible" $?
+check "consulta espelhada: oM (UWMain own-hit) excluído; oS confirmado (RE.6)" $?
 "$TCHECK" json66 "$D/pm.json" "$D/d1.prg" > "$D/pj.log" 2>&1
 grep -q "^json ok$" "$D/pj.log"
-check "possible (pós-RE.3) entra nas Location[]; nenhum excluded sem fato" $?
+check "excluded (RE.6) FORA das Location[]; só o confirmed da consultada entra" $?
 
 echo "case 67: RE.3 - herança simples: sem grafo no veredito, classe != consultada é possible"
 # Q4 já tinha rebaixado o alcance por vínculo escrito a possible NOMEADO;
@@ -1830,14 +1830,14 @@ echo "case 67: RE.3 - herança simples: sem grafo no veredito, classe != consult
 # confirmando SÓ pela igualdade de classe declarada.
 grep -q "possible send (receiver class UWCHILD, relation to UWMAIN unknown) in USA67  | oC:Paint()" "$D/pm.log"
 check "filho sem override: possible com o fato do receptor (RE.3)" $?
-grep -q "possible send (receiver class UWOVER, relation to UWMAIN unknown) in USA67  | oO:Paint()" "$D/pm.log"
-check "filho com override: possible na consulta do pai (exclusão por grafo saiu)" $?
+grep -q "excluded send within the declared class graph (dispatches to UWOVER:PAINT) in USA67  | oO:Paint()" "$D/pm.log"
+check "filho com OVERRIDE: excluído por fato (own-hit UWOver sombreia o pai; RE.6)" $?
 grep -q "possible send (receiver class UWCHILD, relation to UWMAIN unknown) in USA67  | oD:Paint()" "$D/pm.log"
-check "receptor declarado do filho: mesmo possible (vínculo não é fato)" $?
+check "filho SEM override herda a consultada: possible (uso real, não exclui)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp UWOver:Paint > po.log 2>&1 )
-grep -q "possible send (receiver class UWCHILD, relation to UWOVER unknown) in USA67  | oC:Paint()" "$D/po.log" && \
+grep -q "excluded send within the declared class graph (dispatches to UWMAIN:PAINT) in USA67  | oC:Paint()" "$D/po.log" && \
    grep -q "confirmed send (receiver class UWOVER via declared types) in USA67  | oO:Paint()" "$D/po.log"
-check "consulta do override: só o receptor do override confirma; filho é possible" $?
+check "consulta do override: filho (herda UWMain) excluído; override confirma (RE.6)" $?
 
 echo "case 68: RE.3 - herança múltipla: sem walk pela ordem escrita, possible com o fato"
 # o walk pela ordem escrita e o teste de descendentes eram leitura do
@@ -1847,11 +1847,11 @@ echo "case 68: RE.3 - herança múltipla: sem walk pela ordem escrita, possible 
 grep -q "possible send (receiver class HMBOTH, relation to HMALPHA unknown) in USA68  | oB:Paint()" "$D/ha.log"
 check "herança múltipla: possible com o fato do receptor (RE.3)" $?
 grep -q "possible send (receiver class HMBETA, relation to HMALPHA unknown) in USA68  | oPb:Paint()" "$D/ha.log"
-check "promessa de outra classe nunca exclui (independe de descendentes)" $?
+check "oPb (HMBeta) NÃO exclui de HMAlpha: descendente HMBoth despacharia p/ HMAlpha (is-a; RE.6)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp HMBeta:Paint > hb.log 2>&1 )
-grep -q "possible send (receiver class HMBOTH, relation to HMBETA unknown) in USA68  | oB:Paint()" "$D/hb.log" && \
+grep -q "excluded send within the declared class graph (dispatches to HMALPHA:PAINT) in USA68  | oB:Paint()" "$D/hb.log" && \
    grep -q "confirmed send (receiver declared AS CLASS HMBETA) in USA68  | oPb:Paint()" "$D/hb.log"
-check "consulta do 2º pai: declarado confirma; HMBoth fica possible" $?
+check "herança múltipla: HMBoth despacha p/ 1º pai (HMAlpha) por FATO -> excluído de HMBeta (RE.6)" $?
 
 echo "case 69: RE.3 - vínculo de fora do projeto: possible com o fato, sem candidato"
 # OPFirst e OPLast convergem no mesmo rótulo honesto: classe conhecida,
@@ -1897,8 +1897,8 @@ grep -q "d1.prg:23: possible method definition (registered under UWMAIN, relatio
    grep -q "d1.prg:13: possible method declaration (registered under UWMAIN, relation to UWCHILD unknown)" "$D/ch.log"
 check "consulta da herdeira: decl/impl do pai vira possible (Q4 - vínculo não prova o alvo)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp OPFirst:Paint > of.log 2>&1 )
-! grep -q "excluded" "$D/of.log"
-check "consultada com cadeia indecidível (fato 9) não exclui NENHUM site" $?
+! grep -q "excluded method declaration\|excluded method definition\|excluded.*declaration (declares\|excluded.*definition (implements" "$D/of.log"
+check "consultada com cadeia indecidível (fato 9): NENHUMA declaração/impl excluída (sends de receptor próprio excluem por fato - RE.6)" $?
 
 }
 
@@ -1943,25 +1943,25 @@ check "homônimo CRUZADO (classe hbclass) excluído da consulta do DSL" $?
 grep -q "m1.prg:23: forge definition Brilho (rig Totem)" "$D/tb.log" && \
    grep -q "m1.prg:30: excluded forge definition (implements IDOLO:BRILHO)" "$D/tb.log"
 check "implementação por colagem do DSL: própria confirmada, homônima excluída" $?
-grep -q "possible send (receiver class FAROL, relation to TOTEM unknown) in USARIG  | oF:Brilho()" "$D/tb.log" && \
+grep -q "excluded send within the declared class graph (dispatches to FAROL:BRILHO) in USARIG  | oF:Brilho()" "$D/tb.log" && \
    grep -q "confirmed send (receiver class TOTEM via declared types) in USARIG  | oT:Brilho()" "$D/tb.log" && \
-   grep -q "possible send (receiver class IDOLO, relation to TOTEM unknown) in USARIG  | oI:Brilho()" "$D/tb.log"
-check "sends: o próprio confirma pelo declarado; homônimos ficam possible (RE.3)" $?
+   grep -q "excluded send within the declared class graph (dispatches to IDOLO:BRILHO) in USARIG  | oI:Brilho()" "$D/tb.log"
+check "sends de DSL: o próprio confirma; homônimos EXCLUÍDOS por own-hit de FATO (RE.6, generalidade)" $?
 "$TCHECK" json72 "$D/tb.json" > "$D/tj.log" 2>&1
 grep -q "^json ok$" "$D/tj.log"
-check "Location[] com os 3 sites do Totem + os possible pós-RE.3" $?
+check "Location[] só com o confirmed do Totem; homônimos excluídos (RE.6) fora" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp Sol:Fulgor > sf.log 2>&1 )
 grep -q "m2.prg:7: dote declaration (amuleto SOL)  | DOTE Fulgor RENDE Sol" "$D/sf.log" && \
    grep -q "m2.prg:11: excluded dote declaration (declares LUA:FULGOR)" "$D/sf.log"
 check "DSL declarativa PURA: declaração própria confirmada, homônima excluída" $?
-grep -q "possible send (receiver class LUA, relation to SOL unknown) in USAAMULETO  | l:Fulgor()" "$D/sf.log" && \
+grep -q "excluded send within the declared class graph (dispatches to LUA:FULGOR) in USAAMULETO  | l:Fulgor()" "$D/sf.log" && \
    grep -q "confirmed send (receiver class SOL via declared types) in USAAMULETO  | s:Fulgor()" "$D/sf.log"
-check "DSL declarativa: declarado confirma o próprio; homônimo é possible (RE.3)" $?
+check "DSL declarativa PURA: próprio confirma; homônimo EXCLUÍDO por own-hit declarado (RE.6)" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp Farol:Brilho > fb.log 2>&1 )
 grep -q "m1.prg:9: method declaration (class FAROL)" "$D/fb.log" && \
    grep -q "m1.prg:19: excluded cog declaration (declares TOTEM:BRILHO)" "$D/fb.log" && \
-   grep -q "possible send (receiver class TOTEM, relation to FAROL unknown) in USARIG  | oT:Brilho()" "$D/fb.log"
-check "consulta espelhada: DECLARAÇÃO homônima segue excluída; send é possible (RE.3)" $?
+   grep -q "excluded send within the declared class graph (dispatches to TOTEM:BRILHO) in USARIG  | oT:Brilho()" "$D/fb.log"
+check "consulta espelhada: declaração E send homônimos EXCLUÍDOS por fato (RE.6)" $?
 # fatia 2 (alinhamento do Diego): a generalidade também é de COMANDOS
 # NOVOS embrulhando classes JÁ EXISTENTES (`#command mybrowse <a> <b> =>
 # tbrowse`) - a instância e o send existem só na EXPANSÃO; o escrito só
@@ -1970,8 +1970,8 @@ check "consulta espelhada: DECLARAÇÃO homônima segue excluída; send é possi
 ( cd "$D" && "$BIN" usages fixhom.hbp Grade:Pintar > gp.log 2>&1 )
 grep -q "confirmed send (receiver class GRADE via declared types) in USAB  | MYPAINT g" "$D/gp.log"
 check "send que SÓ existe na expansão: confirmado no site ESCRITO do comando" $?
-grep -q "possible send (receiver class LOUSA, relation to GRADE unknown) in USAB  | MYPAINT l" "$D/gp.log"
-check "homônimo ATRAVÉS do comando embrulhador: possible com o fato (RE.3)" $?
+grep -q "excluded send within the declared class graph (dispatches to LOUSA:PINTAR) in USAB  | MYPAINT l" "$D/gp.log"
+check "homônimo ATRAVÉS do comando embrulhador: EXCLUÍDO por own-hit de fato (RE.6)" $?
 grep -q "confirmed send (receiver class GRADE via declared types) in USAB  | g:Pintar()" "$D/gp.log"
 check "instância criada NA EXPANSÃO classifica o send escrito depois" $?
 grep -q "possible send (dynamic dispatch, receiver unknown) in USAB  | MYPAINT t" "$D/gp.log"
@@ -1984,8 +1984,8 @@ check "comando sobre classe de FORA do projeto (TBrowse): possible honesto" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp Grade:nT --json gn.json > gn.log 2>&1 )
 grep -q "confirmed send (receiver declared AS CLASS GRADE) in GRADE_NEW  | ::nT := n" "$D/gn.log"
 check "ESCRITA ::nT := n casa e confirma (fato 11 + Self tipado)" $?
-grep -q "possible send (receiver class LOUSA, relation to GRADE unknown) in LOUSA_NEW" "$D/gn.log"
-check "escrita homônima na outra classe: possible com o fato do Self (RE.3)" $?
+grep -q "excluded send within the declared class graph (dispatches to LOUSA:NT) in LOUSA_NEW" "$D/gn.log"
+check "escrita homônima na outra classe: EXCLUÍDA por own-hit do Self de fato (RE.6)" $?
 grep -q "m3.prg:10: var declaration (class GRADE)  | VAR nT INIT 0" "$D/gn.log" && \
    grep -q "m3.prg:23: excluded var declaration (declares LOUSA:NT)" "$D/gn.log"
 check "VAR: site de declaração via lista { } do canal, confirmado/excluído" $?
@@ -2807,8 +2807,8 @@ check "as duas topologias: DECLARE (classe noutro módulo) + _HB_MEMBER avulso (
 check "usages exit 0" $?
 grep -q "c2.prg:32: confirmed send (receiver declared AS CLASS CAIXA) in MAIN  | oC:Soma( 5 )" "$D/u1.log"
 check "site da semente 61 decide por FATO declarado" $?
-grep -q "c2.prg:34: possible send (receiver class OUTRA, relation to CAIXA unknown) in MAIN  | oO:Soma( 2 )" "$D/u1.log"
-check "homônimo NÃO vira exclusão (Rota C sem rota): possible honesto com a relação nomeada" $?
+grep -q "c2.prg:34: excluded send within the declared class graph (dispatches to OUTRA:SOMA) in MAIN  | oO:Soma( 2 )" "$D/u1.log"
+check "homônimo vira EXCLUSÃO por fato (Rota C RECONQUISTADA na RE.6): oO own-hit OUTRA" $?
 echo "-prgflag=-kt" >> "$D/fixmth.hbp"
 ( cd "$D" && "$BIN" usages fixmth.hbp Caixa:Soma > u2.log 2>&1 )
 grep -q "c2.prg:32: guaranteed send (receiver AS CLASS CAIXA imposed by -kt checks) in MAIN" "$D/u2.log"
@@ -2868,8 +2868,8 @@ check "usages exit 0" $?
 grep -q "d1.prg:95: confirmed send (receiver declared AS CLASS NCMAIN) in USA66NC  | oNm:Paint()" "$D/u1.log" && \
    grep -q "d1.prg:96: confirmed send (receiver declared AS CLASS NCSECONDARY) in USA66NC  | oNs:Paint()" "$D/u2.log"
 check "sites da semente 66 decidem por FATO declarado (eram 'via construction chain')" $?
-grep -q "d1.prg:95: possible send (receiver class NCMAIN, relation to NCSECONDARY unknown) in USA66NC" "$D/u2.log"
-check "espelho NÃO vira exclusão (Rota C sem rota): possible honesto - o furo dos homônimos segue aberto" $?
+grep -q "d1.prg:95: excluded send within the declared class graph (dispatches to NCMAIN:PAINT) in USA66NC" "$D/u2.log"
+check "espelho vira EXCLUSÃO por fato: o furo dos homônimos FECHADO (Rota C reconquistada, RE.6)" $?
 echo "-prgflag=-kt" >> "$D/fixdis.hbp"
 ( cd "$D" && "$BIN" usages fixdis.hbp NCMain:Paint > u3.log 2>&1 )
 grep -q "d1.prg:95: guaranteed send (receiver AS CLASS NCMAIN imposed by -kt checks) in USA66NC" "$D/u3.log"
