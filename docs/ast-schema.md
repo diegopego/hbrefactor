@@ -454,6 +454,18 @@ plano da fatia 2 — [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md)):
   ex.: `New` herdado na RTL) e permanece PROMESSA cujo papel é tipar o
   consumidor; a invariante reportável é a da variável anotada no site
   (coberta, RE.2).
+- **W0019 de MÉTODO é condicional — candidato (g) ADOTADO (portão do
+  meio da fatia 2, Diego, 2026-07-09)**: re-declarar método cujo tipo
+  era desconhecido (`pMethod->cType == ' '`, hbmain.c:1193) NÃO warna —
+  o merge projetado ("Last Declaration override", hbmain.c:1178) roda
+  em silêncio e o membro ganha o tipo: `_HB_MEMBER <M>() AS CLASS <C>`
+  repetido é COMPLEMENTO (dump carrega o tipo; execução `-kt` o impõe
+  no store da local anotada — `BASE/3012`). Conflito real (tipo já
+  conhecido) continua W0019; W0019 de FUNÇÃO (hbmain.c:1242) e de
+  CLASSE (hbmain.c:1104) intactos. Resíduo declarado: dup
+  sem-tipo→sem-tipo também silencia (nenhuma informação perdida).
+  Probes pg1-pg5b + re-medição em
+  [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md) § F2.1.
 
 ### TypeOf — propagação na ferramenta (regra FECHADA; extensões B7 e B7b pelos portões de 2026-07-08)
 

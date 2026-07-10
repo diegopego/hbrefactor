@@ -245,6 +245,40 @@ conhecido → tipo diferente) continua warnando. Adoção no portão do
 meio, junto com o (f). Até lá, os sites dessa topologia são
 classificados no relatório como "nível 2-BLOQUEADO (candidato g)".
 
+**PROTÓTIPO (g) EXECUTADO (2026-07-09, abertura do portão "(g)
+primeiro"; core editado e NÃO commitado — commit aguarda adoção):**
+condição em hbmain.c:1174-1180 — o W0019 de MÉTODO só dispara quando o
+tipo anterior já era conhecido (`pMethod->cType != ' '`); o merge
+projetado (última declaração sobrepõe) segue intacto. Nota mecânica: o
+site do warning roda ANTES de o `AsType` novo ser parseado (harbour.y
+:1269 chama `hb_compMethodAdd` no nome), então a condição só pode
+consultar o estado antigo — "tipo ausente → silencia" é o desenho
+implementável de uma linha. Probes pg1-pg5b (scratchpad; protocolo
+`-w3 -es2`, hbmk2 `-prgflag=-kt`, execução real):
+
+| Ponta | Resultado |
+|---|---|
+| complemento (sem tipo → `AS CLASS`) | SILENCIOSO; dump `SOMA S MOEDA`/`PEGA S MOEDA`; send encadeado roda -kt (pg1) |
+| imposição sob -kt | mentira no retorno aborta `Error BASE/3012 declared type check failed: expected S:FORNO, got N: MAIN:OX` no store da local anotada (pg2) |
+| conflito real (tipo conhecido → outro) | W0019 mantido; sob -es2 falha (pg3) |
+| resíduo declarado | dup sem-tipo→sem-tipo agora SILENCIA (antes W0019) — nenhuma informação nova nem perdida (pg4) |
+| vizinhos intactos | W0019 de FUNÇÃO (hbmain.c:1242) e de CLASSE (hbmain.c:1104) inalterados (pg5a/pg5b) |
+
+Re-medição com o core@(g):
+- **suíte 622/0** (testes assertam saída exata — nenhum baseline se
+  moveu); hbmk2 e a ferramenta relinkados (ambos embutem libhbcplr —
+  o link estático não rastreia a lib: relink manual, wart de build);
+- **fixb7b (clone)** com os DOIS one-liners exatamente como o
+  relatório os emite: compila limpo, roda sob -kt com a MESMA saída
+  do fixture original (declaração = zero pcode), re-annotate
+  `metodos-bloqueados-g 2→0`;
+- **hbhttpd (clone)** com os 18 one-liners inseridos pela regra de
+  posição (14 classes em core/log/widgets): build `-w3 -es2` LIMPO,
+  re-annotate `metodos-bloqueados-g 18→0`; honestidade: nenhuma LOCAL
+  sobe por (g) sozinho (nível1=7/nível2=0 inalterados) — o ganho de
+  locais vem do ciclo completo do estágio 2 (New + fábricas + (g)
+  na re-análise iterativa).
+
 Pendente da etapa: **(f)** — protótipo ADIADO para DEPOIS do F2.3
 (decisão de sequência, 2026-07-09): o relatório de alcance deve medir o
 core COMO ESTÁ; o protótipo do New implícito entra como coluna-delta na
@@ -303,6 +337,9 @@ DO MEIO:**
 
 Todas as sementes de Rota A/B fecham por nível 2; as de send encadeado
 (caso 86) dependem do candidato (g). Nenhuma exigiu confiar em `via`.
+*(Atualização pós-portão: o protótipo do (g) fecha as duas linhas
+"(g)-BLOQUEADO" acima — prova no clone do fixb7b, ver o bloco
+"PROTÓTIPO (g) EXECUTADO" em F2.1.)*
 
 *Corpus real (work/hbhttpd, 1,2 s):* 322 locais varridas → nível1=7,
 nível2=0, nível3=1, kind-fora=30, **sem-prova=284** (multi-write/

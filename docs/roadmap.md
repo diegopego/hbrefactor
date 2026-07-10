@@ -292,9 +292,17 @@ CLI — a máquina dormente REVIVEU por `B7Ctx` e o W0034 morreu; suíte
 M-annotate no limites-e-alavancas.md: TODAS as sementes Rota A/B
 fecham por nível 2; caso 86 depende do candidato (g); corpus hbhttpd
 = 13 fábricas declaráveis + 18 métodos presos no (g).
-**== PORTÃO DO MEIO (Diego): examinar a tabela; decidir candidatos de
-core (f) New implícito / (g) merge silencioso; abrir F2.4 (edição +
-extensão) ==**
+**PORTÃO DO MEIO DECIDIDO (Diego, 2026-07-09, mesma sessão)**:
+candidato **(g) ADOTADO** — protótipo executado e provado nas seis
+pontas (complemento silencioso; conflito real segue W0019; vizinhos
+função/classe intactos; imposição -kt no store; resíduo declarado;
+suíte 622/0 com o core@(g)) e re-medição nos clones: fixb7b
+`metodos-bloqueados-g 2→0` com execução -kt byte-igual, hbhttpd
+`18→0` com build limpo — bloco "PROTÓTIPO (g) EXECUTADO" no plano
+§ F2.1 e fato novo no ast-schema (§ FAZ/NÃO FAZ, W0019 condicional);
+commit no core autorizado. Candidato **(f) ADIADO** (não bloqueia
+mais nenhuma semente). **F2.4 ABERTA** (edição + casos por semente +
+extensão VSCode) — em execução.
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a
