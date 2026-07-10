@@ -122,16 +122,21 @@ com registro), K6 FORA. Caso 88 re-baselinado como matriz por FATO
 `guaranteed`; site 5 era INESCREVÍVEL antes do A6). Zero impacto
 1085/1085 (+3 = o próprio A6 no compilador base); suíte **700/0**
 byte-idêntica paralelo × `JOBS=1`; lexdiff limpo. Commits do core sob
-autorização. **RE.6 — portão de EXECUÇÃO aberto pelo Diego (2026-07-10,
-D1-D6 como recomendados); F6.1 ENTREGUE + ZERO IMPACTO PROVADO:
-[spec-re6-parentesco-declarado.md](spec-re6-parentesco-declarado.md)**
-§ Executado — canal `_HB_SUPER` no core (léxico+gramática 0-conflitos+
-hbclass.ch, irmão de `_HB_CLASS`/`_HB_MEMBER`, pai posicionado prov `s`;
-`.hrb` 356/0 byte-idêntico; suíte **750/0**; lexdiff 0; lição hbmk2 =
-2º binário que embute o compilador). F6.2 (consumidor: exclusão de SEND
-por fato de parentesco) + F6.3 (suíte/extensão) pendentes; commits do
-core sob portão. Parentesco DECLARADO reconquista a exclusão de SEND
-(furo dos homônimos, caso 66) sobre arestas de FATO:
+autorização. **RE.6 — F6.1+F6.2+F6.3 ENTREGUES (2026-07-10, D1-D6 como
+recomendados): o FURO DOS HOMÔNIMOS (caso 66, o caso original do Diego)
+FECHADO por FATO.**
+[spec-re6-parentesco-declarado.md](spec-re6-parentesco-declarado.md)
+§ Executado — F6.1: canal `_HB_SUPER` no core (léxico+gramática
+0-conflitos+hbclass.ch, pai posicionado prov `s`; `.hrb` 356/0
+byte-idêntico; lição hbmk2 = 2º binário que embute o compilador,
+commit `52ca3e0b6f`). F6.2: schema `ast-10` (`5a9ba73f91`) + consumidor
+(`ClassSuperFacts`/`ResolveDispatchSuper`/`KinshipExcludes`, exclusão de
+send por parentesco de FATO com degrade honesto sob is-a). F6.3:
+re-baseline dos 16 asserts da Rota C + generalidade adversarial (caso
+104, DSL inventada declara herança só via `_HB_SUPER`) + CHANGELOG;
+suíte **757/0**, lexdiff 0. Commit consumidor+re-baseline `6df5c50`;
+generalidade+CHANGELOG sob portão. Parentesco DECLARADO reconquistou a
+exclusão de SEND sobre arestas de FATO:
 **[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
 — retomada de sessão COMEÇA por lá. Registro narrativo da sessão
 2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no

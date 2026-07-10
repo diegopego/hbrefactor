@@ -143,6 +143,13 @@ freshhom() { # freshhom <case-name> -> fixture for DSL homonym generality (B4f-3
    echo "$d"
 }
 
+freshkin() { # freshkin <case-name> -> fixture da generalidade do parentesco (RE.6/F6.3)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixkin/*.prg "$HERE"/fixkin/*.hbp "$HERE"/fixkin/*.ch "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3228,7 +3235,33 @@ grep -q "all.hbp$" "$D/m3.log"
 check "descoberta de b.prg: container all.hbp entre os donos" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103"
+unit_104() {
+echo "case 104: RE.6/F6.3 - GENERALIDADE do parentesco: DSL inventada declara herança via _HB_SUPER"
+# O parentesco de FATO (_HB_SUPER) não é do hbclass - é da LINGUAGEM. Esta
+# DSL (kin.ch: SPROUT/OFFOF/BUD, vocabulário próprio) declara o pai SÓ pelo
+# canal _HB_SUPER: o nome do pai vai como STRING para KinMake, NUNCA como
+# identificador na linha da função - a leitura por-forma do Q4 não o alcança.
+# Kid HERDA Show de Base (sem sobrescrever); Rogue tem Show PRÓPRIO (homônimo
+# sem parentesco). Se a exclusão por herança vale aqui, vale por FATO.
+D=$(freshkin case104)
+"$HB_BIN/harbour" "$D/k1.prg" -n -q0 -w3 -es2 -s -I"$D" -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixture do caso 104 clean under -w3 -es2" $?
+( cd "$D" && "$BIN" usages fixkin.hbp Base:Show > b.log 2>&1 )
+check "usages Base:Show exit 0" $?
+grep -q "k1.prg:34: possible send (receiver class KID, relation to BASE unknown) in USAKIN  | oKid:Show()" "$D/b.log"
+check "oKid HERDA Show de Base (via _HB_SUPER da DSL): uso REAL, NÃO exclui" $?
+grep -q "k1.prg:35: excluded send within the declared class graph (dispatches to ROGUE:SHOW) in USAKIN  | oRogue:Show()" "$D/b.log"
+check "oRogue (own-hit homônimo, sem parentesco): excluído por fato" $?
+( cd "$D" && "$BIN" usages fixkin.hbp Rogue:Show > r.log 2>&1 )
+grep -q "k1.prg:34: excluded send within the declared class graph (dispatches to BASE:SHOW) in USAKIN  | oKid:Show()" "$D/r.log"
+check "PROVA DO CANAL: oKid despacha p/ BASE:SHOW pelo _HB_SUPER da DSL -> excluído de Rogue:Show" $?
+grep -q "k1.prg:35: confirmed send (receiver declared AS CLASS ROGUE) in USAKIN  | oRogue:Show()" "$D/r.log"
+check "consulta espelhada: oRogue confirma pelo próprio declarado" $?
+! grep -qiwE "sprout|offof|endsprout|kinmake" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona palavra da DSL kin (régua do caso 64)" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

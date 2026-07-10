@@ -5,6 +5,59 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — `usages Classe:Método` deixa de mostrar homônimos de outras classes
+
+### O problema de todo dia
+
+Duas classes do seu projeto têm um método de mesmo nome — `Paint()` na
+`Janela` e `Paint()` no `Relatorio`, `Soma()` na `Conta` e na `Outra`.
+Você pede as referências de `Janela:Paint` (pelo comando ou pelo "find
+all references" da extensão) e no meio dos acertos legítimos aparecem
+`oRel:Paint()`, `oOutra:Soma()` — chamadas que **nunca** são da classe
+que você consultou, só têm o nome igual. Ruído em toda busca, e perigoso
+num rename.
+
+### O que mudou
+
+Agora, quando a ferramenta **prova** que o send vai para o método de
+OUTRA classe, ela o **exclui** do resultado — e a prova é FATO, não
+chute. O compilador passou a registrar no dump **quem herda de quem**
+(um canal novo de parentesco). Com esse fato, a ferramenta resolve o
+despacho pela regra do próprio Harbour (método próprio vence o herdado;
+com herança múltipla, o primeiro pai da cláusula vence) e sela a
+exclusão:
+
+```
+// Janela e Relatorio, ambas com Paint() próprio, sem parentesco
+oJ := Janela():New()
+oR := Relatorio():New()
+oJ:Paint()   // referência de Janela:Paint
+oR:Paint()   // ANTES: aparecia como "possível"; AGORA: EXCLUÍDO por fato
+```
+
+O relatório nomeia o motivo: `excluded send within the declared class
+graph (dispatches to RELATORIO:PAINT)`. Na extensão, o "find all
+references" simplesmente **não lista** mais esses sites.
+
+Continua distinguindo o que é uso real: se `oFilho:Paint()` e `Filho`
+**herda** `Paint` de `Janela` (sem sobrescrever), esse send É referência
+de `Janela:Paint` — segue no resultado. Só o que sobrescreve, ou é de
+classe sem parentesco com a consultada, sai.
+
+### O que a ferramenta NUNCA faz aqui
+
+- **Não exclui por chute**: só quando o tipo do receptor é conhecido
+  (declarado, ou imposto por `-kt`) E a cadeia de herança está toda no
+  projeto. Receptor sem tipo, pai de fora do projeto, ou classe montada
+  em runtime → continua **`possible`** (honesto), nunca excluído.
+- **Não confunde herança com homônimo**: um filho que herda o método da
+  classe consultada continua sendo referência dela.
+- Quem já usa `-kt` ganha a exclusão com a força do cheque de runtime
+  por trás; sem `-kt`, vale a promessa do tipo declarado (o de sempre).
+
+O "como" interno (RE.6, canal `_HB_SUPER`, schema `ast-10`) vive na
+[spec](docs/spec-re6-parentesco-declarado.md).
+
 ## 2026-07-10 — `.hbp` complexo (container, sub-projetos) reconhecido por inteiro
 
 ### O problema de todo dia

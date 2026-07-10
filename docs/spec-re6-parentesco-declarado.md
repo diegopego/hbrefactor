@@ -357,13 +357,23 @@ descendente que sequestra → possible (68 ha.log), DSL por own-hit (72).
 **F6.3 re-baseline ENTREGUE** (drift PRÉ-existente apresentado e
 autorizado pelo Diego, 2026-07-10): 16 asserts dos casos 66/67/68/70/72/
 92/94 e os validadores `Json66`/`Json72` do tcheck migrados para o rótulo
-de FATO (a Rota C do catálogo RECONQUISTADA). Suíte **750/0** byte-idêntica;
-`make lexdiff` 0 divergências reais. **F6.3 restante (pendente)**: fixture
-DSL não-espelho que declara PARENTESCO via `_HB_SUPER` próprio (generalidade
-do canal de herança além do hbclass - own-hit já é genérico no caso 72);
-venenos dedicados (pai que escapa / descendente já cobertos por 69/68);
-extensão (o rótulo flui no texto do `usages`); CHANGELOG. Commits: core
-`5a9ba73f91` (ast-10); consumidor+re-baseline sob portão.
+de FATO (a Rota C do catálogo RECONQUISTADA).
+
+**F6.3 GENERALIDADE ENTREGUE (caso 104)**: fixture `fixkin` (DSL inventada
+`kin.ch` - `SPROUT`/`OFFOF`/`BUD`, vocabulário próprio) declara o
+parentesco SÓ pelo `_HB_SUPER` - o nome do pai vai como STRING para
+`KinMake`, NUNCA como identificador na linha da função, então a leitura
+por-forma do Q4 não o alcança. Prova adversarial do canal: na consulta
+`Rogue:Show`, `oKid:Show()` sai `excluded (dispatches to BASE:SHOW)` SÓ
+porque o `_HB_SUPER Base` da DSL prova a herança (sem ele, super vazio →
+possible); e `oKid` herdando de `Base` é uso REAL na consulta `Base:Show`
+(não exclui). hbclass é só o PRIMEIRO cliente do canal. Extensão: sem
+mudança (o `usages --json` já deixa o excluded fora das `Location[]`,
+flag `.T.` - o "find references" não lista). Venenos cobertos: pai que
+escapa (69), descendente que sequestra (68 ha.log). CHANGELOG atualizado.
+Suíte **757/0**; `make lexdiff` 0 divergências reais. Commits: core
+`52ca3e0b6f` (F6.1) + `5a9ba73f91` (ast-10); consumidor+re-baseline
+`6df5c50`; generalidade (fixkin+caso 104)+CHANGELOG sob portão.
 
 ## Fora do escopo
 
