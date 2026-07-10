@@ -157,3 +157,23 @@ runtime"*. Mapeamento honesto sobre os fatos já auditados:
   REGRA DO FATO aceita segue o decidido aqui: alimentar FATO imposto
   (ex.: sugerir anotações que o `-kt` passa a checar — o ciclo
   virtuoso), jamais veredito estático.
+
+Refinamento (Diego, mesma data): aumentar o lado IMPOSTO tem duas
+fontes — entendimento profundo da arquitetura (lexer/parser/pp/
+macrolex; foi o motor de (g), prólogo de bloco, chk) e ENGENHOSIDADE
+com ferramentas do core: compilar/executar com `hb_compileFromBuf`,
+pp ou debug os trechos que só rodariam em runtime. Candidato nomeado
+que sai disso: **execução controlada como sugeridora do
+materializador** — rodar em sandbox só o código de REGISTRO de
+classes de runtime (top-level, tipicamente incondicional), ler a
+tabela viva (`hb_clsName`/seletores) e materializar os `DECLARE`
+correspondentes, que o `-kt` impõe dali em diante. A propriedade que
+o viabiliza sob a REGRA DO FATO: **a imposição lavra a evidência
+condicional** — o sandbox só SUGERE; o veredito é do cheque imposto
+em toda execução real (retrato errado → BASE/3012 nomeando, como o
+caso 90). Limites a espec-ar se abrir: sandbox/efeitos colaterais,
+critério de seleção do que rodar (parente do problema da spec-b8),
+relato com proveniência ("materializado a partir de execução de X").
+Encaixe natural: fatia da B9 (segunda FONTE da sugeridora), não fase
+nova. Alvo medido: o balde "classes de runtime" da M-cov (DSLs
+__clsNew-puras; cls*cast, 2.260 sites).
