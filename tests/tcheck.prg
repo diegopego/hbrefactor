@@ -23,6 +23,7 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "json72"  ; lOk := Json72( cA1 )            ; EXIT
    CASE "b4g82"   ; lOk := B4g82( cA1, cA2, cA3 )   ; EXIT
    CASE "pof83"   ; lOk := Pof83( cA1 )             ; EXIT
+   CASE "rtr101"  ; lOk := Rtr101( cA1 )            ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
       lOk := .F.
@@ -596,6 +597,65 @@ STATIC FUNCTION Pof83( cJson )
    IF !( xVal[ 1 ] == "p1.hbp" .AND. xVal[ 2 ] == "p2.hbp" )
       RETURN Fail( "pof83: donos errados: " + hb_jsonEncode( xVal ) )
    ENDIF
+   OutStd( "json ok" + hb_eol() )
+
+   RETURN .T.
+
+// unidade 101: conteúdo PROFUNDO do retrato rtr-1 do exec-registry (B9
+// fatia 4) - proveniência por chamada, seletores com tipo (INLINE=3,
+// self-cast SUPER=5 - o padrão do cls*cast), failed/ran/skipped honestos
+// e a VM (baseline por nome: programa vazio = só ERROR) separada
+STATIC FUNCTION Rtr101( cJson )
+
+   LOCAL hSnap := JLoad( cJson ), hCls, hBronze, hForno, aSel
+
+   IF ! HB_ISHASH( hSnap )
+      RETURN Fail( "rtr101: json inválido" )
+   ENDIF
+   IF !( hb_HGetDef( hSnap, "schema", "" ) == "rtr-1" )
+      RETURN Fail( "rtr101: schema rtr-1" )
+   ENDIF
+   IF !( hSnap[ "stamp" ] == "fixo" )
+      RETURN Fail( "rtr101: carimbo vem de FORA (determinismo)" )
+   ENDIF
+   IF !( Len( hSnap[ "vm" ] ) == 1 .AND. hSnap[ "vm" ][ 1 ] == "ERROR" )
+      RETURN Fail( "rtr101: VM (baseline ERROR) não separada" )
+   ENDIF
+   IF !( Len( hSnap[ "classes" ] ) == 3 .AND. ;
+         hSnap[ "classes" ][ 1 ][ "name" ] == "FORNO_BASE" .AND. ;
+         hSnap[ "classes" ][ 2 ][ "name" ] == "METAL_ACO" .AND. ;
+         hSnap[ "classes" ][ 3 ][ "name" ] == "METAL_BRONZE" )
+      RETURN Fail( "rtr101: classes[] fora da ordem/conteúdo esperado" )
+   ENDIF
+   hForno := hSnap[ "classes" ][ 1 ]
+   hBronze := hSnap[ "classes" ][ 3 ]
+   IF !( hForno[ "from" ] == "startup" )
+      RETURN Fail( "rtr101: FORNO_BASE sem proveniência startup" )
+   ENDIF
+   IF !( hBronze[ "from" ] == "FORJA_BRONZE" )
+      RETURN Fail( "rtr101: METAL_BRONZE sem proveniência da chamada" )
+   ENDIF
+   IF ! Empty( hBronze[ "parents" ] )
+      RETURN Fail( "rtr101: METAL_BRONZE com pais inesperados" )
+   ENDIF
+   aSel := hBronze[ "sels" ]
+   IF !( Len( aSel ) == 3 .AND. ;
+         aSel[ 1 ][ "name" ] == "FUNDE" .AND. aSel[ 1 ][ "type" ] == 3 .AND. ;
+         aSel[ 2 ][ "name" ] == "METAL_BRONZE" .AND. aSel[ 2 ][ "type" ] == 5 .AND. ;
+         aSel[ 3 ][ "name" ] == "VERGA" .AND. aSel[ 3 ][ "type" ] == 3 )
+      RETURN Fail( "rtr101: seletores de METAL_BRONZE (INLINE=3 + self-cast SUPER=5): " + ;
+                   hb_jsonEncode( aSel ) )
+   ENDIF
+   IF !( Len( hSnap[ "ran" ] ) == 2 .AND. Len( hSnap[ "failed" ] ) == 1 .AND. ;
+         hSnap[ "failed" ][ 1 ] == "MONTAMETAL" .AND. Empty( hSnap[ "skipped" ] ) )
+      RETURN Fail( "rtr101: ran/failed/skipped fora do esperado" )
+   ENDIF
+   FOR EACH hCls IN hSnap[ "classes" ]
+      IF hCls:__enumIndex() > 1 .AND. ;
+         hSnap[ "classes" ][ hCls:__enumIndex() - 1 ][ "name" ] > hCls[ "name" ]
+         RETURN Fail( "rtr101: classes[] fora de ordem (determinismo)" )
+      ENDIF
+   NEXT
    OutStd( "json ok" + hb_eol() )
 
    RETURN .T.

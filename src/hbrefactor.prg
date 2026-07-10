@@ -64,6 +64,8 @@ PROCEDURE Main()
       nExit := ProjectsOf( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "annotate"
       nExit := Annotate( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "exec-registry"
+      nExit := ExecRegistry( aArgs )
    OTHERWISE
       Usage()
       nExit := EXIT_USAGE
@@ -99,6 +101,9 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor annotate <projeto> [<arq[:função]>] [--json <out>] [--apply]" + hb_eol() )
    OutStd( "                                     (escada de anotações; RELATÓRIO por padrão, --apply escreve" + hb_eol() )
    OutStd( "                                      DECLAREs + AS CLASS com verificação padrão-ouro e rollback)" + hb_eol() )
+   OutStd( "  hbrefactor exec-registry <projeto> [--out <arq.astr.json>] [--stamp <c>] [--run <F1,F2>]" + hb_eol() )
+   OutStd( "                                     (EXECUTA funções de registro de classes em sandbox e grava o" + hb_eol() )
+   OutStd( "                                      retrato da tabela viva; o snapshot SUGERE, o -kt impõe)" + hb_eol() )
    OutStd( "  <projeto> = qualquer alvo que o hbmk2 aceite (.hbp, .hbc com sources=," + hb_eol() )
    OutStd( "              lista de .prg separada por vírgula ou espaço)" + hb_eol() )
 
@@ -7512,6 +7517,313 @@ STATIC FUNCTION AnnChkLine( cText )
    NEXT
 
    RETURN ""
+
+// ---------------------------------------------------------------------------
+// B9 fatia 4 (F4.1) - execução controlada como 2ª FONTE da sugeridora
+// (spec-b9-fatia4-execucao-controlada.md, portão aberto 2026-07-10, D1-D6
+// nas recomendações). Roda em sandbox SÓ funções de registro de classes
+// (driver com entry próprio via -main=; a barra de contenção é a MESMA já
+// praticada pelo AnnKtRun: subprocess + timeout + GT:CGI + workdir temp) e
+// grava o retrato da tabela viva (.astr.json, schema rtr-1) com
+// proveniência por chamada. O snapshot SUGERE; o veredito é sempre do
+// cheque imposto (-kt) em execução real - a imposição SELA a evidência
+// condicional. Seleção 100% fato do dump (D2): class functions (clsmap) +
+// funções cujo calls[] contém primitiva __CLS* + lista manual --run;
+// MAIN (entry do app) e STATICs ficam de fora COM RELATO.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION ExecRegistry( aArgs )
+
+   LOCAL cSpec, cOut := "", cStamp := "", cRun := "", cWhy := "", nI
+   LOCAL hProj, cTmp, hLoad, hSel, hDrv
+
+   IF Len( aArgs ) < 2
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cSpec := aArgs[ 2 ]
+   FOR nI := 3 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--out" .AND. nI < Len( aArgs )
+         cOut := aArgs[ ++nI ]
+      CASE Lower( aArgs[ nI ] ) == "--stamp" .AND. nI < Len( aArgs )
+         cStamp := aArgs[ ++nI ]
+      CASE Lower( aArgs[ nI ] ) == "--run" .AND. nI < Len( aArgs )
+         cRun := aArgs[ ++nI ]
+      OTHERWISE
+         Usage()
+         RETURN EXIT_USAGE
+      ENDCASE
+   NEXT
+   IF Empty( cOut )
+      cOut := hb_FNameName( hb_ATokens( StrTran( cSpec, ",", " " ), " " )[ 1 ] ) + ;
+              ".astr.json"
+   ENDIF
+
+   hProj := LoadProject( cSpec )
+   IF hProj == NIL
+      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   hLoad := AnnLoad( hProj, cTmp )
+   IF ! HB_ISHASH( hLoad )
+      RETURN Refuse( "o projeto não compila / dumps ast ausentes (harbour com -x " + ;
+                     "do branch feature/compiler-ast-dump) - corrija o build primeiro" )
+   ENDIF
+
+   hSel := RegSelect( hLoad, cRun )
+   hDrv := RegDriverRun( hProj, cSpec, cTmp, hSel[ "run" ], @cWhy )
+   IF hDrv == NIL
+      RETURN Refuse( cWhy )
+   ENDIF
+
+   RETURN RegSnapWrite( hDrv, hSel, cSpec, cStamp, cOut )
+
+// seleção do que rodar (D2) - 100% fato do dump, lista ENUMERADA e relatada:
+// class functions (clsmap, nasceram de expansão) + funções cujo calls[]
+// contém primitiva do sistema de classes (prefixo __CLS, nomenclatura do
+// core) + lista manual --run. INIT PROCEDURE (sufixo $) roda sozinha antes
+// do entry - não entra na lista de chamadas. MAIN nunca é executado (é o
+// app inteiro); STATIC não tem símbolo dinâmico. Ambos saem no relato
+STATIC FUNCTION RegSelect( hLoad, cRun )
+
+   LOCAL hAsts := hLoad[ "asts" ], hInter := hLoad[ "inter" ]
+   LOCAL aRun := {}, aSkip := {}, hSeen := { => }, hByName := { => }
+   LOCAL cPath, hAst, hFunc, hCall, cUpF, lPick, cName
+
+   FOR EACH cPath IN hb_HKeys( hAsts )
+      hAst := hAsts[ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         cUpF := Upper( hFunc[ "name" ] )
+         IF ! hb_HHasKey( hByName, cUpF )
+            hByName[ cUpF ] := hFunc
+         ENDIF
+         IF Right( cUpF, 1 ) == "$"
+            LOOP                 // INIT PROCEDURE: roda sozinha (startup)
+         ENDIF
+         lPick := hb_HHasKey( hInter[ "clsmap" ], cUpF )
+         IF ! lPick
+            FOR EACH hCall IN hFunc[ "calls" ]
+               IF hb_LeftEq( hCall[ "sym" ], "__CLS" )
+                  lPick := .T.
+                  EXIT
+               ENDIF
+            NEXT
+         ENDIF
+         IF ! lPick .OR. hb_HHasKey( hSeen, cUpF )
+            LOOP
+         ENDIF
+         hSeen[ cUpF ] := .T.
+         DO CASE
+         CASE cUpF == "MAIN"
+            AAdd( aSkip, { "name" => cUpF, ;
+                           "why" => "entry do app - nunca executado" } )
+         CASE hFunc[ "static" ]
+            AAdd( aSkip, { "name" => cUpF, ;
+                           "why" => "STATIC - sem símbolo dinâmico para chamada" } )
+         OTHERWISE
+            AAdd( aRun, cUpF )
+         ENDCASE
+      NEXT
+   NEXT
+
+   // composição manual (--run): o usuário conhece o próprio bootstrap
+   FOR EACH cName IN hb_ATokens( cRun, "," )
+      cUpF := Upper( AllTrim( cName ) )
+      IF Empty( cUpF ) .OR. hb_HHasKey( hSeen, cUpF ) .AND. AScan( aRun, cUpF ) > 0
+         LOOP
+      ENDIF
+      DO CASE
+      CASE ! hb_HHasKey( hByName, cUpF )
+         AAdd( aSkip, { "name" => cUpF, ;
+                        "why" => "--run: não encontrada no projeto" } )
+      CASE hByName[ cUpF ][ "static" ]
+         AAdd( aSkip, { "name" => cUpF, ;
+                        "why" => "--run: STATIC - sem símbolo dinâmico" } )
+      OTHERWISE
+         IF AScan( aRun, cUpF ) == 0
+            AAdd( aRun, cUpF )
+         ENDIF
+      ENDCASE
+   NEXT
+   ASort( aRun )
+
+   RETURN { "run" => aRun, "skip" => aSkip }
+
+// gera o driver (entry HBREF_REGDRV), compila JUNTO com os módulos do
+// projeto (hbmk2 -main=, D1 - mesmas flags/includes do .hbp) e roda com a
+// contenção do AnnKtRun (D3). Devolve o hash do retrato ou NIL com o porquê
+STATIC FUNCTION RegDriverRun( hProj, cSpec, cTmp, aRun, cWhy )
+
+   LOCAL cDrv := hb_DirSepAdd( cTmp ) + "hbrefregd.prg"
+   LOCAL cJson := hb_DirSepAdd( cTmp ) + "hbrefregd.json"
+   LOCAL cExe := hb_DirSepAdd( cTmp ) + "hbrefregd"
+   LOCAL cWork := hb_DirSepAdd( cTmp ) + "regwork"
+   LOCAL cOut := "", cErr := "", hDrv, nRet
+
+   HB_SYMBOL_UNUSED( hProj )
+   cWhy := ""
+   hb_DirBuild( cWork )
+   hb_MemoWrit( cDrv, RegDriverSrc( aRun ) )
+   // -hbexe ANTES do projeto: o retrato precisa de um PROCESSO e o
+   // primeiro seletor de alvo vence (l_lTargetSelected, hbmk2.prg:2596) -
+   // projeto-biblioteca (-hblib) vira executável com o driver; inócuo
+   // para projeto já-exe
+   IF hb_processRun( HbMk2Bin() + " -hbexe " + StrTran( cSpec, ",", " " ) + " " + ;
+                     cDrv + " -q0 -gtcgi -main=HBREF_REGDRV -workdir=" + cWork + ;
+                     " -o" + cExe,, @cOut, @cErr ) != 0
+      cWhy := "o projeto (com o driver de registro) não compila: " + ;
+              ErrLines( cOut + cErr )
+      RETURN NIL
+   ENDIF
+   cOut := cErr := ""
+   nRet := hb_processRun( "timeout 30 " + cExe + " " + cJson + " //GT:CGI",, ;
+                          @cOut, @cErr )
+   IF nRet != 0
+      cWhy := "a execução do driver de registro terminou com código " + ;
+              hb_ntos( nRet ) + iif( Empty( ErrLines( cOut + cErr ) ), "", ;
+              ": " + ErrLines( cOut + cErr ) )
+      RETURN NIL
+   ENDIF
+   hDrv := hb_jsonDecode( hb_MemoRead( cJson ) )
+   IF ! HB_ISHASH( hDrv )
+      cWhy := "o driver de registro não produziu o retrato (json ausente/inválido)"
+      RETURN NIL
+   ENDIF
+
+   RETURN hDrv
+
+// fonte do driver: retrato da tabela ANTES de qualquer chamada (classes de
+// startup - INITs que já rodaram + VM), depois cada função da lista sob
+// errorBlock+SEQUENCE (função que quebra vira "failed", nunca derruba a
+// colheita; NUNCA inventamos argumentos). Proveniência = delta da tabela
+// entre chamadas. Colheita em STATICs + flush em EXIT PROCEDURE: função
+// que dá QUIT (saída LIMPA no meio da lista - aconteceu no xhb) não
+// engole o retrato; quem abortou sai nomeado em "aborted". Ordenação por
+// nome (determinismo); carimbo vem de FORA
+STATIC FUNCTION RegDriverSrc( aRun )
+
+   LOCAL cSrc, cName
+
+   cSrc := "// driver GERADO pelo hbrefactor exec-registry (B9 fatia 4) - temporário" + hb_eol() + ;
+           "STATIC s_aCls := {}, s_aRan := {}, s_aFail := {}, s_aStart := {}" + hb_eol() + ;
+           "STATIC s_cOut := " + Chr( 34 ) + Chr( 34 ) + ", s_cCur := " + Chr( 34 ) + Chr( 34 ) + ", s_lDone := .F." + hb_eol() + hb_eol() + ;
+           "PROCEDURE HBREF_REGDRV( cOut )" + hb_eol() + ;
+           "   LOCAL aRun := {}, cName, bOld, lFail, nBefore, nK" + hb_eol() + ;
+           "   s_cOut := cOut" + hb_eol()
+   FOR EACH cName IN aRun
+      cSrc += "   AAdd( aRun, " + Chr( 34 ) + cName + Chr( 34 ) + " )" + hb_eol()
+   NEXT
+   cSrc += "   FOR nK := 1 TO __clsCntClasses()" + hb_eol() + ;
+           "      AAdd( s_aStart, __className( nK ) )" + hb_eol() + ;
+           "      AAdd( s_aCls, HbRefClsSnap( nK, " + Chr( 34 ) + "startup" + Chr( 34 ) + " ) )" + hb_eol() + ;
+           "   NEXT" + hb_eol() + ;
+           "   FOR EACH cName IN aRun" + hb_eol() + ;
+           "      nBefore := __clsCntClasses()" + hb_eol() + ;
+           "      s_cCur := cName" + hb_eol() + ;
+           "      lFail := .F." + hb_eol() + ;
+           "      bOld := ErrorBlock( {| oErr | Break( oErr ) } )" + hb_eol() + ;
+           "      BEGIN SEQUENCE" + hb_eol() + ;
+           "         hb_ExecFromArray( cName )" + hb_eol() + ;
+           "      RECOVER" + hb_eol() + ;
+           "         lFail := .T." + hb_eol() + ;
+           "      END SEQUENCE" + hb_eol() + ;
+           "      ErrorBlock( bOld )" + hb_eol() + ;
+           "      s_cCur := " + Chr( 34 ) + Chr( 34 ) + hb_eol() + ;
+           "      AAdd( iif( lFail, s_aFail, s_aRan ), cName )" + hb_eol() + ;
+           "      FOR nK := nBefore + 1 TO __clsCntClasses()" + hb_eol() + ;
+           "         AAdd( s_aCls, HbRefClsSnap( nK, cName ) )" + hb_eol() + ;
+           "      NEXT" + hb_eol() + ;
+           "   NEXT" + hb_eol() + ;
+           "   HbRefFlush()" + hb_eol() + ;
+           "   RETURN" + hb_eol() + hb_eol() + ;
+           "// QUIT no meio da colheita: o hb_vmQuit roda os EXIT PROCEDUREs -" + hb_eol() + ;
+           "// grava o retrato parcial com o abortador nomeado" + hb_eol() + ;
+           "EXIT PROCEDURE HBREF_REGDRVX()" + hb_eol() + ;
+           "   HbRefFlush()" + hb_eol() + ;
+           "   RETURN" + hb_eol() + hb_eol() + ;
+           "STATIC PROCEDURE HbRefFlush()" + hb_eol() + ;
+           "   IF s_lDone .OR. Empty( s_cOut )" + hb_eol() + ;
+           "      RETURN" + hb_eol() + ;
+           "   ENDIF" + hb_eol() + ;
+           "   s_lDone := .T." + hb_eol() + ;
+           "   ASort( s_aCls,,, {| h1, h2 | h1[ " + Chr( 34 ) + "name" + Chr( 34 ) + " ] < h2[ " + Chr( 34 ) + "name" + Chr( 34 ) + " ] } )" + hb_eol() + ;
+           "   hb_MemoWrit( s_cOut, hb_jsonEncode( { " + Chr( 34 ) + "classes" + Chr( 34 ) + " => s_aCls, " + ;
+           Chr( 34 ) + "ran" + Chr( 34 ) + " => s_aRan, " + Chr( 34 ) + "failed" + Chr( 34 ) + " => s_aFail, " + ;
+           Chr( 34 ) + "startup" + Chr( 34 ) + " => s_aStart, " + ;
+           Chr( 34 ) + "aborted" + Chr( 34 ) + " => s_cCur } ) )" + hb_eol() + ;
+           "   RETURN" + hb_eol() + hb_eol() + ;
+           "STATIC FUNCTION HbRefClsSnap( nCls, cFrom )" + hb_eol() + ;
+           "   LOCAL aMsg := {}, aPar := {}, cSel, nSup" + hb_eol() + ;
+           "   FOR EACH cSel IN __classSel( nCls )" + hb_eol() + ;
+           "      AAdd( aMsg, { " + Chr( 34 ) + "name" + Chr( 34 ) + " => cSel, " + ;
+           Chr( 34 ) + "type" + Chr( 34 ) + " => __clsMsgType( nCls, cSel ) } )" + hb_eol() + ;
+           "   NEXT" + hb_eol() + ;
+           "   ASort( aMsg,,, {| h1, h2 | h1[ " + Chr( 34 ) + "name" + Chr( 34 ) + " ] < h2[ " + Chr( 34 ) + "name" + Chr( 34 ) + " ] } )" + hb_eol() + ;
+           "   FOR EACH nSup IN __clsGetAncestors( nCls )" + hb_eol() + ;
+           "      AAdd( aPar, __className( nSup ) )" + hb_eol() + ;
+           "   NEXT" + hb_eol() + ;
+           "   ASort( aPar )" + hb_eol() + ;
+           "   RETURN { " + Chr( 34 ) + "name" + Chr( 34 ) + " => __className( nCls ), " + ;
+           Chr( 34 ) + "from" + Chr( 34 ) + " => cFrom, " + Chr( 34 ) + "sels" + Chr( 34 ) + " => aMsg, " + ;
+           Chr( 34 ) + "parents" + Chr( 34 ) + " => aPar }" + hb_eol()
+
+   RETURN cSrc
+
+// monta o .astr.json final (schema rtr-1) e o relato humano. Classes da VM
+// (baseline por NOME - fato do probe: programa vazio = só ERROR) saem de
+// classes[] para vm[]; o resto fica como o driver viu, com proveniência
+STATIC FUNCTION RegSnapWrite( hDrv, hSel, cSpec, cStamp, cOut )
+
+   LOCAL aBase := { "ERROR" }, aVm := {}, aCls := {}, hCls, hSkip
+   LOCAL nRev := 0
+
+   FOR EACH hCls IN hDrv[ "classes" ]
+      IF hCls[ "from" ] == "startup" .AND. AScan( aBase, hCls[ "name" ] ) > 0
+         AAdd( aVm, hCls[ "name" ] )
+      ELSE
+         AAdd( aCls, hCls )
+         IF !( hCls[ "from" ] == "startup" )
+            nRev++
+         ENDIF
+      ENDIF
+   NEXT
+
+   hb_MemoWrit( cOut, hb_jsonEncode( { "schema" => "rtr-1", ;
+                "stamp" => cStamp, "project" => cSpec, ;
+                "baseline" => aBase, "vm" => aVm, ;
+                "classes" => aCls, "ran" => hDrv[ "ran" ], ;
+                "failed" => hDrv[ "failed" ], "skipped" => hSel[ "skip" ], ;
+                "aborted" => hb_HGetDef( hDrv, "aborted", "" ) } ) )
+
+   OutStd( "exec-registry (retrato da tabela viva; o snapshot SUGERE, o -kt impõe)" + hb_eol() )
+   FOR EACH hCls IN aCls
+      OutStd( "  classe " + hCls[ "name" ] + "  [" + ;
+              iif( hCls[ "from" ] == "startup", "startup (INIT)", ;
+                   "execução de " + hCls[ "from" ] + "()" ) + ;
+              ", seletores=" + hb_ntos( Len( hCls[ "sels" ] ) ) + ;
+              iif( Empty( hCls[ "parents" ] ), "", ;
+                   ", pais: " + ArrJoin( hCls[ "parents" ], "," ) ) + "]" + hb_eol() )
+   NEXT
+   FOR EACH hSkip IN hSel[ "skip" ]
+      OutStd( "  fora: " + hSkip[ "name" ] + " - " + hSkip[ "why" ] + hb_eol() )
+   NEXT
+   IF ! Empty( hb_HGetDef( hDrv, "aborted", "" ) )
+      OutStd( "  ABORTOU a colheita: " + hDrv[ "aborted" ] + ;
+              " encerrou o processo (QUIT/exit) - retrato PARCIAL até ele" + hb_eol() )
+   ENDIF
+   OutStd( "resumo: executadas=" + hb_ntos( Len( hDrv[ "ran" ] ) ) + ;
+           " falharam=" + hb_ntos( Len( hDrv[ "failed" ] ) ) + ;
+           " classes-reveladas=" + hb_ntos( nRev ) + ;
+           " startup=" + hb_ntos( Len( hDrv[ "startup" ] ) - Len( aVm ) ) + ;
+           " vm=" + hb_ntos( Len( aVm ) ) + ;
+           " fora=" + hb_ntos( Len( hSel[ "skip" ] ) ) + ;
+           " snapshot=" + cOut + hb_eol() )
+
+   RETURN EXIT_OK
 
 // ---------------------------------------------------------------------------
 // B7 - tipos interprocedurais (spec-b7-tipos-interprocedurais.md, portão

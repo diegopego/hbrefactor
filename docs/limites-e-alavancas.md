@@ -183,8 +183,11 @@ de dinamismo genuíno (cls*cast = testes de TORTURA de casting,
 
 Caveats: corpus adversarial (tortura de casting + GET afogado em
 blocos), não retrato de produção; diagnóstico por inspeção do nó (20
-não localizados); a régua final continua sendo o dogfooding no código
-do Diego. Consequência registrada (decisão do Diego, 2026-07-08):
+não localizados); ~~a régua final continua sendo o dogfooding no código
+do Diego~~ **(REVOGADA, Diego 2026-07-10: a régua de maturação é código
+bem escrito do CORE — ampliar work/ com cópias pertinentes; o código do
+Diego é só exploração até a ferramenta estar sólida no core — regra no
+CLAUDE.md)**. Consequência registrada (decisão do Diego, 2026-07-08):
 **escada revisada — inferência (fase B7b) > alavanca D > alavanca G/B9
 (gaveta, decisões T1-T5 preservadas)**.
 
@@ -220,8 +223,10 @@ corpus porque os encadeados dominantes atravessam construção dinâmica
 de tortura; os blocos de GET/tbrowse (SETGET/param de bloco) têm os
 Evals NA RTL, fora do projeto — ponto cego estrutural, degrade
 honesto; detached multi-write (1.284) permanece ⊤ por regra (sem
-ordem). O mecanismo está provado onde o fato existe (caso 86); a
-régua final segue sendo o dogfooding em código de produção.
+ordem). O mecanismo está provado onde o fato existe (caso 86); ~~a
+régua final segue sendo o dogfooding em código de produção~~
+**(REVOGADA, Diego 2026-07-10: régua = código bem escrito do core;
+regra no CLAUDE.md)**.
 
 **ESCADA RE-REVISADA — A REGRA DO FATO (Diego, 2026-07-08, ao ver o
 portão da alavanca D; revoga a escada do início do dia)**: hbrefactor
@@ -295,3 +300,77 @@ com relato honesto), e o re-relatório DRENA: retornos-fun 13→0,
 métodos-(g) 18→0, nível1 7→0 (anotadas saem da varredura, 322→315).
 Resíduo estrutural honesto e inalterado: sem-prova=284 (multi-write/
 parâmetros/sem binding único — o balde aberto da M-cov) + 1 nível 3.
+
+## M1 — fonte de execução controlada (2026-07-10, B9 fatia 4/F4.2; portão do critério de matar)
+
+Método: `exec-registry` (F4.1) rodado nos 3 programas cls\*cast e no
+hbhttpd (lib com driver `-hbexe`; stub SÓ da medição para
+`UWSecondary:Add` — a lib declara e nunca implementa, referência
+pendente que só link de executável expõe); contagem por python sobre
+snapshot × dumps (sends[] cujo sym é seletor de CAST da tabela viva).
+
+| Corpus | classes reveladas | novas (sem canal estático) | pares (classe, seletor CAST) | sends totais | sites de cast |
+|---|---|---|---|---|---|
+| cls\*cast (3 progs) | 6 | **0** | **24** | 1.752 | **669 (38%)** |
+| hbhttpd (lib) | 17 | **0** | 62 | 408 | **0** |
+| fixreg (fixture F4.1) | 4+1 | **4** (por construção) | — | — | — |
+
+Leitura honesta:
+- **Classe nova, zero nos corpora reais**: cls\*cast e hbhttpd são
+  hbclass — toda classe tem função homônima no dump. O mundo
+  `__clsNew`-puro (nome computado) existe e o mecanismo o cobre
+  (fixture fixreg, caso 101), mas NÃO está nestes corpora.
+- **O rendimento real está no seletor de CAST**: os 24 pares de
+  cls\*cast (`o:myclass1:`…) não têm NENHUM canal estático (o cast é
+  criado pelo VM — derivá-lo de parents escritos seria réplica da
+  semântica de classes.c, inferência proibida) e são o primeiro salto
+  de 669/1.752 sends; o receptor `o` é local de escrita única por
+  cadeia de construção ESCRITA (provável pela sugeridora) — o elo que
+  falta é exatamente o membro de cast (`_HB_MEMBER MYCLASS1() AS
+  CLASS MYCLASS1`, idioma (g) já existente no annotate).
+- **hbhttpd: zero sites de cast** — o balde aberto de lá (sem-prova
+  284: multi-write/parâmetros) NÃO é problema de registro/shape; a
+  fonte de execução não o alcança e nada aqui muda isso.
+- Achado colateral: o link `-hbexe` expôs método declarado sem
+  implementação no hbhttpd (`UWSecondary:Add`) — o exec-registry
+  recusa nomeando o símbolo (diagnóstico honesto de lib).
+
+### M1b — corpus do core AMPLIADO (2026-07-10; régua recalibrada pelo Diego: corpus = código do core, ver CLAUDE.md)
+
+Corpus novo em work/ (cópias do core): `src/rtl` (74 .prg), `contrib/
+gtwvg` (28), `contrib/xhb` (42 — NÃO-mantida, braço xHarbour: vale
+como medição, número dela sozinho não justifica capacidade; nota no
+CLAUDE.md). Dumps 144/144 limpos; contagem estática = sends cujo sym é
+nome de classe do corpus (candidato a CAST); execução real no xhb
+(lib, driver `-hbexe`).
+
+| Corpus | classes | sends | sites de cast | leitura |
+|---|---|---|---|---|
+| rtl | 45 | 6.416 | **4 (~0%)** | casting NÃO é idioma da RTL |
+| gtwvg | 50 | 6.125 | **65 (~1%)** | idioma real (`::WvgWindow:destroy()`, estilo Xbase++), concentrado no pai comum; win-only (execução não medida no Linux) |
+| xhb | 44 | 5.822 | **~0** | casting ausente |
+| (M1: cls\*cast) | 6 | 1.752 | 669 (38%) | TORTURA — não representa o idioma médio |
+
+Execução no xhb (o achado do M1b):
+- **Classe invisível à estática EXISTE em código real do core**: 6
+  classes escalares (`DATE`/`LOGICAL`/`NIL`/`POINTER`/`SCALAROBJECT`/
+  `TIMESTAMP`, pai SCALAROBJECT) entram no retrato SEM `CREATE CLASS`
+  em fonte nenhum — registradas no startup (tscalar.prg da RTL +
+  INITs); proveniência cruzada também é fato só-de-execução
+  (`TCGI()` registra `THTML`).
+- **Registrador PARAMÉTRICO fica fora do alcance**: os 3 `HB_CSTRUCT*`
+  falham honesto (chamada sem args — args nunca inventados); as
+  classes "C Structure <nome>" só nascem POR APLICAÇÃO que define
+  structs — um retrato de lib não as revela.
+- **QUIT no meio da colheita aconteceu de verdade**
+  (`TStreamFileReader` encerra o processo): motivou o flush por
+  `EXIT PROCEDURE` no driver (agora produto) — retrato PARCIAL com o
+  abortador NOMEADO em `aborted`.
+
+**Veredito M1b para a F4.3 (escrita)**: no core bem escrito, casting é
+raro (0-1%) e classe invisível é nicho de startup/por-APP — o 38% do
+cls\*cast é tortura, não idioma. Os números largos NÃO sustentam a
+fatia de escrita agora; o exec-registry fica como instrumento (valor
+diagnóstico provado: `UWSecondary:Add` sem corpo no hbhttpd, QUIT do
+xhb, paramétricos nomeados). Decisão formal do portão registrada no
+roadmap/spec.

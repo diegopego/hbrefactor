@@ -19,6 +19,24 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   pedir. O único freio é o de sempre: **commit no core continua sob
   autorização por-commit do Diego** (não editar ≠ não commitar). É a
   perna concreta da REGRA DO FATO ("estender o core para o fato existir").
+- **CORPUS DE MATURAÇÃO = código do CORE do Harbour; o código do Diego
+  NÃO é régua (Diego, 2026-07-10)**: a ferramenta amadurece resolvendo
+  problemas em código BEM ESCRITO E TESTADO do core (work/ = cópias de
+  pastas extraídas de `~/devel/harbour-core/harbour` — tests, hbhttpd;
+  copiar MAIS pastas pertinentes do core quando a fase pedir). O código
+  do Diego (`~/devel/bravo-experimento*`) é bagunçado e
+  pré-melhores-práticas (ex.: PRIVATE em massa, que o próprio Harbour
+  desaconselha) — serve para EXPERIMENTAÇÃO/EXPLORAÇÃO pontual e SÓ
+  isso; nunca como régua de valor de fase, nunca como alvo de entrega.
+  Só viramos para o bravo quando hbrefactor + branch do core estiverem
+  funcionando bem no código do core. REVOGA o "a régua final é o
+  dogfooding no código do Diego" que os docs repetiam (notas datadas em
+  limites-e-alavancas.md; não propor dogfooding no bravo como critério
+  de decisão). Nuance da **xhb** (Diego, 2026-07-10): é do braço
+  xHarbour, marcada como NÃO-mantida pelos mantenedores do core —
+  funcional e cheia de ideias interessantes, vale como corpus de
+  MEDIÇÃO, mas código novo não deve usá-la; número vindo só dela não
+  justifica capacidade sozinho.
 - **Compile todo .prg (fixture, exemplo, teste) ANTES de usá-lo em
   qualquer teste** — `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto
   via hbmk2. Fixture que não compila gera diagnóstico enganoso.

@@ -176,4 +176,6 @@ critério de seleção do que rodar (parente do problema da spec-b8),
 relato com proveniência ("materializado a partir de execução de X").
 Encaixe natural: fatia da B9 (segunda FONTE da sugeridora), não fase
 nova. Alvo medido: o balde "classes de runtime" da M-cov (DSLs
-__clsNew-puras; cls*cast, 2.260 sites).
+__clsNew-puras; cls*cast, 2.260 sites). **Espec-ado (2026-07-10,
+escopo aberto pelo Diego): a fatia 4 da B9 —
+[spec-b9-fatia4-execucao-controlada.md](spec-b9-fatia4-execucao-controlada.md).**

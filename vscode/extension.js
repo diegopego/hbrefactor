@@ -401,9 +401,27 @@ async function cmdAnnotateApply() {
   report('annotate --apply ' + c.file, await run(['annotate', c.spec, c.file, '--apply'], c.cwd));
 }
 
+// exec-registry (B9 fatia 4): EXECUTA as funções de registro de classes do
+// projeto em sandbox (driver próprio, timeout) e grava o retrato da tabela
+// viva (.astr.json). O snapshot só SUGERE - o veredito é do -kt. Executar
+// código do usuário é ação real: confirmação modal SEMPRE (contrato D4)
+async function cmdExecRegistry() {
+  const c = await projCtx();
+  if (!c) return;
+  const ok = await vscode.window.showWarningMessage(
+    `hbrefactor: EXECUTAR as funções de registro de classes de ${c.spec} em sandbox? ` +
+    `Roda código do projeto (INITs + registradores) com timeout e grava o retrato ` +
+    `da tabela viva (.astr.json). Nenhum fonte é editado.`,
+    { modal: true }, 'Executar registro');
+  if (ok !== 'Executar registro') return;
+  await saveAll();
+  report('exec-registry', await run(['exec-registry', c.spec], c.cwd));
+}
+
 function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('hbrefactor.usages', cmdUsages),
+    vscode.commands.registerCommand('hbrefactor.execRegistry', cmdExecRegistry),
     vscode.commands.registerCommand('hbrefactor.annotate', cmdAnnotate),
     vscode.commands.registerCommand('hbrefactor.annotateApply', cmdAnnotateApply),
     vscode.commands.registerCommand('hbrefactor.renameLocal', cmdRenameLocal),

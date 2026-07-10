@@ -5,6 +5,73 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — `exec-registry`: o retrato das classes que só existem em runtime
+
+### O problema de todo dia
+
+Se o seu sistema monta classes em tempo de execução — uma DSL própria
+sobre `__clsNew`, nomes de classe calculados, registro dentro de um
+INIT — nenhuma análise de fonte consegue vê-las. E mesmo em classes
+comuns de hbclass, o VM cria mensagens que não estão escritas em lugar
+nenhum: os *casts* de superclasse (`o:MinhaBase:Campo`). Para a
+ferramenta, tudo isso era "receiver unknown".
+
+### O que mudou
+
+```
+hbrefactor exec-registry projeto.hbp
+```
+
+compila o seu projeto com um driver mínimo (nunca o seu `Main`), RODA
+só as funções de registro de classes — encontradas por fato: quem chama
+`__clsNew`/`__cls*` no código compilado, mais os INITs, mais o que você
+indicar com `--run F1,F2` — e grava o retrato da tabela viva de classes
+num `.astr.json`: cada classe com nome, seletores (com tipo — método,
+inline, cast), ancestrais e a PROVENIÊNCIA ("registrada pela execução
+de F()").
+
+- **Nada é editado**: o comando só observa e grava o retrato.
+- **Cada chamada é protegida**: função de registro que exige argumento
+  quebra em isolamento e sai no relatório como "falhou" — o resto da
+  colheita continua. Argumentos nunca são inventados.
+- **Sandbox com a mesma contenção que o `--apply` já usa**: processo
+  separado, timeout, diretório de trabalho isolado. (Honestidade: I/O
+  que o SEU código de registro fizer não é bloqueado — o comando é
+  opt-in justamente por isso, e na extensão VSCode pede confirmação.)
+- **Funciona em biblioteca** (`-hblib`): o driver vira o executável.
+  Efeito colateral útil: o link de executável denuncia método declarado
+  e nunca implementado — no próprio hbhttpd ele achou um.
+- **Retrato determinístico**: duas execuções produzem o mesmo arquivo
+  byte a byte.
+
+### O que a ferramenta NUNCA faz
+
+- Rodar o seu `Main` ou o programa inteiro — só registradores.
+- Tratar o retrato como verdade estática: o que rodou com aqueles
+  caminhos é evidência CONDICIONAL. O retrato SUGERE; quem sela é o
+  cheque `-kt` em execução real (errou o retrato → erro nomeando site
+  e tipos).
+- Editar fonte a partir do retrato — a escrita automática foi MEDIDA e
+  descartada por ora: no código bem escrito do core, casting é 0-1%
+  dos sends e classe invisível ao fonte é nicho de inicialização; o
+  retrato vale como inventário/diagnóstico, e a escrita só volta se o
+  uso real pedir.
+
+### Limites honestos
+
+- Classe registrada só em caminho condicional (config, ambiente) pode
+  não aparecer no retrato — a ausência nunca vira veredito.
+- Função de registro `STATIC` não tem símbolo chamável de fora: fica
+  de fora COM relato (mova o registro para função pública ou use um
+  INIT).
+- Medição nos corpora reais (detalhe em docs/): o ganho está nos
+  seletores de CAST (38% dos sends do corpus de tortura de casting os
+  usam); em código sem casting nem registro dinâmico o retrato não
+  acrescenta site nenhum.
+
+(Interno: B9 fatia 4, F4.1+F4.2 —
+[docs/spec-b9-fatia4-execucao-controlada.md](docs/spec-b9-fatia4-execucao-controlada.md).)
+
 ## 2026-07-10 — o `annotate` aprendeu a anotar parâmetro de codeblock
 
 ### O problema de todo dia

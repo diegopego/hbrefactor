@@ -129,6 +129,13 @@ freshkt() { # freshkt <case-name> -> fixture for imposed type checks (B9, -kt)
    echo "$d"
 }
 
+freshreg() { # freshreg <case-name> -> fixture for runtime class registry (B9 fatia 4)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixreg/*.prg "$HERE"/fixreg/*.ch "$HERE"/fixreg/*.hbp "$d"/
+   echo "$d"
+}
+
 freshhom() { # freshhom <case-name> -> fixture for DSL homonym generality (B4f-3)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3080,7 +3087,45 @@ check "fixture ORIGINAL intocado" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100"
+unit_101() {
+echo "case 101: B9 fatia 4 (F4.1) - exec-registry: retrato da tabela viva (o snapshot SUGERE, o -kt impõe)"
+# spec-b9-fatia4-execucao-controlada.md (portão 2026-07-10, D1-D6 nas
+# recomendações). DSL não-espelho FORJA registra LIGA_* com nome COMPUTADO
+# ("METAL_BRONZE" não está escrito em fonte nenhum - régua dos casos
+# 64/72-74); seleção 100% fato do dump (calls[] com primitiva __CLS* +
+# clsmap); INIT PROCEDURE = startup; helper com parâmetro obrigatório
+# quebra PROTEGIDO ("failed" honesto - nunca inventamos argumentos);
+# registrador INDIRETO (chama o helper, não a primitiva) só entra por
+# --run (o v1 da seleção é chamada DIRETA); retrato determinístico.
+D=$(freshreg case101)
+( cd "$D" && "$BIN" exec-registry fixreg.hbp --stamp fixo --out s1.astr.json > r1.log 2>&1 )
+check "exec-registry exit 0" $?
+grep -q "classe METAL_BRONZE  \[execução de FORJA_BRONZE(), seletores=3\]" "$D/r1.log" && \
+   grep -q "classe METAL_ACO  \[execução de FORJA_ACO(), seletores=4\]" "$D/r1.log"
+check "metais de nome COMPUTADO reveladas com proveniência da chamada" $?
+grep -q "classe FORNO_BASE  \[startup (INIT), seletores=2\]" "$D/r1.log"
+check "INIT PROCEDURE entra como startup" $?
+grep -q "resumo: executadas=2 falharam=1 classes-reveladas=2 startup=1 vm=1 fora=0" "$D/r1.log"
+check "resumo: helper com parâmetro quebra protegido (failed=1), VM separada" $?
+"$TCHECK" rtr101 "$D/s1.astr.json" > /dev/null 2>&1
+check "retrato rtr-1 profundo: proveniência, seletores com tipo, self-cast SUPER=5" $?
+( cd "$D" && "$BIN" exec-registry fixreg.hbp --stamp fixo --out s2.astr.json > /dev/null 2>&1 )
+cmp -s "$D/s1.astr.json" "$D/s2.astr.json"
+check "dois runs -> retrato byte-idêntico (determinismo; carimbo vem de fora)" $?
+( cd "$D" && "$BIN" exec-registry fixreg.hbp --stamp fixo --run RegistraEspecial,NaoExiste --out s3.astr.json > r3.log 2>&1 )
+check "--run exit 0" $?
+grep -q "classe METAL_ESPECIAL  \[execução de REGISTRAESPECIAL(), seletores=2\]" "$D/r3.log"
+check "--run compõe: registrador indireto revela o metal" $?
+grep -q "fora: NAOEXISTE - --run: não encontrada no projeto" "$D/r3.log"
+check "--run inexistente relatado honesto" $?
+! ls "$HERE"/fixreg/*.astr.json > /dev/null 2>&1
+check "fixture ORIGINAL intocado (retrato só no work dir)" $?
+! grep -qiwE "forja|metal|tempera|funde|verga|solda|forno_base|acende|montametal|registraespecial|preparabase" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixreg (régua do caso 64)" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

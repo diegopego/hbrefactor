@@ -312,7 +312,21 @@ baixo hoje — param quase sempre é nível 3; o fato de posição da
 fatia 3/D2 destrava a âncora se emitido para assinaturas); (2)
 candidato (f) de core ADIADO (New implícito — protótipo como
 coluna-delta quando reabrir); (3) execução controlada como 2ª FONTE
-da sugeridora (spec-d § adendo, registrado 2026-07-10).
+da sugeridora — **fatia 4 FECHADA (2026-07-10): F4.1+F4.2 entregues;
+F4.3 (escrita) MORTA POR MEDIÇÃO (decisão do Diego sobre o M1b —
+critério de matar acionado; spec na gaveta, padrão B8)**:
+**[spec-b9-fatia4-execucao-controlada.md](spec-b9-fatia4-execucao-controlada.md)**
+§ Executado — `exec-registry` entrega o retrato da tabela viva
+(driver `-hbexe`+`-main=`, seleção 100% fato, proveniência por
+chamada, flush por `EXIT PROCEDURE` contra QUIT do código executado,
+schema `rtr-1` determinístico, zero edição no core; fixture fixreg +
+caso 101; suíte **740/0** byte-idêntica). M1+M1b no
+[mapa](limites-e-alavancas.md) (régua recalibrada: corpus = código do
+CORE, regra no CLAUDE.md): casting raro no core bem escrito (rtl ~0%,
+gtwvg ~1%, xhb ~0%; 38% do cls\*cast é tortura); classe invisível à
+estática existe (escalares de startup do xhb) mas é nicho; registrador
+paramétrico fica fora do alcance honesto — continuar/matar a escrita
+(F4.3) é decisão do Diego sobre estes números.
 
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 
@@ -386,4 +400,8 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
    candidata a fixture de RELATO se um projeto real trouxer o caso.
 4. Dedup pré/pós-decremento: não-fazer mantido (v2).
 5. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
-   final — só depois de suíte + hbhttpd verdes.
+   final — só depois de suíte + hbhttpd verdes. **Recalibrada (Diego,
+   2026-07-10, regra no CLAUDE.md)**: antes de qualquer produção/bravo,
+   a maturação acontece em corpus do CORE ampliado (copiar mais pastas
+   pertinentes de `harbour-core/harbour` para work/); o bravo é só
+   exploração até a ferramenta estar sólida no código do core.
