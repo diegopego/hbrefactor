@@ -81,7 +81,7 @@ de consumo em [ast-schema.md](ast-schema.md) — LER antes de mexer.
 | B-infra Etapa 2 (2026-07-08) | Runner em Harbour: despacho+join `tests/parrun.prg` (`hb_processOpen`) + checker `tests/tcheck.prg` (`hb_jsonDecode`) — python fora do `make test`; paridade byte-idêntica nos dois modos, 10/10 sem flake, 14 s |
 | B7 (2026-07-08) | Tipos interprocedurais: cadeia de construção + oráculo QSelf (ast-6 `ret`); rito D4 (5 checks/6 sites aprovados caso a caso); homônimos separados por receptor; união de call sites/IIF; casos 84/85; suíte 582/0 |
 | B7b (2026-07-08) | Inferência fatia 3 (zero core): retorno de MÉTODO pelos pushes `ret` (send encadeado, identidade em cadeia); 1º param de bloco INLINE = receptor (fato classes.c:4554, provado em DSL não-espelho); param de bloco pela união dos Evals rastreáveis; venenos honestos; furos latentes fechados (B7AllRetsSelf envenenado, índice do B7ParamType); caso 86; suíte 600/0; delta M-cov 2 no mapa |
-| B9 fatias 1+2 (2026-07-08→10) | Tipos declarados IMPOSTOS: `-kt` no core (ast-7) + camada `guaranteed` honesta (RE.2) + materializador `annotate`/`--apply` (escada de declarações, padrão-ouro inerte/compila/roda-`-kt` com rollback byte a byte); candidato (g) de core adotado; casos 87-96; Rotas A/B dos testes-suspensos RECONQUISTADAS; extensão 0.9.0; suíte 692/0 |
+| B9 fatias 1+2 (2026-07-08→10) | Tipos declarados IMPOSTOS: `-kt` no core (ast-7) + camada `guaranteed` honesta (RE.2) + materializador `annotate`/`--apply` (escada de declarações, padrão-ouro inerte/compila/roda-`-kt` com rollback byte a byte); candidato (g) de core adotado; casos 87-97 (inclui rollback provocado e projeto já-`-kt`); Rotas A/B dos testes-suspensos RECONQUISTADAS; extensão 0.9.0; suíte 699/0 |
 | Auditoria (2026-07-05) | Gramática duplicada morta (`NameAccepted` via compilador-biblioteca; `CoreFunction` via harbour.hbx) |
 
 Réplicas conservadoras remanescentes (da auditoria, não urgentes):
@@ -265,12 +265,17 @@ declarações + 7 anotações verificadas, re-relatório DRENA (M-annotate
 no [limites-e-alavancas.md](limites-e-alavancas.md)). Suíte **692/0**
 byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.
 
+**Projeto já-`-kt` ENTREGUE (2026-07-10, escopo aberto pelo Diego)**:
+o teste inerte compila baseline/pós-edição SEM a flag (`AnnNoKt`) — a
+anotação sob `-kt` muda pcode por DESIGN (emite os cheques); caso 97:
+quem já adotou `-kt` anota e o site coberto sai `guaranteed` direto.
+Suíte **699/0** byte-idêntica paralelo × `JOBS=1`.
+
 **Resíduos em aberto (fatia futura da B9, portão de ESCOPO do
-Diego)**: (1) projeto que JÁ compila com `-kt` — o teste inerte
-compara `.hrb` sem `-kt`; falta o strip da flag no baseline; (2)
-anotação de PARÂMETRO (assinatura colapsa em `tokens[]`, pede o idioma
-`SigParamHits`); (3) candidato (f) de core ADIADO (New implícito —
-protótipo como coluna-delta quando reabrir).
+Diego)**: (1) anotação de PARÂMETRO (assinatura colapsa em `tokens[]`,
+pede o idioma `SigParamHits`; rendimento auto-escrevível baixo hoje —
+param quase sempre é nível 3); (2) candidato (f) de core ADIADO (New
+implícito — protótipo como coluna-delta quando reabrir).
 
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 

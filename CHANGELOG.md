@@ -68,12 +68,23 @@ da classe.
   re-relatório zera — tudo que era declarável foi declarado; o que
   sobra é o que só inferência alcançaria, e esse a ferramenta não
   escreve.
+- **Projeto que já compila com `-kt` agora anota** (era o último
+  bloqueio para quem adotou o fail-fast): a prova de "binário
+  idêntico" passou a comparar compilações sem a flag — com ela a
+  anotação muda o binário *de propósito*, é ela emitindo os cheques.
+  Bônus de quem já é `-kt`: a anotação recém-escrita sai `guaranteed`
+  na mesma hora no `usages`, sem passo extra.
 
 ### Limites que continuam (honestos, declarados)
 
-- Parâmetros de função ainda não são anotados — só locais.
-- Projeto que **já** compila com `-kt`: fica para a fatia do strip no
-  baseline.
+- Parâmetros de função ainda não são anotados — só locais. E quando
+  vierem, a maioria continuará apenas RELATADA: o tipo de um parâmetro
+  quase nunca decorre de declaração (é união de quem chama = palpite,
+  e palpite a ferramenta não escreve).
+- No send encadeado (`oM:Soma( 1 ):Soma( 2 )`), o rótulo fica
+  `confirmed via declared types` mesmo quando `oM` está anotado num
+  projeto `-kt` — a resolução em cadeia prefere subdeclarar a
+  exagerar. O `guaranteed` aparece nos sites de receptor direto.
 
 Detalhes internos: [docs/spec-b9-fatia2-materializacao.md](docs/spec-b9-fatia2-materializacao.md)
 § "Entregue (F2.4-complemento + F2.5)".

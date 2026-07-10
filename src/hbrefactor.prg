@@ -6950,6 +6950,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    LOCAL hOrig := { => }, aIns := {}, hModAst := { => }
    LOCAL hCand, hLn, hEntry, cPath, cWhy := "", cKt := "skipped", cKtBase := ""
    LOCAL lRunnable, hLoad2, hPlan2, aAnn := {}, nCol, hAst
+   LOCAL hInert := AnnNoKt( hProj )    // baseline/inerte SEM -kt (projeto já--kt)
 
    HB_SYMBOL_UNUSED( cFuncFil )
 
@@ -6962,7 +6963,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    lRunnable := AnnHasMain( hLoad )
 
    // 1. baseline .hrb (estado de referência, sem -kt)
-   IF ! CompileHrbAll( hProj, cTmp, "annb4" )
+   IF ! CompileHrbAll( hInert, cTmp, "annb4" )
       RETURN Refuse( "falha ao compilar o estado de referência" )
    ENDIF
 
@@ -7017,7 +7018,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
          RollbackAll( hOrig )
          RETURN Refuse( "falha ao inserir declarações: " + cWhy )
       ENDIF
-      IF ! AnnGoldCheck( hProj, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
+      IF ! AnnGoldCheck( hInert, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
          RollbackAll( hOrig )
          RETURN Refuse( "padrão-ouro FALHOU após inserir declarações: " + cWhy )
       ENDIF
@@ -7051,7 +7052,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
          RollbackAll( hOrig )
          RETURN Refuse( "falha ao anotar locais: " + cWhy )
       ENDIF
-      IF ! AnnGoldCheck( hProj, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
+      IF ! AnnGoldCheck( hInert, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
          RollbackAll( hOrig )
          RETURN Refuse( "padrão-ouro FALHOU após anotar locais: " + cWhy )
       ENDIF
@@ -7066,6 +7067,25 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
                 "execução já falhava SEM edição - passo -kt pulado (declared, não imposto)" ) ) + hb_eol() )
 
    RETURN EXIT_OK
+
+// clone do projeto SEM a flag -kt nos flags do compilador: o teste
+// inerte do padrão-ouro compara .hrb compilados sem ela (com -kt a
+// anotação muda pcode POR DESIGN - ela emite os cheques; comparar com a
+// flag reprovaria justamente o projeto que já adotou o -kt, resíduo 1
+// da F2.4). Só o baseline/inerte usa o clone; a execução (AnnKtRun)
+// segue com o projeto como está
+STATIC FUNCTION AnnNoKt( hProj )
+
+   LOCAL hOut := hb_HClone( hProj ), aFlags := {}, cTok
+
+   FOR EACH cTok IN hProj[ "flags" ]
+      IF !( Lower( cTok ) == "-kt" )
+         AAdd( aFlags, cTok )
+      ENDIF
+   NEXT
+   hOut[ "flags" ] := aFlags
+
+   RETURN hOut
 
 // há uma PROCEDURE/FUNCTION MAIN? (projeto executável => verificação -kt)
 STATIC FUNCTION AnnHasMain( hLoad )

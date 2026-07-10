@@ -383,8 +383,10 @@ provocado e as demais sementes como casos incrementais — próxima
 sessão.
 
 **COMPLEMENTO ENTREGUE (2026-07-10)** — resíduos (3) e (4) fechados
-como casos incrementais; (1) e (2) seguem fatia futura (portão do
-Diego):
+como casos incrementais; na mesma sessão o Diego abriu o escopo do
+resíduo (1) — **projeto já-`-kt` ENTREGUE** (`AnnNoKt`: o teste inerte
+compila baseline/pós-edição sem a flag; caso 97, suíte 699/0); o (2)
+(parâmetro) segue fatia futura:
 - **Caso 90 — ROLLBACK PROVOCADO** (fixture nova `fixrbk`): a mentira
   vive num fato DECLARADO (`_HB_MEMBER ACHA() AS CLASS MOEDA` com
   runtime devolvendo N — dona BAU e retorno MOEDA são classes

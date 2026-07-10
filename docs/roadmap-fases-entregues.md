@@ -1791,3 +1791,14 @@ plano-b9-fatia2-escada.md, executado F2.0-F2.5:
 Resíduos em aberto (fatia futura, portão de ESCOPO do Diego): projeto
 já-`-kt` (strip no baseline inerte), anotação de PARÂMETRO
 (`SigParamHits`), candidato (f) como coluna-delta.
+
+Adendo (mesma sessão, 2026-07-10): o Diego abriu o escopo do resíduo
+(1) — **projeto já-`-kt`**: `AnnNoKt` remove só o `-kt` dos flags
+resolvidos para os `.hrb` do teste inerte (a anotação sob `-kt` muda
+pcode por DESIGN — ela emite os cheques); a execução de verificação
+segue com o projeto como está. Caso 97 (fixb7b + `-prgflag=-kt`):
+antes recusava "a edição NÃO é inerte"; agora anota, os cheques rodam
+e o site coberto sai `guaranteed` DIRETO — invariante no mesmo passo.
+Suíte 699/0 byte-idêntica paralelo × JOBS=1; lexdiff limpo. Resíduo
+que segue aberto: anotação de PARÂMETRO (rendimento auto-escrevível
+baixo — quase sempre nível 3) e candidato (f) como coluna-delta.

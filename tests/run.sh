@@ -2939,7 +2939,38 @@ check "fixture ORIGINAL intocado" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96"
+unit_97() {
+echo "case 97: B9 fatia 2 - projeto que JÁ compila com -kt: strip da flag no baseline inerte"
+# resíduo 1 da F2.4 (spec § Entregue): sob -kt a anotação muda pcode POR
+# DESIGN (ela emite os cheques) - comparar .hrb com a flag reprovaria
+# justamente quem já adotou o -kt, o estado-alvo do produto. O teste
+# inerte agora compila baseline e pós-edição SEM a flag (AnnNoKt); a
+# execução de verificação continua com o projeto como está (o -kt roda
+# e os cheques passam). Antes da correção este caso recusava com
+# "a edição NÃO é inerte: q1.hrb mudou (pcode)". Bônus do projeto
+# já--kt: o site coberto sai guaranteed DIRETO no usages - a anotação
+# vira invariante no mesmo passo, sem re-flag.
+D=$(freshb7b case97)
+echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
+( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0 em projeto já--kt" $?
+grep -q "4 declaração(ões) + 3 anotação(ões) AS CLASS" "$D/app.log" && \
+   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+check "padrão-ouro completo: inerte (baseline SEM a flag) + compila limpo + roda sob -kt" $?
+grep -q "LOCAL oM AS CLASS MOEDA" "$D/q1.prg" && grep -q "_HB_MEMBER SOMA() AS CLASS MOEDA" "$D/q1.prg"
+check "declarações e anotações escritas no projeto -kt" $?
+( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > ms.log 2>&1 )
+check "usages exit 0" $?
+grep -q "q1.prg:79: confirmed send (receiver class MOEDA via declared types) in MAIN  | oM:Soma( 1 ):Soma( 2 )" "$D/ms.log"
+check "send encadeado decide por FATO no projeto já--kt" $?
+grep -q "q1.prg:86: guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN" "$D/ms.log"
+check "site coberto sai guaranteed DIRETO (invariante imposta no mesmo passo)" $?
+! grep -q "AS CLASS MOEDA" "$HERE/fixb7b/q1.prg"
+check "fixture ORIGINAL intocado" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

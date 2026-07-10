@@ -190,16 +190,25 @@ surpresa); a extensão VSCode expõe `hbrefactor.annotate` (relatório) e
 `hbrefactor.annotateApply` (edição com confirmação modal), guardas no
 harness do caso 71; `package.json` 0.9.0.
 
-**Resíduos honestos de F2.4** (declarados, não varridos): (1) a
-verificação inerte compila SEM `-kt`; num projeto que JÁ compila com
-`-kt` a anotação muda pcode e o teste de byte-identidade recusaria —
-os fixtures-semente não são `-kt`, e o `-kt`-project cai numa fatia
-futura (strip de `-kt` no baseline). (2) Anotação de PARÂMETRO
+**Resíduos honestos de F2.4** (declarados, não varridos): (1)
+~~projeto já-`-kt`~~ — **FECHADO (2026-07-10, portão de escopo aberto
+pelo Diego)**: o teste inerte compila baseline e pós-edição SEM a flag
+(`AnnNoKt` remove só o `-kt` dos flags resolvidos; com ela a anotação
+muda pcode POR DESIGN — ela emite os cheques); a execução de
+verificação segue com o projeto como está. Caso 97 (fixb7b +
+`-prgflag=-kt`): antes recusava "a edição NÃO é inerte"; agora anota,
+roda os cheques e o site coberto sai `guaranteed` DIRETO no `usages` —
+invariante no mesmo passo, sem re-flag. (2) Anotação de PARÂMETRO
 (assinatura) fica de fora — só LOCAL puro; a assinatura colapsa em
-`tokens[]` (fato B4) e pede o idioma de `SigParamHits`, fatia futura.
-(3) ~~rollback provocado~~ e (4) ~~demais sementes~~ — **FECHADOS no
-complemento abaixo (2026-07-10)**; (1) e (2) seguem em aberto, sob
-portão de escopo do Diego.
+`tokens[]` (fato B4) e pede o idioma de `SigParamHits`; rendimento
+auto-escrevível hoje é BAIXO (parâmetro quase sempre só se prova por
+união de call sites = inferência = nível 3, que não edita) — fatia
+futura, sob demanda real. (3) ~~rollback provocado~~ e (4) ~~demais
+sementes~~ — **FECHADOS no complemento abaixo (2026-07-10)**.
+Observação honesta registrada (caso 97): no send ENCADEADO o rótulo do
+1º elo fica `confirmed ... via declared types` mesmo com a local
+anotada coberta — o caminhante de cadeia subclama (nunca overclaim);
+o `guaranteed` aparece no site de receptor direto.
 
 ## Entregue (F2.4-complemento + F2.5, 2026-07-10)
 
