@@ -38,6 +38,13 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   escopo + critério de pronto ANTES de executá-las; concluída uma fase,
   atualizar o status na mesma sessão; trabalho novo entra como fase/item.
   Decisões de produto e autorizações continuam com o Diego.
+- **CHANGELOG.md para o programador final (Diego, 2026-07-09)**: toda
+  capacidade/entrega ganha entrada no CHANGELOG.md escrita para o
+  programador Harbour FINAL — o problema de todo dia, o que muda na
+  prática (exemplo antes/depois quando couber), o que a ferramenta
+  NUNCA faz, e os limites honestos da entrega. Sem jargão interno de
+  fase (B9/F2.x ficam nos docs; a entrada só aponta para eles no fim).
+  Atualizar na mesma sessão da entrega, como o roadmap.
 - **Genérico > específico**: comando dedicado só com razão forte (o
   `usages-dsl` foi absorvido pelo `usages`); ao consumir fatos de pp, operar
   sobre o genérico (cabeça/kind/marker), nunca por DSL/família conhecida.

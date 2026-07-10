@@ -2,7 +2,7 @@
   "name": "hbrefactor",
   "displayName": "hbrefactor - Harbour refactoring",
   "description": "Refatoração verificada para Harbour: rename (local/param/static/function/method/nome de match marker de pp/palavra de diretiva), reorder, extract, usages e relatórios via CLI hbrefactor (oráculo do compilador -x, projetos resolvidos pelo hbmk2).",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "diegopego",
   "license": "MIT",
   "engines": { "vscode": "^1.80.0" },
@@ -12,6 +12,8 @@
   "contributes": {
     "commands": [
       { "command": "hbrefactor.usages", "title": "hbrefactor: Usages (all references)" },
+      { "command": "hbrefactor.annotate", "title": "hbrefactor: Annotate report (type-declaration ladder, no edit)" },
+      { "command": "hbrefactor.annotateApply", "title": "hbrefactor: Annotate apply (materialize DECLAREs + AS CLASS, verified)" },
       { "command": "hbrefactor.renameLocal", "title": "hbrefactor: Rename local/param under cursor" },
       { "command": "hbrefactor.renameFunction", "title": "hbrefactor: Rename function under cursor" },
       { "command": "hbrefactor.renameDsl", "title": "hbrefactor: Rename directive/command word under cursor (pp DSL)" },

@@ -377,9 +377,35 @@ async function cmdFindDynamicCalls() {
   report('find-dynamic-calls', await run(['find-dynamic-calls', c.spec], c.cwd));
 }
 
+// annotate ESTÁGIO 1 (relatório): a escada de anotações do arquivo atual,
+// nenhuma edição. O consumidor de uso diário vê o que fecharia por fato
+async function cmdAnnotate() {
+  const c = await ctx();
+  if (!c) return;
+  await saveAll();
+  report('annotate ' + c.file, await run(['annotate', c.spec, c.file], c.cwd));
+}
+
+// annotate ESTÁGIO 2 (--apply): materializa DECLAREs + AS CLASS com
+// verificação padrão-ouro (byte-inerte sem -kt, compila limpo, roda sob
+// -kt) e rollback automático. Confirmação modal antes de escrever fonte
+async function cmdAnnotateApply() {
+  const c = await ctx();
+  if (!c) return;
+  const ok = await vscode.window.showWarningMessage(
+    `hbrefactor: materializar anotações em ${c.file}? Escreve DECLAREs + AS CLASS ` +
+    `(verificação padrão-ouro; rollback automático em qualquer falha).`,
+    { modal: true }, 'Materializar');
+  if (ok !== 'Materializar') return;
+  await saveAll();
+  report('annotate --apply ' + c.file, await run(['annotate', c.spec, c.file, '--apply'], c.cwd));
+}
+
 function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('hbrefactor.usages', cmdUsages),
+    vscode.commands.registerCommand('hbrefactor.annotate', cmdAnnotate),
+    vscode.commands.registerCommand('hbrefactor.annotateApply', cmdAnnotateApply),
     vscode.commands.registerCommand('hbrefactor.renameLocal', cmdRenameLocal),
     vscode.commands.registerCommand('hbrefactor.renameFunction', cmdRenameFunction),
     vscode.commands.registerCommand('hbrefactor.renameDsl', cmdRenameDsl),

@@ -2662,7 +2662,53 @@ check "sites cobertos seguem guaranteed (caso 87 intacto)" $?
 
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88"
+unit_89() {
+echo "case 89: B9 fatia 2 F2.4 - annotate --apply: materializa e verifica (round-trip)"
+# a escada ESCREVE (spec-b9-fatia2 § Pipeline estágio 2): _HB_MEMBER que
+# COMPLETA o tipo do membro (topologia (g), fato do core desde
+# hbmain.c:1174 - candidato (g) adotado), e AS CLASS nas locais nível 1
+# pós-recompute. Verificação padrão-ouro POR EDIÇÃO: .hrb byte-idêntico
+# SEM -kt (a anotação é inerte), compila limpo -w3 -es2, e RODA sob -kt.
+# Depois o usages decide por FATO os sends encadeados que a fatia RE.3
+# degradara para possible (caso 86). Fixtures ORIGINAIS intocados: a
+# edição vive só na cópia em WorkDir.
+"$HB_BIN/harbour" "$HERE/fixb7b/q1.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixb7b/q1.prg clean under -w3 -es2 (baseline)" $?
+D=$(freshb7b case89)
+# relatório (sem edição): 3 locais nível 2 + 2 retornos de método declaráveis
+( cd "$D" && "$BIN" annotate fixb7b.hbp > rep.log 2>&1 )
+check "annotate relatório exit 0" $?
+grep -q "nível2=3 " "$D/rep.log" && grep -q "retornos-metodo-declaráveis=2" "$D/rep.log"
+check "relatório: 3 locais nível 2, 2 completadores (g)" $?
+! grep -q "_HB_MEMBER SOMA" "$D/q1.prg"
+check "relatório NÃO tocou a cópia (nenhuma edição)" $?
+# --apply: materializa e verifica
+( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
+check "annotate --apply exit 0" $?
+grep -q "declaração(ões) + 3 anotação(ões) AS CLASS" "$D/app.log"
+check "materializou declarações + 3 anotações AS CLASS" $?
+grep -q "byte-idêntico sem -kt; compila limpo -w3 -es2; roda sob -kt" "$D/app.log"
+check "padrão-ouro completo: inerte + compila limpo + roda sob -kt" $?
+grep -q "_HB_MEMBER SOMA() AS CLASS MOEDA" "$D/q1.prg" && \
+   grep -q "_HB_MEMBER PEGA() AS CLASS MOEDA" "$D/q1.prg"
+check "completadores (g) escritos após as classes (merge silencioso do core)" $?
+grep -q "LOCAL oM AS CLASS MOEDA" "$D/q1.prg"
+check "local anotada com AS CLASS (nível 1 pós-recompute)" $?
+"$HB_BIN/harbour" "$D/q1.prg" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "cópia anotada compila limpa -w3 -es2" $?
+( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > ms.log 2>&1 )
+check "usages na cópia anotada exit 0" $?
+grep -q "confirmed send (receiver class MOEDA via declared types) in MAIN  | oM:Soma( 1 ):Soma( 2 )" "$D/ms.log"
+check "send encadeado que era possible (caso 86) agora decide por FATO" $?
+grep -q "confirmed send (receiver class MOEDA via declared types) in MAIN  | oC:Pega():Soma( 5 )" "$D/ms.log"
+check "send via retorno de método completado (g) decide por FATO" $?
+# fixture ORIGINAL intocado
+! grep -q "_HB_MEMBER SOMA" "$HERE/fixb7b/q1.prg" && ! grep -q "AS CLASS MOEDA" "$HERE/fixb7b/q1.prg"
+check "fixture ORIGINAL intocado (edição só na cópia em WorkDir)" $?
+
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

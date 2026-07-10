@@ -301,8 +301,15 @@ suíte 622/0 com o core@(g)) e re-medição nos clones: fixb7b
 `18→0` com build limpo — bloco "PROTÓTIPO (g) EXECUTADO" no plano
 § F2.1 e fato novo no ast-schema (§ FAZ/NÃO FAZ, W0019 condicional);
 commit no core autorizado. Candidato **(f) ADIADO** (não bloqueia
-mais nenhuma semente). **F2.4 ABERTA** (edição + casos por semente +
-extensão VSCode) — em execução.
+mais nenhuma semente). **F2.4 ENTREGUE (núcleo, 2026-07-09)**:
+`annotate --apply` (pipeline bottom-up + padrão-ouro inerte/compila/
+roda-`-kt` + re-análise + rollback), **caso 89** round-trip na fixb7b
+(sends de `possible` do caso 86 → `confirmed via declared types`;
+original intocado), extensão VSCode `annotate`/`annotateApply`
+(confirmação modal) + guardas 71, `package.json` 0.9.0; suíte
+**636/0**. Resíduos declarados na spec § "Entregue (F2.4)" (projeto
+já-`-kt`, parâmetro, rollback provocado, demais sementes) — casos
+incrementais.
 
 A REGRA DO FATO inverte a escada do início do dia: fato ausente →
 **estender o core para o fato existir**, e a B9 é exatamente isso — a

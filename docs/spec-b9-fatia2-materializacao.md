@@ -2,9 +2,10 @@
 
 Status: **ATIVA (reescrita F2.2 do plano vigente
 [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md), 2026-07-09;
-execução aberta pelo Diego na mesma data).** Estágio 1 (relatório) em
-implementação; **PORTÃO DO DIEGO entre o relatório de alcance (F2.3) e
-a edição (F2.4)**. A v1 desta spec (P1-a/P1-b/P2/P3 como portões) foi
+execução aberta pelo Diego na mesma data).** Estágio 1 (relatório)
+ENTREGUE; **PORTÃO DO MEIO decidido (Diego, 2026-07-09): candidato (g)
+adotado, F2.4 aberta.** Estágio 2 (`--apply`) ENTREGUE — ver
+"Entregue (F2.4)" no fim. A v1 desta spec (P1-a/P1-b/P2/P3 como portões) foi
 dissolvida pela investigação do P1 — registro da dissolução no plano,
 § "Esclarecimentos pós-aprovação". Fatos do compilador que esta spec
 consome: ast-schema § "O que o compilador FAZ e NÃO FAZ com as
@@ -49,7 +50,7 @@ Todo candidato à anotação é classificado pela JUSTIFICATIVA disponível:
 | classe hbclass no MESMO módulo, membro FALTANTE (`New` herdado — fixrcv r2) | `_HB_MEMBER <M>() AS CLASS <Cls>` avulso após a classe; sem W0019; gruda na ÚLTIMA classe declarada (`pLastClass`) — multi-classe (fixext e1) exige posição entre a classe-alvo e a próxima | proba/proba2 + execução `-kt` |
 | classe em OUTRO módulo ou runtime-pura (fixcls w2, fixdis, fixmth, DSLs) | `DECLARE <Cls> <M>() AS CLASS <Cls>` no módulo do SITE — registra a classe (mata o W0025/degrade), declara o membro e auto-declara `<Cls>()` | smoke3/probc; `-kt` checa por NOME no objeto VIVO |
 | fábrica/retorno de função (fixb7 b1) | `DECLARE <F>() AS CLASS <Cls>` **antes da definição, no módulo definidor** — a ordem é IMPOSIÇÃO (DECLARE depois NÃO embrulha, provado com fábrica mentirosa); se a classe não está registrada no módulo, registrá-la ANTES (linha da topologia acima) | probb: `MenteA` dispara, `MenteB` silencia, `CriaA` roda |
-| membro JÁ declarado ganhando retorno (fixb7b q1 `Pega`/`Soma`) | **BLOQUEADA hoje**: `_HB_MEMBER` repetido faz o merge na tabela mas emite W0019 (falha `-es2`); `METHOD ... AS CLASS` no CREATE CLASS é E0030. Candidato de core **(g)** no portão do meio: silenciar W0019 quando a re-declaração COMPLETA tipo ausente (hbmain.c:1174) | probg/probg2 |
+| membro JÁ declarado ganhando retorno (fixb7b q1 `Pega`/`Soma`) | **DESBLOQUEADA (candidato (g) ADOTADO, core `00ccbc20b3`)**: `_HB_MEMBER <M>() AS CLASS <C>` repetido faz o merge (hbmain.c:1178) e o W0019 já não dispara em complemento de tipo (hbmain.c:1174-1180); topologia (g) vira nível 2 normal | probg/probg2 + pg1-pg5b |
 | classe citada sem registro no módulo | RECUSA mecânica: W0025 + o dump PERDE a classe (`type O`) | probd |
 
 ## Pipeline
@@ -155,3 +156,53 @@ Rota C (exclusão de homônimo em send) — SEM ROTA, não se promete;
 Rota D (codeblock) — A6 + RE.5; Rota E (`possible` nomeado) — degrade
 pleno salvo RE.6; cobertura completa do `-kt` — RE.5; FIELD/MEMVAR/
 variável-de-macro; reativar `B7Ctx` no `usages` — proibido (RE.3).
+
+## Entregue (F2.4, 2026-07-09)
+
+Comando `annotate <projeto> [<arq[:função]>] [--json <out>] [--apply]`:
+RELATÓRIO por padrão (estágio 1); `--apply` escreve (estágio 2). No CLI
+(`src/hbrefactor.prg`): a análise virou reutilizável (`AnnLoad`/
+`AnnPlan`/`AnnReport`) e o caminho de edição é `AnnApply` +
+`AnnQueueIns`/`AnnResolveLine`/`AnnWriteInserts`/`InsertLinesBefore`/
+`AnnNameCol`/`AnnWriteAnnots`/`AnnInsertAt`/`AnnGoldCheck`/`AnnKtRun`/
+`AnnHasMain`. Âncoras ESTRUTURAIS (não texto): cada one-liner carrega
+`{ kind: afterClass|beforeFunc, cls|func }`, resolvida em linha-fonte
+por fato do dump (função por nome; classe = antes da 1ª função após o
+CREATE CLASS, i.e. após END CLASS/antes da próxima — pLastClass é a
+classe-alvo). Inserções bottom-up (linha DESC, agrupadas por linha);
+AS CLASS por âncora de token (type 21, prov 's', ÚNICO na linha de
+declaração) aplicada (linha,col) DESC. `-l` (suprime nº de linha) faz
+o `.hrb` ser byte-idêntico apesar do deslocamento de linhas → o teste
+inerte vale.
+
+Pipeline bottom-up entregue: baseline `.hrb` → escreve one-liners →
+**padrão-ouro** (inerte byte-idêntico sem `-kt` + compila limpo `-w3
+-es2` + roda sob `-kt` se executável) → **re-analisa** (`AnnLoad`+
+`AnnPlan` de novo) → escreve `AS CLASS` das locais AGORA nível 1 →
+padrão-ouro de novo → `RollbackAll` + recusa nomeada em qualquer
+falha. Prova de round-trip: **caso 89** (fixb7b) — 4 declarações + 3
+AS CLASS, verificado, e os sends encadeados que a RE.3 degradara para
+`possible` (caso 86) voltam a `confirmed ... via declared types`;
+fixture original intocado (cópia em WorkDir). O `--apply` na topologia
+(g) (send via retorno de método completado) também decide por fato.
+Adotado o gatilho `--apply` (relatório = padrão seguro, sem edição
+surpresa); a extensão VSCode expõe `hbrefactor.annotate` (relatório) e
+`hbrefactor.annotateApply` (edição com confirmação modal), guardas no
+harness do caso 71; `package.json` 0.9.0.
+
+**Resíduos honestos de F2.4** (declarados, não varridos): (1) a
+verificação inerte compila SEM `-kt`; num projeto que JÁ compila com
+`-kt` a anotação muda pcode e o teste de byte-identidade recusaria —
+os fixtures-semente não são `-kt`, e o `-kt`-project cai numa fatia
+futura (strip de `-kt` no baseline). (2) Anotação de PARÂMETRO
+(assinatura) fica de fora — só LOCAL puro; a assinatura colapsa em
+`tokens[]` (fato B4) e pede o idioma de `SigParamHits`, fatia futura.
+(3) O caso de ROLLBACK PROVOCADO por mentira de runtime não tem
+fixture próprio ainda: o mecanismo de rollback está exercido (uma
+falha real de build sob `-kt` restaurou os fontes byte-a-byte durante
+o desenvolvimento), mas fabricar uma mentira que a análise (conservadora
+por RE.3) ESCREVERIA e o `-kt` PEGARIA é trabalho de fixture à parte —
+próxima sessão. (4) As demais sementes da tabela de aceite (fixcls,
+fixmth, fixrcv, fixdis, fixext, fixb7) têm o `--apply` implementado e
+genérico, mas só a fixb7b virou caso de suíte nesta fatia; as outras
+entram como casos incrementais.

@@ -366,6 +366,22 @@ versão.
 **Critério**: round-trip por semente; caso de rollback provocado;
 suíte verde byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.
 
+**ENTREGUE (2026-07-09, núcleo).** `annotate --apply` no CLI: pipeline
+bottom-up (baseline → one-liners → padrão-ouro → re-análise → AS CLASS
+→ padrão-ouro), âncoras estruturais, `AnnApply` + helpers; padrão-ouro
+= inerte byte-idêntico sem `-kt` (o `-l` do compilador dispensa nº de
+linha) + compila limpo `-w3 -es2` + roda sob `-kt` se executável;
+`RollbackAll` + recusa em qualquer falha. Gatilho `--apply` (relatório
+= padrão, sem edição surpresa). **Caso 89** (fixb7b, round-trip): 4
+declarações + 3 AS CLASS verificados; os sends encadeados de `possible`
+(caso 86) voltam a `confirmed via declared types`; original intocado.
+Extensão: `hbrefactor.annotate`/`annotateApply` (confirmação modal) +
+guardas no harness 71; `package.json` 0.9.0. Suíte **636/0**.
+**Resíduos declarados** (spec § "Entregue (F2.4)"): projeto já-`-kt`
+(baseline sem strip), anotação de PARÂMETRO, fixture de rollback
+provocado e as demais sementes como casos incrementais — próxima
+sessão.
+
 ### F2.5 — Fechamento
 Roadmap: fase fechada com uma linha + narrativa no arquivo;
 testes-suspensos-re3: itens reconquistados marcados (SÓ os que a

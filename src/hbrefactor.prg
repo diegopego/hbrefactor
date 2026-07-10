@@ -96,8 +96,9 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor dump <projeto>          (gera os .ast.json e informa o diretório)" + hb_eol() )
    OutStd( "  hbrefactor projects-of <arq.prg> <projeto1> [<projeto2> ...] [--json <out>]" + hb_eol() )
    OutStd( "                                     (quais destes projetos têm o arquivo como fonte)" + hb_eol() )
-   OutStd( "  hbrefactor annotate <projeto> [<arq[:função]>] [--json <out>] [--dry-run]" + hb_eol() )
-   OutStd( "                                     (RELATÓRIO da escada de anotações - estágio 1, nenhuma edição)" + hb_eol() )
+   OutStd( "  hbrefactor annotate <projeto> [<arq[:função]>] [--json <out>] [--apply]" + hb_eol() )
+   OutStd( "                                     (escada de anotações; RELATÓRIO por padrão, --apply escreve" + hb_eol() )
+   OutStd( "                                      DECLAREs + AS CLASS com verificação padrão-ouro e rollback)" + hb_eol() )
    OutStd( "  <projeto> = qualquer alvo que o hbmk2 aceite (.hbp, .hbc com sources=," + hb_eol() )
    OutStd( "              lista de .prg separada por vírgula ou espaço)" + hb_eol() )
 
@@ -6282,12 +6283,8 @@ STATIC PROCEDURE SendNodesWalk( hExpr, cUpMsg, nLine, xBlock, aNodes )
 // ---------------------------------------------------------------------------
 STATIC FUNCTION Annotate( aArgs )
 
-   LOCAL cSpec, cScope := "", cJsonOut := "", nI, nAt
-   LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hDecl, hInter
-   LOCAL hFunc, hItem, cFileFil := "", cFuncFil := "", cMod
-   LOCAL aRep := {}, aFR := {}, aMR := {}, hCand, hSum, hLn, cTag
-   LOCAL nScan := 0, nSem := 0, cUpF, hEntry, hRet
-   LOCAL hSeenFR := { => }, hImpls, xImpl
+   LOCAL cSpec, cScope := "", cJsonOut := "", nI, nAt, lApply := .F.
+   LOCAL hProj, cTmp, cFileFil := "", cFuncFil := "", hLoad, hPlan
 
    IF Len( aArgs ) < 2
       Usage()
@@ -6298,9 +6295,10 @@ STATIC FUNCTION Annotate( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--json" .AND. nI < Len( aArgs )
          cJsonOut := aArgs[ ++nI ]
+      CASE Lower( aArgs[ nI ] ) == "--apply"
+         lApply := .T.        // F2.4: caminho de edição (padrão-ouro + rollback)
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
-         // estágio 1 é SEMPRE dry-run (não existe caminho de edição);
-         // aceito para compatibilidade com o fluxo do estágio 2
+         lApply := .F.        // relatório (padrão); explícito por simetria
       CASE Empty( cScope ) .AND. ! hb_LeftEq( aArgs[ nI ], "--" )
          cScope := aArgs[ nI ]
       OTHERWISE
@@ -6322,26 +6320,56 @@ STATIC FUNCTION Annotate( aArgs )
       RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
+   hLoad := AnnLoad( hProj, cTmp )
+   IF ! HB_ISHASH( hLoad )
+      RETURN Refuse( "o projeto não compila / dumps ast ausentes (harbour com -x " + ;
+                     "do branch feature/compiler-ast-dump) - corrija o build primeiro" )
+   ENDIF
+   hPlan := AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
+
+   IF lApply
+      RETURN AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
+   ENDIF
+
+   AnnReport( hPlan, cJsonOut, .F. )
+
+   RETURN EXIT_OK
+
+// carrega o projeto para análise: dump ast + leitura + tabelas declaradas
+// + máquina dormente (B7Ctx, único consumidor - RE.3). NIL em qualquer
+// falha (o chamador decide entre recusa e rollback). Reutilizado na
+// re-análise pós-edição do estágio 2
+STATIC FUNCTION AnnLoad( hProj, cTmp )
+
+   LOCAL hAsts := { => }, hAst, cPath, hDecl
+
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN NIL
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ast-1 ausente/inválido para '" + cPath + ;
-                        "' (harbour com -x do branch feature/compiler-ast-dump)" )
+         RETURN NIL
       ENDIF
       hAsts[ cPath ] := hAst
    NEXT
    hDecl := DeclTables( hAsts )
    IF hDecl == NIL
-      RETURN Refuse( "annotate precisa de dumps ast-4+ (canal de tipos declarados)" )
+      RETURN NIL
    ENDIF
-   // a máquina dormente REVIVE aqui - único consumidor (RE.3; plano F2.3)
-   hInter := B7Ctx( hAsts, hDecl )
 
-   hSum := { "n1" => 0, "n2" => 0, "n2g" => 0, "n3" => 0, ;
-             "kind" => 0, "semprova" => 0 }
+   RETURN { "asts" => hAsts, "decl" => hDecl, "inter" => B7Ctx( hAsts, hDecl ) }
+
+// a ESCADA: classifica locais (n1/n2/n3/kind), lista fábricas declaráveis
+// (Rota B) e completadores de membro (topologia (g), agora fato do core).
+// Puro sobre hLoad - não toca fonte. Devolve o plano
+STATIC FUNCTION AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
+
+   LOCAL hAsts := hLoad[ "asts" ], hDecl := hLoad[ "decl" ], hInter := hLoad[ "inter" ]
+   LOCAL cPath, hAst, hFunc, hItem, cMod, hCand, cUpF, hEntry, hRet, cTag
+   LOCAL aRep := {}, aFR := {}, aMR := {}, nScan := 0, nSem := 0
+   LOCAL hSeenFR := { => }, hImpls, xImpl
+   LOCAL hSum := { "n1" => 0, "n2" => 0, "n3" => 0, "kind" => 0, "semprova" => 0 }
 
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -6368,7 +6396,9 @@ STATIC FUNCTION Annotate( aArgs )
                LOOP
             ENDIF
             hCand[ "module" ] := cMod
+            hCand[ "path" ]   := cPath
             hCand[ "func" ]   := hFunc[ "name" ]
+            hCand[ "param" ]  := hb_HGetDef( hItem, "param", .F. )
             hSum[ hCand[ "level" ] ]++
             AAdd( aRep, hCand )
          NEXT
@@ -6392,7 +6422,6 @@ STATIC FUNCTION Annotate( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
       cMod := hb_FNameNameExt( hb_HGetDef( hAst, "module", cPath ) )
-      // filtro de escopo vale também aqui (Q5.1 da revisão Codex)
       IF ! Empty( cFileFil ) .AND. ;
          !( Lower( cMod ) == Lower( hb_FNameNameExt( cFileFil ) ) )
          LOOP
@@ -6418,7 +6447,7 @@ STATIC FUNCTION Annotate( aArgs )
             LOOP
          ENDIF
          hSeenFR[ cTag ] := .T.
-         AAdd( aFR, { "module" => cMod, "name" => hFunc[ "name" ], ;
+         AAdd( aFR, { "module" => cMod, "path" => cPath, "name" => hFunc[ "name" ], ;
                       "line" => hFunc[ "line" ], "cls" => hRet[ "cls" ], ;
                       "text" => "DECLARE " + hFunc[ "name" ] + ;
                                 AnnSigTxt( AnnParamList( hFunc ) ) + ;
@@ -6431,10 +6460,9 @@ STATIC FUNCTION Annotate( aArgs )
    NEXT
 
    // topologia (g): membros DECLARADOS sem tipo cujo retorno a máquina
-   // prova - completá-los é re-declarar (merge funciona, hbmain.c:1178)
-   // mas o W0019 bloqueia sob -es2; candidato de core (g), portão do meio
+   // prova - completá-los é re-declarar (merge, hbmain.c:1178); o W0019 já
+   // não dispara em complemento de tipo (candidato (g) ADOTADO no core)
    FOR EACH cTag IN hb_HKeys( hDecl[ "c" ] )
-      // filtro de escopo pelo módulo da classe (Q5.1 da revisão Codex)
       IF ! Empty( cFileFil ) .AND. ;
          !( Lower( AnnClsModName( NIL, cTag, hInter ) ) == ;
             Lower( hb_FNameNameExt( cFileFil ) ) )
@@ -6447,29 +6475,35 @@ STATIC FUNCTION Annotate( aArgs )
          hRet := B7SendRet( { "cls" => cTag }, cUpF, hInter )
          IF hRet != NIL .AND. hb_HHasKey( hRet, "cls" )
             AAdd( aMR, { "cls" => cTag, "msg" => cUpF, "ret" => hRet[ "cls" ], ;
+                         "module" => AnnClsModName( NIL, cTag, hInter ), ;
                          "text" => "_HB_MEMBER " + cUpF + "() AS CLASS " + ;
                                    hRet[ "cls" ] } )
          ENDIF
       NEXT
    NEXT
 
-   // relato humano
-   OutStd( "annotate (estágio 1 - RELATÓRIO; nenhuma edição)" + hb_eol() )
+   RETURN { "rep" => aRep, "fr" => aFR, "mr" => aMR, "sum" => hSum, "scan" => nScan }
+
+// relato humano (+ JSON). lApplied controla o banner (relatório × pós-edição)
+STATIC PROCEDURE AnnReport( hPlan, cJsonOut, lApplied )
+
+   LOCAL aRep := hPlan[ "rep" ], aFR := hPlan[ "fr" ], aMR := hPlan[ "mr" ]
+   LOCAL hSum := hPlan[ "sum" ], hCand, hLn, hEntry, cTag
+
+   IF ! lApplied
+      OutStd( "annotate (RELATÓRIO; nenhuma edição - use --apply para escrever)" + hb_eol() )
+   ENDIF
    FOR EACH hCand IN aRep
       cTag := hCand[ "module" ] + " " + hCand[ "func" ] + " " + hCand[ "sym" ] + ": "
       DO CASE
       CASE hCand[ "level" ] == "n1"
          OutStd( cTag + "nível 1 - AS CLASS " + hCand[ "cls" ] + ;
                  " (fato declarado puro)" + hb_eol() )
-      CASE hCand[ "level" ] == "n2" .OR. hCand[ "level" ] == "n2g"
-         OutStd( cTag + iif( hCand[ "level" ] == "n2g", ;
-                 "nível 2-BLOQUEADO(g)", "nível 2" ) + " - AS CLASS " + ;
-                 hCand[ "cls" ] + ", fecha com:" + hb_eol() )
+      CASE hCand[ "level" ] == "n2"
+         OutStd( cTag + "nível 2 - AS CLASS " + hCand[ "cls" ] + ", fecha com:" + hb_eol() )
          FOR EACH hLn IN hCand[ "lines" ]
             OutStd( "    + " + hLn[ "text" ] + "   [" + hLn[ "module" ] + ;
-                    ", " + hLn[ "pos" ] + ;
-                    iif( hLn[ "blocked" ], " - BLOQUEADO (g): W0019", "" ) + ;
-                    "]" + hb_eol() )
+                    ", " + hLn[ "pos" ] + "]" + hb_eol() )
          NEXT
       CASE hCand[ "level" ] == "n3"
          OutStd( cTag + "nível 3 - " + ;
@@ -6481,7 +6515,7 @@ STATIC FUNCTION Annotate( aArgs )
       ENDCASE
    NEXT
    IF ! Empty( aFR )
-      OutStd( "retornos declaráveis (Rota B):" + hb_eol() )
+      OutStd( "retornos de FUNÇÃO declaráveis (Rota B - DECLARE imposto sob -kt):" + hb_eol() )
       FOR EACH hEntry IN aFR
          OutStd( "    + " + hEntry[ "text" ] + "   [" + hEntry[ "module" ] + ;
                  ", antes da definição (linha " + hb_ntos( hEntry[ "line" ] ) + ")" + ;
@@ -6490,28 +6524,26 @@ STATIC FUNCTION Annotate( aArgs )
       NEXT
    ENDIF
    IF ! Empty( aMR )
-      OutStd( "retornos de MÉTODO prováveis - BLOQUEADOS pela topologia (g):" + hb_eol() )
+      OutStd( "retornos de MÉTODO declaráveis (topologia (g) - _HB_MEMBER completa tipo):" + hb_eol() )
       FOR EACH hEntry IN aMR
-         OutStd( "    + " + hEntry[ "cls" ] + ": " + hEntry[ "text" ] + ;
-                 "   [W0019 - candidato de core (g)]" + hb_eol() )
+         OutStd( "    + " + hEntry[ "cls" ] + ": " + hEntry[ "text" ] + hb_eol() )
       NEXT
    ENDIF
-   OutStd( "resumo: locais-varridas=" + hb_ntos( nScan ) + ;
+   OutStd( "resumo: locais-varridas=" + hb_ntos( hPlan[ "scan" ] ) + ;
            " nível1=" + hb_ntos( hSum[ "n1" ] ) + ;
            " nível2=" + hb_ntos( hSum[ "n2" ] ) + ;
-           " nível2-bloqueado=" + hb_ntos( hSum[ "n2g" ] ) + ;
            " nível3=" + hb_ntos( hSum[ "n3" ] ) + ;
            " kind-fora=" + hb_ntos( hSum[ "kind" ] ) + ;
            " sem-prova=" + hb_ntos( hSum[ "semprova" ] ) + ;
-           " retornos-declaráveis=" + hb_ntos( Len( aFR ) ) + ;
-           " metodos-bloqueados-g=" + hb_ntos( Len( aMR ) ) + hb_eol() )
+           " retornos-fun-declaráveis=" + hb_ntos( Len( aFR ) ) + ;
+           " retornos-metodo-declaráveis=" + hb_ntos( Len( aMR ) ) + hb_eol() )
    IF ! Empty( cJsonOut )
       hb_MemoWrit( cJsonOut, hb_jsonEncode( { "candidates" => aRep, ;
                    "funrets" => aFR, "methodrets" => aMR, ;
                    "summary" => hSum } ) )
    ENDIF
 
-   RETURN 0
+   RETURN
 
 // classifica UMA local sem tipo na escada. NIL = sem prova nenhuma
 STATIC FUNCTION AnnOne( hItem, hFunc, hAst, hDecl, hInter )
@@ -6543,7 +6575,7 @@ STATIC FUNCTION AnnOne( hItem, hFunc, hAst, hDecl, hInter )
       RETURN NIL                        // kind por inferência: fora da fatia
    ENDIF
    // caminha os elos para NOMEAR o que fecharia a cadeia por declaração
-   hCtx := { "lines" => {}, "infer" => "", "gblk" => .F. }
+   hCtx := { "lines" => {}, "infer" => "" }
    hWalk := AnnLinks( hVar, hFunc, hDecl, .F., NIL, hInter, hAst, hCtx )
    IF ! Empty( hCtx[ "infer" ] )
       RETURN { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
@@ -6552,7 +6584,7 @@ STATIC FUNCTION AnnOne( hItem, hFunc, hAst, hDecl, hInter )
    ENDIF
    IF hWalk != NIL .AND. hb_HHasKey( hWalk, "cls" ) .AND. ! Empty( hCtx[ "lines" ] )
       RETURN { "sym" => hItem[ "sym" ], "declLine" => hItem[ "declLine" ], ;
-               "level" => iif( hCtx[ "gblk" ], "n2g", "n2" ), ;
+               "level" => "n2", ;
                "cls" => hWalk[ "cls" ], "lines" => hCtx[ "lines" ] }
    ENDIF
    // divergência caminhante × máquina: relato honesto, nunca palpite
@@ -6692,14 +6724,16 @@ STATIC FUNCTION AnnLinks( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst, hCtx
                            hRet[ "cls" ], ;
                            hb_FNameNameExt( hb_HGetDef( aFA[ 1 ], "module", "" ) ), ;
                            "registro da classe, antes da definição de " + ;
-                           aFA[ 2 ][ "name" ], .F. )
+                           aFA[ 2 ][ "name" ], ;
+                           { "kind" => "beforeFunc", "func" => aFA[ 2 ][ "name" ] } )
             ENDIF
             AnnAddLine( hCtx, "DECLARE " + aFA[ 2 ][ "name" ] + ;
                         AnnSigTxt( AnnParamList( aFA[ 2 ] ) ) + ;
                         " AS CLASS " + hRet[ "cls" ], ;
                         hb_FNameNameExt( hb_HGetDef( aFA[ 1 ], "module", "" ) ), ;
                         "antes da definição (linha " + ;
-                        hb_ntos( aFA[ 2 ][ "line" ] ) + ")", .F. )
+                        hb_ntos( aFA[ 2 ][ "line" ] ) + ")", ;
+                        { "kind" => "beforeFunc", "func" => aFA[ 2 ][ "name" ] } )
             RETURN hRet
          ENDIF
          RETURN NIL
@@ -6732,15 +6766,16 @@ STATIC FUNCTION AnnLinks( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst, hCtx
          IF hExprA != NIL
             RETURN hExprA
          ENDIF
-         // membro DECLARADO mas SEM tipo - topologia (g): re-declarar faz
-         // merge mas emite W0019 (probe probg); bloqueado até o candidato
-         // de core abrir no portão do meio
+         // membro DECLARADO mas SEM tipo - topologia (g): re-declarar faz o
+         // merge (hbmain.c:1178); o W0019 já NÃO dispara em complemento de
+         // tipo (candidato (g) ADOTADO no core, hbmain.c:1174-1180, portão
+         // do meio 2026-07-09). Fecha por _HB_MEMBER após a classe
          hRet := B7SendRet( hRes, cMsg, hInter )
          IF hRet != NIL .AND. hb_HHasKey( hRet, "cls" )
-            hCtx[ "gblk" ] := .T.
             AnnAddLine( hCtx, "_HB_MEMBER " + cMsg + "() AS CLASS " + hRet[ "cls" ], ;
                         AnnClsModName( hAst, cCls, hInter ), ;
-                        "após a classe " + cCls, .T. )
+                        "após a classe " + cCls + " (completa o tipo do membro)", ;
+                        { "kind" => "afterClass", "cls" => cCls } )
             RETURN hRet
          ENDIF
          RETURN NIL
@@ -6756,14 +6791,16 @@ STATIC FUNCTION AnnLinks( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst, hCtx
             AnnAddLine( hCtx, "_HB_MEMBER " + cMsg + "() AS CLASS " + hRet[ "cls" ], ;
                         hb_FNameNameExt( hb_HGetDef( hAst, "module", "" ) ), ;
                         "após a classe " + cCls + ;
-                        " e ANTES da próxima classe do módulo", .F. )
+                        " e ANTES da próxima classe do módulo", ;
+                        { "kind" => "afterClass", "cls" => cCls } )
          ELSE
             // classe de fora/runtime: a UMA linha DECLARE no módulo do
             // site registra classe + membro + função-classe (smoke3/probc)
             AnnAddLine( hCtx, "DECLARE " + cCls + " " + cMsg + "() AS CLASS " + ;
                         hRet[ "cls" ], ;
                         hb_FNameNameExt( hb_HGetDef( hAst, "module", "" ) ), ;
-                        "antes de " + hFunc[ "name" ], .F. )
+                        "antes de " + hFunc[ "name" ], ;
+                        { "kind" => "beforeFunc", "func" => hFunc[ "name" ] } )
          ENDIF
          RETURN hRet
       ENDIF
@@ -6796,8 +6833,11 @@ STATIC FUNCTION AnnLinks( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst, hCtx
 
    RETURN NIL
 
-// acrescenta um one-liner (dedup por texto+módulo)
-STATIC PROCEDURE AnnAddLine( hCtx, cText, cModule, cPos, lBlocked )
+// acrescenta um one-liner (dedup por texto+módulo). hAnchor = âncora
+// ESTRUTURAL de inserção (fato, não texto): { "kind" => "afterClass"|
+// "beforeFunc", "cls"|"func" => <nome> } - o caminho de edição (F2.4)
+// resolve a linha-fonte a partir dela; o relato usa o texto humano cPos
+STATIC PROCEDURE AnnAddLine( hCtx, cText, cModule, cPos, hAnchor )
 
    LOCAL hLn
 
@@ -6807,7 +6847,7 @@ STATIC PROCEDURE AnnAddLine( hCtx, cText, cModule, cPos, lBlocked )
       ENDIF
    NEXT
    AAdd( hCtx[ "lines" ], { "text" => cText, "module" => cModule, ;
-                            "pos" => cPos, "blocked" => lBlocked } )
+                            "pos" => cPos, "anchor" => hAnchor } )
 
    RETURN
 
@@ -6876,6 +6916,422 @@ STATIC FUNCTION AnnSetTxt( hType )
    NEXT
 
    RETURN cOut
+
+// ---------------------------------------------------------------------------
+// annotate ESTÁGIO 2 (F2.4) - o caminho de EDIÇÃO. Pipeline bottom-up com
+// verificação padrão-ouro por edição e rollback (spec-b9-fatia2 § Pipeline):
+//   1. baseline .hrb SEM -kt (a declaração/anotação é INERTE: zero pcode)
+//   2. escreve os one-liners de habilitação (DECLARE de fábrica, registro
+//      de classe, _HB_MEMBER que completa o tipo - topologia (g)/core)
+//   3. padrão-ouro: (i) .hrb byte-idêntico ao baseline (inerte sem -kt);
+//      (ii) compila limpo -w3 -es2; (iii) sob -kt RODA e cheques passam
+//   4. RE-ANALISA (os elos agora fecham por fato declarado, não por via)
+//   5. escreve os AS CLASS das locais AGORA nível 1, âncora byte-exata
+//      pelos tokens (prov 's'); param = fatia futura (assinatura)
+//   6. padrão-ouro de novo. Qualquer falha => RollbackAll + recusa nomeada
+// Só edita o que a recompilação VERIFICA (nunca editar o não-verificável).
+// ---------------------------------------------------------------------------
+STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
+
+   LOCAL hOrig := { => }, aIns := {}, hModAst := { => }
+   LOCAL hCand, hLn, hEntry, cPath, cWhy := "", cKt := "skipped"
+   LOCAL lRunnable, hLoad2, hPlan2, aAnn := {}, nCol, hAst
+
+   HB_SYMBOL_UNUSED( cFuncFil )
+
+   // mapa basename-do-módulo -> { ast, path } do estado ATUAL
+   FOR EACH cPath IN hProj[ "files" ]
+      hModAst[ Lower( hb_FNameNameExt( ;
+         hb_HGetDef( hLoad[ "asts" ][ cPath ], "module", cPath ) ) ) ] := ;
+         { "ast" => hLoad[ "asts" ][ cPath ], "path" => cPath }
+   NEXT
+   lRunnable := AnnHasMain( hLoad )
+
+   // 1. baseline .hrb (estado de referência, sem -kt)
+   IF ! CompileHrbAll( hProj, cTmp, "annb4" )
+      RETURN Refuse( "falha ao compilar o estado de referência" )
+   ENDIF
+
+   // 2. one-liners de habilitação: elos do nível 2 + Rota B + topologia (g)
+   FOR EACH hCand IN hPlan[ "rep" ]
+      IF hCand[ "level" ] == "n2"
+         FOR EACH hLn IN hCand[ "lines" ]
+            AnnQueueIns( aIns, hModAst, hLn[ "module" ], hLn[ "anchor" ], ;
+                         hLn[ "text" ], @cWhy )
+            IF ! Empty( cWhy )
+               RETURN Refuse( "não posicionei '" + hLn[ "text" ] + "': " + cWhy )
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+   FOR EACH hEntry IN hPlan[ "fr" ]
+      IF hEntry[ "needreg" ]
+         AnnQueueIns( aIns, hModAst, hEntry[ "module" ], ;
+            { "kind" => "beforeFunc", "func" => hEntry[ "name" ] }, ;
+            hEntry[ "regtext" ], @cWhy )
+      ENDIF
+      AnnQueueIns( aIns, hModAst, hEntry[ "module" ], ;
+         { "kind" => "beforeFunc", "func" => hEntry[ "name" ] }, hEntry[ "text" ], @cWhy )
+      IF ! Empty( cWhy )
+         RETURN Refuse( "não posicionei '" + hEntry[ "text" ] + "': " + cWhy )
+      ENDIF
+   NEXT
+   FOR EACH hEntry IN hPlan[ "mr" ]
+      AnnQueueIns( aIns, hModAst, hEntry[ "module" ], ;
+         { "kind" => "afterClass", "cls" => hEntry[ "cls" ] }, hEntry[ "text" ], @cWhy )
+      IF ! Empty( cWhy )
+         RETURN Refuse( "não posicionei '" + hEntry[ "text" ] + "': " + cWhy )
+      ENDIF
+   NEXT
+
+   IF Empty( aIns ) .AND. AnnCountN1( hPlan ) == 0
+      OutStd( "annotate --apply: nada a materializar (nenhum nível 1/2 no escopo)" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   // 3. escreve os one-liners e verifica (inerte + compila limpo + roda -kt)
+   IF ! Empty( aIns )
+      IF ! AnnWriteInserts( aIns, hOrig, @cWhy )
+         RollbackAll( hOrig )
+         RETURN Refuse( "falha ao inserir declarações: " + cWhy )
+      ENDIF
+      IF ! AnnGoldCheck( hProj, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
+         RollbackAll( hOrig )
+         RETURN Refuse( "padrão-ouro FALHOU após inserir declarações: " + cWhy )
+      ENDIF
+   ENDIF
+
+   // 4. re-análise: com as declarações no lugar, os elos fecham por FATO
+   hLoad2 := AnnLoad( hProj, cTmp )
+   IF ! HB_ISHASH( hLoad2 )
+      RollbackAll( hOrig )
+      RETURN Refuse( "re-análise falhou após inserir declarações - rollback" )
+   ENDIF
+   hPlan2 := AnnPlan( hProj, hLoad2, cFileFil, cFuncFil )
+
+   // 5. AS CLASS nas locais AGORA nível 1 (fato declarado puro; nunca via)
+   FOR EACH hCand IN hPlan2[ "rep" ]
+      IF !( hCand[ "level" ] == "n1" ) .OR. hCand[ "param" ]
+         LOOP                    // param = assinatura (fatia futura); só n1
+      ENDIF
+      hAst := hLoad2[ "asts" ][ hCand[ "path" ] ]
+      nCol := AnnNameCol( hAst, hCand[ "declLine" ], hCand[ "sym" ] )
+      IF nCol == 0
+         LOOP                    // sem âncora byte-exata: pula (honesto)
+      ENDIF
+      AAdd( aAnn, { "path" => hCand[ "path" ], "line" => hCand[ "declLine" ], ;
+                    "col" => nCol + Len( hCand[ "sym" ] ), ;
+                    "text" => " AS CLASS " + hCand[ "cls" ] } )
+   NEXT
+
+   IF ! Empty( aAnn )
+      IF ! AnnWriteAnnots( aAnn, hOrig, @cWhy )
+         RollbackAll( hOrig )
+         RETURN Refuse( "falha ao anotar locais: " + cWhy )
+      ENDIF
+      IF ! AnnGoldCheck( hProj, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
+         RollbackAll( hOrig )
+         RETURN Refuse( "padrão-ouro FALHOU após anotar locais: " + cWhy )
+      ENDIF
+   ENDIF
+
+   OutStd( "annotate --apply: " + hb_ntos( Len( aIns ) ) + ;
+           " declaração(ões) + " + hb_ntos( Len( aAnn ) ) + " anotação(ões) AS CLASS" + hb_eol() )
+   OutStd( "verificado: .hrb byte-idêntico sem -kt; compila limpo -w3 -es2; " + ;
+           iif( cKt == "ran", "roda sob -kt (cheques passam)", ;
+                "projeto não-executável - passo -kt pulado (declared, não imposto)" ) + hb_eol() )
+
+   RETURN EXIT_OK
+
+// há uma PROCEDURE/FUNCTION MAIN? (projeto executável => verificação -kt)
+STATIC FUNCTION AnnHasMain( hLoad )
+
+   LOCAL cPath, hFunc
+
+   FOR EACH cPath IN hb_HKeys( hLoad[ "asts" ] )
+      FOR EACH hFunc IN hLoad[ "asts" ][ cPath ][ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == "MAIN"
+            RETURN .T.
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN .F.
+
+// quantas locais nível 1 no plano (para decidir "nada a materializar")
+STATIC FUNCTION AnnCountN1( hPlan )
+
+   LOCAL hCand, nN := 0
+
+   FOR EACH hCand IN hPlan[ "rep" ]
+      IF hCand[ "level" ] == "n1" .AND. ! hCand[ "param" ]
+         nN++
+      ENDIF
+   NEXT
+
+   RETURN nN
+
+// resolve a âncora ESTRUTURAL numa linha-fonte (insert-before). 0 = não
+// resolvida; -1 = anexar no fim do módulo (classe sem função seguinte)
+STATIC FUNCTION AnnResolveLine( hAst, hAnchor )
+
+   LOCAL hFunc, nClsLine := 0, nBest := 0, cKind := hb_HGetDef( hAnchor, "kind", "" )
+
+   DO CASE
+   CASE cKind == "beforeFunc"
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. ;
+            Upper( hFunc[ "name" ] ) == Upper( hAnchor[ "func" ] )
+            RETURN hFunc[ "line" ]
+         ENDIF
+      NEXT
+   CASE cKind == "afterClass"
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. ;
+            Upper( hFunc[ "name" ] ) == Upper( hAnchor[ "cls" ] )
+            nClsLine := hFunc[ "line" ]
+            EXIT
+         ENDIF
+      NEXT
+      IF nClsLine == 0
+         RETURN 0
+      ENDIF
+      // 1ª função (fora fileDecl) com linha > CREATE CLASS => o _HB_MEMBER
+      // vai ANTES dela (após END CLASS, antes da próxima classe: pLastClass
+      // continua a classe-alvo, probes proba/proba2)
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "line" ] > nClsLine .AND. ;
+            ( nBest == 0 .OR. hFunc[ "line" ] < nBest )
+            nBest := hFunc[ "line" ]
+         ENDIF
+      NEXT
+      RETURN iif( nBest == 0, -1, nBest )   // -1 = classe é a última: anexa
+   ENDCASE
+
+   RETURN 0
+
+// enfileira um one-liner resolvendo a âncora -> { path, line, text }; dedup
+// por (path, text). cWhy != "" em falha de posicionamento
+STATIC PROCEDURE AnnQueueIns( aIns, hModAst, cModule, hAnchor, cText, cWhy )
+
+   LOCAL cBase := Lower( cModule ), hM, nLine, hIns
+
+   cWhy := ""
+   IF ! HB_ISHASH( hAnchor )
+      cWhy := "sem âncora estrutural"
+      RETURN
+   ENDIF
+   IF ! hb_HHasKey( hModAst, cBase )
+      cWhy := "módulo '" + cModule + "' não é do projeto"
+      RETURN
+   ENDIF
+   hM := hModAst[ cBase ]
+   nLine := AnnResolveLine( hM[ "ast" ], hAnchor )
+   IF nLine == 0
+      cWhy := "âncora não resolvida (" + hb_HGetDef( hAnchor, "kind", "?" ) + ")"
+      RETURN
+   ENDIF
+   FOR EACH hIns IN aIns
+      IF hIns[ "path" ] == hM[ "path" ] .AND. hIns[ "text" ] == cText
+         RETURN                 // já enfileirado
+      ENDIF
+   NEXT
+   AAdd( aIns, { "path" => hM[ "path" ], "line" => nLine, "text" => cText } )
+
+   RETURN
+
+// escreve os one-liners (insert-before). Por arquivo: agrupa por linha,
+// processa de baixo p/ cima (linha DESC) para não deslocar as pendentes;
+// -1 = anexar no fim. Cacheia o texto original em hOrig (rollback)
+STATIC FUNCTION AnnWriteInserts( aIns, hOrig, cWhy )
+
+   LOCAL hByPath := { => }, cPath, aList, hIns, cText, cEol, aLines, hByLine
+   LOCAL nLine, aKeys, nCount
+
+   cWhy := ""
+   FOR EACH hIns IN aIns
+      IF ! hb_HHasKey( hByPath, hIns[ "path" ] )
+         hByPath[ hIns[ "path" ] ] := {}
+      ENDIF
+      AAdd( hByPath[ hIns[ "path" ] ], hIns )
+   NEXT
+
+   FOR EACH cPath IN hb_HKeys( hByPath )
+      cText := hb_MemoRead( cPath )
+      IF cText == NIL
+         cWhy := "não consegui ler " + cPath
+         RETURN .F.
+      ENDIF
+      IF ! hb_HHasKey( hOrig, cPath )
+         hOrig[ cPath ] := cText
+      ENDIF
+      cEol := iif( Chr( 13 ) + Chr( 10 ) $ cText, Chr( 13 ) + Chr( 10 ), Chr( 10 ) )
+      aList := hByPath[ cPath ]
+      nCount := Len( LineOffsets( cText ) )
+      // agrupa por linha (preserva ordem de fila dentro da mesma linha)
+      hByLine := { => }
+      FOR EACH hIns IN aList
+         nLine := iif( hIns[ "line" ] == -1, nCount + 1, hIns[ "line" ] )
+         IF ! hb_HHasKey( hByLine, nLine )
+            hByLine[ nLine ] := {}
+         ENDIF
+         AAdd( hByLine[ nLine ], hIns[ "text" ] )
+      NEXT
+      aKeys := hb_HKeys( hByLine )
+      ASort( aKeys,,, {| x, y | x > y } )          // DESC: de baixo p/ cima
+      FOR EACH nLine IN aKeys
+         aLines := hByLine[ nLine ]
+         cText := InsertLinesBefore( cText, nLine, aLines, cEol )
+      NEXT
+      hb_MemoWrit( cPath, cText )
+   NEXT
+
+   RETURN .T.
+
+// insere um bloco de linhas ANTES da linha nLine 1-based; nLine > total =
+// anexa no fim do texto
+STATIC FUNCTION InsertLinesBefore( cText, nLine, aLines, cEol )
+
+   LOCAL aOffs := LineOffsets( cText ), cBlock := "", cL, nStart
+
+   FOR EACH cL IN aLines
+      cBlock += cL + cEol
+   NEXT
+   IF nLine > Len( aOffs )
+      IF ! ( Empty( cText ) .OR. hb_BRight( cText, hb_BLen( cEol ) ) == cEol )
+         cText += cEol
+      ENDIF
+      RETURN cText + cBlock
+   ENDIF
+   nStart := aOffs[ nLine ]
+
+   RETURN hb_BLeft( cText, nStart - 1 ) + cBlock + hb_BSubStr( cText, nStart )
+
+// coluna 1-based do INÍCIO do nome da local na sua linha de declaração -
+// exige token identificador (type 21) prov 's' ÚNICO (âncora byte-exata);
+// 0 se ambíguo/ausente/reescrito por pp (recusa honesta do site)
+STATIC FUNCTION AnnNameCol( hAst, nLine, cSym )
+
+   LOCAL cUp := Upper( cSym ), hTok, nCol := 0, nHits := 0
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "line" ] == nLine .AND. hTok[ "type" ] == 21 .AND. ;
+         hb_HGetDef( hTok, "prov", "" ) == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+         Upper( hTok[ "text" ] ) == cUp
+         nCol := hTok[ "col" ] + 1
+         nHits++
+      ENDIF
+   NEXT
+
+   RETURN iif( nHits == 1, nCol, 0 )
+
+// escreve as anotações AS CLASS. Por arquivo, aplica (linha,col) DESC para
+// que uma inserção não desloque as posições ainda pendentes
+STATIC FUNCTION AnnWriteAnnots( aAnn, hOrig, cWhy )
+
+   LOCAL hByPath := { => }, cPath, aList, hA, cText
+
+   cWhy := ""
+   FOR EACH hA IN aAnn
+      IF ! hb_HHasKey( hByPath, hA[ "path" ] )
+         hByPath[ hA[ "path" ] ] := {}
+      ENDIF
+      AAdd( hByPath[ hA[ "path" ] ], hA )
+   NEXT
+
+   FOR EACH cPath IN hb_HKeys( hByPath )
+      cText := hb_MemoRead( cPath )
+      IF cText == NIL
+         cWhy := "não consegui ler " + cPath
+         RETURN .F.
+      ENDIF
+      IF ! hb_HHasKey( hOrig, cPath )
+         hOrig[ cPath ] := cText
+      ENDIF
+      aList := hByPath[ cPath ]
+      ASort( aList,,, {| x, y | iif( x[ "line" ] == y[ "line" ], ;
+             x[ "col" ] > y[ "col" ], x[ "line" ] > y[ "line" ] ) } )
+      FOR EACH hA IN aList
+         cText := AnnInsertAt( cText, hA[ "line" ], hA[ "col" ], hA[ "text" ] )
+      NEXT
+      hb_MemoWrit( cPath, cText )
+   NEXT
+
+   RETURN .T.
+
+// insere cIns na posição (linha,col 1-based) do texto
+STATIC FUNCTION AnnInsertAt( cText, nLine, nCol, cIns )
+
+   LOCAL aOffs := LineOffsets( cText ), nAbs
+
+   IF nLine > Len( aOffs )
+      RETURN cText
+   ENDIF
+   nAbs := aOffs[ nLine ] + nCol - 1
+
+   RETURN hb_BLeft( cText, nAbs - 1 ) + cIns + hb_BSubStr( cText, nAbs )
+
+// verificação padrão-ouro: (i) .hrb byte-idêntico ao baseline (sem -kt, a
+// edição é inerte); (ii) compila limpo (flags do projeto, -w3 -es2);
+// (iii) sob -kt o projeto RODA e os cheques passam (se executável).
+// cKt <- "ran"/"skipped"; cWhy nomeia a falha
+STATIC FUNCTION AnnGoldCheck( hProj, cSpec, cTmp, lRunnable, cWhy, cKt )
+
+   LOCAL cP
+
+   cWhy := ""
+   cKt := "skipped"
+   // (ii) compila limpo
+   IF ! CompileHrbAll( hProj, cTmp, "annaf" )
+      cWhy := "o projeto parou de compilar limpo (-w3 -es2)"
+      RETURN .F.
+   ENDIF
+   // (i) inerte: byte-idêntico ao baseline (zero pcode sem -kt)
+   FOR EACH cP IN hProj[ "files" ]
+      IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cP ) + ".annb4.hrb" ) == ;
+            hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cP ) + ".annaf.hrb" ) )
+         cWhy := "a edição NÃO é inerte: " + hb_FNameName( cP ) + ".hrb mudou (pcode)"
+         RETURN .F.
+      ENDIF
+   NEXT
+   // (iii) sob -kt: roda e cheques passam
+   IF lRunnable
+      IF ! AnnKtRun( cSpec, cTmp, @cWhy )
+         RETURN .F.
+      ENDIF
+      cKt := "ran"
+   ENDIF
+
+   RETURN .T.
+
+// build+run sob -kt, limitado no tempo. Exit != 0 ou "declared type check
+// failed" na saída => o cheque disparou (anotação contradiz o runtime)
+STATIC FUNCTION AnnKtRun( cSpec, cTmp, cWhy )
+
+   LOCAL cExe := hb_DirSepAdd( cTmp ) + "annkt", cOut := "", cErr := "", nRet
+   LOCAL cWork := hb_DirSepAdd( cTmp ) + "ktwork"
+
+   cWhy := ""
+   hb_DirBuild( cWork )
+   IF hb_processRun( HbMk2Bin() + " " + StrTran( cSpec, ",", " " ) + ;
+                     " -q0 -gtcgi -prgflag=-kt -workdir=" + cWork + ;
+                     " -o" + cExe,, @cOut, @cErr ) != 0
+      cWhy := "o projeto não compila sob -kt: " + ErrLines( cOut + cErr )
+      RETURN .F.
+   ENDIF
+   cOut := cErr := ""
+   nRet := hb_processRun( "timeout 30 " + cExe + " //GT:CGI",, @cOut, @cErr )
+   IF nRet != 0
+      cWhy := "execução sob -kt terminou com código " + hb_ntos( nRet ) + ;
+              " (cheque de tipo declarado pode ter disparado)"
+      RETURN .F.
+   ENDIF
+   IF "declared type check failed" $ ( cOut + cErr )
+      cWhy := "cheque de tipo declarado FALHOU na execução sob -kt"
+      RETURN .F.
+   ENDIF
+
+   RETURN .T.
 
 // ---------------------------------------------------------------------------
 // B7 - tipos interprocedurais (spec-b7-tipos-interprocedurais.md, portão

@@ -93,5 +93,23 @@ check('relatórios de projeto inteiro não mudam: projCtx pergunta sem arquivo',
 check('extensão não lê .hbp (o fato vem do hbmk2 via CLI)',
   !/readFileSync\([^)]*\.hbp/i.test(src) && !/hb[pc]'?\s*\)\s*\.map[^)]*parse/i.test(src));
 
+// 7. annotate (B9 fatia 2 F2.4): a capacidade nova do CLI chega à extensão
+// (regra "extensão sempre com os últimos recursos"). RELATÓRIO e --apply,
+// os dois registrados; o --apply confirma ANTES de escrever fonte (modal)
+// e só então roda 'annotate ... --apply'
+check('hbrefactor.annotate registrado (relatório)',
+  /registerCommand\('hbrefactor\.annotate',\s*cmdAnnotate\)/.test(src));
+check('hbrefactor.annotateApply registrado (edição)',
+  /registerCommand\('hbrefactor\.annotateApply',\s*cmdAnnotateApply\)/.test(src));
+check('annotate relatório: roda annotate sem --apply (nenhuma edição)',
+  /run\(\s*\[\s*'annotate',\s*c\.spec,\s*c\.file\s*\]\s*,\s*c\.cwd\s*\)/.test(src));
+check('annotate --apply confirma (modal) ANTES de escrever fonte',
+  /showWarningMessage\([\s\S]*?\{\s*modal:\s*true\s*\}[\s\S]*?\)/.test(src) &&
+  /run\(\s*\[\s*'annotate',\s*c\.spec,\s*c\.file,\s*'--apply'\s*\]/.test(src));
+const pkg2 = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const cmds = pkg2.contributes.commands.map(x => x.command);
+check('os dois comandos annotate no package.json (paleta os expõe)',
+  cmds.includes('hbrefactor.annotate') && cmds.includes('hbrefactor.annotateApply'));
+
 console.log('\n' + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);
