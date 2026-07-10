@@ -14,3 +14,4 @@ work/
 
 # artefatos de build incremental do hbmk2 em fixtures/experimentos
 .hbmk/
+.vscode/settings.json
