@@ -13,13 +13,26 @@ if [ -n "$found" ]; then
 fi
 
 # barra também o C GERADO pelo compilador Harbour (harbour/hbmk2 emitem .c
-# intermediário com o cabeçalho ` * Generated C source from "..."` - literal
-# FIXO em src/compiler/genc.c do core; a linha de versão acima dele varia e
-# por isso não entra no padrão). É texto, então a heurística de binário não
-# pega (o sh1.c que vazou na raiz provou, 2026-07-11). Checa o BLOB staged
-# (git show :f), não a worktree, nas primeiras linhas do cabeçalho.
+# intermediário). É texto, então a heurística de binário não pega (o sh1.c
+# que vazou na raiz provou, 2026-07-11). Match ESTRUTURAL do template que o
+# src/compiler/genc.c do core escreve como PRIMEIRA coisa no arquivo:
+#   /*
+#    * Harbour <versão> (r<rev>)      <- hb_verHarbour(), prefixo fixo
+#    * <compilador C usado>           <- hb_verCompiler(), varia
+#    * Generated C source from "..."  <- literal fixo
+#    */
+# As 5 linhas POSICIONAIS, ancoradas na linha 1 - um .c legítimo que apenas
+# CITE a frase num comentário não casa. Checa o BLOB staged (git show :f),
+# não a worktree.
 gen=$(git diff --cached --name-only --diff-filter=AM -- '*.c' | while IFS= read -r f; do
-  if git show ":$f" 2>/dev/null | head -6 | grep -q 'Generated C source from "'; then
+  if git show ":$f" 2>/dev/null | head -5 | awk '
+       NR==1 { ok1 = ($0 == "/*") }
+       NR==2 { ok2 = ($0 ~ /^ \* Harbour /) }
+       NR==3 { ok3 = ($0 ~ /^ \* /) }
+       NR==4 { ok4 = ($0 ~ /^ \* Generated C source from ".*"$/) }
+       NR==5 { ok5 = ($0 == " */") }
+       END { exit (ok1 && ok2 && ok3 && ok4 && ok5) ? 0 : 1 }'
+  then
     printf '%s\n' "$f"
   fi
 done)
