@@ -12,7 +12,7 @@ HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
-.PHONY: build test clean hooks
+.PHONY: build test ppcorpus clean hooks
 
 build: hooks $(BIN)
 
@@ -34,6 +34,13 @@ $(BIN): src/hbrefactor.prg
 # JOBS=1 força o modo sequencial com saída ao vivo, para depurar um caso
 test: build bin/tcheck bin/parrun
 	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
+
+# suite EXPLORATORIA do PP (P-DOC): o corpus de diretivas REAIS do Harbour
+# (docs/pp-corpus.md) casado com os quatro oraculos (.ppo/.ppt/ast dump/codigo
+# compilavel). SEPARADA do contrato de proposito - e exploratoria e o core sera
+# modificado durante a exploracao. Nao entra no `make test`.
+ppcorpus: build
+	@HB_BIN=$(HB_BIN) tests/ppcorpus.sh
 
 bin/tcheck: tests/tcheck.prg
 	@mkdir -p bin

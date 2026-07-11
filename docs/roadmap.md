@@ -448,8 +448,15 @@ nela. Vira **fonte essencial de conhecimento do PP** (para o Diego, para o
 usuário final e para as próprias fatias P). **Formato:** fixture por família de
 diretiva + o par `.ppo`/`.ppt` anotado + a explicação bilíngue (técnica +
 programador). Encaixa na fase P (alimenta Eixo A/fonte-de-fato e Eixo
-B/instrumento) e no mapa do alcançável. Escopo/critério de pronto a detalhar
-antes de executar (regra do documento vivo).
+B/instrumento) e no mapa do alcançável. **Spec + método:
+[spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
+[pp-corpus.md](pp-corpus.md).** Método = os QUATRO oráculos (`.ppo` + `.ppt` +
+ast dump + fixture COMPILÁVEL); suíte SEPARADA do contrato (`make ppcorpus`, não
+`make test`) porque é exploratória E o core será estendido para gerar mais
+informação durante a fase (permissão do Diego). **1ª família ENTREGUE
+(2026-07-11): SET EXACT (std.ch) — restrict + smart-quote, prova-de-formato,
+`make ppcorpus` 4/4; formato confirmado pelo Diego.** Próximas na ordem:
+`@…SAY…GET`, `TEXT`/`STORE`, hbclass `CLASS`/`METHOD`/`VAR`, um contrib.
 
 **Portões pontuais a submeter durante a execução:** D-P3 (fato provado vira
 `ast-N` OU fica computado do `from`?), D-P4 (restrict-validation e
