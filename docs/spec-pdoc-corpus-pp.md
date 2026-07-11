@@ -39,7 +39,7 @@ pp) e é o termo interno das specs; nos textos para o programador Harbour usar
 
 ## Formato de cada família (o molde executável)
 
-Cada família de diretiva vira uma ENTRADA no corpus ([pp-corpus.md](pp-corpus.md))
+Cada família de diretiva vira uma ENTRADA no corpus ([pp-corpus/README.md](pp-corpus/README.md))
 com, nesta ordem:
 1. **A diretiva** (colada do `.ch` real, com arquivo:linha de origem).
 2. **A fixture `.prg`** que a exercita (compila LIMPO sob `-w3 -es2` — régua do
@@ -52,6 +52,11 @@ com, nesta ordem:
    significa para quem escreve o comando (programador Harbour).
 6. **Lente de refatoração:** o que o hbrefactor consegue fazer nessa diretiva
    (rename de qual posição? usages? limite honesto?), ligando ao FATO do dump.
+7. **Lacunas** (SER CRÍTICO): o que os oráculos NÃO mostram, cada item
+   classificado por FATO em **[Consumo futuro]** (o dado É derivável, só falta a
+   ferramenta consumi-lo → P3-P8, sem core) ou **[LACUNA real]** (o dado NÃO está
+   nos oráculos → PAUSA a exploração + experimento estendendo o core). Regra e
+   distinção detalhadas no [pp-corpus/README.md](pp-corpus/README.md).
 
 ### Os QUATRO oráculos (o método, decisão do Diego 2026-07-11)
 
@@ -115,8 +120,16 @@ explicação bilíngue. O corpus cresce fatia a fatia; este spec lista o alcanç
 
 ## Status
 
-- **Família SET (`SET EXACT`) — prova-de-formato ENTREGUE** (2026-07-11):
-  fixture `tests/ppc-set/setx.prg`, entrada no [pp-corpus.md](pp-corpus.md),
-  guarda executável `make ppcorpus` verde (4/4, os quatro oráculos). O contrato
-  `make test` segue 813/0 byte-idêntico. Escala para as demais famílias do
-  corpus planejado após confirmação do FORMATO pelo Diego.
+- **Reorganização (2026-07-11, ordem do Diego):** corpus agora é DIRETÓRIO
+  `docs/pp-corpus/` — índice enxuto (README) + UM ARQUIVO POR FAMÍLIA, para o
+  Claude do futuro carregar só a família que precisa (o monolito estouraria o
+  contexto). Instrução permanente no README.
+- **Famílias 1-4 ENTREGUES (2026-07-11):** SET EXACT (restrict+smart-quote), @…SAY
+  (grupos opcionais + seleção de forma), STORE (grupo opcional que repete), hbclass
+  (o dialeto OO é pp: paste + genealogia ast-13 + `Self AS CLASS`). `make ppcorpus`
+  **16/16**; contrato `make test` segue **813/0** byte-idêntico.
+- **LACUNA encontrada (família hbclass) → exploração PAUSADA** (regra do Diego):
+  o `rename` de um **DATA/VAR member** de classe recusa honesto (não há verbo). A
+  info NÃO falta (usages resolve tudo escopado à classe) → é lacuna de CAPACIDADE,
+  decisão de produto do Diego, não experimento de core. Registrada em class.md e
+  no roadmap; a próxima família (contrib) aguarda a direção do Diego sobre a lacuna.

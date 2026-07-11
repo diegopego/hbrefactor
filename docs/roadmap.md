@@ -450,13 +450,20 @@ diretiva + o par `.ppo`/`.ppt` anotado + a explicação bilíngue (técnica +
 programador). Encaixa na fase P (alimenta Eixo A/fonte-de-fato e Eixo
 B/instrumento) e no mapa do alcançável. **Spec + método:
 [spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
-[pp-corpus.md](pp-corpus.md).** Método = os QUATRO oráculos (`.ppo` + `.ppt` +
+[pp-corpus/README.md](pp-corpus/README.md).** Método = os QUATRO oráculos (`.ppo` + `.ppt` +
 ast dump + fixture COMPILÁVEL); suíte SEPARADA do contrato (`make ppcorpus`, não
 `make test`) porque é exploratória E o core será estendido para gerar mais
-informação durante a fase (permissão do Diego). **1ª família ENTREGUE
-(2026-07-11): SET EXACT (std.ch) — restrict + smart-quote, prova-de-formato,
-`make ppcorpus` 4/4; formato confirmado pelo Diego.** Próximas na ordem:
-`@…SAY…GET`, `TEXT`/`STORE`, hbclass `CLASS`/`METHOD`/`VAR`, um contrib.
+informação durante a fase (permissão do Diego). **Organização (ordem do Diego):**
+diretório `docs/pp-corpus/` — índice + UM ARQUIVO POR FAMÍLIA (o Claude do futuro
+carrega só o que precisa; monolito estoura contexto). **Regra dura (Diego):** cada
+LACUNA real (info que os oráculos NÃO dão) PAUSA a exploração e vira experimento
+de core imediato; consumo-futuro (fato derivável) NÃO pausa. **Famílias 1-4
+ENTREGUES (2026-07-11):** SET EXACT (restrict+smart-quote), @…SAY (grupos
+opcionais), STORE (grupo que repete), hbclass (OO é pp: paste + genealogia ast-13
++ `Self AS CLASS`); `make ppcorpus` 16/16, contrato 813/0 intocado. **LACUNA
+encontrada → exploração PAUSADA:** o `rename` de DATA/VAR member de classe recusa
+(não há verbo; a info não falta) — candidato a CAPACIDADE nova (ver abaixo), portão
+do Diego. Restante da ordem após a decisão: um contrib (medição).
 
 **Portões pontuais a submeter durante a execução:** D-P3 (fato provado vira
 `ast-N` OU fica computado do `from`?), D-P4 (restrict-validation e
@@ -688,6 +695,17 @@ regen bison 3.8.2 documentado;
 split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 
 ## Backlog (por valor)
+
+- **Rename de DATA/VAR member de classe (LACUNA achada pelo P-DOC, família
+  hbclass, 2026-07-11 — aguarda portão do Diego)**: o `rename` sobre `::nSaldo`
+  recusa honesto ("é VAR/DATA, não método"). A INFO está toda presente (o
+  `usages Conta:nSaldo` resolve `VAR nSaldo` + os `::nSaldo` como confirmed sends,
+  escopo Conta pelo `Self AS CLASS`), então NÃO é experimento de core — é uma
+  CAPACIDADE nova (verbo de rename para DATA member). Sujeita à regra "genérico >
+  específico: comando dedicado só com razão forte" e ao portão do Diego. O
+  `resolve-at` de `::nSaldo` ainda não escopa à classe (consumo do fato já no
+  dump) — pré-requisito do verbo. Registro em
+  [pp-corpus/class.md](pp-corpus/class.md) § Lacunas.
 
 0. **Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
    verificação proporcional à edição quando o uso real doer.
