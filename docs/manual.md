@@ -1,15 +1,18 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@112ec7e · harbour-core@8499d78b45 (feature/compiler-ast-dump)
-    — phase U slice 2 removed the eight `rename-*` from the public surface (the engine
-      functions live on as internal delegates of the unified `rename`; a typed `rename-*`
-      gets an honest redirect). The harness migrated to `rename <pos>`, which exposed and
-      fixed one ast-12 core bug (a pure #xtranslate stringify inside a command: the
-      reverse-scan now also visits the applications' CONSUMED tokens, which keep the
-      original op). Both this hbrefactor commit and a new harbour-core commit ride on the
-      parents above (advance both once committed).
-  suite at baseline: 103 cases, 782 checks green
+  baseline: hbrefactor@5d8f108 · harbour-core@2738f97079 (feature/compiler-ast-dump)
+    — phase P/P1 delivered rule GENEALOGY (ast-13): a rule created by another rule's
+      expansion records which application created it, and derivation now survives token
+      clones. Consumers shipped with the channel: seed collection edits only fact-owned
+      occurrences (a marker value colliding with a REAL homonym function no longer drags
+      the function in — that refusal became a correct rename), resolution routes "name
+      that BECOMES a rule" to the marker (rule-generating DSLs — hbclass's own inner
+      pattern — are now renameable at both positions), verification lets the raw name
+      legitimately stay (real homonym) or change (derived clone). Case 108, fixture
+      fixgen. Slice U-2 ("rename-* removed") was already described by the previous
+      baseline note and is now reflected in the body text.
+  suite at baseline: 104 cases, 796 checks green
   updated: 2026-07-11
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -306,6 +309,73 @@ where it used to shrug `possible`. The compiler attaches each block's own parame
 that block, so the tool types the receiver by the exact block it sits in, never
 confusing the two.
 
+### Same name, different owner — it only edits yours
+
+<!-- prov: case 108 (14 checks, fixture fixgen — invented non-mirror DSL, plus the
+     hbclass METHOD rules as the real-world proof); live-run 2026-07-11 (scratchpad
+     probes, both outputs below verbatim); hbrefactor 5d8f108 + harbour-core
+     2738f97079 (ast-13 rule genealogy + derivation surviving clones). -->
+
+Real code reuses names. Say your DSL labels something `Vendas` — and a function named
+`Vendas()` already exists, unrelated:
+
+```harbour
+#xtranslate LABEL <n> => RegLabel( <"n"> )
+
+PROCEDURE Main()
+   LABEL Vendas        // 'Vendas' here is a label your DSL turns into a string
+   ? Vendas()          // 'Vendas' HERE is the real function — a different owner
+   RETURN
+
+FUNCTION Vendas()
+   RETURN 42
+```
+
+Rename the label, and only the label changes:
+
+```
+$ hbrefactor rename app.hbp a.prg:4:10 Receita
+rename-pp-marker: Vendas -> Receita
+  a.prg:4:10
+  predicted string: "Vendas" -> "Receita" (a.prg)
+verified: 1 edit(s); derived artifacts renamed as predicted
+```
+
+The call `? Vendas()` and the function are untouched — and the other direction holds
+too: renaming the *function* leaves the DSL sites alone. An occurrence is edited only
+when a compiler fact ties it to the thing you pointed at; a matching spelling is never
+enough.
+
+It goes one level deeper. A directive can *define another directive* — that's how
+Harbour's own class system works inside, and your DSLs can do it too:
+
+```harbour
+#xcommand DEFREGRA <n> => #xcommand USA <n> => ? Marca( <"n"> )
+
+PROCEDURE Main()
+   DEFREGRA Ponto      // creates, at preprocess time, the rule `USA Ponto`
+   USA Ponto           // uses the rule that was just created
+   RETURN
+```
+
+Renaming `Ponto` — at either position — edits both lines together and predicts the
+derived string:
+
+```
+$ hbrefactor rename app.hbp a.prg:4:13 Marco
+rename-pp-marker: Ponto -> Marco
+  a.prg:4:13
+  a.prg:5:8
+  predicted string: "Ponto" -> "Marco" (a.prg)
+verified: 2 edit(s); derived artifacts renamed as predicted
+```
+
+Behind both: the compiler now records the **genealogy** of preprocessor rules — when a
+rule is created by another rule's expansion, the dump says which application created
+it — and the tool only edits an occurrence whose owner is proven. Honest limit: if one
+module mixes the two roles so tightly that even the symbol table can't separate them,
+the tool still refuses and rolls back rather than guess.
+
 ### The certainty ladder
 
 <!-- prov: labels from src SendVerdict; layers exercised by cases 61–63, 66, 70, 87,
@@ -409,7 +479,8 @@ hbrefactor annotate vendas.hbp --apply
 One `rename` covers every kind — you give it the position, it finds out whether that's
 a local, a static, a method, a directive word… and does exactly what the dedicated
 command would (same edit, same verified rollback). The eight old `rename-*` commands
-still work but are **deprecated** in favor of this one.
+are **gone**: typing one gets an honest redirect to the unified form — never a wrong
+action.
 
 A "project" is anything `hbmk2` accepts: a `.hbp`, a `.hbc`, or just a list of `.prg`
 files — including **container/multi-target `.hbp`** (`-hbcontainer`, sub-projects,
@@ -471,6 +542,7 @@ one fact at a time:
 | `ast-10` | **declared class parentage** (`_HB_SUPER`) — who inherits from whom, as fact |
 | `ast-11` | each codeblock carries its **own parameters** — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding) |
 | `ast-12` | a directive marker is stamped **`generates`** when the name you wrote gets pasted/stringified into an artifact — so "rename a name that becomes code" is told apart from "rename a symbol that just flows into a command" |
+| `ast-13` | **rule genealogy**: a rule created by another rule's expansion records which application created it — and derivation now survives token clones, so a generated rule's artifacts stay traceable through its uses |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
@@ -484,15 +556,16 @@ does** — never build a guess inside the tool.
 
 ## Where it stands — honest status
 
-<!-- prov: roadmap.md (delivered table, RE.6/RD-c entregues, U slice 1 delivered,
-     gates B6/B8/D), CLI 0.5.0 / extension 0.13.0, suite 782/0 (this commit, phase U
-     slices 1-2 - unified rename + the eight rename-* removed); rough edges: cases 88 (@ref,
-     PARAMETERS AS), commit c127b1f (same-basename limit), CHANGELOG 2026-07-10;
-     limits doc (limites-e-alavancas.md: irreducible maybe, library openness). -->
+<!-- prov: roadmap.md (delivered table, RE.6/RD-c entregues, U slices 1-2 delivered,
+     phase P/P1 delivered, gates B6/B8/D), CLI 0.5.0 / extension 0.13.0, suite 796/0
+     (this commit, phase P/P1 - ast-13 rule genealogy consumed, case 108); rough
+     edges: cases 88 (@ref, PARAMETERS AS), commit c127b1f (same-basename limit),
+     CHANGELOG 2026-07-10/11; limits doc (limites-e-alavancas.md: irreducible maybe,
+     library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.13.0`; they version independently). The behavior contract is a suite of **103 cases /
-782 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.13.0`; they version independently). The behavior contract is a suite of **104 cases /
+796 checks**, all green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
@@ -517,9 +590,6 @@ language); English is on the roadmap.
 
 **What's next, if it all goes well**
 
-- One rename to rule them all: `rename <file:line:col> <new>` — you point, and the fact
-  under your cursor decides whether it's a local, a function, a method, or a directive
-  word.
 - Inference reborn as a *suggester*, never a verdict: it proposes an `AS CLASS`, the
   tool only writes it if a declaration can make it a fact, and the core then enforces
   it. The machine suggests; the compiler proves.
@@ -533,7 +603,7 @@ language); English is on the roadmap.
 <!-- prov: Diego's explicit ask (2026-07-10); branch inventory from git log. -->
 
 I built the `harbour-core` branch that makes these compiler facts exist — the AST dump
-(eleven schema steps), the `-kt` enforcement, the parentage channel, the segfault and
+(thirteen schema steps), the `-kt` enforcement, the parentage channel, the segfault and
 warning fixes. But I'm a Harbour **application** developer, **not a compiler/VM
 specialist**. I would genuinely value people who know Harbour's core taking a look.
 
@@ -559,7 +629,7 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (103 cases)
+   make test         # optional: the behavior suite (104 cases)
    ```
 3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.

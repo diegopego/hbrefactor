@@ -534,6 +534,58 @@ VAR nVia  AS Numeric IS nCount TO oPart</code></pre>
   </div>
 </section>
 
+<!-- §5d same name, different owner (phase P — ast-13 rule genealogy, case 108) -->
+<section>
+  <div class="narrow">
+    <p class="sec-eyebrow">Owned by fact</p>
+    <h2>Same name, different owner — it only edits yours</h2>
+    <p>Real code reuses names. Say your DSL labels something <span class="mono">Vendas</span> — and a function named <span class="mono">Vendas()</span> already exists, unrelated:</p>
+    <div class="code">
+      <button class="copy" type="button">Copy</button>
+<pre><code>#xtranslate LABEL &lt;n&gt; =&gt; RegLabel( &lt;"n"&gt; )
+
+PROCEDURE Main()
+   LABEL Vendas        <span class="c">// 'Vendas' here is a label your DSL turns into a string</span>
+   ? Vendas()          <span class="c">// 'Vendas' HERE is the real function — a different owner</span>
+   RETURN
+
+FUNCTION Vendas()
+   RETURN 42</code></pre>
+    </div>
+    <p>Rename the label, and only the label changes:</p>
+    <div class="code term">
+      <button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">hbrefactor</span> rename app.hbp a.prg:4:10 Receita
+rename-pp-marker: Vendas -&gt; Receita
+  a.prg:4:10
+  predicted string: "Vendas" -&gt; "Receita" (a.prg)
+<span class="ok">verified</span>: 1 edit(s); derived artifacts renamed as predicted</code></pre>
+    </div>
+    <p>The call <span class="mono">? Vendas()</span> and the function are untouched — and the other direction holds too: renaming the <em>function</em> leaves the DSL sites alone. An occurrence is edited only when a compiler fact ties it to the thing you pointed at; a matching spelling is never enough.</p>
+    <p>It goes one level deeper. A directive can <em>define another directive</em> — that's how Harbour's own class system works inside, and your DSLs can do it too:</p>
+    <div class="code">
+      <button class="copy" type="button">Copy</button>
+<pre><code>#xcommand DEFREGRA &lt;n&gt; =&gt; #xcommand USA &lt;n&gt; =&gt; ? Marca( &lt;"n"&gt; )
+
+PROCEDURE Main()
+   DEFREGRA Ponto      <span class="c">// creates, at preprocess time, the rule `USA Ponto`</span>
+   USA Ponto           <span class="c">// uses the rule that was just created</span>
+   RETURN</code></pre>
+    </div>
+    <p>Renaming <span class="mono">Ponto</span> — at either position — edits both lines together and predicts the derived string:</p>
+    <div class="code term">
+      <button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">hbrefactor</span> rename app.hbp a.prg:4:13 Marco
+rename-pp-marker: Ponto -&gt; Marco
+  a.prg:4:13
+  a.prg:5:8
+  predicted string: "Ponto" -&gt; "Marco" (a.prg)
+<span class="ok">verified</span>: 2 edit(s); derived artifacts renamed as predicted</code></pre>
+    </div>
+    <p>Behind both: the compiler now records the <strong>genealogy</strong> of preprocessor rules — when a rule is created by another rule's expansion, the dump says which application created it — and the tool only edits an occurrence whose owner is proven. Honest limit: if one module mixes the two roles so tightly that even the symbol table can't separate them, the tool still refuses and rolls back rather than guess.</p>
+  </div>
+</section>
+
 <!-- §6 fact rule + ladder -->
 <section>
   <div class="narrow">
@@ -694,6 +746,7 @@ Eval( bPaga )
       <tr><td>ast-10</td><td><b>declared class parentage</b> (<span class="mono">_HB_SUPER</span>) — who inherits from whom, as fact</td></tr>
       <tr><td>ast-11</td><td>each codeblock carries its <b>own parameters</b> — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding)</td></tr>
       <tr><td>ast-12</td><td>a directive marker is stamped <b>generates</b> when the name you wrote gets pasted/stringified into an artifact — telling "rename a name that becomes code" apart from "rename a symbol that just flows into a command"</td></tr>
+      <tr><td>ast-13</td><td><b>rule genealogy</b>: a rule created by another rule's expansion records which application created it — and derivation now survives token clones, so a generated rule's artifacts stay traceable through its uses</td></tr>
     </table>
     </div>
     <p>Along the way: a <b>20-year-old segfault fixed</b> (annotating a code-block parameter with <span class="mono">AS CLASS</span> used to crash the compiler — stock Harbour still does), and a false <span class="mono">W0019</span> "duplicate declaration" warning silenced when a re-declaration merely completes a missing type — it had blocked 18 methods in <span class="mono">hbhttpd</span>.</p>
@@ -706,7 +759,7 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong>103 cases / 782 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong>104 cases / 796 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
     <div class="grid-2">
       <div>
@@ -722,7 +775,6 @@ Eval( bPaga )
       <div>
         <h3>What's next, if it all goes well</h3>
         <ul class="clean next">
-          <li><b>One rename to rule them all:</b> <span class="mono">rename &lt;file:line:col&gt; &lt;new&gt;</span> — you point, and the fact under your cursor decides whether it's a local, a function, a method, or a directive word.</li>
           <li><b>Inference reborn as a suggester</b>, never a verdict: it proposes an <span class="mono">AS CLASS</span>, the tool only writes it if a declaration can make it a fact, and the core then enforces it. The machine suggests; the compiler proves.</li>
           <li><b>Per-instance usages</b> — narrowing "find references" to the calls on one specific variable.</li>
           <li>More maturation across real Harbour code — then real applications.</li>
@@ -738,7 +790,7 @@ Eval( bPaga )
     <div class="callout help">
       <p class="sec-eyebrow" style="color:var(--purple)">An honest ask</p>
       <h3 style="font-size:1.4rem">Help wanted: review the Harbour branch</h3>
-      <p>I built the <span class="mono">harbour-core</span> branch that makes these compiler facts exist — the AST dump (eleven schema steps), the <span class="mono">-kt</span> enforcement, the parentage channel, the segfault and warning fixes. But I'm a Harbour <strong>application</strong> developer, <strong>not a compiler/VM specialist</strong>. I would genuinely value people who know Harbour's core taking a look at that branch.</p>
+      <p>I built the <span class="mono">harbour-core</span> branch that makes these compiler facts exist — the AST dump (thirteen schema steps), the <span class="mono">-kt</span> enforcement, the parentage channel, the segfault and warning fixes. But I'm a Harbour <strong>application</strong> developer, <strong>not a compiler/VM specialist</strong>. I would genuinely value people who know Harbour's core taking a look at that branch.</p>
       <p>If you know the compiler, the VM, or the class system — issues, corrections, and second opinions are all welcome.</p>
       <p style="margin-top:18px">
         <a class="btn btn-primary" href="https://github.com/diegopego/harbour-core/tree/feature/compiler-ast-dump" target="_blank" rel="noopener">Review <span class="mono" style="font-weight:700">feature/compiler-ast-dump</span> →</a>
@@ -761,7 +813,7 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (103 cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (104 cases)</span></code></pre>
         </div>
       </li>
       <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.13.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>
