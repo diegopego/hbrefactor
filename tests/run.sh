@@ -238,7 +238,7 @@ done
 unit_1() {
 echo "case 1: rename nTotal->nSoma in Main (success + verification)"
 D=$(fresh case1)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal nSoma > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 diff -q "$D/a.prg" "$HERE/fix01/expected/a_renamed.prg" > /dev/null 2>&1
@@ -253,7 +253,7 @@ check "reports 2 modules verified" $?
 unit_2() {
 echo "case 2: collision with existing local (refuse)"
 D=$(fresh case2)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal i > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 i > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
@@ -264,7 +264,7 @@ check "a.prg untouched"            $?
 unit_3() {
 echo "case 3: unrelated #define on the declaration line (safe rename succeeds)"
 D=$(fresh case3)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg LimiteMax nMax nTeto > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 nTeto > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "nTeto := K_LIMITE" "$D/a.prg"
@@ -277,7 +277,7 @@ check "verification passed"        $?
 unit_4() {
 echo "case 4: new name is reserved word written as 'nIL' (refuse)"
 D=$(fresh case4)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal nIL > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nIL > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 
@@ -286,7 +286,7 @@ check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 unit_5() {
 echo "case 5: homonymous codeblock parameter shadows target (refuse)"
 D=$(fresh case5)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Sombra xVal xNovo > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:26:10 xNovo > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -qi "shadow" "$D/out.log"
@@ -296,19 +296,11 @@ check "a.prg untouched"            $?
 
 }
 
-unit_6() {
-echo "case 6: variable does not exist (refuse)"
-D=$(fresh case6)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main naoExiste nQualquer > out.log 2>&1 )
-RC=$?
-check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-
-}
 
 unit_7() {
 echo "case 7: symbol consumed by stringify marker - verification must roll back"
 D=$(fresh case7)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Rotulada nVisto nOutro > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:33:10 nOutro > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -qi "rollback" "$D/out.log"
@@ -349,7 +341,7 @@ check "read listed"                $?
 unit_10() {
 echo "case 10: rename-function across modules + idempotence (A->B->A)"
 D=$(fresh case10)
-( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
@@ -358,7 +350,7 @@ grep -q "Dobrar( i )" "$D/a.prg"
 check "call renamed (a.prg)"       $?
 grep -q "pcode byte-identical" "$D/out.log"
 check "structural verification"    $?
-( cd "$D" && "$BIN" rename-function fix01.hbp Dobrar Dupla > out2.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dupla > out2.log 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg" && cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "idempotence: A->B->A restores sources" $?
 
@@ -368,7 +360,7 @@ unit_11() {
 echo "case 11: string literal with the function name (refuse without --force)"
 D=$(fresh case11)
 printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
-( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
 RC=$?
 check "exit != 0 without --force"  $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "string igual a 'Dupla' - possível chamada por nome" "$D/out.log"
@@ -376,7 +368,7 @@ check "warning classifies exact-name string" $?
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla > usages.log 2>&1 )
 grep -q "possible reference in string" "$D/usages.log"
 check "usages reports the string reference" $?
-( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar --force > out2.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --force > out2.log 2>&1 )
 RC=$?
 check "exit 0 with --force"        $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q '"Dupla"' "$D/a.prg"
@@ -389,7 +381,7 @@ check "definition renamed"         $?
 unit_12() {
 echo "case 12: STATIC FUNCTION renamed inside its module only"
 D=$(fresh case12)
-( cd "$D" && "$BIN" rename-function fix01.hbp Meio Metade > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:15:17 Metade > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "STATIC FUNCTION Metade( nN )" "$D/b.prg"
@@ -404,16 +396,13 @@ check "a.prg untouched"            $?
 unit_13() {
 echo "case 13: rename-param (parameter is a local; non-param refused)"
 D=$(fresh case13)
-( cd "$D" && "$BIN" rename-param fix01.hbp b.prg Dupla nV nValor > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:18 nValor > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "FUNCTION Dupla( nValor )" "$D/b.prg"
 check "parameter renamed in signature" $?
 grep -q "nValor + nValor" "$D/b.prg"
 check "parameter renamed in body"  $?
-( cd "$D" && "$BIN" rename-param fix01.hbp b.prg Dupla nR nRes > out2.log 2>&1 )
-RC=$?
-check "non-parameter refused"      $([ $RC -ne 0 ] && echo 0 || echo 1)
 
 }
 
@@ -539,7 +528,7 @@ check "filter by function works"   $?
 unit_21() {
 echo "case 21: rename-static (file-wide) with byte-identical verification"
 D=$(fresh case21)
-( cd "$D" && "$BIN" rename-static fix01.hbp b.prg s_nContador s_nSeq > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:3:8 s_nSeq > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "STATIC s_nSeq := 0" "$D/b.prg"
@@ -588,7 +577,7 @@ check "later read listed"          $?
 unit_24() {
 echo "case 24: rename inside a ;-continued statement (token on middle line)"
 D=$(fresh case24)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Continuada cMsg cTexto > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:41:10 cTexto > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "^           cTexto + ;$" "$D/a.prg"
@@ -627,7 +616,7 @@ echo "case 27: rename-function warns about DYNAMIC in .hbx export file"
 D=$(fresh case27)
 printf 'DYNAMIC Dupla\n' > "$D/exports.hbx"
 printf 'exports.hbx\n' >> "$D/fix01.hbp"
-( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
 RC=$?
 check "refused without --force"    $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "DYNAMIC DUPLA em export (.hbx)" "$D/out.log"
@@ -685,15 +674,12 @@ RC=$?
 check "usages exit 0 (project compiles)" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "method definition Deposita (class Conta)" "$D/out.log"
 check "method definition lifted to source vocabulary (B4)" $?
-( cd "$D" && "$BIN" rename-local case29.hbp c.prg Deposita nNovo nCalc > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename case29.hbp c.prg:14:10 nCalc > ren.log 2>&1 )
 RC=$?
 check "rename-local by method name"  $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "verified: all 3 module" "$D/ren.log"
 check "3 modules verified"           $?
-( cd "$D" && "$BIN" rename-local case29.hbp c.prg Conta:Deposita nCalc nNovo > ren2.log 2>&1 )
-RC=$?
-check "rename-local by Class:Method" $([ $RC -eq 0 ] && echo 0 || echo 1)
-( cd "$D" && "$BIN" rename-function case29.hbp Dupla Dobrar > hbx.log 2>&1 )
+( cd "$D" && "$BIN" rename case29.hbp b.prg:5:10 Dobrar > hbx.log 2>&1 )
 RC=$?
 check "hbx via \${hb_name} refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "DYNAMIC DUPLA em export (.hbx)" "$D/hbx.log"
@@ -767,7 +753,7 @@ FUNCTION ChamaContinuada()
 
    RETURN n
 EOF
-( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "^              Dobrar( 4 ) + ;$" "$D/a.prg"
@@ -908,14 +894,14 @@ unit_37() {
 echo "case 37: name validity comes from the project's compiler, not from lists"
 # WHILE is rejected by the compiler as a variable name -> clean refusal
 D=$(fresh case37)
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg Main nTotal while > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 while > out.log 2>&1 )
 RC=$?
 check "compiler-rejected name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "compilador do projeto rejeita" "$D/out.log"
 check "refusal cites the compiler"  $?
 # LOOP is ACCEPTED by the compiler as a local name (the occ-era list wrongly
 # refused it - grammar truth restored); byte-identical verification still rules
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg LimiteMax nMax Loop > loop.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 Loop > loop.log 2>&1 )
 RC=$?
 check "compiler-accepted keyword-like name renames" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "verified: all 2 module" "$D/loop.log"
@@ -923,12 +909,12 @@ check "byte-identical verification" $?
 # hard-reserved RTL names (Len, Space...) the compiler itself refuses to
 # redefine - the probe relays that; names it does accept (OutStd) but the
 # RUNTIME knows (hb_IsFunction) get a shadowing warning + --force gate
-( cd "$D" && "$BIN" rename-function fix01.hbp Sub2 Len > rtl.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 Len > rtl.log 2>&1 )
 RC=$?
 check "compiler-protected RTL name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "compilador do projeto rejeita" "$D/rtl.log"
 check "probe relays the compiler refusal" $?
-( cd "$D" && "$BIN" rename-function fix01.hbp Sub2 hb_ntos > rtl2.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_ntos > rtl2.log 2>&1 )
 RC=$?
 check "runtime function name refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "função do runtime Harbour" "$D/rtl2.log"
@@ -936,14 +922,14 @@ check "warning explains the shadowing" $?
 # hb_MilliSeconds is NOT linked into the tool itself: only the canonical
 # core list (include/harbour.hbx, found via the project's -i paths) knows
 # it - hb_IsFunction alone would miss the shadowing
-( cd "$D" && "$BIN" rename-function fix01.hbp Sub2 hb_MilliSeconds > rtl3.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_MilliSeconds > rtl3.log 2>&1 )
 RC=$?
 check "core function unknown to the tool's runtime still refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "função do runtime Harbour" "$D/rtl3.log"
 check "harbour.hbx caught it" $?
 # renaming to a name the project already CALLS (even an external one, like
 # QOut) would hijack those calls
-( cd "$D" && "$BIN" rename-function fix01.hbp Sub2 QOut > hij.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 QOut > hij.log 2>&1 )
 RC=$?
 check "name already called in project refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "sequestraria" "$D/hij.log"
@@ -971,7 +957,7 @@ check "application in second module"   $?
 ( cd "$D" && "$BIN" usages fixdsl.hbp ACTION > act.log 2>&1 )
 grep -q "a.prg:11:21: keyword (#command MENUITEM" "$D/act.log"
 check "secondary DSL word reported as keyword of the rule" $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU_ITEM > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM > ren.log 2>&1 )
 RC=$?
 check "rename-dsl exit 0"            $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "3 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical" "$D/ren.log"
@@ -980,33 +966,30 @@ grep -q "MENU_ITEM <label>" "$D/menu.ch"
 check "directive head renamed in menu.ch" $?
 grep -q 'MENU_ITEM "Abrir"' "$D/a.prg" && grep -q 'MENU_ITEM "Sub"' "$D/b.prg"
 check "application sites renamed in both modules" $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENU_ITEM MENUITEM > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENUITEM > /dev/null 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/b.prg" "$HERE/fixdsl/b.prg" && \
    cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "A->B->A round-trip byte-exact (sources + .ch)" $?
 # o #define constante é o caso degenerado (regra sem markers)
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp LIMITE_TETO LIMITE_TOPO > def.log 2>&1 && \
-             "$BIN" rename-dsl fixdsl.hbp LIMITE_TOPO LIMITE_TETO > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp b.prg:8:22 LIMITE_TOPO > def.log 2>&1 && \
+             "$BIN" rename fixdsl.hbp b.prg:8:22 LIMITE_TETO > /dev/null 2>&1 )
 check "#define rename (degenerate rule) round-trips" $?
 cmp -s "$D/b.prg" "$HERE/fixdsl/b.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "#define round-trip byte-exact"  $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU_X --dry-run > dry.log 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_X --dry-run > dry.log 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "dry run writes nothing"        $?
 # recusas: sequestro de identificador, abreviação dBase, palavra inexistente
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MenuAdd > hij.log 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MenuAdd > hij.log 2>&1 )
 RC=$?
 check "new word already an identifier refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "capturaria" "$D/hij.log"
 check "refusal explains the capture"  $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU > abr.log 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU > abr.log 2>&1 )
 RC=$?
 check "dBase 4-letter abbreviation clash refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "abreviação" "$D/abr.log"
 check "refusal cites the abbreviation rule" $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp NAOEXISTE Outra > nex.log 2>&1 )
-RC=$?
-check "word that is not a rule head refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 
 }
 
@@ -1047,14 +1030,6 @@ grep -q "a.prg:23:11: keyword (#command @, builtin)" "$D/say.log"
 check "builtin @..SAY application with exact column" $?
 grep -q "sem posição no fonte" "$D/say.log"
 check "multi-pass reapplication visible (no source position)" $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp "@" ARROBA > bi.log 2>&1 )
-RC=$?
-check "rename-dsl of builtin rule refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "builtin" "$D/bi.log"
-check "refusal explains there is no directive file" $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp SAY XSAY > say2.log 2>&1 )
-RC=$?
-check "rename of secondary word refused (not a head)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 
 }
 
@@ -1073,8 +1048,8 @@ check "keyword on the continuation line has its own position" $?
 grep -q "a.prg:17:6: application (#xtranslate SQUARED" "$D/sq.log" && \
    grep -q "a.prg:17:20: application (#xtranslate SQUARED" "$D/sq.log"
 check "two mid-statement applications on one line, distinct columns" $?
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp REPEAT LACO > rep.log 2>&1 && \
-             "$BIN" rename-dsl fixdsl.hbp LACO REPEAT > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:19:4 LACO > rep.log 2>&1 && \
+             "$BIN" rename fixdsl.hbp a.prg:19:4 REPEAT > /dev/null 2>&1 )
 check "xcommand rename round-trips"   $?
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "xcommand round-trip byte-exact" $?
@@ -1145,12 +1120,12 @@ D=$(freshmv case45)
 check "fixture runs before"           $?
 # a criação via '&' FORA do alcance é aviso (não roda com o PRIVATE vivo):
 # sem --force recusa e não escreve; com --force executa
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta xCaixa > ren0.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xCaixa > ren0.log 2>&1 )
 RC=$?
 check "out-of-reach '&' creation gates without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg"
 check "nothing written without --force" $?
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta xCaixa --force > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xCaixa --force > ren.log 2>&1 )
 RC=$?
 check "rename-memvar exit 0 (clean closure)" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "verified: 5 edit(s); symbol renamed, pcode byte-identical" "$D/ren.log"
@@ -1161,7 +1136,7 @@ check "declaration, creator and cross-module use renamed" $?
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after rename" $?
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xCaixa xConta --force > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xConta --force > /dev/null 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
 check "A->B->A round-trip byte-exact"  $?
 
@@ -1170,31 +1145,28 @@ check "A->B->A round-trip byte-exact"  $?
 unit_46() {
 echo "case 46: B4b - rename-memvar refusals explain the hole"
 D=$(freshmv case46)
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xSaldo xGrana > r1.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:7:11 xGrana > r1.log 2>&1 )
 RC=$?
 check "more than one creator refused"  $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "mais de um criador" "$D/r1.log" && grep -q "PUBLIC em MAIN" "$D/r1.log"
 check "refusal lists the creators"     $?
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xTaxa xImposto > r2.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp b.prg:39:4 xImposto > r2.log 2>&1 )
 RC=$?
 check "implicit memvar (no creator) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "não tem criador" "$D/r2.log"
 check "refusal explains missing creator" $?
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xOculta xVista > r3.log 2>&1 )
-RC=$?
-check "macro-created memvar refused"   $([ $RC -ne 0 ] && echo 0 || echo 1)
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta nAux > r4.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 nAux > r4.log 2>&1 )
 RC=$?
 check "new name is LOCAL in a using function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "mudariam de binding em silêncio" "$D/r4.log"
 check "refusal names the silent binding change" $?
-( cd "$D" && "$BIN" rename-memvar fixmv.hbp xConta xSaldo > r5.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xSaldo > r5.log 2>&1 )
 RC=$?
 check "new name already a living memvar refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "fundiria duas variáveis" "$D/r5.log"
 check "refusal explains the merge"     $?
 # o inverso da recusa-chave: rename-local para nome de memvar usada na função
-( cd "$D" && "$BIN" rename-local fixmv.hbp b.prg SomaConta nAux xConta > r6.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp b.prg:13:10 xConta > r6.log 2>&1 )
 RC=$?
 check "rename-local to a memvar used in the function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "sombrearia esses usos" "$D/r6.log"
@@ -1213,7 +1185,7 @@ done
 D=$(freshmth case47)
 ( cd "$D" && $HB_BIN/hbmk2 c1.prg c2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
 check "fixture runs before"           $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Mostra > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Mostra > ren.log 2>&1 )
 RC=$?
 check "clean method rename exit 0"    $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "c1.prg:8:11" "$D/ren.log" && grep -q "c1.prg:17:8" "$D/ren.log" \
@@ -1224,17 +1196,17 @@ check "verification with the two expected symbol renames" $?
 ( cd "$D" && $HB_BIN/hbmk2 c1.prg c2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after rename" $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Mostra Info > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Info > /dev/null 2>&1 )
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "A->B->A round-trip byte-exact"  $?
 # INLINE: o nome também vive numa string do usuário -> --force obrigatório
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Dobro Duplo > inl0.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:7:11 Duplo > inl0.log 2>&1 )
 RC=$?
 check "user string with the name gates without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg"
 check "nothing written without --force" $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Dobro Duplo --force > inl.log 2>&1 && \
-             "$BIN" rename-method fixmth.hbp Caixa:Duplo Dobro --force > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:7:11 Duplo --force > inl.log 2>&1 && \
+             "$BIN" rename fixmth.hbp c1.prg:7:11 Dobro --force > /dev/null 2>&1 )
 check "INLINE method renames with --force and returns" $?
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "INLINE round-trip byte-exact"   $?
@@ -1244,22 +1216,22 @@ check "INLINE round-trip byte-exact"   $?
 unit_48() {
 echo "case 48: B4c - send is dynamic dispatch: refusals explain the ambiguity"
 D=$(freshmth case48)
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Soma Junta > r1.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:11:8 Junta > r1.log 2>&1 )
 RC=$?
 check "method owned by two classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "também é membro de: OUTRA" "$D/r1.log" && grep -q "despacho dinâmico" "$D/r1.log"
 check "refusal names the other class and the dispatch problem" $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Soma > r2.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Soma > r2.log 2>&1 )
 RC=$?
 check "new name already a registered message refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "fundiria mensagens" "$D/r2.log"
 check "refusal explains the message merge" $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Fantasma > r3.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Fantasma > r3.log 2>&1 )
 RC=$?
 check "new name already sent somewhere refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "passaria a respondê-la" "$D/r3.log"
 check "refusal explains the hijack"    $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:nTot nTotal > r4.log 2>&1 )
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:5:8 nTotal > r4.log 2>&1 )
 RC=$?
 check "VAR/DATA member (setter send _NTOT) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "send _NTOT" "$D/r4.log"
@@ -1269,19 +1241,6 @@ check "sources untouched by all refusals" $?
 
 }
 
-unit_49() {
-echo "case 49: B4c - bare method name resolves when unique in the project"
-D=$(freshmth case49)
-( cd "$D" && "$BIN" rename-method fixmth.hbp Zera Limpa > z.log 2>&1 && \
-             "$BIN" rename-method fixmth.hbp Limpa Zera > /dev/null 2>&1 )
-check "unique bare name renames and returns" $?
-cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
-check "bare-name round-trip byte-exact" $?
-( cd "$D" && "$BIN" rename-method fixmth.hbp Soma Junta > amb.log 2>&1 )
-RC=$?
-check "ambiguous bare name refused"    $([ $RC -ne 0 ] && echo 0 || echo 1)
-
-}
 
 unit_50() {
 echo "case 50: B4d G2/G6 - invented DSL: usages lifts in source vocabulary"
@@ -1306,7 +1265,7 @@ grep -q "e1.prg:5: registro definition Salva" "$D/sal.log" && \
 check "definition and derived cross-module use site, exact positions" $?
 ( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
 check "fixture runs before"           $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Click Novo > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Novo > ren.log 2>&1 )
 RC=$?
 check "prefix-paste marker rename exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "predicted: ON_CLICK -> ON_NOVO" "$D/ren.log"
@@ -1316,7 +1275,7 @@ check "verification computed from the trace" $?
 ( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after rename" $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Novo Click > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Click > /dev/null 2>&1 )
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "A->B->A round-trip byte-exact"  $?
 
@@ -1325,7 +1284,7 @@ check "A->B->A round-trip byte-exact"  $?
 unit_51() {
 echo "case 51: B4d G3 - pure stringify: the derived string is a predicted fact"
 D=$(freshppm case51)
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Pronto Feito > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e2.prg:10:13 Feito > ren.log 2>&1 )
 RC=$?
 check "stringify-only marker rename exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q 'predicted string: "Pronto" -> "Feito"' "$D/ren.log"
@@ -1333,7 +1292,7 @@ check "derived string change predicted, not warned" $?
 ( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp -gtcgi -q0 > /dev/null 2>&1 && ./app > saida.txt 2>/dev/null )
 grep -q '\[Feito\]' "$D/saida.txt" && ! grep -q '\[Pronto\]' "$D/saida.txt"
 check "runtime string regenerated from the edited identifier" $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Feito Pronto > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e2.prg:10:13 Pronto > /dev/null 2>&1 )
 cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "A->B->A round-trip byte-exact"  $?
 
@@ -1344,7 +1303,7 @@ echo "case 52: B4d G4 - clone+paste+stringify in ONE rule; derived call crosses 
 D=$(freshppm case52)
 ( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
 check "fixture runs before"           $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Salva Grava > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:5:10 Grava > ren.log 2>&1 )
 RC=$?
 check "multi-derivation marker rename exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "e1.prg:5:10" "$D/ren.log" && grep -q "e2.prg:8:12" "$D/ren.log"
@@ -1355,7 +1314,7 @@ check "pasted symbol and stringified string both predicted" $?
 ( cd "$D" && $HB_BIN/hbmk2 e1.prg e2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 sed 's/Salva/Grava/g' "$D/saida_antes.txt" | cmp -s - "$D/saida_depois.txt"
 check "output changed exactly as the prediction says" $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Grava Salva > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:5:10 Salva > /dev/null 2>&1 )
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "A->B->A round-trip byte-exact"  $?
 
@@ -1364,22 +1323,22 @@ check "A->B->A round-trip byte-exact"  $?
 unit_53() {
 echo "case 53: B4d G5 - co-derivation: neighbour intact; collisions refused by name"
 D=$(freshppm case53)
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Motor Trem > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:10:6 Trem > ren.log 2>&1 )
 RC=$?
 check "renaming one of two co-derived names exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "predicted: MOTOR_RODA -> TREM_RODA" "$D/ren.log"
 check "pasted artifact predicted with the neighbour (Roda) intact" $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Trem Motor > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:10:6 Motor > /dev/null 2>&1 )
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg"
 check "A->B->A round-trip byte-exact"  $?
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Motor Freio > col.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:10:6 Freio > col.log 2>&1 )
 RC=$?
 check "predicted symbol colliding with existing function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "FREIO_RODA" "$D/col.log" && grep -q "já existe como função" "$D/col.log"
 check "refusal NAMES the predicted artifact (G5)" $?
 printf '\nFUNCTION Chama()\n   RETURN on_Click()\n' >> "$D/e1.prg"
 cp "$D/e1.prg" "$D/e1.saved"
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Click Novo > orf.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Novo > orf.log 2>&1 )
 RC=$?
 check "source spelling a generated name gates the rename" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "soletra o nome gerado 'on_Click'" "$D/orf.log"
@@ -1399,14 +1358,14 @@ echo "case 54: B4e regression - shared-origin sites must not double-apply an edi
 # nome de parâmetro não entra no pcode, o verify byte-idêntico deixava
 # passar (corrupção silenciosa, exit 0). Regressão do fix de dedup.
 D=$(freshppm case54)
-( cd "$D" && "$BIN" rename-param fixppm.hbp e1.prg pf_Dobra nX nXX > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:18:16 nXX > ren.log 2>&1 )
 RC=$?
 check "rename-param on a DSL-generated function param exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "PARAMFN Dobra( nXX )" "$D/e1.prg" && ! grep -q "nXXXX" "$D/e1.prg"
 check "edit applied exactly once (no nXXXX corruption)" $?
 test "$(grep -c 'e1.prg:18:' "$D/ren.log")" = "1"
 check "the shared-origin site is listed only once" $?
-( cd "$D" && "$BIN" rename-param fixppm.hbp e1.prg pf_Dobra nXX nX > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:18:16 nX > /dev/null 2>&1 )
 cmp -s "$D/e1.prg" "$HERE/fixppm/e1.prg"
 check "A->B->A round-trip byte-exact"  $?
 
@@ -1428,7 +1387,7 @@ done
 D=$(freshsig case55)
 ( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
 check "fixture runs before"           $?
-( cd "$D" && "$BIN" rename-param fixsig.hbp w1.prg Widget:Resize nW nLargura > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixsig.hbp w1.prg:11:16 nLargura > ren.log 2>&1 )
 RC=$?
 check "rename-param on a 2-param method exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "w1.prg:7:19" "$D/ren.log" && grep -q "w1.prg:11:16" "$D/ren.log" \
@@ -1442,11 +1401,11 @@ check "verification byte-identical (param name not in pcode)" $?
 ( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after rename" $?
-( cd "$D" && "$BIN" rename-param fixsig.hbp w1.prg Widget:Resize nLargura nW > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixsig.hbp w1.prg:11:16 nW > /dev/null 2>&1 )
 cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg"
 check "A->B->A round-trip byte-exact"  $?
 # a assinatura de OUTRO método (Grow) não é tocada ao renomear Resize
-( cd "$D" && "$BIN" rename-param fixsig.hbp w1.prg Widget:Grow nDy nDelta > g.log 2>&1 )
+( cd "$D" && "$BIN" rename fixsig.hbp w1.prg:17:19 nDelta > g.log 2>&1 )
 RC=$?
 check "second method's param renames independently" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "METHOD Grow( nDx, nDelta )" "$D/w1.prg" && grep -q "METHOD Resize( nW, nH )" "$D/w1.prg"
@@ -2072,13 +2031,13 @@ check "chamada que SÓ existe na expansão listada no site ESCRITO do comando" $
 ( cd "$D" && "$BIN" usages sf1.hbp m --func UsaS > fm.log 2>&1 )
 grep -q "sf1.prg:8: declaration (local) in USAS  | CONTA m" "$D/fm.log"
 check "LOCAL declarado por comando: declaração no site escrito" $?
-( cd "$D" && "$BIN" rename-local sf1.hbp sf1.prg UsaS m mm > rl.log 2>&1 )
+( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:8:10 mm > rl.log 2>&1 )
 RC=$?
 check "rename-local através do açúcar exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "CONTA mm" "$D/sf1.prg" && grep -q "mm := Dobro( mm )" "$D/sf1.prg" && \
    grep -q "byte-identical" "$D/rl.log"
 check "rename editou o site do comando e verificou byte-idêntico" $?
-( cd "$D" && "$BIN" rename-function sf1.hbp Dobro Duplo > rf.log 2>&1 )
+( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Duplo > rf.log 2>&1 )
 RC=$?
 check "rename-function com o nome no CORPO da regra: recusa ACIONÁVEL (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 # B4g: a recusa deixou de ser cega - nomeia diretiva+posição (match[]/
@@ -2091,7 +2050,7 @@ check "recusa NOMEIA diretiva+posição, oferece --edit-rules; nada editado" $?
 # oráculo (mapa de símbolos + rollback); execução idêntica fecha o contrato
 cp "$D/sf1.prg" "$D/sf1.antes"; cp "$D/suga.ch" "$D/suga.antes"
 ( cd "$D" && rm -rf .hbmk && "$HB_BIN/hbmk2" sf1.prg -oapp -gtcgi -q0 -main=UsaS > /dev/null 2>&1 && ./app > saida_antes.txt 2>/dev/null )
-( cd "$D" && "$BIN" rename-function sf1.hbp Dobro Duplo --edit-rules > rf2.log 2>&1 )
+( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Duplo --edit-rules > rf2.log 2>&1 )
 RC=$?
 check "rename-function --edit-rules exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "FUNCTION Duplo( n )" "$D/sf1.prg" && grep -q "Duplo( <v> )" "$D/suga.ch" && \
@@ -2100,7 +2059,7 @@ check "--edit-rules editou fonte E diretiva; oráculo verificou" $?
 ( cd "$D" && rm -rf .hbmk && "$HB_BIN/hbmk2" sf1.prg -oapp2 -gtcgi -q0 -main=UsaS > /dev/null 2>&1 && ./app2 > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execução idêntica após o rename com --edit-rules" $?
-( cd "$D" && "$BIN" rename-function sf1.hbp Duplo Dobro --edit-rules > rf3.log 2>&1 )
+( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Dobro --edit-rules > rf3.log 2>&1 )
 RC=$?
 cmp -s "$D/sf1.prg" "$D/sf1.antes" && cmp -s "$D/suga.ch" "$D/suga.antes" && [ $RC -eq 0 ]
 check "ida-e-volta A->B->A byte-exata (fonte e diretiva)" $?
@@ -2197,7 +2156,7 @@ echo "case 77: Q2 (revisao-generalidade) - rename-method Dona:Membro resolve don
 D=$(freshofi case77)
 ofirun "$D" saida_antes.txt
 check "fixture runs before"           $?
-( cd "$D" && "$BIN" rename-method fixofi.hbp Banca:Talha Cinzela > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixofi.hbp o1.prg:12:8 Cinzela > ren.log 2>&1 )
 RC=$?
 check "rename Dona:Membro de DSL própria exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "LAVRA Cinzela" "$D/o1.prg" && grep -q "OFICIO Cinzela DA Banca PEDE" "$D/o1.prg"
@@ -2211,13 +2170,10 @@ check "string de registro prevista e conferida" $?
 ofirun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execução idêntica após o rename" $?
-( cd "$D" && "$BIN" rename-method fixofi.hbp Banca:Cinzela Talha > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixofi.hbp o1.prg:12:8 Talha > /dev/null 2>&1 )
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "A->B->A round-trip byte-exact"  $?
-( cd "$D" && "$BIN" rename-method fixofi.hbp Talha Cinzela --dry-run > bare.log 2>&1 )
-grep -q "rename-method: BANCA:Talha -> Cinzela" "$D/bare.log"
-check "forma crua resolve a dona única pelo fato (dry-run)" $?
-( cd "$D" && "$BIN" rename-method fixofi.hbp Banca:Lustro Polir > amb.log 2>&1 )
+( cd "$D" && "$BIN" rename fixofi.hbp o1.prg:27:8 Polir > amb.log 2>&1 )
 RC=$?
 check "membro homônimo em duas donas recusado" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "também é membro de: TEAR (o2.prg)" "$D/amb.log"
@@ -2394,27 +2350,27 @@ grep -q "forja.ch:14:19: in rule restriction (#xcommand FORJA, marker 3)" "$D/ra
 check "usages: palavra de restrição com posição-fato" $?
 # rename-dsl de keyword SECUNDÁRIA (não-cabeça): diretiva + sites, padrão-ouro
 cp "$D/forja.ch" "$D/forja.ch.antes"; cp "$D/forja.prg" "$D/forja.prg.antes"
-( cd "$D" && "$BIN" rename-dsl forja.hbp TAMANHO MEDIDA > rd1.log 2>&1 )
+( cd "$D" && "$BIN" rename forja.hbp forja.prg:9:14 MEDIDA > rd1.log 2>&1 )
 RC=$?
 check "rename-dsl de keyword secundária exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "MEDIDA <nTam>" "$D/forja.ch" && grep -q "FORJA oIt MEDIDA DOBRO" "$D/forja.prg" && \
    grep -q "byte-identical" "$D/rd1.log"
 check "secundária editada na diretiva e no uso; .ppo/.hrb byte-idênticos" $?
-( cd "$D" && "$BIN" rename-dsl forja.hbp MEDIDA TAMANHO > rd2.log 2>&1 )
+( cd "$D" && "$BIN" rename forja.hbp forja.prg:9:14 TAMANHO > rd2.log 2>&1 )
 cmp -s "$D/forja.ch" "$D/forja.ch.antes" && cmp -s "$D/forja.prg" "$D/forja.prg.antes"
 check "ida-e-volta A->B->A byte-exata da secundária" $?
 # restrição que NÃO vaza (marker fora do result): renomeável padrão-ouro
-( cd "$D" && "$BIN" rename-dsl forja.hbp FRIO GELADO > rd3.log 2>&1 )
+( cd "$D" && "$BIN" rename forja.hbp forja.prg:14:16 GELADO > rd3.log 2>&1 )
 RC=$?
 check "rename-dsl de palavra de restrição (não vaza) exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "<m: GELADO, QUENTE>" "$D/forja.ch" && grep -q "RECOZE MODO GELADO" "$D/forja.prg"
 check "restrição editada na diretiva e no uso" $?
-( cd "$D" && "$BIN" rename-dsl forja.hbp GELADO FRIO > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename forja.hbp forja.prg:14:16 FRIO > /dev/null 2>&1 )
 cmp -s "$D/forja.ch" "$D/forja.ch.antes" && cmp -s "$D/forja.prg" "$D/forja.prg.antes"
 check "ida-e-volta da restrição byte-exata" $?
 # restrição cujo valor VAZA (stringify do marker): a expansão mudaria em
 # silêncio - a rede .ppo recusa com rollback, honesto
-( cd "$D" && "$BIN" rename-dsl forja.hbp RAPIDO VELOZ > rd4.log 2>&1 )
+( cd "$D" && "$BIN" rename forja.hbp forja.prg:9:64 VELOZ > rd4.log 2>&1 )
 RC=$?
 check "restrição que vaza: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "rollback" "$D/rd4.log" && cmp -s "$D/forja.ch" "$D/forja.ch.antes" && \
@@ -3344,7 +3300,7 @@ check "oG:nRaw (AS CLASS de fonte, fora de bloco) confirma pelo declarado escrit
 }
 
 unit_107() {
-echo "case 107: U - verbo unificado 'rename <arq:linha:col> <novo>': o KIND vem do FATO sob o cursor, saída BYTE-IDÊNTICA ao rename-* específico"
+echo "case 107: U - verbo unificado 'rename <arq:linha:col> <novo>': o KIND vem do FATO sob o cursor (golden - os rename-* foram removidos na fatia 2)"
 # O NORTE proíbe réplica sintática no MOTOR (a taxonomia é do compilador);
 # a fase U tira a mesma réplica da SUPERFÍCIE da CLI. O usuário deixa de
 # CLASSIFICAR o alvo no sufixo (rename-local? rename-method? rename-dsl?) -
@@ -3357,48 +3313,36 @@ echo "case 107: U - verbo unificado 'rename <arq:linha:col> <novo>': o KIND vem 
 # DUPLA (o verbo não recebe casing do usuário: o kind e o escopo são fato).
 D=$(fresh case107)
 ( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma --dry-run > n1.log 2>&1 )
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg MAIN nTotal nSoma --dry-run > o1.log 2>&1 )
-diff -q "$D/n1.log" "$D/o1.log" > /dev/null
-check "LOCAL (a.prg:5:10): rename <pos> byte-idêntico a rename-local" $?
 grep -q "^rename-local: nTotal -> nSoma in MAIN" "$D/n1.log"
 check "LOCAL: o verbo resolveu o kind local por fato (sem sufixo)" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:18 nValor --dry-run > n2.log 2>&1 )
-( cd "$D" && "$BIN" rename-param fix01.hbp b.prg DUPLA nV nValor --dry-run > o2.log 2>&1 )
-diff -q "$D/n2.log" "$D/o2.log" > /dev/null
-check "PARAM (b.prg:5:18): byte-idêntico a rename-param" $?
+grep -q "^rename-param: nV -> nValor in DUPLA" "$D/n2.log"
+check "PARAM (b.prg:5:18): resolve rename-param por FATO (golden)" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:3:8 s_nSeq --dry-run > n3.log 2>&1 )
-( cd "$D" && "$BIN" rename-static fix01.hbp b.prg s_nContador s_nSeq --dry-run > o3.log 2>&1 )
-diff -q "$D/n3.log" "$D/o3.log" > /dev/null
-check "STATIC file-wide (b.prg:3:8): byte-idêntico a rename-static" $?
+grep -q "^rename-static: s_nContador -> s_nSeq (file-wide)" "$D/n3.log"
+check "STATIC file-wide (b.prg:3:8): resolve rename-static por FATO (golden)" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --dry-run > n4.log 2>&1 )
-( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar --dry-run > o4.log 2>&1 )
-diff -q "$D/n4.log" "$D/o4.log" > /dev/null
-check "FUNCTION (b.prg:5:10, def): byte-idêntico a rename-function" $?
+grep -q "^rename-function: Dupla -> Dobrar" "$D/n4.log"
+check "FUNCTION (b.prg:5:10, def): resolve rename-function por FATO (golden)" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:33:12 xNovo --dry-run > n5.log 2>&1 )
-( cd "$D" && "$BIN" rename-memvar fix01.hbp xCfg xNovo --dry-run > o5.log 2>&1 )
-diff -q "$D/n5.log" "$D/o5.log" > /dev/null
-check "MEMVAR (b.prg:33:12, PRIVATE): byte-idêntico a rename-memvar" $?
+grep -q "^rename-memvar: xCfg -> xNovo" "$D/n5.log"
+check "MEMVAR (b.prg:33:12, PRIVATE): resolve rename-memvar por FATO (golden)" $?
 # método: o cursor na IMPLEMENTAÇÃO resolve COM a dona (CAIXA:Info) - fato
 # da aplicação-identidade do hbclass, não forma
 D=$(freshmth case107b)
 ( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Mostra --dry-run > n6.log 2>&1 )
-( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Mostra --dry-run > o6.log 2>&1 )
-diff -q "$D/n6.log" "$D/o6.log" > /dev/null
-check "METHOD (c1.prg:17:8): byte-idêntico a rename-method Caixa:Info (dona por fato)" $?
 grep -q "^rename-method: CAIXA:Info -> Mostra" "$D/n6.log"
 check "METHOD: o verbo resolveu a DONA (CAIXA) pelo site, sem o usuário dar Classe:Método" $?
 # pp-marker: nome que preenche match marker de DSL inventada (sem classe)
 D=$(freshppm case107c)
 ( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Novo --dry-run > n7.log 2>&1 )
-( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Click Novo --dry-run > o7.log 2>&1 )
-diff -q "$D/n7.log" "$D/o7.log" > /dev/null
-check "PP-MARKER (e1.prg:8:9): byte-idêntico a rename-pp-marker" $?
+grep -q "^rename-pp-marker: Click -> Novo" "$D/n7.log"
+check "PP-MARKER (e1.prg:8:9): resolve rename-pp-marker por FATO (golden)" $?
 # dsl: palavra de regra de pp num site de USO
 D=$(freshdsl case107d)
 ( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM --dry-run > n8.log 2>&1 )
-( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU_ITEM --dry-run > o8.log 2>&1 )
-diff -q "$D/n8.log" "$D/o8.log" > /dev/null
-check "DSL (a.prg:11:4, palavra de regra): byte-idêntico a rename-dsl" $?
+grep -q "^rename-dsl: MENUITEM -> MENU_ITEM" "$D/n8.log"
+check "DSL (a.prg:11:4, palavra de regra): resolve rename-dsl por FATO (golden)" $?
 # aplicação REAL (não dry-run): o verbo edita e VERIFICA byte a byte
 D=$(fresh case107e)
 ( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma > real.log 2>&1 )
@@ -3422,9 +3366,8 @@ check "REFUSA nomeando a exceção (nunca adivinha)"   $?
 # aplicou um rename real e mexeu no a.prg)
 D=$(fresh case107g)
 ( cd "$D" && "$BIN" rename fix01.hbp a.prg:13:16 nZeta --dry-run > qm.log 2>&1 )
-( cd "$D" && "$BIN" rename-local fix01.hbp a.prg MAIN nTotal nZeta --dry-run > qo.log 2>&1 )
-diff -q "$D/qm.log" "$D/qo.log" > /dev/null
-check "BINDING: local dentro de '? ...' resolve rename-local (não pp-marker)" $?
+grep -q "^rename-local: nTotal -> nZeta in MAIN" "$D/qm.log"
+check "BINDING: local dentro de '? ...' resolve rename-local, não pp-marker (golden)" $?
 # parse de posição: linha/col não-numéricas RECUSAM (Val('5x')=5 não passa)
 ( cd "$D" && "$BIN" rename fix01.hbp "a.prg:5x:10" nZeta --dry-run > mal.log 2>&1 )
 check "REFUSA posição malformada 'a.prg:5x:10': exit != 0"  $([ $? -ne 0 ] && echo 0 || echo 1)
@@ -3470,11 +3413,9 @@ D=$(freshstat case107j)
 ( cd "$D" && "$BIN" rename fixstat.hbp a.prg:6:17 Aux --dry-run > st.log 2>&1 )
 grep -q "^rename-function: Helper -> Aux (static, só a.prg)" "$D/st.log"
 check "STATIC homônima: a posição passa --file e desambigua (Codex #1)" $?
-( cd "$D" && "$BIN" rename-function fixstat.hbp Helper Aux --dry-run > st0.log 2>&1; [ $? -ne 0 ] ) && grep -q "mais de um módulo" "$D/st0.log"
-check "  (prova: o rename-function pelado SEM --file recusa - o bug que o verbo fecha)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

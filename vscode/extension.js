@@ -299,118 +299,6 @@ async function cmdRename() {
   report(`rename @ ${at} -> ${novo}`, res);
 }
 
-async function cmdRenameLocal() {
-  const c = await ctx();
-  if (!c) return;
-  const word = wordAt(c.editor);
-  if (!word) return;
-  const func = enclosingFunction(c.editor.document, c.editor.selection.active.line);
-  if (!func) {
-    vscode.window.showErrorMessage('hbrefactor: não achei FUNCTION/PROCEDURE/METHOD acima do cursor.');
-    return;
-  }
-  const novo = await vscode.window.showInputBox({ prompt: `Novo nome para ${word} (local/param de ${func})` });
-  if (!novo) return;
-  await saveAll();
-  const res = await run(['rename-local', c.spec, c.file, func, word, novo], c.cwd);
-  report(`rename-local ${func}:${word} -> ${novo}`, res);
-}
-
-async function cmdRenameFunction() {
-  const c = await ctx();
-  if (!c) return;
-  const word = wordAt(c.editor);
-  if (!word) return;
-  const novo = await vscode.window.showInputBox({ prompt: `Novo nome para a função ${word}` });
-  if (!novo) return;
-  await saveAll();
-  const flags = [];
-  let res = await run(['rename-function', c.spec, word, novo], c.cwd);
-  // B4g: o nome citado DENTRO de regra de pp - a recusa nomeia diretiva e
-  // posição; --edit-rules edita as diretivas junto (mesmo oráculo)
-  if (res.code !== 0 && /--edit-rules/.test(res.stderr + res.stdout)) {
-    report(`rename-function ${word} -> ${novo} (citado em regra de pp)`, res);
-    const go = await vscode.window.showWarningMessage(
-      'O nome é citado DENTRO de regra(s) de pp (diretivas nomeadas na saída). Editar as diretivas junto?',
-      'Prosseguir (--edit-rules)', 'Cancelar');
-    if (go !== 'Prosseguir (--edit-rules)') return;
-    flags.push('--edit-rules');
-    res = await run(['rename-function', c.spec, word, novo, ...flags], c.cwd);
-  }
-  if (res.code !== 0 && /referências textuais/.test(res.stderr + res.stdout)) {
-    report(`rename-function ${word} -> ${novo} (referências textuais)`, res);
-    const go = await vscode.window.showWarningMessage(
-      'Há referências textuais (strings/HB_FUNC) que NÃO serão alteradas. Prosseguir mesmo assim?',
-      'Prosseguir (--force)', 'Cancelar');
-    if (go !== 'Prosseguir (--force)') return;
-    flags.push('--force');
-    res = await run(['rename-function', c.spec, word, novo, ...flags], c.cwd);
-  }
-  report(`rename-function ${word} -> ${novo}`, res);
-}
-
-// renomeia a palavra-cabeça de uma diretiva de pp (#command/#xcommand/
-// #[x]translate/#define) na definição E em todos os sites de aplicação.
-// Projeto inteiro (a diretiva pode viver num .ch compartilhado); o CLI
-// verifica .ppo/.hrb byte-idênticos e faz rollback em qualquer divergência.
-async function cmdRenameDsl() {
-  const c = await ctx();
-  if (!c) return;
-  const word = wordAt(c.editor);
-  if (!word) return;
-  const novo = await vscode.window.showInputBox({
-    prompt: `Novo nome para a palavra de DSL/diretiva ${word} (definição + todos os usos)` });
-  if (!novo) return;
-  await saveAll();
-  const res = await run(['rename-dsl', c.spec, word, novo], c.cwd);
-  report(`rename-dsl ${word} -> ${novo}`, res);
-}
-
-// renomeia um NOME DE MATCH MARKER de diretiva de pp sob o cursor - o nome
-// que o programador escreve e que preenche um <marker> (método de classe do
-// hbclass, palavra capturada de qualquer DSL) e todos os artefatos que a
-// expansão deriva dele. rename-pp-marker e rename-method são a mesma engine
-// (fase B4d): o rastro de derivação do dump ast-3 acha declaração,
-// implementação, sends e os artefatos gerados (símbolos colados, strings de
-// stringify), edita o fonte e prevê/verifica cada artefato - sem nada
-// por-DSL. O CLI recusa e faz rollback em qualquer divergência.
-async function cmdRenamePpMarker() {
-  const c = await ctx();
-  if (!c) return;
-  const word = wordAt(c.editor);
-  if (!word) return;
-  const novo = await vscode.window.showInputBox({
-    prompt: `Novo nome para o marker ${word} (declaração, implementação, sends e artefatos derivados)` });
-  if (!novo) return;
-  await saveAll();
-  let res = await run(['rename-pp-marker', c.spec, word, novo], c.cwd);
-  // strings iguais ao nome (possível acesso por nome, __objSendMsg/:&) não
-  // são editadas: o CLI pede confirmação via --force. (Um método definido
-  // por mais de uma classe é recusa por DESENHO - send é despacho dinâmico;
-  // a mensagem do CLI explica e não há --force que a contorne.)
-  if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
-    report(`rename-pp-marker ${word} -> ${novo} (referências textuais)`, res);
-    const go = await vscode.window.showWarningMessage(
-      'Há strings iguais ao nome (possível acesso por nome) que NÃO serão alteradas. Prosseguir mesmo assim?',
-      'Prosseguir (--force)', 'Cancelar');
-    if (go !== 'Prosseguir (--force)') return;
-    res = await run(['rename-pp-marker', c.spec, word, novo, '--force'], c.cwd);
-  }
-  report(`rename-pp-marker ${word} -> ${novo}`, res);
-}
-
-async function cmdRenameStatic() {
-  const c = await ctx();
-  if (!c) return;
-  const word = wordAt(c.editor);
-  if (!word) return;
-  const novo = await vscode.window.showInputBox({ prompt: `Novo nome para a STATIC ${word} (módulo ${c.file})` });
-  if (!novo) return;
-  await saveAll();
-  const res = await run(['rename-static', c.spec, c.file, word, novo], c.cwd);
-  report(`rename-static ${word} -> ${novo}`, res);
-}
-
 async function cmdReorderParams() {
   const c = await ctx();
   if (!c) return;
@@ -513,11 +401,6 @@ function activate(context) {
     vscode.commands.registerCommand('hbrefactor.execRegistry', cmdExecRegistry),
     vscode.commands.registerCommand('hbrefactor.annotate', cmdAnnotate),
     vscode.commands.registerCommand('hbrefactor.annotateApply', cmdAnnotateApply),
-    vscode.commands.registerCommand('hbrefactor.renameLocal', cmdRenameLocal),
-    vscode.commands.registerCommand('hbrefactor.renameFunction', cmdRenameFunction),
-    vscode.commands.registerCommand('hbrefactor.renameDsl', cmdRenameDsl),
-    vscode.commands.registerCommand('hbrefactor.renamePpMarker', cmdRenamePpMarker),
-    vscode.commands.registerCommand('hbrefactor.renameStatic', cmdRenameStatic),
     vscode.commands.registerCommand('hbrefactor.reorderParams', cmdReorderParams),
     vscode.commands.registerCommand('hbrefactor.extractFunction', cmdExtractFunction),
     vscode.commands.registerCommand('hbrefactor.unusedLocals', cmdUnusedLocals),

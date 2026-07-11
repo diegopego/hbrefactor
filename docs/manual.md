@@ -1,13 +1,15 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@a3b7514 · harbour-core@034ee65f7b (feature/compiler-ast-dump)
-    — phase U (unified `rename`) is mostly hbrefactor, BUT its second review round added
-      one core fact: schema ast-12, the ppApplications `generates` stamp (a marker that
-      pastes/stringifies GENERATES an artifact). Both the hbrefactor commit and a new
-      harbour-core commit ride on top of these parents (a commit can't name its own hash,
-      so the baseline is the parent pair — advance both once committed).
-  suite at baseline: 108 cases (0–107), 797 checks green
+  baseline: hbrefactor@112ec7e · harbour-core@8499d78b45 (feature/compiler-ast-dump)
+    — phase U slice 2 removed the eight `rename-*` from the public surface (the engine
+      functions live on as internal delegates of the unified `rename`; a typed `rename-*`
+      gets an honest redirect). The harness migrated to `rename <pos>`, which exposed and
+      fixed one ast-12 core bug (a pure #xtranslate stringify inside a command: the
+      reverse-scan now also visits the applications' CONSUMED tokens, which keep the
+      original op). Both this hbrefactor commit and a new harbour-core commit ride on the
+      parents above (advance both once committed).
+  suite at baseline: 103 cases, 782 checks green
   updated: 2026-07-11
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -69,7 +71,7 @@ matching, still text. Still blind to what your code *means*.
 
 ### So what is refactoring?
 
-<!-- prov: cases 1 (rename-local verified), 10 (rename-function round-trip),
+<!-- prov: cases 1 (rename local verified), 10 (rename function round-trip),
      14 (reorder preserves behavior), 16 (extract preserves behavior) -->
 
 Refactoring means changing the **shape** of your code without changing **what it
@@ -483,14 +485,14 @@ does** — never build a guess inside the tool.
 ## Where it stands — honest status
 
 <!-- prov: roadmap.md (delivered table, RE.6/RD-c entregues, U slice 1 delivered,
-     gates B6/B8/D), CLI 0.5.0 / extension 0.12.0, suite 797/0 (this commit, phase U
-     slice 1 - unified rename); rough edges: cases 88 (@ref,
+     gates B6/B8/D), CLI 0.5.0 / extension 0.13.0, suite 782/0 (this commit, phase U
+     slices 1-2 - unified rename + the eight rename-* removed); rough edges: cases 88 (@ref,
      PARAMETERS AS), commit c127b1f (same-basename limit), CHANGELOG 2026-07-10;
      limits doc (limites-e-alavancas.md: irreducible maybe, library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.12.0`; they version independently). The behavior contract is a suite of **108 cases /
-797 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.13.0`; they version independently). The behavior contract is a suite of **103 cases /
+782 checks**, all green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
@@ -544,7 +546,7 @@ opinions are all welcome:
 
 ## Install
 
-<!-- prov: Makefile (build/test, HB_BIN default), vscode/hbrefactor-0.12.0.vsix,
+<!-- prov: Makefile (build/test, HB_BIN default), vscode/hbrefactor-0.13.0.vsix,
      CLAUDE.md HB_BIN rule. -->
 
 **Requirement, stated honestly:** hbrefactor drives a special build of Harbour — the
@@ -557,9 +559,9 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (108 cases)
+   make test         # optional: the behavior suite (103 cases)
    ```
-3. **VSCode (optional):** install `vscode/hbrefactor-0.12.0.vsix` and point
+3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.
 
 ---

@@ -286,10 +286,23 @@ da spec tem o placar das duas rodadas. Specs:
 de derivação do pp (clone × paste/stringify) como FATO de resolução —
 possivelmente arquitetural, com limites e perguntas em aberto honestos — tem
 ADR próprio: [adr-003-derivacao-pp-como-fato.md](adr-003-derivacao-pp-como-fato.md).**
-**Fatia 2 (próxima, mesmo portão):** REMOVER a superfície pública dos oito
-(`Main`/`Usage`; as funções `Rename*` viram delegados internos), migrar o
-harness (~40 invocações → `rename <pos>` ou golden congelado), CHANGELOG do
-corte. Registro completo da motivação abaixo (preservado).
+**Fatia 2 — ENTREGUE (2026-07-11, decisão do Diego "remover + dropar os
+~13"):** a superfície pública dos oito `rename-*` foi REMOVIDA do `Main`/
+`Usage` (as funções `Rename*` viram delegados internos do `Rename()`);
+`rename-*` digitado à mão recebe redirecionamento honesto ("removido na fase
+U; use `rename <arq:linha:col>`"). Harness migrado por FATO: **98 invocações
+`rename-*`** → 76 viraram `rename <pos>` (a saída do delegado é idêntica, os
+asserts ficaram), 9 oráculos do caso 107 viraram asserção **golden**, 1 (VAR
+membro) migrada; **13 testes da INTERFACE removida DROPADOS** (cases 6/49
+inteiros; parciais em 13/29/38/40/46/77 — ambiguidade de nome-cru que a
+posição resolve, seletor, "não existe" sem posição). A migração destravou e
+consertou um BUG do canal ast-12: um marker que só STRINGIFICA por
+`#xtranslate` DENTRO de um comando (`? EVENTO x`) tinha o `from` do token
+sobrevivente re-clonado pelo comando externo — o reverse-scan agora varre
+também os tokens CONSUMIDOS das aplicações (que guardam a op original).
+Extensão 0.13.0 (os 5 comandos por-kind removidos, só "Rename Symbol").
+Suíte **782/0** (103 casos), lexdiff 0; rebuild harbour+hbmk2 (compast.c).
+Registro completo da motivação abaixo (preservado).
 
 **A pergunta, firme**: por que a CLI expõe OITO comandos de rename
 (`rename-local`, `rename-static`, `rename-memvar`, `rename-param`,
@@ -334,6 +347,63 @@ pp-marker); ponto ambíguo ou sem fato degrada honesto (recusa nomeada, sem
 adivinhação); capacidades por-flag preservadas sob o verbo; nomes antigos
 viram aliases OU a remoção fica registrada em ADR; `extract`/`reorder`
 recebem o mesmo tratamento se o fato os cobrir. Zero regressão na suíte.
+
+### P — Investigação exaustiva do pp para refatoração — **AGENDADA (portão aberto pelo Diego, 2026-07-11; D-P0 U-2 antes, D-P1 dois eixos, D-P2 investigação+capacidade)**
+
+A rodada 2 da fase U destravou a operação de derivação do pp
+(`clone`/`paste`/`stringify`) como fato de resolução (ast-12, `generates`);
+o [adr-003](adr-003-derivacao-pp-como-fato.md) registrou que o achado ABRE
+perguntas — não fecha portão — e nomeou 6 eixos em aberto + o critério de
+matar ("fato sem consumidor = fato local, não arquitetura"). Diego pediu
+(2026-07-11) **investigar AO EXTREMO as possibilidades e limitações do pp
+para refatoração**, aproveitando esses achados; a fase é **EXAURIDA antes de
+avançar outras frentes ativas**. É o esgotamento sistemático: cada pergunta
+aberta e cada fato que o `ppcore` sabe-e-não-exporta vira veredito provado —
+capacidade, fato novo (`ast-N`) ou recusa honesta documentada.
+
+**Decisões do portão (Diego, 2026-07-11):** **D-P0** — a fase U **fatia 2**
+(corte da superfície pública dos 8 `rename-*` + migração do harness) fecha
+ANTES, como pré-requisito. **D-P1** — DOIS eixos: pp como **FONTE DE FATO** (o
+que o `ppcore` sabe e não exporta) E pp como **INSTRUMENTO** de reescrita (o
+próprio pp do core como motor/oráculo; pode terminar em recusa, mas decidida
+por prova). **D-P2** — **investigação + capacidade**: todo fato que sobreviver
+à prova adversarial aterrissa como consumo mínimo na ferramenta + caso na
+suíte (responde ao critério de matar do adr-003).
+
+**Fatias** (ordem: U-2 → Eixo A P1–P6 → Eixo B P7 → Eixo C P8 → P9 → P10):
+- **Eixo A (fonte de fato):** P1 granularidade `paste`×`stringify`
+  (adr-003:82-86, candidato `ast-13` `genOp` OU recusa via guard `--force`);
+  P2 marker que gera E passa adiante (adr-003:87-90); P3 `generates` para
+  `usages`/find-references (a hipótese grande, adr-003:60-63); P4 mkinds de
+  RESULT marker como veredito (`block`/`reference`/stringify… já exportados,
+  não consumidos); P5 mkinds de MATCH (`wild`/`extexp`/`restrict` — validação
+  por alternativas do restrict [ppcore.c:877-878]); P6 estrutura da regra
+  (multi-passe, opcionais reordenados, regra-em-expansão, **regra sem cabeça**
+  — fecha o relato pendente do backlog, linha 644).
+- **Eixo B (instrumento):** P7 pp do core como motor de migração de DSL /
+  oráculo de equivalência (`.ppo`/`.ppt` como conferência humana, não canal) —
+  veredito provável parcial ou recusa honesta.
+- **Eixo C (editar a regra):** P8 rename da palavra de marker na regra (match+
+  result coerentes, canal ast-5) + limites de edição estrutural da regra.
+- **P9** custo do reverse-scan O(tokens×from) (adr-003:96-98); **P10**
+  síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
+
+**Portões pontuais a submeter durante a execução:** D-P3 (fato provado vira
+`ast-N` OU fica computado do `from`?), D-P4 (restrict-validation e
+rename-de-literal-da-regra são capacidades desejadas OU fato sem comando?),
+D-P5 (se o Eixo B for viável, migração de DSL ganha verbo próprio?).
+
+**Critério de pronto ("exaurida"):** cada uma das 6 perguntas do adr-003 com
+veredito registrado; cada match-mkind e result-mkind com fixture provando
+consumo OU recusa documentada no ast-schema; Eixo B com veredito provado; todo
+fato sobrevivente com consumidor + caso na suíte (nenhum `ast-N` sem cliente);
+passe de completude sem conceito de pp não exercitado; suíte verde
+byte-idêntica + `lexdiff 0` por bump; régua do caso 64 em cada fixture nova.
+Toda prova em **DSL inventada NÃO-espelho** ([revisao-generalidade.md:57-64](revisao-generalidade.md)).
+**Fora do escopo:** nome de classe, macros (B8), herança (RE.6), colisão de
+módulos homônimos. Spec dedicada a criar: `docs/spec-p-pp-refatoracao.md`
+(molde da [spec-u](spec-u-verbos-unificados.md)). Plano detalhado salvo em
+`~/.claude/plans/crie-um-plano-para-enchanted-flask.md`.
 
 ### B-infra — suíte paralela ✅ ENTREGUE (Etapas 1 e 2) — narrativa no [arquivo](roadmap-fases-entregues.md)
 

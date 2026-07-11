@@ -5,6 +5,33 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-11 — os oito `rename-*` foram REMOVIDOS (fica só o `rename`)
+
+Na entrega anterior o `rename` unificado chegou e os oito comandos antigos
+(`rename-local`, `rename-param`, `rename-static`, `rename-memvar`,
+`rename-function`, `rename-method`, `rename-dsl`, `rename-pp-marker`) ficaram
+**descontinuados**. Agora eles **saíram de vez**.
+
+### O que muda pra você
+
+- Use **`rename <projeto> <arq:linha:col> <novo>`** (na extensão, **Rename
+  Symbol**, o F2). Um comando só, o kind vem do fato sob o cursor.
+- Se você digitar um comando velho, a ferramenta **avisa e redireciona** em
+  vez de fazer algo errado:
+  ```
+  $ hbrefactor rename-local app.hbp a.prg Main x y
+  hbrefactor: 'rename-local' foi removido na fase U - use `rename <projeto> <arq:linha:col> <novo>`
+  ```
+- **Nenhuma capacidade some.** O motor de cada rename continua lá por dentro
+  (o `rename` delega a ele); só o comando por-espécie foi tirado da linha de
+  comando e da paleta do VSCode.
+
+### Se você tem scripts
+
+Troque `rename-<kind> <projeto> ... <velho> <novo>` por `rename <projeto>
+<arq:linha:col> <novo>`, apontando a posição do símbolo. É a mesma edição
+verificada, com o mesmo relato.
+
 ## 2026-07-11 — um só `rename`: você aponta, a ferramenta descobre o que é
 
 ### O problema de todo dia

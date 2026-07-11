@@ -29,15 +29,8 @@ PROCEDURE Main()
       // verbo unificado (fase U): o KIND vem do FATO sob o cursor, não do
       // sufixo do comando - despacha para o rename-* específico por dentro
       nExit := Rename( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. ( Lower( aArgs[ 1 ] ) == "rename-local" .OR. ;
-                                  Lower( aArgs[ 1 ] ) == "rename-param" )
-      nExit := RenameLocal( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "reorder-params"
       nExit := ReorderParams( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-static"
-      nExit := RenameStatic( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-function"
-      nExit := RenameFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "extract-function"
       nExit := ExtractFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "inline-local"
@@ -48,16 +41,6 @@ PROCEDURE Main()
       nExit := CallGraph( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "find-dynamic-calls"
       nExit := FindDynamicCalls( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-dsl"
-      nExit := RenameDsl( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename-memvar"
-      nExit := RenameMemvar( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. ( Lower( aArgs[ 1 ] ) == "rename-method" .OR. ;
-                                  Lower( aArgs[ 1 ] ) == "rename-pp-marker" )
-      // mesmo motor (B4d): rename-method é o açúcar com política de
-      // mensagem; rename-pp-marker renomeia qualquer nome que preencha um
-      // match marker de diretiva de pp (e os artefatos que ele deriva)
-      nExit := RenameMethod( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "usages"
       nExit := Usages( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "resolve-at"
@@ -70,6 +53,15 @@ PROCEDURE Main()
       nExit := Annotate( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "exec-registry"
       nExit := ExecRegistry( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Left( Lower( aArgs[ 1 ] ), 7 ) == "rename-"
+      // fase U fatia 2: os oito rename-* específicos foram REMOVIDOS - o
+      // KIND vira consequência do fato sob o cursor, não do sufixo. As
+      // funções-motor viram delegados internos do `rename`; redireciona
+      // honesto (nomeando o comando velho), nunca adivinha
+      OutStd( "hbrefactor: '" + aArgs[ 1 ] + "' foi removido na fase U - " + ;
+              "use `rename <projeto> <arq:linha:col> <novo>` " + ;
+              "(o kind vem do fato sob o cursor)" + hb_eol() )
+      nExit := EXIT_USAGE
    OTHERWISE
       Usage()
       nExit := EXIT_USAGE
@@ -87,20 +79,11 @@ STATIC PROCEDURE Usage()
    OutStd( "                                     (renomeia o símbolo SOB O CURSOR; o KIND -" + hb_eol() )
    OutStd( "                                      local/param/static/memvar/função/método/dsl/marker -" + hb_eol() )
    OutStd( "                                      vem do FATO da árvore, não do comando)" + hb_eol() )
-   OutStd( "  --- rename-* específicos (DESCONTINUADOS: use `rename <arq:linha:col>`) ---" + hb_eol() )
-   OutStd( "  hbrefactor rename-local <projeto> <arq.prg> <função> <velho> <novo> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor rename-param <projeto> <arq.prg> <função> <velho> <novo> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor rename-function <projeto> <velho> <novo> [--file <f.prg>] [--force] [--edit-rules] [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor rename-static <projeto> <arq.prg> <velho> <novo> [--func <função>] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor reorder-params <projeto> <função> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <projeto> <arq.prg> <ini>-<fim> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor inline-local <projeto> <arq.prg> <função> <nome> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <projeto> <nome|Classe:Método|--at arq:linha:col> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
    OutStd( "  hbrefactor resolve-at <projeto> <arq.prg> <linha> <coluna>   (posição -> 'query: <spec>')" + hb_eol() )
-   OutStd( "  hbrefactor rename-dsl <projeto> <velha> <nova> [--dry-run]   (cabeça, keyword do match ou palavra de restrição)" + hb_eol() )
-   OutStd( "  hbrefactor rename-memvar <projeto> <velho> <novo> [--force] [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor rename-method <projeto> <Classe:Método> <novo> [--force] [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor rename-pp-marker <projeto> <nome> <novo> [--force] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor unused-locals <projeto>" + hb_eol() )
    OutStd( "  hbrefactor call-graph <projeto> [<função>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <projeto>" + hb_eol() )

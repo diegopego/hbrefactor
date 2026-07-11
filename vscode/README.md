@@ -51,11 +51,7 @@ Harbour é a árvore de fontes (não uma instalação com os headers copiados).
 | Comando | O que faz |
 |---|---|
 | `hbrefactor: Usages` | Todas as referências do símbolo sob o cursor (variável, função, método **ou palavra de diretiva de pp**) no painel de referências + canal. No canal, o relato inclui o que a expansão fabrica (`-> CAIXA_SOMA`, `-> derives ...`): a extensão passa `--show-expansion` sempre — diferente do CLI pelado, cujo default omite os nomes gerados; o painel de referências segue no vocabulário do fonte (o `--json` não muda com o flag) |
-| `hbrefactor: Rename Symbol under cursor` | **Rename unificado (F2)**: você dá só a POSIÇÃO; o kind — local, parâmetro, STATIC, memvar, função, método, palavra de DSL ou marker de diretiva — vem do FATO da árvore, não de um comando por-espécie. Despacha ao motor específico por dentro (saída idêntica), pede `--edit-rules`/`--force` quando o nome é citado em diretiva ou em strings, e recusa nomeando a exceção se a posição não tem símbolo de compilação. **Substitui os quatro comandos por-kind abaixo (descontinuados).** |
-| `hbrefactor: Rename local/param under cursor` _(descontinuado → use Rename Symbol)_ | Rename verificado de LOCAL/parâmetro (funciona dentro de `METHOD ... CLASS` — a extensão passa `Classe:Método` ao CLI) |
-| `hbrefactor: Rename function under cursor` _(descontinuado → use Rename Symbol)_ | Rename de função no projeto inteiro; se houver referências textuais, mostra os avisos e oferece prosseguir com `--force` |
-| `hbrefactor: Rename directive/command word (pp DSL)` _(descontinuado → use Rename Symbol)_ | Renomeia a palavra-cabeça de uma diretiva `#command`/`#xcommand`/`#[x]translate`/`#define` na definição (o `.ch`) **e** em todos os usos; o CLI verifica `.ppo`/`.hrb` byte-idênticos e faz rollback |
-| `hbrefactor: Rename STATIC variable under cursor` _(descontinuado → use Rename Symbol)_ | Rename de STATIC (de função ou file-wide) no módulo atual |
+| `hbrefactor: Rename Symbol under cursor` | **Rename unificado (F2)**: você dá só a POSIÇÃO; o kind — local, parâmetro, STATIC, memvar, função, método, palavra de DSL ou marker de diretiva — vem do FATO da árvore, não de um comando por-espécie. Pede `--edit-rules`/`--force` quando o nome é citado em diretiva ou em strings, e recusa nomeando a exceção se a posição não tem símbolo de compilação. **É o único comando de rename** — os quatro por-kind foram REMOVIDOS na fase U (fatia 2). |
 | `hbrefactor: Reorder parameters` | Nova ordem por nomes separados por vírgula |
 | `hbrefactor: Extract selection to new function` | Extrai as linhas selecionadas para STATIC FUNCTION/PROCEDURE nova (locais exclusivas da seleção migram junto) |
 | `hbrefactor: Unused locals` | Relatório de locais declaradas e não usadas / atribuídas e não lidas (W0003/W0032, projeto inteiro) |
@@ -70,10 +66,12 @@ Shift+F12 → `hbrefactor.usages`).
 - Os arquivos são modificados **no disco pelo CLI** (que verifica e faz
   rollback); a extensão salva os editores antes de invocar e o VSCode
   recarrega os arquivos alterados. O "desfazer" é o git, não o Ctrl+Z.
-- A única heurística local é achar o nome da `FUNCTION/PROCEDURE/METHOD`
-  acima do cursor para montar a linha de comando — se errar, o CLI recusa
-  com mensagem clara (nenhuma edição acontece por palpite).
+- O **Rename Symbol** não tem heurística: passa a POSIÇÃO do cursor ao CLI,
+  que resolve o kind pelo FATO da árvore; se a posição não tem símbolo de
+  compilação, recusa nomeando o motivo (nenhuma edição por palpite). Só o
+  *Reorder parameters* ainda procura a `FUNCTION/PROCEDURE/METHOD` acima do
+  cursor.
 - Em projetos legados com módulos que não compilam, os relatórios rodam em
-  **cobertura parcial** (avisam quais módulos ficaram de fora) e os renames
-  de módulo único (local/param/static) funcionam desde que o módulo alvo
-  compile. Renames de projeto inteiro continuam exigindo o projeto são.
+  **cobertura parcial** (avisam quais módulos ficaram de fora) e o rename de
+  símbolo de módulo único funciona desde que o módulo alvo compile. Rename de
+  projeto inteiro (função/método/marker) continua exigindo o projeto são.
