@@ -5,6 +5,79 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-11 — rename certo com nome repetido; DSL que cria DSL agora renomeia
+
+Duas situações que antes davam errado (uma recusava confuso, a outra nem
+existia) agora simplesmente funcionam.
+
+### 1. O valor do seu marker coincide com o nome de uma função real
+
+```harbour
+#xtranslate LABEL <n> => RegLabel( <"n"> )
+
+PROCEDURE Main()
+   LABEL Vendas        // 'Vendas' aqui é rótulo (vira a string "Vendas")
+   ? Vendas()          // 'Vendas' aqui é a FUNÇÃO real, homônima
+   RETURN
+
+FUNCTION Vendas()
+   RETURN 42
+```
+
+Renomear o rótulo (`rename app.hbp a.prg:5:10 Receita`) agora edita **só a
+linha do LABEL** e prevê a string derivada — a chamada `? Vendas()` e a
+função ficam intactas. Antes, a ferramenta arrastava a chamada da função
+homônima junto, a verificação percebia o estrago e desfazia tudo com uma
+mensagem confusa; agora ela sabe, por fato do compilador, **a qual dono cada
+ocorrência pertence**. O inverso também: renomear a FUNÇÃO (pela chamada ou
+pela definição) não toca os sites de DSL homônimos.
+
+### 2. Sua DSL define OUTRA DSL — e o nome no meio agora renomeia
+
+```harbour
+#xcommand DEFREGRA <n> => #xcommand USA <n> => ? Marca( <"n"> )
+
+PROCEDURE Main()
+   DEFREGRA Ponto      // cria, em tempo de pp, a regra `USA Ponto`
+   USA Ponto           // usa a regra criada
+   RETURN
+```
+
+Renomear `Ponto` — em QUALQUER das duas posições — agora edita os dois
+sites juntos e prevê a string derivada:
+
+```
+$ hbrefactor rename app.hbp a.prg:5:13 Marco
+rename-pp-marker: Ponto -> Marco
+  a.prg:5:13
+  a.prg:6:8
+  predicted string: "Ponto" -> "Marco" (a.prg)
+verified: 2 edit(s); derived artifacts renamed as predicted
+```
+
+Antes a posição do `DEFREGRA` recusava ("não consigo classificar"). O que
+destravou: o compilador do branch agora registra a **genealogia** — quando
+uma regra de pp é criada pela expansão de outra, o dump diz de qual
+aplicação ela nasceu — e a ferramenta consome esse fato. Vale para o
+hbclass real (é assim que `METHOD` funciona por dentro) e para qualquer
+DSL sua, existente ou inventada.
+
+### O que a ferramenta continua NUNCA fazendo
+
+- Editar por coincidência de nome: cada edição precisa de um fato do
+  compilador ligando a ocorrência ao alvo.
+- Deixar árvore quebrada: toda aplicação recompila e verifica; qualquer
+  divergência desfaz tudo (rollback byte-exato).
+
+### Limites honestos
+
+- Exige o toolchain atualizado do branch `feature/compiler-ast-dump`
+  (schema `ast-13`) — harbour E hbmk2 rebuildados.
+- Se um MESMO símbolo do módulo mistura os dois papéis de um jeito que a
+  contagem de símbolos não separa (o nome cru do marker vira símbolo E
+  existe função homônima), a ferramenta continua recusando com rollback —
+  ambiguidade real não vira adivinhação.
+
 ## 2026-07-11 — os oito `rename-*` foram REMOVIDOS (fica só o `rename`)
 
 Na entrega anterior o `rename` unificado chegou e os oito comandos antigos

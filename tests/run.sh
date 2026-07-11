@@ -178,6 +178,13 @@ freshstat() { # freshstat <case-name> -> STATIC FUNCTION homônima em módulos d
    echo "$d"
 }
 
+freshgen() { # freshgen <case-name> -> genealogia de regra: homônimo de marker + DSL que GERA regra (fase P, ast-13)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixgen/*.prg "$HERE"/fixgen/*.ch "$HERE"/fixgen/*.hbp "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3415,7 +3422,58 @@ grep -q "^rename-function: Helper -> Aux (static, só a.prg)" "$D/st.log"
 check "STATIC homônima: a posição passa --file e desambigua (Codex #1)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107"
+unit_108() {
+echo "case 108: P - genealogia de regra (ast-13): homônimo de marker + DSL que GERA regra"
+# fixture fixgen: hom.ch (LABEL stringify + MAKE paste) com FUNCTION Vendas
+# REAL homônima do valor do marker; gen.ch (DEFREGRA <n> gera a regra USA <n>)
+for f in h.prg g.prg; do
+   "$HB_BIN/harbour" "$HERE/fixgen/$f" -n -q0 -w3 -es2 -s -I"$HERE/fixgen" > /dev/null 2>&1
+   check "fixgen/$f clean under -w3 -es2"  $?
+done
+# --- homônimo: a coleta de sementes só edita o que pertence ao marker por FATO
+D=$(freshgen case108a)
+( cd "$D" && "$BIN" rename hom.hbp h.prg:5:10 Receita > str.log 2>&1 )
+check "stringify marker rename with REAL homonym function: exit 0" $?
+grep -q '   ? Vendas()' "$D/h.prg" && grep -q '   LABEL Receita' "$D/h.prg"
+check "DSL site edited; ? Vendas() call of the REAL function untouched" $?
+grep -q 'predicted string: "Vendas" -> "Receita"' "$D/str.log"
+check "derived string predicted despite the homonym" $?
+( cd "$D" && "$HB_BIN/harbour" h.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "edited module still clean" $?
+( cd "$D" && "$BIN" rename hom.hbp h.prg:5:10 Vendas > /dev/null 2>&1 )
+cmp -s "$D/h.prg" "$HERE/fixgen/h.prg"
+check "A->B->A round-trip byte-exact" $?
+( cd "$D" && "$BIN" rename hom.hbp h.prg:9:6 Receita --dry-run > mk.log 2>&1 )
+grep -q "h.prg:9:6" "$D/mk.log" && ! grep -q "h.prg:6:6" "$D/mk.log" && \
+   grep -q "predicted: MK_VENDAS -> MK_RECEITA" "$D/mk.log"
+check "paste marker: only the MAKE site collected, composite predicted" $?
+# a via inversa: renomear a FUNÇÃO real pela chamada não pode tocar os markers
+( cd "$D" && "$BIN" rename hom.hbp h.prg:6:6 Conta > fn.log 2>&1 )
+grep -q "^rename-function: Vendas -> Conta" "$D/fn.log" && \
+   grep -q '   LABEL Vendas' "$D/h.prg" && grep -q '^MAKE Vendas' "$D/h.prg" && \
+   grep -q '   ? Conta()' "$D/h.prg"
+check "renaming the REAL function leaves both marker sites untouched" $?
+# --- regra GERADA: o marker cujo valor VIRA regra (genealogia, não generates)
+D=$(freshgen case108b)
+( cd "$D" && "$BIN" rename gen.hbp g.prg:5:13 Marco > gr.log 2>&1 )
+check "marker that BECOMES a generated rule: rename exit 0" $?
+grep -q "g.prg:5:13" "$D/gr.log" && grep -q "g.prg:6:8" "$D/gr.log" && \
+   grep -q 'predicted string: "Ponto" -> "Marco"' "$D/gr.log"
+check "definition site AND generated-rule use site edited; string predicted" $?
+( cd "$D" && "$HB_BIN/harbour" g.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "edited module still clean" $?
+( cd "$D" && "$BIN" rename gen.hbp g.prg:5:13 Ponto > /dev/null 2>&1 )
+cmp -s "$D/g.prg" "$HERE/fixgen/g.prg"
+check "A->B->A round-trip byte-exact" $?
+# a posição do USO da regra gerada resolve como palavra de DSL (os mesmos sites)
+D=$(freshgen case108c)
+( cd "$D" && "$BIN" rename gen.hbp g.prg:6:8 Marco --dry-run > use.log 2>&1 )
+grep -q "^rename-dsl: Ponto -> Marco" "$D/use.log" && \
+   grep -q "g.prg:6:8" "$D/use.log" && grep -q "g.prg:5:13" "$D/use.log"
+check "use site of the GENERATED rule resolves rename-dsl, same two sites" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

@@ -348,7 +348,32 @@ adivinhação); capacidades por-flag preservadas sob o verbo; nomes antigos
 viram aliases OU a remoção fica registrada em ADR; `extract`/`reorder`
 recebem o mesmo tratamento se o fato os cobrir. Zero regressão na suíte.
 
-### P — Investigação exaustiva do pp para refatoração — **AGENDADA (portão aberto pelo Diego, 2026-07-11; D-P0 U-2 antes, D-P1 dois eixos, D-P2 investigação+capacidade)**
+### P — Investigação exaustiva do pp para refatoração — **EM CURSO (portão aberto pelo Diego, 2026-07-11; D-P0 U-2 antes, D-P1 dois eixos, D-P2 investigação+capacidade)**
+
+**P1 — ENTREGUE (2026-07-11): veredito do genOp + o primeiro pedaço do GRAFO
+(ast-13, genealogia de regra) com consumidores.** Spec:
+**[spec-p-pp-refatoracao.md](spec-p-pp-refatoracao.md)**; a tese arquitetural
+(grafo de transformação do pp, recomendações do Diego, oráculo `.ppo`/`.ppt`):
+**[adr-004](adr-004-grafo-transformacao-pp.md)**. (1) Granularidade
+paste×stringify (adr-003:82-86): `genOp` isolado recusado — a resolução usa o
+booleano `generates` (casos 51/52/107), a predição já lê a distinção do rastro
+`from`, stringify não exige `--force`. (2) Prova adversarial revelou a colisão
+de homônimo (`? Vendas()` colhido por nome lexical); DUAS hipóteses minhas
+caíram por execução (filtro `generates` quebra método — clone multi-passe;
+"conserto por binding" era desnecessário) e **a visão do Diego venceu: o
+conserto era completar o GRAFO**. (3) **ast-13 entregue**: genealogia de regra
+(`from` nos tokens de match/result de regra GERADA — liga a regra à aplicação
+criadora; `ppcore.c`/`hbpp.h`/`compast.c`) + derivação sobrevivendo ao clone
+(`hb_pp_tokenClone`); consumidores: coleta de sementes v2 (gate de
+pertencimento por fato), `genrule` na resolução (nome que VIRA regra =
+pp-marker mesmo sem `generates`), verificação com renome opcional do nome cru
+(`hOpt`). O homônimo deixou de ser degrade e virou rename CORRETO; o marker
+que gera regra (`DEFREGRA <n> => #xcommand USA <n> => ...`) ficou renomeável
+nas duas posições. Prova: **caso 108** (14 checks, fixture `fixgen`
+não-espelho) + regras METHOD do hbclass real; suíte **796/0**, lexdiff 0,
+zero drift nos 782 pré-existentes. Também fecha o miolo de **P6
+"regra-em-expansão"** por antecipação. **Commits (core + ferramenta) pendentes
+de autorização por-commit do Diego.**
 
 A rodada 2 da fase U destravou a operação de derivação do pp
 (`clone`/`paste`/`stringify`) como fato de resolução (ast-12, `generates`);

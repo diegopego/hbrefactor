@@ -275,12 +275,15 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // pelo bloco EXATO, destravando getter+setter de VAR..IS na mesma linha;
    // ast-12 = "generates": true no token-fonte de marker do ppApplications
    // (o nome PASTEIA/STRINGIFICA -> gera artefato; fase U/revisão) - separa
-   // "nome que a diretiva vira código" de "símbolo ligado num comando".
+   // "nome que a diretiva vira código" de "símbolo ligado num comando";
+   // ast-13 = GENEALOGIA de regra ("from" nos tokens de match[]/result[]
+   // de regra GERADA por expansão de outra regra - liga a regra à
+   // aplicação/marker que a criou; fase P).
    // O leitor usa só seções presentes em todos - comandos que
    // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
    // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12", "ast-13" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -1142,8 +1145,9 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
    LOCAL aPosApps := {}, hMk, hFunc, aParts, cPart, nCls, cCur, nState, cSide
    // ast: papel estrutural do site (aditivo; o `rename` unificado despacha
    // por ele - o resolve-at/usages ignoram estas chaves). lGen = o marker
-   // sob o cursor GERA artefato (paste/stringify, fato do core ast-12)
-   LOCAL cRole := NIL, cOwner := NIL, lGen := .F.
+   // sob o cursor GERA artefato (paste/stringify, fato do core ast-12);
+   // lGenRule = o nome vira token de REGRA GERADA (genealogia, ast-13)
+   LOCAL cRole := NIL, cOwner := NIL, lGen := .F., lGenRule := .F., hFrom
 
    // camadas 1/2: o site escrito nas aplicações de pp (a assinatura de um
    // construto gerado só tem posição byte-exata AQUI - tokens[] colapsa)
@@ -1177,6 +1181,36 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
             IF hTok[ "marker" ] >= 1 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
                ! Empty( PpMarkerRanges( hAst, hTok, hPairs, cUpName ) )
                hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
+            ENDIF
+         NEXT
+      NEXT
+      // o nome vira REGRA? (ast-13, genealogia): um token de regra GERADA
+      // deriva de um par deste fecho soletrando o nome - a derivação de
+      // uma diretiva gerada entra no REGISTRO da regra, não no stream,
+      // então o `generates` (ast-12) não a vê; este é o fato irmão
+      FOR EACH hRule IN hAst[ "ppRules" ]
+         IF lGenRule
+            EXIT
+         ENDIF
+         FOR EACH aParts IN { hb_HGetDef( hRule, "match", {} ), ;
+                              hb_HGetDef( hRule, "result", {} ) }
+            FOR EACH hTok IN aParts
+               IF hb_HGetDef( hTok, "text", NIL ) != NIL .AND. ;
+                  hb_HHasKey( hTok, "from" )
+                  FOR EACH hFrom IN hTok[ "from" ]
+                     IF FromSpells( hTok, hFrom, cUpName ) .AND. ;
+                        hb_HHasKey( hPairs, PairKey( hFrom[ "app" ], hFrom[ "marker" ] ) )
+                        lGenRule := .T.
+                        EXIT
+                     ENDIF
+                  NEXT
+               ENDIF
+               IF lGenRule
+                  EXIT
+               ENDIF
+            NEXT
+            IF lGenRule
+               EXIT
             ENDIF
          NEXT
       NEXT
@@ -1358,7 +1392,7 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
 
    RETURN { "name" => iif( cMk != NIL, cMk, cWd ), "kind" => cKind, ;
             "query" => cQuery, "role" => cRole, "owner" => cOwner, ;
-            "generates" => lGen }
+            "generates" => lGen, "genrule" => lGenRule }
 
 // ---------------------------------------------------------------------------
 // rename unificado (fase U): `rename <projeto> <arq:linha:col> <novo>` - o
@@ -1481,13 +1515,16 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
       RETURN { "cmd" => "rename-dsl", "old" => cTok }
    ENDCASE
 
-   // (2) o nome GERA artefato (paste/stringify, fato do core ast-12)? então é
-   //     um marker que a DSL transforma em código - renomeá-lo carrega os
-   //     artefatos derivados. Vence QUALQUER binding homônimo, inclusive um
-   //     LOCAL que a PRÓPRIA expansão fabrica (`REGISTRO <n> => ...LOCAL <n>`
-   //     gera um `LOCAL <n>` na linha da diretiva). Só 'p'aste/'s'tringify
-   //     contam: 'c'lone (pass-through, ex.: `? x`, param de método) NÃO gera
-   IF cRole == "ppmarker" .AND. hR[ "generates" ]
+   // (2) o nome GERA artefato (paste/stringify, fato do core ast-12) OU vira
+   //     token de REGRA GERADA (genealogia, ast-13 - a derivação de uma
+   //     diretiva gerada entra no REGISTRO da regra, não no stream, então o
+   //     `generates` não a vê)? então é um marker que a DSL transforma em
+   //     código - renomeá-lo carrega os artefatos derivados. Vence QUALQUER
+   //     binding homônimo, inclusive um LOCAL que a PRÓPRIA expansão fabrica
+   //     (`REGISTRO <n> => ...LOCAL <n>` gera um `LOCAL <n>` na linha da
+   //     diretiva). Só 'p'aste/'s'tringify/regra-gerada contam: 'c'lone
+   //     (pass-through, ex.: `? x`, param de método) NÃO gera
+   IF cRole == "ppmarker" .AND. ( hR[ "generates" ] .OR. hR[ "genrule" ] )
       RETURN { "cmd" => "rename-pp-marker", "old" => cTok }
    ENDIF
 
@@ -10141,22 +10178,71 @@ STATIC FUNCTION FromSpells( hTok, hFrom, cUp )
 
 // sementes do nome de marker num módulo: pares (aplicação, marker) alimentados
 // pelo nome escrito - transitivo numa única passada, porque "from" só
-// referencia aplicações ANTERIORES - e os sites escritos {linha, col 1-based}
+// referencia aplicações ANTERIORES - e os sites escritos {linha, col 1-based}.
+// PARES alimentam o fecho (artefatos/donos/predições) e não têm gate. SITES
+// (sementes de EDIÇÃO) exigem pertencimento por FATO: o nome GERA artefato
+// (ast-12), vira token de regra GERADA (ast-13, hGenRef) ou o site pertence
+// a uma aplicação de regra gerada do próprio nome (genealogia, lLinked - a
+// impl de método, o uso da DSL gerada; nesses o nome é palavra LITERAL da
+// regra gerada, marker 0). Um clone pass-through homônimo (`? Vendas()` com
+// FUNCTION Vendas real) casa a grafia mas é OUTRO símbolo - fica FORA das
+// sementes; o binding fica com o dono verdadeiro (caso 108)
 STATIC FUNCTION PpMarkerSeeds( hAst, cUp )
 
    LOCAL hPairs := { => }, aSites := {}, hApp, hTok, nApp
+   LOCAL hGenRef := { => }, hRuleRef := { => }, hRule, aSide, hFrom
+   LOCAL cKey, lLinked
+
+   // índice de genealogia (ast-13) para ESTE nome: quais pares (aplicação,
+   // marker) os tokens de regra GERADA que soletram o nome referenciam -
+   // por regra (hRuleRef: liga as APLICAÇÕES da regra gerada ao fecho) e
+   // no agregado (hGenRef: o par de ORIGEM cujo valor virou regra)
+   FOR EACH hRule IN hb_HGetDef( hAst, "ppRules", {} )
+      FOR EACH aSide IN { hb_HGetDef( hRule, "match", {} ), ;
+                          hb_HGetDef( hRule, "result", {} ) }
+         FOR EACH hTok IN aSide
+            IF hb_HGetDef( hTok, "text", NIL ) != NIL .AND. hb_HHasKey( hTok, "from" )
+               FOR EACH hFrom IN hTok[ "from" ]
+                  IF FromSpells( hTok, hFrom, cUp )
+                     cKey := PairKey( hFrom[ "app" ], hFrom[ "marker" ] )
+                     hGenRef[ cKey ] := .T.
+                     IF ! hb_HHasKey( hRuleRef, hRule[ "id" ] )
+                        hRuleRef[ hRule[ "id" ] ] := { => }
+                     ENDIF
+                     hRuleRef[ hRule[ "id" ] ][ cKey ] := .T.
+                  ENDIF
+               NEXT
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
 
    FOR EACH hApp IN hAst[ "ppApplications" ]
       nApp := hApp:__enumIndex() - 1
+      // a REGRA desta aplicação foi GERADA a partir de um par já no fecho?
+      // (a regra gerada nasce numa aplicação ANTERIOR às suas aplicações,
+      // então a passada em ordem fecha o transitivo aqui também)
+      lLinked := .F.
+      IF hb_HHasKey( hRuleRef, hApp[ "rule" ] )
+         FOR EACH cKey IN hb_HKeys( hRuleRef[ hApp[ "rule" ] ] )
+            IF hb_HHasKey( hPairs, cKey )
+               lLinked := .T.
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
       FOR EACH hTok IN hApp[ "tokens" ]
-         IF hTok[ "marker" ] == 0
-            LOOP
-         ENDIF
          IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
             hTok[ "col" ] != NIL .AND. Upper( hTok[ "text" ] ) == cUp
-            AddHit( aSites, hTok )
-            hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
-         ELSEIF hb_HHasKey( hTok, "from" ) .AND. ;
+            IF hTok[ "marker" ] >= 1
+               hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
+            ENDIF
+            IF hb_HGetDef( hTok, "generates", .F. ) .OR. lLinked .OR. ;
+               ( hTok[ "marker" ] >= 1 .AND. ;
+                 hb_HHasKey( hGenRef, PairKey( nApp, hTok[ "marker" ] ) ) )
+               AddHit( aSites, hTok )
+            ENDIF
+         ELSEIF hTok[ "marker" ] >= 1 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
             ! Empty( PpMarkerRanges( hAst, hTok, hPairs, cUp ) )
             hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
          ENDIF
@@ -10537,6 +10623,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL aWarn := {}, hEdits := { => }, aE, nLine, aSpans, hOwn, aArts
    LOCAL hMap := { => }, hPredStr := { => }, aPS, cPred, cOwn, aArt, hTok
    LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
+   LOCAL hOpt := { => }
 
    IF Len( aArgs ) < 4
       Usage()
@@ -10693,8 +10780,18 @@ STATIC FUNCTION RenameMethod( aArgs )
 
    // mapa de símbolos/strings esperado, COMPUTADO do rastro: cada artefato
    // derivado muda deterministicamente - texto previsto = faixas do nome
-   // de marker substituídas pelo nome novo
-   hMap[ cUpOld ] := cUpNew
+   // de marker substituídas pelo nome novo. O nome CRU só é expectativa
+   // ESTRITA quando é símbolo por definição (método: a mensagem vive na
+   // tabela de símbolos); para marker puro é OPCIONAL - um símbolo homônimo
+   // REAL (função com o nome do valor do marker) legitimamente FICA, um
+   // clone derivado legitimamente VIRA o novo (caso 108); os artefatos
+   // COMPOSTOS (hMap) e as strings previstas (hPredStr) continuam estritos,
+   // e a contagem de símbolos fecha o caso misto
+   IF lMethod
+      hMap[ cUpOld ] := cUpNew
+   ELSE
+      hOpt[ cUpOld ] := cUpNew
+   ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       aPS := {}
       FOR EACH aArt IN hFacts[ cPath ][ "arts" ]
@@ -10846,7 +10943,7 @@ STATIC FUNCTION RenameMethod( aArgs )
       cText := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" )
       cWhy  := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" )
       IF ! Empty( hFacts[ cPath ][ "arts" ] )
-         IF ! HrbSymbolsRenamed( cText, cWhy, hMap, @cSpec )
+         IF ! HrbSymbolsRenamed( cText, cWhy, hMap, hOpt, @cSpec )
             RollbackAll( hOrig )
             RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
          ENDIF
@@ -10894,11 +10991,15 @@ STATIC FUNCTION RenameMethod( aArgs )
 
 // símbolos/funções iguais módulo um conjunto de renomes esperados; o
 // PCODE do módulo pode divergir (strings de registro de mensagem mudam
-// de conteúdo e tamanho) - quem fecha o contrato é a execução idêntica
-STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, cWhy )
+// de conteúdo e tamanho) - quem fecha o contrato é a execução idêntica.
+// hMap = renomes ESTRITOS (têm que acontecer: mensagem de método,
+// artefatos compostos); hOpt = renomes OPCIONAIS (nome cru de marker
+// puro: um símbolo homônimo REAL fica, um clone derivado vira o novo -
+// os dois desfechos são legais, caso 108)
+STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, hOpt, cWhy )
 
    LOCAL hA := HrbParse( cBefore ), hB := HrbParse( cAfter )
-   LOCAL nI, cName
+   LOCAL nI, cName, cAfterName
 
    cWhy := ""
    IF hA == NIL .OR. hB == NIL
@@ -10910,18 +11011,20 @@ STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, cWhy )
       RETURN .F.
    ENDIF
    FOR nI := 1 TO Len( hA[ "syms" ] )
-      cName := hA[ "syms" ][ nI ][ 1 ]
-      cName := hb_HGetDef( hMap, cName, cName )
-      IF !( cName == hB[ "syms" ][ nI ][ 1 ] )
-         cWhy := "símbolo " + hA[ "syms" ][ nI ][ 1 ] + " -> " + hB[ "syms" ][ nI ][ 1 ] + " inesperado"
+      cName      := hA[ "syms" ][ nI ][ 1 ]
+      cAfterName := hB[ "syms" ][ nI ][ 1 ]
+      IF !( hb_HGetDef( hMap, cName, cName ) == cAfterName ) .AND. ;
+         !( hb_HHasKey( hOpt, cName ) .AND. hOpt[ cName ] == cAfterName )
+         cWhy := "símbolo " + cName + " -> " + cAfterName + " inesperado"
          RETURN .F.
       ENDIF
    NEXT
    FOR nI := 1 TO Len( hA[ "funcs" ] )
-      cName := hA[ "funcs" ][ nI ][ 1 ]
-      cName := hb_HGetDef( hMap, cName, cName )
-      IF !( cName == hB[ "funcs" ][ nI ][ 1 ] )
-         cWhy := "função " + hA[ "funcs" ][ nI ][ 1 ] + " -> " + hB[ "funcs" ][ nI ][ 1 ] + " inesperada"
+      cName      := hA[ "funcs" ][ nI ][ 1 ]
+      cAfterName := hB[ "funcs" ][ nI ][ 1 ]
+      IF !( hb_HGetDef( hMap, cName, cName ) == cAfterName ) .AND. ;
+         !( hb_HHasKey( hOpt, cName ) .AND. hOpt[ cName ] == cAfterName )
+         cWhy := "função " + cName + " -> " + cAfterName + " inesperada"
          RETURN .F.
       ENDIF
    NEXT

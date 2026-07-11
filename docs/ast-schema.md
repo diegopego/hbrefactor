@@ -1,9 +1,26 @@
-# Schema `ast-12` — o dump AST do compilador (spec)
+# Schema `ast-13` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-12` (fase U / revisão) = `ast-11` + `"generates": true` no
+com `-x`. O `ast-13` (fase P) = `ast-12` + a **GENEALOGIA DE REGRA**:
+(a) `"from"` (mesmo formato do ast-3) nos tokens de `match[]`/`result[]`
+de uma regra **GERADA pela expansão de outra regra** — a linha de diretiva
+dela foi SINTETIZADA, então seus tokens carregam de qual aplicação/marker
+cada faixa de bytes deriva, ligando a regra à aplicação que a CRIOU
+(capturado no registro, `hb_pp_ruleTokWalk`/`hb_pp_drvFind`; accessors
+`hb_pp_trackRuleTokenFrom*`); ausente em regra escrita direto no
+fonte/include; (b) a **derivação sobrevive ao CLONE**
+(`hb_pp_tokenClone` copia as entradas de derivação junto com a posição —
+a cópia carrega o mesmo texto, logo as mesmas faixas derivam da mesma
+origem): o literal de resultado de uma regra gerada mantém a origem
+através das APLICAÇÕES dela (a string stringificada na expansão de uma
+regra que outra regra criou vira artefato rastreável). Consumidores:
+resolução do `rename` (`genrule` — o nome que VIRA regra é do marker,
+mesmo sem `generates`, porque a derivação de uma diretiva gerada entra no
+REGISTRO da regra e não no stream), coleta de sementes com gate de
+pertencimento (caso 108) e o fecho de artefatos/predições. O
+`ast-12` (fase U / revisão) = `ast-11` + `"generates": true` no
 recheio de match marker do `ppApplications[].tokens[]` cujo nome ESCRITO
 alimenta um paste/stringify (GERA artefato) — reverse-scan do `from` (op
 `p`/`s`), puro no dump; separa "nome que a diretiva vira código" de "símbolo
@@ -54,7 +71,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-12",          // versão emitida hoje (ast-1→...→ast-12)
+{ "schema": "ast-13",          // versão emitida hoje (ast-1→...→ast-13)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -306,6 +323,28 @@ ADR-001.
   OUTRO arquivo que o da regra (a posTbl não guarda nome de arquivo) — o
   guard de edição byte-exato contra o arquivo da regra decide (não
   confere → recusa honesta), e o oráculo pós-edição cobre o resto.
+- **`from` em token de regra GERADA (ast-13, genealogia)**: quando a
+  regra foi CRIADA pela expansão de outra regra (a diretiva dela é
+  sintetizada — hbclass gerando os `#xcommand METHOD ... <nome> CLASS
+  <classe> ...` por método; qualquer DSL `#xcommand DEF <n> => #xcommand
+  USA <n> => ...`), os tokens de `match[]`/`result[]` que derivam de
+  markers carregam `"from"` no MESMO formato do ast-3
+  (`{app, marker, op, at, len}`) — a ligação da regra à aplicação que a
+  criou. Capturado no snapshot do registro (a tabela de derivação ainda
+  tem entrada viva para cada token da diretiva). Ausente em regra escrita
+  à mão. É o fato que separa "nome que VIRA regra" (renomear = pp-marker,
+  mesmo com `generates` ausente — a derivação de uma diretiva gerada
+  entra no REGISTRO, não no stream, e o reverse-scan do ast-12 não a vê)
+  de homônimo coincidente; fixtures `fixgen` (caso 108), prova real:
+  regras `METHOD` por-método do hbclass apontando a app da declaração.
+- **Derivação sobrevive ao clone (ast-13)**: `hb_pp_tokenClone` copia as
+  entradas de derivação junto com a posição — o literal de RESULT de uma
+  regra gerada mantém a origem quando a regra é APLICADA (a string
+  `"Ponto"` na expansão de `USA Ponto` traz `from` op `stringify`
+  apontando a app do `DEFREGRA`). Antes do ast-13 esses tokens nasciam
+  órfãos; agora o fecho de artefatos/predições os alcança. Recheio de
+  marker clonado logo em seguida ganha o registro próprio via
+  `hb_pp_drvAdd1` (substitui a cópia) — comportamento inalterado.
 
 ## `functions[]` — um item por FUNCTION/PROCEDURE (+ pseudo-função fileDecl)
 
