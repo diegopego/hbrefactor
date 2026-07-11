@@ -19,6 +19,22 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   pedir. O único freio é o de sempre: **commit no core continua sob
   autorização por-commit do Diego** (não editar ≠ não commitar). É a
   perna concreta da REGRA DO FATO ("estender o core para o fato existir").
+- **Buildar o core após editar — 3 armadilhas que custam diagnóstico
+  (Diego, 2026-07-11; consolida notas espalhadas em specs)**: (a) mudança
+  no COMPILADOR (harbour.y, hbmain.c, compast.c, complex.c…) exige
+  rebuildar `harbour` **E** `hbmk2` — o hbmk2 EMBUTE o compilador
+  (libhbcplr); o built-in velho rejeita gramática/canal novo com erro
+  enganoso. (b) O `make` costuma reportar `harbour`/`hbmk2` "up to date" e
+  NÃO relincar mesmo após reconstruir a `libhbcplr.a` (dependência
+  quebrada) → binário STALE com o compilador antigo; conserto: apagar os
+  binários (`rm bin/linux/gcc/harbour bin/linux/gcc/hbmk2`) e refazer o
+  make. (c) `HB_REBUILD_PARSER=yes` regenera o `obj/<plat>/harboury.c`
+  (artefato de build), **NÃO** o `harbour.yyc`/`.yyh` COMMITADOS — é
+  preciso COPIAR à mão `obj/harboury.c`→`src/compiler/harbour.yyc` e o
+  `.h`→`harbour.yyh`, senão um checkout limpo (build default, SEM a flag)
+  usa a gramática VELHA; commitar os três juntos (.y + .yyc + .yyh) e
+  conferir que um rebuild default (binários apagados) carrega a feature.
+  Provado na RD (`_HB_INLINESELF`, core `4d8d9af766`).
 - **CORPUS DE MATURAÇÃO = código do CORE do Harbour; o código do Diego
   NÃO é régua (Diego, 2026-07-10)**: a ferramenta amadurece resolvendo
   problemas em código BEM ESCRITO E TESTADO do core (work/ = cópias de
