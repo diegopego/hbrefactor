@@ -11,4 +11,22 @@ if [ -n "$found" ]; then
   printf 'se for intencional: git commit --no-verify\n' >&2
   exit 1
 fi
+
+# barra também o C GERADO pelo compilador Harbour (harbour/hbmk2 emitem .c
+# intermediário com o cabeçalho ` * Generated C source from "..."` - literal
+# FIXO em src/compiler/genc.c do core; a linha de versão acima dele varia e
+# por isso não entra no padrão). É texto, então a heurística de binário não
+# pega (o sh1.c que vazou na raiz provou, 2026-07-11). Checa o BLOB staged
+# (git show :f), não a worktree, nas primeiras linhas do cabeçalho.
+gen=$(git diff --cached --name-only --diff-filter=AM -- '*.c' | while IFS= read -r f; do
+  if git show ":$f" 2>/dev/null | head -6 | grep -q 'Generated C source from "'; then
+    printf '%s\n' "$f"
+  fi
+done)
+if [ -n "$gen" ]; then
+  printf 'pre-commit BLOQUEOU C gerado pelo Harbour no commit (artefato, nao fonte):\n' >&2
+  printf '%s\n' "$gen" | sed 's/^/  /' >&2
+  printf 'se for intencional: git commit --no-verify\n' >&2
+  exit 1
+fi
 exit 0
