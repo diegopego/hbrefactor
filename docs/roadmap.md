@@ -435,6 +435,38 @@ estática existe (escalares de startup do xhb) mas é nicho; registrador
 paramétrico fica fora do alcance honesto — continuar/matar a escrita
 (F4.3) é decisão do Diego sobre estes números.
 
+### RD-c — Completude M-B: acessadores de DATA do hbclass + params no nó (ast-11) — ✅ **ENTREGUE (2026-07-11; suíte 768/0)**
+
+A RD carimbou o `Self` gerado dos blocos `INLINE`/`OPERATOR`/`MESSAGE`,
+mas deixou de fora os **acessadores de DATA** do dialeto Class(y)
+(`VAR ... IN`/`IS`/`IS ... IN`/`IS ... TO`, hbclass.ch ~484-502): cada um
+gera um getter `{|Self| Self:<msg>...}` E um `"_"`setter
+`{|Self,param| Self:<msg> := param}`. Emitir o marcador `_HB_INLINESELF`
+neles (8 blocos) foi **necessário mas não suficiente**: os dois blocos
+caem na MESMA linha de fonte, e o consumidor degradava para `possible`
+pela régua "dois blocos numa linha ⇒ a declaração do param é inatribuível
+a um bloco só" (`B7BlockParam`, casamento por `declLine`). **Escolha do
+Diego (portão, sobre relaxar-o-consumidor × aceitar-o-limite): numerar os
+blocos no core** — que refinei para o mais direto: o nó `CODEBLOCK` passa
+a carregar seus **próprios params tipados** no dump (`"params":[{sym,type,
+class}]`, schema **ast-11**, compast.c dump-only lendo de
+`asCodeblock.pLocals`). O consumidor tipa o receptor de um send pelo bloco
+**EXATO** em que ele está (`hBlk["params"]`), sem casar por linha — a
+ambiguidade some e resolve até o caso adversarial de dois blocos com
+receptores de classes diferentes. Provas: **E1** dump com `"params"` +
+`type:'S'`/class no `Self` (param sem tipo NÃO vaza classe); **E2** getter
+E setter de `VAR nEcho IS nRaw` (2 blocos na linha 15) AMBOS `confirmed`,
+mais a delegação via membro (`IS nCount TO oPart`, `Self:oPart` confirmed)
+e o `oG:nRaw` de fonte; **custo-zero** `.c -kt` byte-idêntico (marcador ×
+sem-marcador, mesmo nome de saída) — fact-only estendido aos acessadores;
+**zero drift** (762 asserções antigas intactas — o caminho params-first
+devolve o MESMO tipo que o antigo para bloco-único-por-linha); suíte
+**768/0**, lexdiff 0 divergências. Fixture `fixdel` + caso 106 (formas do
+CORE hbclass; a generalidade da rota já é do caso 105 com DSL inventada).
+Consumidor lê `"params"` de QUALQUER nó de bloco — nada keyed a hbclass.
+Rebuild: harbour E hbmk2 (compast.c → libhbcplr; sem regen de parser, não
+toquei harbour.y). Commits do core sob autorização por-commit do Diego.
+
 ### B8 — Macros: pipe hbmk2, ast-7 + complemento por probe — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 
 Rebaixamento (decisão do Diego ao seguir a análise estratégica):

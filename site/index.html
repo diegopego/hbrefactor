@@ -527,6 +527,10 @@ method definition Send (class Payment)
 <pre><code><span class="ok">confirmed</span> send (receiver declared AS CLASS MOEDA, codeblock)  | METHOD Total INLINE ::Soma( 0 ):nCents</code></pre>
     </div>
     <p>And it costs your program nothing: that fact is <strong>never</strong> turned into a runtime check — not even under <span class="mono">-kt</span> — because an <span class="mono">INLINE</span>'s receiver is always its own class anyway. So the label stays <span class="mono">confirmed</span>, never <span class="mono">guaranteed</span>, and a <span class="mono">-kt</span> build gains <strong>zero</strong> extra instructions (proven byte-for-byte). As always, it isn't an hbclass trick — a DSL of your own that generates a typed-receiver block gets exactly the same, with the tool's source never naming your directive.</p>
+    <p>The same now holds for <strong>delegated properties</strong> — the Class(y) shorthand where one <span class="mono">VAR</span> forwards to another field or object:</p>
+<pre><code>VAR nEcho AS Numeric IS nRaw          <span class="c">// reading nEcho reads nRaw</span>
+VAR nVia  AS Numeric IS nCount TO oPart</code></pre>
+    <p>Each of these generates a hidden read <em>and</em> write block on the same source line, and "find all references" for <span class="mono">nRaw</span> (or <span class="mono">oPart</span>) now returns <span class="mono">confirmed</span> inside both — where it used to shrug <span class="mono">possible</span>. The compiler attaches each block's own parameters to that block, so the tool types the receiver by the exact block it sits in, never confusing the two.</p>
   </div>
 </section>
 
@@ -688,6 +692,7 @@ Eval( bPaga )
       <tr><td>ast-8</td><td>the compiler's own mark of what <span class="mono">-kt</span> actually checked (no deduced coverage)</td></tr>
       <tr><td>ast-9</td><td>exact written position of every declared name (the editor's anchor)</td></tr>
       <tr><td>ast-10</td><td><b>declared class parentage</b> (<span class="mono">_HB_SUPER</span>) — who inherits from whom, as fact</td></tr>
+      <tr><td>ast-11</td><td>each codeblock carries its <b>own parameters</b> — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding)</td></tr>
     </table>
     </div>
     <p>Along the way: a <b>20-year-old segfault fixed</b> (annotating a code-block parameter with <span class="mono">AS CLASS</span> used to crash the compiler — stock Harbour still does), and a false <span class="mono">W0019</span> "duplicate declaration" warning silenced when a re-declaration merely completes a missing type — it had blocked 18 methods in <span class="mono">hbhttpd</span>.</p>
@@ -700,7 +705,7 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.11.0</span> (they version independently). The behavior contract is a suite of <strong>106 cases / 762 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.11.0</span> (they version independently). The behavior contract is a suite of <strong>107 cases / 768 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
     <div class="grid-2">
       <div>
@@ -732,7 +737,7 @@ Eval( bPaga )
     <div class="callout help">
       <p class="sec-eyebrow" style="color:var(--purple)">An honest ask</p>
       <h3 style="font-size:1.4rem">Help wanted: review the Harbour branch</h3>
-      <p>I built the <span class="mono">harbour-core</span> branch that makes these compiler facts exist — the AST dump (ten schema steps), the <span class="mono">-kt</span> enforcement, the parentage channel, the segfault and warning fixes. But I'm a Harbour <strong>application</strong> developer, <strong>not a compiler/VM specialist</strong>. I would genuinely value people who know Harbour's core taking a look at that branch.</p>
+      <p>I built the <span class="mono">harbour-core</span> branch that makes these compiler facts exist — the AST dump (eleven schema steps), the <span class="mono">-kt</span> enforcement, the parentage channel, the segfault and warning fixes. But I'm a Harbour <strong>application</strong> developer, <strong>not a compiler/VM specialist</strong>. I would genuinely value people who know Harbour's core taking a look at that branch.</p>
       <p>If you know the compiler, the VM, or the class system — issues, corrections, and second opinions are all welcome.</p>
       <p style="margin-top:18px">
         <a class="btn btn-primary" href="https://github.com/diegopego/harbour-core/tree/feature/compiler-ast-dump" target="_blank" rel="noopener">Review <span class="mono" style="font-weight:700">feature/compiler-ast-dump</span> →</a>
@@ -755,7 +760,7 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (106 cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (107 cases)</span></code></pre>
         </div>
       </li>
       <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.11.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>

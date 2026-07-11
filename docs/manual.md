@@ -1,11 +1,11 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@d2520b0 · harbour-core@4d8d9af766 (feature/compiler-ast-dump)
-    — the RD "rota da diretiva" core work is harbour-core@4d8d9af766; the hbrefactor
-      side (this manual, case 105, fixself) rides the commit that carries this line
+  baseline: hbrefactor@f2c8417 · harbour-core@034ee65f7b (feature/compiler-ast-dump)
+    — the completude M-B / RD-c core work is harbour-core@034ee65f7b; the hbrefactor
+      side (this manual, case 106, fixdel) rides the commit that carries this line
       (a commit can't name its own hash, so the hbrefactor baseline is its parent).
-  suite at baseline: 106 cases (0–105), 762 checks green
+  suite at baseline: 107 cases (0–106), 768 checks green
   updated: 2026-07-11
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -256,10 +256,12 @@ a goal, not a current capability.
 ### It reaches inside your `INLINE` methods
 
 <!-- prov: RD "rota da diretiva" (roadmap §RD, CHANGELOG 2026-07-11); case 105 (invented
-     non-hbclass DSL fixself); live-run 2026-07-10: usages on the Moeda class →
+     non-hbclass DSL fixself); completude M-B / RD-c (roadmap §RD-c, CHANGELOG 2026-07-11):
+     case 106 (fixdel, hbclass VAR..IS/IN delegated properties, getter+setter on one line,
+     ast-11 "params" on the block node); live-run 2026-07-10: usages on the Moeda class →
      "q1.prg:13: confirmed send (receiver declared AS CLASS MOEDA, codeblock) in MOEDA".
-     Core channel _HB_INLINESELF, fact-only (never -kt-imposed); zero-impact proven on
-     43 modules byte-identical under -kt. Does NOT revive B7b inference (vaccine): it is
+     Core channel _HB_INLINESELF, fact-only (never -kt-imposed); zero-impact proven
+     byte-identical under -kt. Does NOT revive B7b inference (vaccine): it is
      a compiled FACT. -->
 
 Harbour classes lean on `INLINE` — one-line methods, `OPERATOR` overloads,
@@ -285,6 +287,20 @@ the label is `confirmed`, never `guaranteed`, and a `-kt` build gains **zero** e
 instructions (proven byte-for-byte). As always, it isn't an hbclass trick — a DSL of
 your own that generates a typed-receiver block gets exactly the same, with the tool's
 source never naming your directive.
+
+The same now holds for **delegated properties** — the Class(y) shorthand where one
+`VAR` forwards to another field or object:
+
+```harbour
+VAR nEcho AS Numeric IS nRaw          // reading nEcho reads nRaw
+VAR nVia  AS Numeric IS nCount TO oPart
+```
+
+Each of these generates a hidden read *and* write block on the same source line, and
+`find all references` for `nRaw` (or `oPart`) now returns `confirmed` inside both —
+where it used to shrug `possible`. The compiler attaches each block's own parameters to
+that block, so the tool types the receiver by the exact block it sits in, never
+confusing the two.
 
 ### The certainty ladder
 
@@ -444,6 +460,7 @@ one fact at a time:
 | `ast-8` | the compiler's own mark of what `-kt` actually checked (no deduced coverage) |
 | `ast-9` | exact written position of every declared name (the editor's anchor) |
 | `ast-10` | **declared class parentage** (`_HB_SUPER`) — who inherits from whom, as fact |
+| `ast-11` | each codeblock carries its **own parameters** — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding) |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
@@ -505,7 +522,7 @@ language); English is on the roadmap.
 <!-- prov: Diego's explicit ask (2026-07-10); branch inventory from git log. -->
 
 I built the `harbour-core` branch that makes these compiler facts exist — the AST dump
-(ten schema steps), the `-kt` enforcement, the parentage channel, the segfault and
+(eleven schema steps), the `-kt` enforcement, the parentage channel, the segfault and
 warning fixes. But I'm a Harbour **application** developer, **not a compiler/VM
 specialist**. I would genuinely value people who know Harbour's core taking a look.
 

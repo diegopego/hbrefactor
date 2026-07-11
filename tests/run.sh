@@ -157,6 +157,13 @@ freshself() { # freshself <case-name> -> fixture da generalidade da rota da dire
    echo "$d"
 }
 
+freshdel() { # freshdel <case-name> -> fixture da completude M-B (acessadores de DATA do hbclass)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixdel/*.prg "$HERE"/fixdel/*.hbp "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3295,7 +3302,34 @@ check "oA:Ring() (AS CLASS de fonte) confirma pelo declarado escrito" $?
 check "a ferramenta não menciona palavra da DSL self nem o marcador do core (régua do caso 64)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105"
+unit_106() {
+echo "case 106: completude M-B - acessadores de DATA do hbclass (VAR..IS/IN) geram getter+setter na MESMA linha; o receptor Self de cada bloco vira FATO (ast-11 'params' no nó) e o send confirma pelo bloco EXATO"
+# Os comandos VAR..IS/IN do Class(y) geram DOIS codeblocks (o getter e o
+# "_"setter) na MESMA linha de fonte. O canal _HB_INLINESELF carimba o Self
+# de cada um; o ast-11 emite os params NO PRÓPRIO nó do bloco, então a
+# ferramenta tipa o receptor pelo bloco ESPECÍFICO - sem o furo "dois blocos
+# na linha => ambíguo" que degradava para possible. Se os sends confirmam
+# aqui, a completude fecha (é hbclass core, mas o mecanismo é o mesmo do
+# caso 105: params tipados do bloco, sem forma-de-hbclass no consumidor).
+D=$(freshdel case106)
+"$HB_BIN/harbour" "$D/g1.prg" -n -q0 -w3 -es2 -s -I"$D" -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixture do caso 106 clean under -w3 -es2" $?
+( cd "$D" && "$BIN" usages fixdel.hbp Gizmo:nRaw > a.log 2>&1 )
+check "usages Gizmo:nRaw exit 0" $?
+[ "$(grep -c "g1.prg:15: confirmed send (receiver declared AS CLASS GIZMO, codeblock) in GIZMO" "$D/a.log")" -eq 2 ]
+check "PROVA: getter E setter de 'VAR nEcho IS nRaw' (2 blocos na MESMA linha 15) - AMBOS confirmed pelo bloco exato (ast-11)" $?
+( cd "$D" && "$BIN" usages fixdel.hbp Gizmo:oPart > b.log 2>&1 )
+check "usages Gizmo:oPart exit 0" $?
+grep -q "g1.prg:16: confirmed send (receiver declared AS CLASS GIZMO, codeblock) in GIZMO" "$D/b.log"
+check "delegação via membro ('VAR nVia IS nCount TO oPart'): Self:oPart DENTRO do bloco - confirmed" $?
+grep -q "g1.prg:30: confirmed send (receiver declared AS CLASS GIZMO) in MAIN" "$D/a.log"
+check "oG:nRaw (AS CLASS de fonte, fora de bloco) confirma pelo declarado escrito" $?
+# (a generalidade da rota da diretiva - tool não keyed a hbclass - já é provada
+#  pelo caso 105 com DSL inventada; o caso 106 fecha as formas do CORE hbclass,
+#  e o consumidor lê "params" de QUALQUER nó de bloco, sem palavra de hbclass)
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

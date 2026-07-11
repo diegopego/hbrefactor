@@ -5,6 +5,61 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-11 — `usages`/find-references enxerga o receptor DENTRO das propriedades delegadas (`VAR ... IS/IN`)
+
+### O problema de todo dia
+
+O dialeto Class(y) tem um atalho pra criar uma propriedade que **repassa**
+pra outra — um apelido, ou uma delegação pra um membro/objeto interno:
+
+```
+CREATE CLASS Gizmo
+   VAR nRaw  INIT 0
+   VAR oPart INIT NIL
+   VAR nEcho AS Numeric IS nRaw              // apelido: ler nEcho lê nRaw
+   VAR nVia  AS Numeric IS nCount TO oPart   // delega pro membro oPart
+END CLASS
+```
+
+Cada `VAR ... IS`/`IN` gera, escondido, **duas** mini-funções: uma pra ler
+(`Self:nRaw`) e uma pra gravar (`Self:nRaw := valor`). Ao pedir as
+referências de `Gizmo:nRaw` (ou de `Gizmo:oPart`), os usos DENTRO dessas
+mini-funções saíam como **`possible` (receiver unknown)** — ruído, porque
+o `Self` ali é gerado pela diretiva e os dois blocos caem na mesma linha
+do seu fonte, o que a ferramenta não sabia desempatar.
+
+### O que mudou
+
+Agora esses usos saem **`confirmed`**. Vale para as quatro formas do
+Class(y) — `VAR x IN Super`, `VAR x IS y`, `VAR x IS y IN Super`,
+`VAR x IS y TO oObj` — e para o **getter E o setter** de cada uma:
+
+```
+usages Gizmo:nRaw
+// ANTES: g1.prg:15: possible send (... receiver unknown, codeblock)   (x2)
+// AGORA: g1.prg:15: confirmed send (receiver declared AS CLASS GIZMO, codeblock)  (x2)
+```
+
+Fecha o buraco irmão do que a entrega anterior (métodos `INLINE`) resolveu:
+lá era um bloco por linha; aqui são dois (ler + gravar), e o compilador
+passou a anexar a cada bloco a lista dos **próprios parâmetros** — então a
+ferramenta tipa o receptor pelo bloco exato, sem confundir os dois.
+
+### O que a ferramenta NUNCA faz aqui
+
+- Não altera nada gerado: continua sendo **detecção e relato**; nenhuma
+  edição automática dentro dessas mini-funções.
+- **Custo zero**: o `.c` compilado (inclusive com `-kt`) fica byte-idêntico
+  — o fato novo mora só no dump de análise, não no seu executável.
+- Só confirma o `Self` do bloco: um send encadeado depois dele
+  (`Self:oPart:nCount` → o `:nCount`) segue precisando do fato do próximo
+  elo; o que vira `confirmed` é o envio ancorado no `Self`.
+
+### Detalhe interno
+
+Rota da diretiva / completude M-B — [docs/roadmap.md](docs/roadmap.md) § RD-c;
+canal `"params"` no nó do bloco em [docs/ast-schema.md](docs/ast-schema.md) (schema `ast-11`).
+
 ## 2026-07-10 — `usages`/find-references enxerga o receptor DENTRO de um método `INLINE`
 
 ### O problema de todo dia

@@ -277,12 +277,15 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // de RETURN (fase B7); ast-9 = posição do token ESCRITO do nome nas
    // declarations (nameLine/nameCol, âncora do materializador - B9
    // fatia 3); ast-10 = canal de parentesco DECLARADO no stream
-   // (_HB_SUPER, RE.6/F6.1 - o gate do fato de exclusão de send).
+   // (_HB_SUPER, RE.6/F6.1 - o gate do fato de exclusão de send);
+   // ast-11 = params do bloco no PRÓPRIO nó CODEBLOCK ("params":
+   // [{sym,type,class}], completude M-B) - tipa o receptor de um send
+   // pelo bloco EXATO, destravando getter+setter de VAR..IS na mesma linha.
    // O leitor usa só seções presentes em todos - comandos que
    // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
    // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -6267,7 +6270,7 @@ STATIC FUNCTION DeclType( hItem, cHow )
 // (degrada como sempre), ou o próprio nó CODEBLOCK que contém hExpr
 STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
 
-   LOCAL cEt, cSym, cMsg, hItem, hExprA, hRes, hOcc, hFun, lBlock, hBlk, aBP
+   LOCAL cEt, cSym, cMsg, hItem, hExprA, hRes, hOcc, hFun, lBlock, hBlk, aBP, hCbP
    LOCAL nWrites := 0, nRefs := 0, nAssigns := 0, hAssign := NIL, lAsgBlock := .F.
 
    IF ! HB_ISHASH( hExpr )
@@ -6299,6 +6302,24 @@ STATIC FUNCTION TypeOf( hExpr, hFunc, hDecl, xBlock, hSeen, hInter, hAst )
             ENDIF
          ENDIF
       NEXT
+      // ast-11 (completude M-B): o nó do bloco carrega seus PRÓPRIOS params
+      // tipados. Quando o send está num bloco ESPECÍFICO (hBlk) e o param
+      // homônimo existe lá com classe declarada, o tipo vem do bloco exato -
+      // sem casar por linha. É o que destrava getter+setter de um VAR..IS na
+      // mesma linha (dois blocos por linha), que o casamento por declLine do
+      // B7BlockParam degradava como ambíguo. Só resolve param DECLARADO com
+      // classe; sem tipo, cai no fluxo normal. Dump antigo (sem "params")
+      // ignora e usa o caminho de baixo (degradação idêntica à de antes)
+      IF hBlk != NIL .AND. hb_HHasKey( hBlk, "params" )
+         FOR EACH hCbP IN hBlk[ "params" ]
+            IF HB_ISHASH( hCbP ) .AND. Upper( hb_HGetDef( hCbP, "sym", "" ) ) == cSym
+               IF ( hRes := DeclType( hCbP, "declared" ) ) != NIL
+                  RETURN B7KtMark( hRes, hAst, hFunc, cSym )
+               ENDIF
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
       // dentro de codeblock, uso de local EXTERNA resolve como 'detached'
       // (segue o caminho normal); PARÂMETRO de bloco é fato da declaração
       // (param + declLine na linha do bloco - B7b): tipo declarado do

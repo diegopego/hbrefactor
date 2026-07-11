@@ -1,9 +1,17 @@
-# Schema `ast-9` — o dump AST do compilador (spec)
+# Schema `ast-11` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-9` (B9 fatia 3) = `ast-8` + `"nameLine"`/`"nameCol"` em
+com `-x`. O `ast-11` (completude M-B) = `ast-10` + `"params"` no nó
+`CODEBLOCK` — a lista dos parâmetros do bloco COMO DECLARADOS, presa ao
+PRÓPRIO nó (`[{"sym","type","class"}]`; `type`/`class` só quando há
+anotação, inclusive a `'S'`+classe do canal `_HB_INLINESELF`). Deixa o
+consumidor tipar o receptor de um send pelo bloco EXATO em que ele está,
+sem casar por linha — dois blocos na MESMA linha de fonte (o getter e o
+`"_"`setter de um `VAR ... IS`) deixam de ser ambíguos; o `ast-10`
+(RE.6/F6.1) = `ast-9` + o canal de parentesco DECLARADO no stream
+(`_HB_SUPER`, o gate do fato de exclusão de send); o `ast-9` (B9 fatia 3) = `ast-8` + `"nameLine"`/`"nameCol"` em
 `declarations[]` (posição do token ESCRITO do nome — a âncora do
 materializador; ausente quando o nome não tem token de fonte, ex.: param
 gerado por diretiva); o `ast-8` (RE.5) = `ast-7` + `"chk"` (fato de
@@ -41,7 +49,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-9",           // versão emitida hoje (ast-1→...→ast-9)
+{ "schema": "ast-11",          // versão emitida hoje (ast-1→...→ast-11)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -349,7 +357,9 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
 Filhos por `et`: operadores → `left`/`right` (unário: sem right);
 `FUNCALL` → `fun`+`parms`; `SEND` → `msg`/`msgmacro`+`obj`+`parms`;
 `ARRAYAT` → `base`+`index`; `ARRAY/HASH/LIST/ARGLIST/IIF` → `items[]`;
-`CODEBLOCK` → `cbflags`+`body[]`; `ALIASVAR/ALIASEXPR` → `alias`+`var`+
+`CODEBLOCK` → `cbflags`+`params[]`+`body[]` (ast-11: `params` = os
+parâmetros do bloco como declarados, `[{"sym","type","class"}]`, presos ao
+nó — tipam o receptor pelo bloco EXATO); `ALIASVAR/ALIASEXPR` → `alias`+`var`+
 `expr`; `SETGET` → `var`+`expr`; `MACRO` → `val`+`expr`; `RTVAR` → `val`.
 Folhas com `val`: VARIABLE, FUNNAME, STRING (+ NUMERIC/LOGICAL/DATE).
 
