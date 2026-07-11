@@ -62,6 +62,37 @@ aplicação ela nasceu — e a ferramenta consome esse fato. Vale para o
 hbclass real (é assim que `METHOD` funciona por dentro) e para qualquer
 DSL sua, existente ou inventada.
 
+### 3. Renomear uma palavra de DSL que ao mesmo tempo CONSTRÓI e REFERENCIA
+
+Uma palavra do seu marker às vezes faz duas coisas na mesma regra: **constrói**
+um nome novo (colando `w_<n>`, ou virando a string `"<n>"`) E **referencia** algo
+que já existe (uma chamada, uma variável). Exemplo:
+
+```harbour
+#xcommand WRAP <n> => FUNCTION w_<n>() ;; RETURN <n>()
+
+WRAP Soma           // gera FUNCTION w_Soma() que chama a Soma() real
+
+FUNCTION Soma()
+   RETURN 42
+```
+
+Ao renomear `Soma` no `WRAP Soma`, a ferramenta re-deriva TUDO que vem daquela
+palavra — o nome colado, a string, a referência. E você fica seguro dos dois
+lados, sem surpresa silenciosa:
+
+- se o novo nome **não existe** (`WRAP Soma → WRAP Multiplica`, e não há função
+  `Multiplica`), a recompilação percebe a referência quebrada e **desfaz tudo**
+  (rollback) — nada de código torto;
+- se o novo nome **existe**, compila e a diretiva passa a operar sobre ele — que
+  é o que "renomear o argumento da diretiva" quer dizer.
+
+Isso vale por mais complexa que seja a diretiva: a mesma palavra pode ser colada
+**várias vezes** e o pp não põe limite — a ferramenta prevê todos os artefatos e,
+se errasse algum, a verificação desfaz. **A garantia não depende de a ferramenta
+"entender" a sua DSL** — ela confere o resultado COMPILADO: ou bate com o previsto
+(rename correto), ou desfaz (rollback). Nunca deixa um rename pela metade.
+
 ### O que a ferramenta continua NUNCA fazendo
 
 - Editar por coincidência de nome: cada edição precisa de um fato do

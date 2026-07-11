@@ -185,6 +185,13 @@ freshgen() { # freshgen <case-name> -> genealogia de regra: homônimo de marker 
    echo "$d"
 }
 
+freshp2() { # freshp2 <case-name> -> marker que GERA e PASSA ADIANTE + multiplicidade (fase P, P2)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixp2/*.prg "$HERE"/fixp2/*.ch "$HERE"/fixp2/*.hbp "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3473,7 +3480,73 @@ grep -q "^rename-dsl: Ponto -> Marco" "$D/use.log" && \
 check "use site of the GENERATED rule resolves rename-dsl, same two sites" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108"
+unit_109() {
+echo "case 109: P - marker que GERA E passa adiante (P2, adr-003:87-90) + multiplicidade"
+# fixture fixp2 (DSL inventada nao-espelho): LOG (stringify + clone a um LOCAL
+# externo), WRAP (paste + clone a uma FUNCAO externa), SNAP (o mesmo <n>
+# colado 2x + stringificado 2x - o pp nao limita a multiplicidade no destino).
+# Veredito P2: `generates` vence -> rename-pp-marker; a seguranca e ESTRUTURAL
+# - a rede dupla (recompilacao -es2 + simbolos/identidade do .hrb) confere o
+# ARTEFATO COMPILADO FINAL, indiferente a multiplicidade e ao aninhamento de
+# diretivas. Todo caso e rollback honesto OU re-derivacao verificada; nunca
+# corrupcao silenciosa. (clone INTERNO fabricado pela expansao -> caso 52;
+# diretiva que gera diretiva -> caso 108.)
+for f in a.prg b.prg; do
+   "$HB_BIN/harbour" "$HERE/fixp2/$f" -n -q0 -w3 -es2 -s -I"$HERE/fixp2" > /dev/null 2>&1
+   check "fixp2/$f clean under -w3 -es2"  $?
+done
+# --- A: o site do marker que GERA resolve como marker, nao como o clone (local)
+D=$(freshp2 case109a)
+( cd "$D" && "$BIN" resolve-at p2.hbp a.prg 9 8 > ra.log 2>&1 )
+grep -q "nome de marker" "$D/ra.log" && grep -q "LOG Preco" "$D/ra.log"
+check "generating marker site resolves as pp-marker, not the clone's local" $?
+# A2: nome novo que JA EXISTE (Custo, local irmao) -> re-deriva a string E
+# re-aponta o clone, verificado compilando (re-target correto por semantica)
+( cd "$D" && "$BIN" rename p2.hbp a.prg:9:8 Custo > a2.log 2>&1 )
+check "generate+clone, new name EXISTS: rename exit 0" $?
+grep -q 'predicted string: "Preco" -> "Custo"' "$D/a2.log" && grep -q '^   LOG Custo' "$D/a.prg"
+check "the stringify re-derived; the marker occurrence re-pointed" $?
+( cd "$D" && "$HB_BIN/harbour" a.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "re-targeted module still clean" $?
+# A3: nome novo INEXISTENTE -> a recompilacao pega o clone quebrado, rollback
+D=$(freshp2 case109b)
+( cd "$D" && "$BIN" rename p2.hbp a.prg:9:8 Zzz > a3.log 2>&1 )
+RC=$?
+check "generate+clone, new name ABSENT: exit != 0" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -qi "rollback" "$D/a3.log"
+check "reports honest rollback (broken clone caught by recompilation)" $?
+cmp -s "$D/a.prg" "$HERE/fixp2/a.prg"
+check "a.prg restored byte-exact" $?
+# B: paste + clone a uma FUNCAO externa; renomear para funcao inexistente ->
+# o delta de simbolo nao-previsto e barrado pelo .hrb, rollback
+D=$(freshp2 case109c)
+( cd "$D" && "$BIN" rename p2.hbp b.prg:6:6 Multiplica > b.log 2>&1 )
+RC=$?
+check "paste+clone to external function, absent target: exit != 0" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -qi "rollback" "$D/b.log"
+check "reports honest rollback (symbol count net)" $?
+cmp -s "$D/b.prg" "$HERE/fixp2/b.prg"
+check "b.prg restored byte-exact" $?
+# C: MULTIPLICIDADE - o mesmo <n> colado 2x + stringificado 2x; a predicao
+# prevê TODOS os artefatos (o fecho nao tem teto) e o rename sucede/round-trip
+D=$(freshp2 case109d)
+( cd "$D" && "$BIN" rename p2.hbp b.prg:8:6 Contas --dry-run > c1.log 2>&1 )
+grep -q "predicted: G_CONTA -> G_CONTAS" "$D/c1.log" && \
+   grep -q "predicted: H_CONTA -> H_CONTAS" "$D/c1.log" && \
+   grep -q 'predicted string: "Conta" -> "Contas"' "$D/c1.log"
+check "multi-paste + multi-stringify: ALL artifacts predicted (no ceiling)" $?
+( cd "$D" && "$BIN" rename p2.hbp b.prg:8:6 Contas > c2.log 2>&1 )
+check "multiplicity rename exit 0" $?
+grep -q "^SNAP Contas" "$D/b.prg"
+check "marker site edited to the new name" $?
+( cd "$D" && "$HB_BIN/harbour" b.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "edited module still clean" $?
+( cd "$D" && "$BIN" rename p2.hbp b.prg:8:6 Conta > /dev/null 2>&1 )
+cmp -s "$D/b.prg" "$HERE/fixp2/b.prg"
+check "A->B->A round-trip byte-exact" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

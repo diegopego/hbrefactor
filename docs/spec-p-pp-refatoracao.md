@@ -238,10 +238,107 @@ O arco das hipóteses, registrado porque é a lição da fase:
 - [x] commit do core: PENDENTE de autorização por-commit do Diego (ppcore.c,
       hbpp.h, compast.c — árvore do core editada, não commitada).
 
+## Eixo A — P2: marker que GERA E passa adiante (adr-003:87-90) — VEREDITO FECHADO
+
+**A pergunta.** Um marker `<n>` usado ao mesmo tempo como GERADOR (`s_<n>` paste
+/ `<"n">` stringify) **e** como PASS-THROUGH (`<n>` clone) na MESMA regra — hoje
+o fato `generates` (ast-12) vence e o `rename` resolve para `rename-pp-marker`.
+Pode estar errado num caso que ainda não vi? A investigação foi feita com o
+método-oráculo que o Diego mandou usar (adr-004 #5): observar o `.ppo` (saída
+expandida) e o `.ppt` (traço passo a passo) do que o pp REALMENTE faz, e provar
+por execução, nunca por teoria.
+
+### O que o pp faz — lido do `.ppo`/`.ppt` (a evidência)
+
+Uma palavra ESCRITA UMA VEZ no fonte o pp transforma em VÁRIAS coisas. Duas
+formas, ambas em DSL inventada não-espelho (régua do caso 64):
+
+**stringify + clone** — `#xtranslate LOG <n> => QOut( <"n">, <n> )`:
+```
+a.prg(6)  LOG Preco
+   │ (pp)
+   ▼
+a.ppo     QOut( "Preco", Preco )
+a.ppt     a.prg(6) >LOG Preco<
+          #xtranslate >QOut( "Preco", Preco )<
+```
+`Preco` vira a STRING `"Preco"` (stringify — **gera**, o literal perde a ligação
+com o nome) E a referência à variável local `Preco` (clone — **passa adiante**).
+
+**paste + clone** — `#xcommand WRAP <n> => FUNCTION w_<n>() ;; RETURN <n>()`:
+```
+b.prg(3)  WRAP Soma
+   │ (pp)
+   ▼
+b.ppo     FUNCTION w_Soma() ;; RETURN Soma()
+b.ppt     b.prg(3) >WRAP Soma<
+          #xcommand >FUNCTION w_Soma() ;; RETURN Soma()<
+          b.prg(3) >w_ Soma<
+          (concatenate) >w_Soma<     ← a COLAGEM: "w_" + "Soma" = "w_Soma"
+```
+`Soma` é COLADA em `w_Soma` (o passo `(concatenate)` do traço, **gera** um nome
+de função novo) E vira a CHAMADA a `Soma()`, a função que já existe (clone —
+**passa adiante**). *Nota Harbour:* o `(concatenate)` no `.ppt` é exatamente onde
+o pp executa a paste; renomear a palavra do marker re-executa essa colagem.
+
+### Os cantos extremos (levantados pelo Diego no portão) — todos provados
+
+- **(a) Colado mais de uma vez / (b) multiplicidade sem teto.** O pp não limita
+  quantos usos no destino. O fecho de artefatos da ferramenta (`PpMarkerArtifacts`,
+  reverse-scan sobre TODO o rastro `from`) também não tem teto — a predição é
+  proporcional às ocorrências. Provado: `BUILD <n> => FUNCTION a_<n>()… b_<n>()…
+  c_<n>()` (3 pastes) prevê `A_FOO→A_BAR`, `B_FOO→B_BAR`, `C_FOO→C_BAR`; `SNAP`
+  (2 pastes + 2 stringify, caso 109) prevê `G_`, `H_` e a string, tudo (stringify
+  deduplicado).
+- **(c) Diretivas que geram diretivas — o PRÓPRIO pp restringe.** Descoberta por
+  `.ppt`: uma diretiva que gera `#xtranslate` **NÃO registra** a regra (`DEFT <n>
+  => #xtranslate T_<n> => 999` deixa `T_Foo` literal, `W0001`); só `#[x]command`
+  gerado entra no grafo (é o que a fixgen/caso 108 e o hbclass usam), e comando de
+  keyword COLADA (`SHOW_<n>`) nem casa (`E0020`). O que de fato compila cai na
+  genealogia ast-13/P1, já provado no caso 108.
+
+### O veredito — a segurança é ESTRUTURAL
+
+| Caso (DSL não-espelho) | forma / alvo do clone | `rename` no marker | resultado |
+|---|---|---|---|
+| `REGISTRO <n>` (fixppm, caso 52) | LOCAL fabricado pela expansão | exit 0 | **CORRETO** (re-deriva paste+string+local interno) |
+| `WRAP Soma → Multiplica` (ausente) | função externa inexistente | rollback | degrade honesto ("contagem de símbolos mudou") |
+| `LOG Preco → Zzz` (ausente) | local externo inexistente | rollback | degrade honesto ("parou de compilar", W0001+`-es2`) |
+| `LOG Preco → Custo` (existe) | local externo existente | exit 0 | correto-por-semântica (re-target verificado compilando) |
+| `SNAP`/`BUILD` multi-paste, chamador não-derivado | referência escrita à mão | rollback | degrade honesto (multiplicidade completa na predição) |
+
+`generates`-vence é **SEGURO**. A razão de fundo não é o fato fino (paste vs
+stringify) — é a **rede dupla** que confere o ARTEFATO COMPILADO FINAL:
+(1) recompilação sob `-es2` (`AstDumps`) pega toda referência quebrada;
+(2) comparação posicional de símbolos/funções do `.hrb` (`HrbSymbolsRenamed`,
+[hbrefactor.prg:10999](../src/hbrefactor.prg#L10999)) pega todo delta não-previsto.
+Essa rede é **indiferente à multiplicidade e ao aninhamento de diretivas** —
+confere o resultado, não a forma da regra. Logo:
+- clone que alcança símbolo EXTERNO ausente → rollback;
+- clone que re-aponta para símbolo EXTERNO existente → compila e a diretiva passa
+  a operar sobre ele (é o que "renomear o argumento da diretiva" significa);
+- predição incompleta (se o fecho errasse um artefato) → o pp regenera TUDO do
+  marker renomeado → delta não-previsto → rollback. Pior caso = rollback espúrio
+  (provado NÃO acontecer), **jamais corrupção silenciosa**.
+
+### Decisão do portão (Diego) e entrega
+
+Portão submetido em duas rodadas (a 1ª com exemplo textual, a 2ª com os artefatos
+`.ppo`/`.ppt` a pedido do Diego). **Decisão: opção A — fechar como o P1**: sem
+canal novo, sem `genOp`, sem tocar o core ou o motor. O achado CONVERGE para "a
+rede já cobre" — uma recusa de canal DOCUMENTADA, resultado legítimo do critério
+de exaurir a fase (adr-003: fato sem consumidor claro = fato local, não
+arquitetura). Entrega = a PROVA: fixture `tests/fixp2` (LOG/WRAP/SNAP, DSL
+inventada) + **caso 109** (17 checks, incluindo re-target, os dois rollbacks e a
+multiplicidade). Suíte **813/0** byte-idêntica, `lexdiff` não requerido (nada no
+compilador muda). O registro destes achados É a entrega tanto quanto a prova
+(ordem do Diego) — mecânica do pp e o princípio estrutural ficam no
+[adr-004](adr-004-grafo-transformacao-pp.md) e no
+[limites-e-alavancas.md](limites-e-alavancas.md).
+
 ## Fatias seguintes (roadmap § P, ordem)
 
-P2 (marker que gera E passa adiante, adr-003:87-90) · P3 (`generates` para
-`usages`/find-references — a hipótese grande) · P4 (mkinds de RESULT marker) ·
-P5 (mkinds de MATCH) · P6 (estrutura da regra, regra sem cabeça) · Eixo B: P7
-(pp como instrumento — o enquadramento acima aterrissa aqui) · Eixo C: P8
-(rename da palavra na regra) · P9 (custo reverse-scan) · P10 (síntese).
+P3 (`generates` para `usages`/find-references — a hipótese grande) · P4 (mkinds de
+RESULT marker) · P5 (mkinds de MATCH) · P6 (estrutura da regra, regra sem cabeça)
+· Eixo B: P7 (pp como instrumento — o enquadramento acima aterrissa aqui) · Eixo
+C: P8 (rename da palavra na regra) · P9 (custo reverse-scan) · P10 (síntese).

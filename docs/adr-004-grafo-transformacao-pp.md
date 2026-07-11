@@ -92,6 +92,36 @@ e o dump apenas a carrega.
    fixgen — DSL inventada não-espelho) + regras METHOD do hbclass real; suíte
    **796/0**, `lexdiff 0`, zero drift nos 782 checks pré-existentes.
 
+6. **P2 (caso 109) — mecânica do pp descoberta com `.ppo`/`.ppt`, e o
+   PRINCÍPIO ESTRUTURAL de segurança.** Investigando "marker que gera E passa
+   adiante" (adr-003:87-90), o método-oráculo do #5 do Diego rendeu fatos novos
+   sobre o grafo, e um princípio que sustenta as próximas fatias:
+   - **O `(concatenate)` do `.ppt` é a aresta de PASTE, anotada por linha-fonte.**
+     `WRAP Soma` → `.ppt` mostra `(concatenate) >w_Soma<` na linha do uso: o pp
+     expõe a colagem como um passo nomeado. É o mesmo fato que o `from` op `paste`
+     carrega no dump — o `.ppt` é a face humana dele.
+   - **Nem toda diretiva gerada entra no grafo — o pp restringe por FATO.**
+     Diretiva que gera `#[x]translate` **NÃO registra** a regra (o nome sai
+     literal, `W0001`); só `#[x]command` gerado registra (é o que hbclass e a
+     fixgen usam). Comando cuja keyword é COLADA (`SHOW_<n>`) nem casa (`E0020`).
+     Consequência para o grafo: as arestas "regra gerada" que existem de fato são
+     as de `#[x]command` — exatamente o alcance do ast-13/genealogia.
+   - **A multiplicidade no destino é ILIMITADA** e o grafo a acompanha: o mesmo
+     token-fonte pode gerar N arestas (paste/stringify repetidos) + M arestas de
+     clone; o walker (`PpMarkerArtifacts`, reverse-scan sobre todo `from`) não põe
+     teto.
+   - **PRINCÍPIO ESTRUTURAL (a razão de fundo da segurança):** a ferramenta não
+     precisa MODELAR a multiplicidade nem o aninhamento para ser segura, porque a
+     rede de verificação confere o **ARTEFATO COMPILADO FINAL**, não a forma da
+     regra — recompilação `-es2` (referências) + símbolos/identidade do `.hrb`
+     (delta previsto). Todo caso é rollback honesto OU re-derivação verificada;
+     nunca corrupção silenciosa, por mais complexa que a diretiva seja. É o
+     complemento do grafo: o grafo PREVÊ (o que vai mudar), a rede GARANTE (que só
+     mudou isso). Enquanto o grafo cresce fato a fato, a rede é o piso que segura
+     o que o grafo ainda não modela. Registro em
+     [spec-p § P2](spec-p-pp-refatoracao.md) e
+     [limites-e-alavancas.md](limites-e-alavancas.md).
+
 ## Duas leituras (e como a execução as decidiu)
 
 - **Fraca / incremental — EXECUTADA E PAGA.** O primeiro alvo ("carimbar

@@ -375,6 +375,26 @@ zero drift nos 782 pré-existentes. Também fecha o miolo de **P6
 "regra-em-expansão"** por antecipação. **Commits (core + ferramenta) pendentes
 de autorização por-commit do Diego.**
 
+**P2 — ENTREGUE (2026-07-11): "marker que gera E passa adiante" (adr-003:87-90)
+FECHADO como o P1 — veredito + prova, sem canal novo.** A pergunta: um marker
+`<n>` usado como GERADOR (paste `s_<n>` / stringify `<"n">`) E como PASS-THROUGH
+(clone `<n>`) na MESMA regra — `generates` vence → `rename-pp-marker`; erra? A
+investigação (método-oráculo `.ppo`/`.ppt`, portão em 2 rodadas, a 2ª a pedido do
+Diego com os artefatos) provou que **não há corrupção silenciosa**: a segurança é
+ESTRUTURAL — a rede dupla (recompilação `-es2` + símbolos/identidade do `.hrb`)
+confere o ARTEFATO COMPILADO FINAL, indiferente à multiplicidade (o pp não põe
+teto no nº de usos no destino — provado com paste×3 e paste×2+stringify×2) e ao
+aninhamento (diretiva que gera `#xtranslate` nem registra; só `#[x]command`
+gerado entra no grafo — o alcance do ast-13/108). Todo caso é rollback honesto OU
+re-derivação verificada. Decisão do Diego: opção A (fechar como P1, sem `genOp`).
+Entrega: fixture `tests/fixp2` (DSL inventada LOG/WRAP/SNAP) + **caso 109** (17
+checks: re-target verificado, dois rollbacks, multiplicidade completa); suíte
+**813/0** byte-idêntica, sem tocar o core/motor (lexdiff não requerido). O
+REGISTRO é a entrega tanto quanto a prova (ordem do Diego): mecânica do pp e o
+princípio estrutural em [spec-p § P2](spec-p-pp-refatoracao.md),
+[adr-004](adr-004-grafo-transformacao-pp.md) e
+[limites-e-alavancas.md](limites-e-alavancas.md).
+
 A rodada 2 da fase U destravou a operação de derivação do pp
 (`clone`/`paste`/`stringify`) como fato de resolução (ast-12, `generates`);
 o [adr-003](adr-003-derivacao-pp-como-fato.md) registrou que o achado ABRE
@@ -395,10 +415,12 @@ por prova). **D-P2** — **investigação + capacidade**: todo fato que sobreviv
 à prova adversarial aterrissa como consumo mínimo na ferramenta + caso na
 suíte (responde ao critério de matar do adr-003).
 
-**Fatias** (ordem: U-2 → Eixo A P1–P6 → Eixo B P7 → Eixo C P8 → P9 → P10):
-- **Eixo A (fonte de fato):** P1 granularidade `paste`×`stringify`
-  (adr-003:82-86, candidato `ast-13` `genOp` OU recusa via guard `--force`);
-  P2 marker que gera E passa adiante (adr-003:87-90); P3 `generates` para
+**Fatias** (ordem: U-2 → Eixo A P1–P6 → Eixo B P7 → Eixo C P8 → P9 → P10;
+**P1 ✅ + P2 ✅ ENTREGUES (2026-07-11)**):
+- **Eixo A (fonte de fato):** P1 ✅ granularidade `paste`×`stringify`
+  (adr-003:82-86, `genOp` recusado; `ast-13` foi para a genealogia);
+  P2 ✅ marker que gera E passa adiante (adr-003:87-90, veredito estrutural,
+  caso 109); P3 `generates` para
   `usages`/find-references (a hipótese grande, adr-003:60-63); P4 mkinds de
   RESULT marker como veredito (`block`/`reference`/stringify… já exportados,
   não consumidos); P5 mkinds de MATCH (`wild`/`extexp`/`restrict` — validação
@@ -412,6 +434,22 @@ suíte (responde ao critério de matar do adr-003).
   result coerentes, canal ast-5) + limites de edição estrutural da regra.
 - **P9** custo do reverse-scan O(tokens×from) (adr-003:96-98); **P10**
   síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
+
+**P-DOC — corpus exploratório/explicativo do PP (ESSENCIAL, ordem do Diego,
+2026-07-11):** uma bateria de testes que casa diretivas REAIS do Harbour
+(examples/, contribs/, os `.ch` do core — std.ch, hbclass.ch, box.ch, inkey.ch,
+set.ch…) com seus `.ppo` (saída expandida) E `.ppt` (traço passo a passo), no
+MESMO formato explicativo que a investigação P2 usou para explicar ao Diego:
+texto técnico quando preciso, mas SEMPRE explicando também para o público-alvo
+programador Harbour. **Objetivo:** entender A FUNDO o potencial do pp usando as
+diretivas que já existem no ecossistema — o que cada diretiva real gera, como o
+pp a transforma passo a passo, e o que a ferramenta consegue (ou não) refatorar
+nela. Vira **fonte essencial de conhecimento do PP** (para o Diego, para o
+usuário final e para as próprias fatias P). **Formato:** fixture por família de
+diretiva + o par `.ppo`/`.ppt` anotado + a explicação bilíngue (técnica +
+programador). Encaixa na fase P (alimenta Eixo A/fonte-de-fato e Eixo
+B/instrumento) e no mapa do alcançável. Escopo/critério de pronto a detalhar
+antes de executar (regra do documento vivo).
 
 **Portões pontuais a submeter durante a execução:** D-P3 (fato provado vira
 `ast-N` OU fica computado do `from`?), D-P4 (restrict-validation e

@@ -374,3 +374,33 @@ fatia de escrita agora; o exec-registry fica como instrumento (valor
 diagnóstico provado: `UWSecondary:Add` sem corpo no hbhttpd, QUIT do
 xhb, paramétricos nomeados). Decisão formal do portão registrada no
 roadmap/spec.
+
+## Segurança estrutural do rename de marker (2026-07-11, P2 — propriedade durável)
+
+Não é medição; é uma propriedade PERMANENTE da ferramenta, provada na fase P/P2
+(adr-003:87-90, caso 109) e válida para QUALQUER diretiva, por mais complexa.
+
+**O fenômeno.** Uma mesma palavra escrita uma vez o pp transforma em várias
+coisas na mesma regra: pode COLAR num símbolo novo (`w_<n>`, paste), DESPEJAR
+numa string (`<"n">`, stringify) E PASSAR ADIANTE uma referência (`<n>`, clone) —
+tudo do mesmo token-fonte, em multiplicidade ILIMITADA (o pp não põe teto). Ao
+renomear o marker, todas essas formas re-derivam juntas.
+
+**A garantia.** A ferramenta NÃO precisa modelar a multiplicidade nem o
+aninhamento de diretivas para ser segura, porque a rede de verificação confere o
+**artefato COMPILADO FINAL**, não a forma da regra:
+- recompilação sob `-es2` pega qualquer referência quebrada (clone que re-aponta
+  para símbolo ausente) → rollback;
+- comparação posicional de símbolos/funções do `.hrb` pega qualquer delta
+  não-previsto (chamador escrito à mão, artefato que o fecho errou) → rollback.
+
+**Consequência (o teto honesto do rename de marker):** todo caso é ou **rollback
+honesto** ou **re-derivação verificada** — clone que re-aponta para símbolo
+existente compila e a diretiva passa a operar sobre ele (é o que "renomear o
+argumento" significa); clone que alcança símbolo ausente ou artefato órfão desfaz
+tudo. **Nunca corrupção silenciosa.** O clone INTERNO (local fabricado pela
+própria expansão, ex. `REGISTRO`) re-deriva certo; o clone EXTERNO que só uma
+referência escrita à mão alcança desfaz (o fecho cobre o que DERIVA do marker,
+não referência independente). É o complemento do grafo de transformação
+(adr-004): o grafo PREVÊ o que muda, a rede GARANTE que só isso mudou — o piso que
+segura o que o grafo ainda não modela.

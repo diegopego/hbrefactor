@@ -262,6 +262,17 @@ Garantias e limites (provados no smoke test da B4):
   expansão — `UNTIL <c> => IF <c> ; EXIT ; ENDIF ; ENDDO` perde o ENDDO
   (comportamento PRÉ-EXISTENTE do Harbour, provado em binário pristino).
   Forma que funciona: `IF <c> ; EXIT ; END ; END`.
+- **`generates` e o marker que GERA E passa adiante (veredito P2, caso 109)**:
+  um mesmo marker pode GERAR (paste/stringify, `generates: true`) E ao mesmo
+  tempo passar o nome ADIANTE por clone (uma referência), em multiplicidade
+  ILIMITADA (o pp não põe teto no nº de usos no destino). O consumidor resolve
+  pelo `generates` (vence → `rename-pp-marker`), e a segurança NÃO depende de
+  distinguir paste de stringify nem de modelar a multiplicidade: é ESTRUTURAL —
+  a rede de verificação (recompilação `-es2` + símbolos/identidade do `.hrb`)
+  confere o ARTEFATO COMPILADO FINAL. Todo caso é rollback honesto (referência
+  quebrada / delta não-previsto) OU re-derivação verificada; nunca corrupção
+  silenciosa. Fundamentação: [spec-p § P2](spec-p-pp-refatoracao.md),
+  [adr-004](adr-004-grafo-transformacao-pp.md).
 
 ### `match[]`/`result[]` — a regra POR DENTRO (ast-5, fase B4g)
 
