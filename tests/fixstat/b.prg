@@ -1,0 +1,4 @@
+FUNCTION B()
+   RETURN Helper() + 2
+STATIC FUNCTION Helper()
+   RETURN 2

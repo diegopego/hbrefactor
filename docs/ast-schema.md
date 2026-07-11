@@ -1,9 +1,14 @@
-# Schema `ast-11` — o dump AST do compilador (spec)
+# Schema `ast-12` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-11` (completude M-B) = `ast-10` + `"params"` no nó
+com `-x`. O `ast-12` (fase U / revisão) = `ast-11` + `"generates": true` no
+recheio de match marker do `ppApplications[].tokens[]` cujo nome ESCRITO
+alimenta um paste/stringify (GERA artefato) — reverse-scan do `from` (op
+`p`/`s`), puro no dump; separa "nome que a diretiva vira código" de "símbolo
+ligado que só flui para um comando" (ver a seção `ppApplications`). O
+`ast-11` (completude M-B) = `ast-10` + `"params"` no nó
 `CODEBLOCK` — a lista dos parâmetros do bloco COMO DECLARADOS, presa ao
 PRÓPRIO nó (`[{"sym","type","class"}]`; `type`/`class` só quando há
 anotação, inclusive a `'S'`+classe do canal `_HB_INLINESELF`). Deixa o
@@ -49,7 +54,7 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 ## Topo
 
 ```jsonc
-{ "schema": "ast-11",          // versão emitida hoje (ast-1→...→ast-11)
+{ "schema": "ast-12",          // versão emitida hoje (ast-1→...→ast-12)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
@@ -185,6 +190,20 @@ no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
       { "line": 8, "col": 3, "len": 8, "type": 21, "prov": "s",
         "marker": 0,       // 0 = palavra/literal DA PRÓPRIA REGRA;
                            // N = recheio do match marker N (1-based)
+        "generates": true, // ast-12: SÓ em recheio de marker (N>=1) cujo NOME
+                           // ESCRITO alimenta um 'p'aste ou 's'tringify -
+                           // GERA artefato (um símbolo colado dele, uma string
+                           // despejada dele) que perde a ligação com o nome.
+                           // AUSENTE = não gera ('c'lone/pass-through: o valor
+                           // atravessa como está, ex.: arg de `? x`, param de
+                           // método). Reverse-scan do `from` (op p/s) dos
+                           // tokens[], puro no dump. É o fato que separa "nome
+                           // que a diretiva vira código" (renomear = pp-marker,
+                           // carrega os derivados) de "símbolo LIGADO que
+                           // apenas flui para dentro de um comando" (renomear =
+                           // o local/param que ele é). Sem ele, um `REGISTRO
+                           // <n> => ...LOCAL <n>` faria o marker `<n>` colidir
+                           // com o LOCAL homônimo que a própria expansão cria.
         "text": "MENUITEM" } ] } ]
 ```
 

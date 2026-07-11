@@ -5,6 +5,74 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-11 — um só `rename`: você aponta, a ferramenta descobre o que é
+
+### O problema de todo dia
+
+Para renomear, você tinha de saber ANTES que espécie era o alvo e escolher
+o comando certo: `rename-local`, `rename-param`, `rename-static`,
+`rename-memvar`, `rename-function`, `rename-method`, `rename-dsl` ou
+`rename-pp-marker`. Oito comandos, e a pergunta "isto é um local ou um
+static? um método ou uma função?" é exatamente o que o compilador já sabe.
+
+### O que mudou
+
+Agora há **um verbo**, que recebe a POSIÇÃO do cursor:
+
+```
+hbrefactor rename <projeto> <arq:linha:col> <novo> [--force] [--edit-rules] [--dry-run]
+```
+
+Você aponta o cursor no nome e diz o novo nome. A ferramenta olha o FATO da
+árvore naquele ponto e descobre sozinha o que renomear — local, parâmetro,
+STATIC, memvar (PRIVATE/PUBLIC), função, método, palavra de diretiva ou nome
+de marker de pp — e faz exatamente o que o comando específico faria (mesma
+edição, mesma verificação por recompilação, mesmo rollback). Na extensão
+VSCode isso vira um único **"Rename Symbol"** (o F2 de sempre).
+
+```
+# antes: você tinha de saber que era um método e a classe:
+hbrefactor rename-method app.hbp Caixa:Info Mostra
+# agora: cursor em cima do Info, em qualquer uso ou na implementação:
+hbrefactor rename app.hbp c1.prg:17:8 Mostra
+```
+
+### O que a ferramenta NUNCA faz aqui
+
+- **Não adivinha.** Cursor num ponto sem símbolo de compilação (comentário,
+  espaço, coluna torta), ou num caso genuinamente ambíguo, ela **recusa
+  nomeando o motivo** — nunca renomeia a coisa errada em silêncio. Resolve
+  pelo que o compilador *liga* naquele ponto: uma variável usada dentro de
+  um comando (`? x`, `@..SAY`) continua sendo aquela variável; uma chamada
+  `Foo(...)` é a função mesmo que exista um local `Foo` homônimo; um campo
+  de RDD (`FIELD`) — que nenhum verbo cobre — é recusado, não confundido
+  com uma função de mesmo nome; e um nome que a sua diretiva **transforma em
+  código** (que ela cola num nome de função, ou vira uma string) é tratado
+  como o comando/marker que ele é — renomeá-lo carrega os artefatos que ele
+  gera — sem se confundir com um local que a própria expansão por acaso crie
+  com o mesmo nome. (Esses cantos foram fechados por **duas** rodadas de
+  revisão externa cruzada antes da entrega — e o critério "gera código ×
+  só passa adiante" virou um fato explícito do compilador.)
+- **Não perde nenhuma capacidade** dos comandos antigos: o `--edit-rules`
+  (nome citado dentro de diretiva) e o `--force` (strings/`HB_FUNC` iguais
+  ao nome) continuam valendo, agora pedidos num ponto só.
+- **Não renomeia classe** (o nome de uma `CREATE CLASS`) nem colapsa
+  `extract`/`reorder` — uma posição não basta para dizer um trecho a extrair
+  ou uma nova ordem de parâmetros; esses seguem com seus argumentos.
+
+### Aviso de descontinuação
+
+Os oito `rename-*` específicos seguem funcionando nesta versão, mas estão
+**descontinuados** — o `--help` já os marca. Passe a usar `rename
+<arq:linha:col>`; uma versão futura remove os antigos. A extensão já traz o
+comando unificado como o principal.
+
+### Detalhe interno
+
+Verbos unificados (fase U, fatia 1) — [docs/roadmap.md](docs/roadmap.md) § U,
+[docs/spec-u-verbos-unificados.md](docs/spec-u-verbos-unificados.md),
+[docs/adr-002-rename-unificado.md](docs/adr-002-rename-unificado.md).
+
 ## 2026-07-11 — `usages`/find-references enxerga o receptor DENTRO das propriedades delegadas (`VAR ... IS/IN`)
 
 ### O problema de todo dia

@@ -251,6 +251,54 @@ async function cmdUsages() {
 
 async function saveAll() { await vscode.workspace.saveAll(false); }
 
+// verbo unificado (fase U): "Rename Symbol" no estilo F2 do editor. O
+// usuário NÃO classifica o alvo (local? método? palavra de DSL?) - dá só a
+// POSIÇÃO e o CLI resolve o kind por FATO (o mesmo motor do resolve-at:
+// papel estrutural do site + escopo declarado da função dona) e despacha
+// para o rename-* específico por dentro, com saída byte-idêntica. Substitui
+// os comandos por-kind (Local/Static/Function/Dsl/PpMarker, DESCONTINUADOS):
+// a taxonomia é do compilador, não uma escolha remontada na UX. Os fluxos de
+// confirmação (--edit-rules quando o nome é citado em diretiva, --force
+// quando há strings/HB_FUNC) chegam pela MESMA mensagem do CLI - o rename
+// delega ao rename-* que já as emite, então há um único ponto de confirmação.
+// Posição sem identificador de compilação: o CLI recusa nomeando a exceção
+// (degrade honesto, nunca palpite).
+async function cmdRename() {
+  const c = await ctx();
+  if (!c) return;
+  const word = wordAt(c.editor);
+  if (!word) return;
+  const novo = await vscode.window.showInputBox({
+    prompt: `Novo nome para "${word}" sob o cursor (o kind vem do fato: local/param/static/memvar/função/método/dsl/marker)` });
+  if (!novo) return;
+  await saveAll();
+  const pos = c.editor.selection.active;
+  const at = atSpec(c.file, pos.line, pos.character);
+  const flags = [];
+  let res = await run(['rename', c.spec, at, novo], c.cwd);
+  // o nome é citado DENTRO de regra de pp: --edit-rules edita as diretivas junto
+  if (res.code !== 0 && /--edit-rules/.test(res.stderr + res.stdout)) {
+    report(`rename @ ${at} -> ${novo} (citado em regra de pp)`, res);
+    const go = await vscode.window.showWarningMessage(
+      'O nome é citado DENTRO de regra(s) de pp (diretivas nomeadas na saída). Editar as diretivas junto?',
+      'Prosseguir (--edit-rules)', 'Cancelar');
+    if (go !== 'Prosseguir (--edit-rules)') return;
+    flags.push('--edit-rules');
+    res = await run(['rename', c.spec, at, novo, ...flags], c.cwd);
+  }
+  // strings/HB_FUNC iguais ao nome NÃO são editadas: o CLI pede --force
+  if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
+    report(`rename @ ${at} -> ${novo} (referências textuais)`, res);
+    const go = await vscode.window.showWarningMessage(
+      'Há referências textuais (strings/HB_FUNC) que NÃO serão alteradas. Prosseguir mesmo assim?',
+      'Prosseguir (--force)', 'Cancelar');
+    if (go !== 'Prosseguir (--force)') return;
+    flags.push('--force');
+    res = await run(['rename', c.spec, at, novo, ...flags], c.cwd);
+  }
+  report(`rename @ ${at} -> ${novo}`, res);
+}
+
 async function cmdRenameLocal() {
   const c = await ctx();
   if (!c) return;
@@ -461,6 +509,7 @@ async function cmdExecRegistry() {
 function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('hbrefactor.usages', cmdUsages),
+    vscode.commands.registerCommand('hbrefactor.rename', cmdRename),
     vscode.commands.registerCommand('hbrefactor.execRegistry', cmdExecRegistry),
     vscode.commands.registerCommand('hbrefactor.annotate', cmdAnnotate),
     vscode.commands.registerCommand('hbrefactor.annotateApply', cmdAnnotateApply),

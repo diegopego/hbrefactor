@@ -164,6 +164,20 @@ freshdel() { # freshdel <case-name> -> fixture da completude M-B (acessadores de
    echo "$d"
 }
 
+freshshadow() { # freshshadow <case-name> -> fixture de homônimos p/ o degrade honesto do rename unificado (fase U)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixshadow/*.prg "$HERE"/fixshadow/*.hbp "$d"/
+   echo "$d"
+}
+
+freshstat() { # freshstat <case-name> -> STATIC FUNCTION homônima em módulos distintos (revisão Codex #1)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixstat/*.prg "$HERE"/fixstat/*.hbp "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3329,7 +3343,138 @@ check "oG:nRaw (AS CLASS de fonte, fora de bloco) confirma pelo declarado escrit
 #  e o consumidor lê "params" de QUALQUER nó de bloco, sem palavra de hbclass)
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106"
+unit_107() {
+echo "case 107: U - verbo unificado 'rename <arq:linha:col> <novo>': o KIND vem do FATO sob o cursor, saída BYTE-IDÊNTICA ao rename-* específico"
+# O NORTE proíbe réplica sintática no MOTOR (a taxonomia é do compilador);
+# a fase U tira a mesma réplica da SUPERFÍCIE da CLI. O usuário deixa de
+# CLASSIFICAR o alvo no sufixo (rename-local? rename-method? rename-dsl?) -
+# dá só a POSIÇÃO e o `rename` resolve o kind por fato (o mesmo motor do
+# resolve-at: papel estrutural do site + escopo declarado da função dona) e
+# DELEGA ao rename-* específico. Prova executável: em cada um dos OITO
+# alvos, `rename <pos> <novo> --dry-run` sai byte-idêntico ao rename-*
+# correspondente. O nome da função dona que o `rename` deriva é o CANÔNICO
+# do compilador (uppercase) - por isso o oráculo de local/param usa MAIN/
+# DUPLA (o verbo não recebe casing do usuário: o kind e o escopo são fato).
+D=$(fresh case107)
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma --dry-run > n1.log 2>&1 )
+( cd "$D" && "$BIN" rename-local fix01.hbp a.prg MAIN nTotal nSoma --dry-run > o1.log 2>&1 )
+diff -q "$D/n1.log" "$D/o1.log" > /dev/null
+check "LOCAL (a.prg:5:10): rename <pos> byte-idêntico a rename-local" $?
+grep -q "^rename-local: nTotal -> nSoma in MAIN" "$D/n1.log"
+check "LOCAL: o verbo resolveu o kind local por fato (sem sufixo)" $?
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:18 nValor --dry-run > n2.log 2>&1 )
+( cd "$D" && "$BIN" rename-param fix01.hbp b.prg DUPLA nV nValor --dry-run > o2.log 2>&1 )
+diff -q "$D/n2.log" "$D/o2.log" > /dev/null
+check "PARAM (b.prg:5:18): byte-idêntico a rename-param" $?
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:3:8 s_nSeq --dry-run > n3.log 2>&1 )
+( cd "$D" && "$BIN" rename-static fix01.hbp b.prg s_nContador s_nSeq --dry-run > o3.log 2>&1 )
+diff -q "$D/n3.log" "$D/o3.log" > /dev/null
+check "STATIC file-wide (b.prg:3:8): byte-idêntico a rename-static" $?
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --dry-run > n4.log 2>&1 )
+( cd "$D" && "$BIN" rename-function fix01.hbp Dupla Dobrar --dry-run > o4.log 2>&1 )
+diff -q "$D/n4.log" "$D/o4.log" > /dev/null
+check "FUNCTION (b.prg:5:10, def): byte-idêntico a rename-function" $?
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:33:12 xNovo --dry-run > n5.log 2>&1 )
+( cd "$D" && "$BIN" rename-memvar fix01.hbp xCfg xNovo --dry-run > o5.log 2>&1 )
+diff -q "$D/n5.log" "$D/o5.log" > /dev/null
+check "MEMVAR (b.prg:33:12, PRIVATE): byte-idêntico a rename-memvar" $?
+# método: o cursor na IMPLEMENTAÇÃO resolve COM a dona (CAIXA:Info) - fato
+# da aplicação-identidade do hbclass, não forma
+D=$(freshmth case107b)
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Mostra --dry-run > n6.log 2>&1 )
+( cd "$D" && "$BIN" rename-method fixmth.hbp Caixa:Info Mostra --dry-run > o6.log 2>&1 )
+diff -q "$D/n6.log" "$D/o6.log" > /dev/null
+check "METHOD (c1.prg:17:8): byte-idêntico a rename-method Caixa:Info (dona por fato)" $?
+grep -q "^rename-method: CAIXA:Info -> Mostra" "$D/n6.log"
+check "METHOD: o verbo resolveu a DONA (CAIXA) pelo site, sem o usuário dar Classe:Método" $?
+# pp-marker: nome que preenche match marker de DSL inventada (sem classe)
+D=$(freshppm case107c)
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Novo --dry-run > n7.log 2>&1 )
+( cd "$D" && "$BIN" rename-pp-marker fixppm.hbp Click Novo --dry-run > o7.log 2>&1 )
+diff -q "$D/n7.log" "$D/o7.log" > /dev/null
+check "PP-MARKER (e1.prg:8:9): byte-idêntico a rename-pp-marker" $?
+# dsl: palavra de regra de pp num site de USO
+D=$(freshdsl case107d)
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM --dry-run > n8.log 2>&1 )
+( cd "$D" && "$BIN" rename-dsl fixdsl.hbp MENUITEM MENU_ITEM --dry-run > o8.log 2>&1 )
+diff -q "$D/n8.log" "$D/o8.log" > /dev/null
+check "DSL (a.prg:11:4, palavra de regra): byte-idêntico a rename-dsl" $?
+# aplicação REAL (não dry-run): o verbo edita e VERIFICA byte a byte
+D=$(fresh case107e)
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma > real.log 2>&1 )
+check "REAL apply local: exit 0"                     $([ $? -eq 0 ] && echo 0 || echo 1)
+grep -q "verified: all 2 module(s) byte-identical" "$D/real.log"
+check "REAL apply: recompilou e verificou byte a byte"  $?
+grep -q "LOCAL nSoma := 0" "$D/a.prg" && grep -q "nTotal no comentario nao deve mudar" "$D/a.prg"
+check "REAL apply: fonte editada, comentário com o nome velho INTACTO" $?
+# degrade honesto: posição sem identificador de compilação recusa, nomeando
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:4:1 Foo > ref.log 2>&1 )
+check "REFUSA posição vazia: exit != 0"              $([ $? -ne 0 ] && echo 0 || echo 1)
+grep -q "nenhum identificador de compilação em a.prg:4:1" "$D/ref.log"
+check "REFUSA nomeando a exceção (nunca adivinha)"   $?
+# --- guardas da REVISÃO (Codex + Claude): o verbo resolve pelo BINDING do
+#     compilador, não pelo papel de pp. Um símbolo LIGADO que flui para
+#     dentro de um comando (`? x`) continua sendo o símbolo; sombra
+#     chamada/local e FIELD não podem virar palpite. ---
+# BINDING antes de marker: 'nTotal' DENTRO de '? "Total:", nTotal' é o LOCAL,
+# não um marker (o '?' é #command, seus args são marker tokens - o achado que
+# quase passou). Byte-idêntico a rename-local. (dir PRISTINO - o de cima
+# aplicou um rename real e mexeu no a.prg)
+D=$(fresh case107g)
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:13:16 nZeta --dry-run > qm.log 2>&1 )
+( cd "$D" && "$BIN" rename-local fix01.hbp a.prg MAIN nTotal nZeta --dry-run > qo.log 2>&1 )
+diff -q "$D/qm.log" "$D/qo.log" > /dev/null
+check "BINDING: local dentro de '? ...' resolve rename-local (não pp-marker)" $?
+# parse de posição: linha/col não-numéricas RECUSAM (Val('5x')=5 não passa)
+( cd "$D" && "$BIN" rename fix01.hbp "a.prg:5x:10" nZeta --dry-run > mal.log 2>&1 )
+check "REFUSA posição malformada 'a.prg:5x:10': exit != 0"  $([ $? -ne 0 ] && echo 0 || echo 1)
+grep -q "linha e coluna devem ser numéricas" "$D/mal.log"
+check "REFUSA malformada nomeando o motivo (não resolve '5x'->5)" $?
+# SOMBRA de homônimo: 'Dobra' é LOCAL em Main, FUNCTION em sh2 e FIELD em Calc
+D=$(freshshadow case107f)
+"$HB_BIN/harbour" "$D/sh1.prg" -n -q0 -w3 -es2 > /dev/null 2>&1
+check "fixture fixshadow clean under -w3 -es2" $?
+( cd "$D" && "$BIN" rename fixshadow.hbp sh1.prg:11:13 Triplica --dry-run > c.log 2>&1 )
+grep -q "^rename-function: Dobra -> Triplica" "$D/c.log"
+check "SOMBRA: a CHAMADA Dobra( ... ) resolve rename-FUNCTION (não o local homônimo)" $?
+( cd "$D" && "$BIN" rename fixshadow.hbp sh1.prg:11:6 Triplica --dry-run > l.log 2>&1 )
+grep -q "^rename-local: Dobra -> Triplica in MAIN" "$D/l.log"
+check "SOMBRA: o LOCAL Dobra (sem chamar) resolve rename-LOCAL" $?
+( cd "$D" && "$BIN" rename fixshadow.hbp sh1.prg:19:16 Triplica --dry-run > f.log 2>&1 )
+check "FIELD: exit != 0 (nenhum verbo cobre campo de RDD)"  $([ $? -ne 0 ] && echo 0 || echo 1)
+grep -q "campo de área de trabalho (FIELD)" "$D/f.log"
+check "FIELD: RECUSA nomeando (não vira rename-function do homônimo)" $?
+# CHAMADA em statement CONTINUADO com homônimo local (revisão Codex #3): a
+# chamada é resolvida por COLUNA ('(' no stream), sem depender de calls[].line
+( cd "$D" && "$BIN" rename fixshadow.hbp sh1.prg:26:11 Trip --dry-run > cc.log 2>&1 )
+grep -q "^rename-function: Dobra -> Trip" "$D/cc.log"
+check "SOMBRA continuada: a CHAMADA na linha de continuação resolve rename-FUNCTION" $?
+# --- o FATO DO CORE (ast-12 'generates'): marker que PASTEIA/STRINGIFICA gera
+#     artefato -> rename-pp-marker, MESMO com um LOCAL homônimo que a própria
+#     expansão fabrica; marker que só CLONA (pass-through) resolve pelo binding ---
+D=$(freshppm case107h)
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:5:10 Guardado --dry-run > mir.log 2>&1 )
+grep -q "^rename-pp-marker: Salva -> Guardado" "$D/mir.log"
+check "MIRROR: 'REGISTRO Salva' GERA (reg_Salva) -> rename-pp-marker, não o LOCAL gerado homônimo" $?
+( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:18:16 nY --dry-run > cl.log 2>&1 )
+grep -q "^rename-param: nX -> nY" "$D/cl.log"
+check "CLONE: param 'nX' de PARAMFN (pass-through, não gera) -> rename-param" $?
+# param de MÉTODO (função de nome GERADO CAIXA_SOMA, mas param é do usuário):
+# clone -> rename-param (um flag 'declaração gerada' o quebraria)
+D=$(freshmth case107i)
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:11:14 nQuant --dry-run > mp.log 2>&1 )
+grep -q "^rename-param: nQtd -> nQuant in CAIXA_SOMA" "$D/mp.log"
+check "MÉTODO: param 'nQtd' (clone, em função de nome gerado) -> rename-param" $?
+# duas STATIC homônimas: a posição sabe o arquivo e passa --file (Codex #1)
+D=$(freshstat case107j)
+( cd "$D" && "$BIN" rename fixstat.hbp a.prg:6:17 Aux --dry-run > st.log 2>&1 )
+grep -q "^rename-function: Helper -> Aux (static, só a.prg)" "$D/st.log"
+check "STATIC homônima: a posição passa --file e desambigua (Codex #1)" $?
+( cd "$D" && "$BIN" rename-function fixstat.hbp Helper Aux --dry-run > st0.log 2>&1; [ $? -ne 0 ] ) && grep -q "mais de um módulo" "$D/st0.log"
+check "  (prova: o rename-function pelado SEM --file recusa - o bug que o verbo fecha)" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

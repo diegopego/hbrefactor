@@ -1,11 +1,13 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@f2c8417 · harbour-core@034ee65f7b (feature/compiler-ast-dump)
-    — the completude M-B / RD-c core work is harbour-core@034ee65f7b; the hbrefactor
-      side (this manual, case 106, fixdel) rides the commit that carries this line
-      (a commit can't name its own hash, so the hbrefactor baseline is its parent).
-  suite at baseline: 107 cases (0–106), 768 checks green
+  baseline: hbrefactor@a3b7514 · harbour-core@034ee65f7b (feature/compiler-ast-dump)
+    — phase U (unified `rename`) is mostly hbrefactor, BUT its second review round added
+      one core fact: schema ast-12, the ppApplications `generates` stamp (a marker that
+      pastes/stringifies GENERATES an artifact). Both the hbrefactor commit and a new
+      harbour-core commit ride on top of these parents (a commit can't name its own hash,
+      so the baseline is the parent pair — advance both once committed).
+  suite at baseline: 108 cases (0–107), 797 checks green
   updated: 2026-07-11
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -372,7 +374,7 @@ Every classic refactoring, re-seated on the compiler's facts; each one verified
 
 | Command | What it does |
 |---|---|
-| `rename` | Renames a local, parameter, static, memvar, function, method — even a preprocessor directive word or match-marker. It renames the *symbol*, never the text. |
+| `rename` | Point the cursor at a name; it renames the *symbol* — local, parameter, static, memvar, function, method, even a preprocessor directive word or match-marker. **You don't classify the target**: the kind comes from the compiler's fact at that position, not from picking one of eight commands. It renames the symbol, never the text. |
 | `usages` | Every reference to a symbol, scope-aware, with honest certainty labels; homonyms of other classes excluded by fact. Peek them right inside VSCode. |
 | `extract-function` | Pull a range of lines into a new function — or a new METHOD when you're inside one; the locals it needs move with it. |
 | `inline-local` | Fold a variable back into its uses — purity judged by the compiler's own tree. |
@@ -397,10 +399,15 @@ never mentions by name.
 Everything lives in the **command-line tool** — fully usable on its own:
 
 ```
-hbrefactor rename-function vendas.hbp Dupla Dobrar
-hbrefactor usages          vendas.hbp nTotal --func Main
-hbrefactor annotate        vendas.hbp --apply
+hbrefactor rename   vendas.hbp vendas.prg:42:8 Dobrar   # kind resolved by fact at the cursor
+hbrefactor usages   vendas.hbp nTotal --func Main
+hbrefactor annotate vendas.hbp --apply
 ```
+
+One `rename` covers every kind — you give it the position, it finds out whether that's
+a local, a static, a method, a directive word… and does exactly what the dedicated
+command would (same edit, same verified rollback). The eight old `rename-*` commands
+still work but are **deprecated** in favor of this one.
 
 A "project" is anything `hbmk2` accepts: a `.hbp`, a `.hbc`, or just a list of `.prg`
 files — including **container/multi-target `.hbp`** (`-hbcontainer`, sub-projects,
@@ -409,9 +416,9 @@ files — including **container/multi-target `.hbp`** (`-hbcontainer`, sub-proje
 The **VSCode extension** is a thin layer on top: it finds the symbol under your cursor
 and calls the same CLI — and it finds the right `.hbp` for you by asking hbmk2 which
 project actually compiles your file (nearest first when it must ask; never guessed by
-proximity). Command Palette entries include *Usages*, *Rename function under cursor*,
-*Extract selection to new function*, *Annotate apply*, *Unused locals*, *Call graph*,
-and more.
+proximity). Command Palette entries include *Usages*, a single **Rename Symbol** (the
+familiar F2 — it figures out the kind from the cursor), *Extract selection to new
+function*, *Annotate apply*, *Unused locals*, *Call graph*, and more.
 
 ---
 
@@ -461,6 +468,7 @@ one fact at a time:
 | `ast-9` | exact written position of every declared name (the editor's anchor) |
 | `ast-10` | **declared class parentage** (`_HB_SUPER`) — who inherits from whom, as fact |
 | `ast-11` | each codeblock carries its **own parameters** — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding) |
+| `ast-12` | a directive marker is stamped **`generates`** when the name you wrote gets pasted/stringified into an artifact — so "rename a name that becomes code" is told apart from "rename a symbol that just flows into a command" |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
@@ -474,14 +482,15 @@ does** — never build a guess inside the tool.
 
 ## Where it stands — honest status
 
-<!-- prov: roadmap.md (delivered table, RE.6 entregue, gates U/B6/B8/D), CLI 0.5.0 /
-     extension 0.11.0, suite 757/0 (commit 4dbe8c1); rough edges: cases 88 (@ref,
+<!-- prov: roadmap.md (delivered table, RE.6/RD-c entregues, U slice 1 delivered,
+     gates B6/B8/D), CLI 0.5.0 / extension 0.12.0, suite 797/0 (this commit, phase U
+     slice 1 - unified rename); rough edges: cases 88 (@ref,
      PARAMETERS AS), commit c127b1f (same-basename limit), CHANGELOG 2026-07-10;
      limits doc (limites-e-alavancas.md: irreducible maybe, library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.11.0`; they version independently). The behavior contract is a suite of **106 cases /
-762 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.12.0`; they version independently). The behavior contract is a suite of **108 cases /
+797 checks**, all green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
@@ -535,7 +544,7 @@ opinions are all welcome:
 
 ## Install
 
-<!-- prov: Makefile (build/test, HB_BIN default), vscode/hbrefactor-0.11.0.vsix,
+<!-- prov: Makefile (build/test, HB_BIN default), vscode/hbrefactor-0.12.0.vsix,
      CLAUDE.md HB_BIN rule. -->
 
 **Requirement, stated honestly:** hbrefactor drives a special build of Harbour — the
@@ -548,9 +557,9 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (106 cases)
+   make test         # optional: the behavior suite (108 cases)
    ```
-3. **VSCode (optional):** install `vscode/hbrefactor-0.11.0.vsix` and point
+3. **VSCode (optional):** install `vscode/hbrefactor-0.12.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.
 
 ---

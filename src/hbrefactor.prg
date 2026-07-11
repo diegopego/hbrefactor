@@ -25,6 +25,10 @@ PROCEDURE Main()
    LOCAL nExit
 
    DO CASE
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename"
+      // verbo unificado (fase U): o KIND vem do FATO sob o cursor, não do
+      // sufixo do comando - despacha para o rename-* específico por dentro
+      nExit := Rename( aArgs )
    CASE Len( aArgs ) >= 1 .AND. ( Lower( aArgs[ 1 ] ) == "rename-local" .OR. ;
                                   Lower( aArgs[ 1 ] ) == "rename-param" )
       nExit := RenameLocal( aArgs )
@@ -79,6 +83,11 @@ STATIC PROCEDURE Usage()
 
    OutStd( "hbrefactor " + APP_VERSION + " - Harbour refactoring (compiler AST)" + hb_eol() )
    OutStd( "Usage:" + hb_eol() )
+   OutStd( "  hbrefactor rename <projeto> <arq:linha:col> <novo> [--force] [--edit-rules] [--dry-run]" + hb_eol() )
+   OutStd( "                                     (renomeia o símbolo SOB O CURSOR; o KIND -" + hb_eol() )
+   OutStd( "                                      local/param/static/memvar/função/método/dsl/marker -" + hb_eol() )
+   OutStd( "                                      vem do FATO da árvore, não do comando)" + hb_eol() )
+   OutStd( "  --- rename-* específicos (DESCONTINUADOS: use `rename <arq:linha:col>`) ---" + hb_eol() )
    OutStd( "  hbrefactor rename-local <projeto> <arq.prg> <função> <velho> <novo> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-param <projeto> <arq.prg> <função> <velho> <novo> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor rename-function <projeto> <velho> <novo> [--file <f.prg>] [--force] [--edit-rules] [--dry-run]" + hb_eol() )
@@ -280,12 +289,15 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // (_HB_SUPER, RE.6/F6.1 - o gate do fato de exclusão de send);
    // ast-11 = params do bloco no PRÓPRIO nó CODEBLOCK ("params":
    // [{sym,type,class}], completude M-B) - tipa o receptor de um send
-   // pelo bloco EXATO, destravando getter+setter de VAR..IS na mesma linha.
+   // pelo bloco EXATO, destravando getter+setter de VAR..IS na mesma linha;
+   // ast-12 = "generates": true no token-fonte de marker do ppApplications
+   // (o nome PASTEIA/STRINGIFICA -> gera artefato; fase U/revisão) - separa
+   // "nome que a diretiva vira código" de "símbolo ligado num comando".
    // O leitor usa só seções presentes em todos - comandos que
    // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
    // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -1145,6 +1157,10 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
    LOCAL hApp, hTok, nApp, hPairs := { => }, cMk := NIL, cWd := NIL
    LOCAL aArts, hOwners, cUpName, cOwn, hCand := { => }, aPrev, cKind, cQuery
    LOCAL aPosApps := {}, hMk, hFunc, aParts, cPart, nCls, cCur, nState, cSide
+   // ast: papel estrutural do site (aditivo; o `rename` unificado despacha
+   // por ele - o resolve-at/usages ignoram estas chaves). lGen = o marker
+   // sob o cursor GERA artefato (paste/stringify, fato do core ast-12)
+   LOCAL cRole := NIL, cOwner := NIL, lGen := .F.
 
    // camadas 1/2: o site escrito nas aplicações de pp (a assinatura de um
    // construto gerado só tem posição byte-exata AQUI - tokens[] colapsa)
@@ -1156,6 +1172,7 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
             nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
             IF hTok[ "marker" ] >= 1
                cMk := hTok[ "text" ]
+               lGen := hb_HGetDef( hTok, "generates", .F. )
                hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
                AAdd( aPosApps, nApp )
             ELSEIF cWd == NIL
@@ -1268,21 +1285,27 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
       IF hb_HHasKey( hClassMap, cUpName )
          cKind  := "função-de-classe do projeto"
          cQuery := cMk
+         cRole  := "method"           // método do projeto nomeado direto
       ELSEIF Len( hCand ) == 1
          cKind  := "nome de marker, dona única no site (co-derivação/identidade/declared)"
          cQuery := hb_HValueAt( hCand, 1 ) + ":" + cMk
+         cRole  := "method"
+         cOwner := hb_HValueAt( hCand, 1 )
       ELSEIF Len( hCand ) > 1
          // um site com mais de uma dona não decide: consulta crua honesta
          cKind  := "nome de marker com mais de uma dona no site"
          cQuery := cMk
+         cRole  := "ppmarker"
       ELSE
          cKind  := "nome de marker (sem dona identificável)"
          cQuery := cMk
+         cRole  := "ppmarker"
       ENDIF
    ELSEIF cWd != NIL
       cKind  := "palavra de regra de pp (" + RuleTag( hRule ) + ", " + ;
                 RuleWhere( hRule ) + ")"
       cQuery := cWd
+      cRole  := "dsl"
    ELSE
       // camada 3 (B4g): posição DENTRO do texto de uma diretiva do próprio
       // módulo - vem ANTES do stream: linhas de diretiva não têm tokens
@@ -1311,6 +1334,7 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                                     "palavra no " + cSide + " da regra (" ) ) + ;
                                RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")"
                      cQuery := cMk
+                     cRole  := "dsl"
                      EXIT
                   ENDIF
                NEXT
@@ -1335,6 +1359,9 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                               "site de send (mensagem; dispatch dinâmico)", ;
                          iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, ;
                               "campo com alias", "identificador" ) )
+               cRole  := iif( aPrev != NIL .AND. aPrev[ "type" ] == 58, "method", ;
+                         iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, "field", ;
+                              "ident" ) )
                cQuery := cMk
                EXIT
             ENDIF
@@ -1347,7 +1374,358 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
    ENDIF
 
    RETURN { "name" => iif( cMk != NIL, cMk, cWd ), "kind" => cKind, ;
-            "query" => cQuery }
+            "query" => cQuery, "role" => cRole, "owner" => cOwner, ;
+            "generates" => lGen }
+
+// ---------------------------------------------------------------------------
+// rename unificado (fase U): `rename <projeto> <arq:linha:col> <novo>` - o
+// KIND do alvo deixa de ser escolha do usuário e vira CONSEQUÊNCIA do fato
+// sob o cursor. O mesmo motor do resolve-at (papel estrutural do site) +
+// escopo declarado da função dona classificam a posição em um dos oito
+// alvos de rename; o dispatcher reconstrói a argv EXATA que o rename-*
+// específico espera e DELEGA (saída byte-idêntica por reuso; zero
+// reimplementação). Ponto ambíguo/sem fato = recusa nomeando a exceção
+// (idioma do degrade honesto), NUNCA adivinha. É a perna na UX do preceito
+// que O NORTE impõe no motor: a taxonomia é do compilador, não uma tabela
+// de tipos remontada à mão - aqui, no sufixo do comando.
+// ---------------------------------------------------------------------------
+
+// a função que CONTÉM nLine (a de maior `line` <= nLine, não-fileDecl);
+// NIL quando a linha está antes da 1ª função (statics file-wide moram lá)
+STATIC FUNCTION FuncAtLine( hAst, nLine )
+
+   LOCAL hFunc, hBest := NIL
+
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "line" ] <= nLine .AND. ;
+         ( hBest == NIL .OR. hFunc[ "line" ] > hBest[ "line" ] )
+         hBest := hFunc
+      ENDIF
+   NEXT
+
+   RETURN hBest
+
+// cUp nomeia uma FUNÇÃO/PROCEDURE do projeto (definição não-fileDecl) OU é
+// chamada em algum módulo - o rename-function opera por nome projeto-inteiro
+STATIC FUNCTION IsProjectFunction( hAsts, cUp )
+
+   LOCAL hAst, hFunc, hCall
+
+   FOR EACH hAst IN hAsts
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUp
+            RETURN .T.
+         ENDIF
+         FOR EACH hCall IN hFunc[ "calls" ]
+            IF Upper( hCall[ "sym" ] ) == cUp
+               RETURN .T.
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN .F.
+
+// a posição é uma CHAMADA? (o token-fonte sob o cursor é imediatamente
+// seguido de '(' no stream - fato de posição, vale mesmo quando o token foi
+// consumido por um comando de pp: os args-fonte guardam col/prov no dump).
+// '(' == type 50 (include/hbpp.h); pontuação não tem col, mas a ORDEM basta
+STATIC FUNCTION IsCallAt( hAst, nLine, nCol0 )
+
+   LOCAL aTok := hAst[ "tokens" ], nI, hTok
+
+   FOR nI := 1 TO Len( aTok )
+      hTok := aTok[ nI ]
+      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+         hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+         nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+         RETURN nI < Len( aTok ) .AND. aTok[ nI + 1 ][ "type" ] == 50
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// cUp é uma FUNÇÃO STATIC (restrita ao módulo) definida NESTE módulo? o
+// rename-function precisa do `--file` para desambiguar statics homônimas em
+// arquivos diferentes - a posição já sabe o arquivo (achado da revisão)
+STATIC FUNCTION IsStaticFuncInModule( hAst, cUp )
+
+   LOCAL hFunc
+
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUp .AND. ;
+         hb_HGetDef( hFunc, "static", .F. )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// posição -> { "cmd", + campos } (o alvo e o que o rename-* específico
+// precisa) OU { "refuse" => msg } OU NIL (nada de compilação na posição).
+// PRINCÍPIO: resolver pelo BINDING do compilador ANTES de tratar o token
+// como marker de pp - um símbolo LIGADO (local/param/static/memvar/função)
+// que por acaso flui para dentro de um comando (`? x`, `@..SAY`) continua
+// sendo esse símbolo, não um "marker a renomear". O papel de diretiva
+// (ppmarker/dsl) só vale para nomes que NÃO são símbolo ligado (o nome que
+// a DSL transforma em artefatos). Método e campo-com-alias são fato de
+// posição não-ambíguo (prev ':' / marker com dona) e vencem direto.
+STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
+
+   LOCAL hR, cRole, cTok, cUp, hFunc, hItem, cScope, lParam, hOther
+
+   hR := ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
+   IF hR == NIL
+      RETURN NIL
+   ENDIF
+   cRole := hR[ "role" ]
+   cTok  := hR[ "name" ]
+   cUp   := Upper( cTok )
+   hFunc := FuncAtLine( hAst, nLine )
+
+   // (1) fato de posição não-ambíguo: método (send/decl/impl); campo com
+   //     alias; e palavra de regra de pp (a cabeça/keyword da diretiva -
+   //     NUNCA um símbolo ligado; um local homônimo é coincidência, o site
+   //     é a regra). Nenhum é símbolo comum ligado
+   DO CASE
+   CASE cRole == "method"
+      RETURN { "cmd" => "rename-method", ;
+               "target" => iif( hR[ "owner" ] == NIL, cTok, hR[ "owner" ] + ":" + cTok ) }
+   CASE cRole == "field"
+      RETURN { "refuse" => "'" + cTok + "' é campo de área de trabalho (alias) - " + ;
+               "nenhum verbo de rename cobre campos de RDD" }
+   CASE cRole == "dsl"
+      RETURN { "cmd" => "rename-dsl", "old" => cTok }
+   ENDCASE
+
+   // (2) o nome GERA artefato (paste/stringify, fato do core ast-12)? então é
+   //     um marker que a DSL transforma em código - renomeá-lo carrega os
+   //     artefatos derivados. Vence QUALQUER binding homônimo, inclusive um
+   //     LOCAL que a PRÓPRIA expansão fabrica (`REGISTRO <n> => ...LOCAL <n>`
+   //     gera um `LOCAL <n>` na linha da diretiva). Só 'p'aste/'s'tringify
+   //     contam: 'c'lone (pass-through, ex.: `? x`, param de método) NÃO gera
+   IF cRole == "ppmarker" .AND. hR[ "generates" ]
+      RETURN { "cmd" => "rename-pp-marker", "old" => cTok }
+   ENDIF
+
+   // (3) CHAMADA de função nesta posição (nome seguido de '(' no stream).
+   //     Antes do escopo declarado: resolve o homônimo local/função
+   //     (`Dobra( Dobra )`: a chamada é a função). Markers que GERAM já
+   //     saíram acima, então '(' aqui é chamada de fato - por COLUNA, sem
+   //     depender de calls[].line (cobre statement continuado)
+   IF IsCallAt( hAst, nLine, nCol0 )
+      RETURN { "cmd" => "rename-function", "old" => cTok, ;
+               "static" => IsStaticFuncInModule( hAst, cUp ) }
+   ENDIF
+
+   // (4) símbolo DECLARADO na função dona (pega o local dentro de `? x`: é
+   //     marker de pass-through mas continua sendo o local que o usuário
+   //     escreveu, o compilador o LIGA aqui)
+   IF hFunc != NIL
+      FOR EACH hItem IN hFunc[ "declarations" ]
+         IF Upper( hItem[ "sym" ] ) == cUp
+            cScope := hItem[ "scope" ]
+            lParam := hb_HGetDef( hItem, "param", .F. )
+            DO CASE
+            CASE cScope == "local" .AND. lParam
+               RETURN { "cmd" => "rename-param", "func" => hFunc[ "name" ], "old" => cTok }
+            CASE cScope == "local"
+               RETURN { "cmd" => "rename-local", "func" => hFunc[ "name" ], "old" => cTok }
+            CASE cScope == "static"
+               RETURN { "cmd" => "rename-static", "old" => cTok, "func" => hFunc[ "name" ] }
+            CASE cScope == "memvar" .OR. cScope == "private" .OR. cScope == "public"
+               RETURN { "cmd" => "rename-memvar", "old" => cTok }
+            CASE cScope == "field"
+               RETURN { "refuse" => "'" + cTok + "' é campo de área de trabalho (FIELD) - " + ;
+                        "nenhum verbo de rename cobre campos de RDD" }
+            ENDCASE
+         ENDIF
+      NEXT
+      // uso de memvar SEM declaração (dinâmico/implícito) na função dona
+      FOR EACH hItem IN hFunc[ "occurrences" ]
+         IF Upper( hItem[ "sym" ] ) == cUp .AND. ;
+            ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" )
+            RETURN { "cmd" => "rename-memvar", "old" => cTok }
+         ENDIF
+      NEXT
+   ENDIF
+
+   // (5) STATIC file-wide (declarada na pseudo-função fileDecl do módulo)
+   FOR EACH hOther IN hAst[ "functions" ]
+      IF hOther[ "fileDecl" ]
+         FOR EACH hItem IN hOther[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUp .AND. hItem[ "scope" ] == "static"
+               RETURN { "cmd" => "rename-static", "old" => cTok }
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   // (6) função do projeto sem ser chamada AQUI (o nome na própria definição,
+   //     ou passado como símbolo). Um marker que NÃO gera e não é símbolo
+   //     ligado cai aqui e recusa honesto - renomeá-lo como pp-marker
+   //     tocaria só o site (sem artefato), rename incompleto/errado
+   IF IsProjectFunction( hAsts, cUp )
+      RETURN { "cmd" => "rename-function", "old" => cTok, ;
+               "static" => IsStaticFuncInModule( hAst, cUp ) }
+   ENDIF
+
+   RETURN { "refuse" => "não consigo classificar '" + cTok + "' por fato nesta posição - " + ;
+            "não é variável da função dona nem função/método/palavra de diretiva conhecida" }
+
+// string não-vazia formada só por dígitos 0-9 (posição bem-formada)
+STATIC FUNCTION AllDigits( cStr )
+
+   LOCAL nI
+
+   IF Len( cStr ) == 0
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( cStr )
+      IF !( SubStr( cStr, nI, 1 ) $ "0123456789" )
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
+STATIC FUNCTION Rename( aArgs )
+
+   LOCAL cSpec, cAtSpec, cNew, aAtParts, cAtFile, nLine, nCol0, nI
+   LOCAL hProj, cTmp, cAtPath, hAsts := { => }, cPath, hR, aDel
+   LOCAL lForce := .F., lDryRun := .F., lEditRules := .F.
+
+   IF Len( aArgs ) < 4
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   cSpec   := aArgs[ 2 ]
+   cAtSpec := aArgs[ 3 ]
+   cNew    := aArgs[ 4 ]
+   FOR nI := 5 TO Len( aArgs )
+      DO CASE
+      CASE Lower( aArgs[ nI ] ) == "--force"
+         lForce := .T.
+      CASE Lower( aArgs[ nI ] ) == "--dry-run"
+         lDryRun := .T.
+      CASE Lower( aArgs[ nI ] ) == "--edit-rules"
+         lEditRules := .T.
+      ENDCASE
+   NEXT
+
+   // arq:linha:col (o arquivo pode conter ':'; linha/col são os 2 últimos)
+   aAtParts := hb_ATokens( cAtSpec, ":" )
+   IF Len( aAtParts ) < 3
+      RETURN Refuse( "forma da posição é arq:linha:col (1-based): '" + cAtSpec + "'" )
+   ENDIF
+   // linha/col têm de ser numéricas PURAS - Val() aceitaria prefixo ('5x'->5)
+   // e resolveria em silêncio a posição errada; posição malformada recusa
+   IF ! AllDigits( aAtParts[ Len( aAtParts ) - 1 ] ) .OR. ;
+      ! AllDigits( ATail( aAtParts ) )
+      RETURN Refuse( "linha e coluna devem ser numéricas: '" + cAtSpec + "'" )
+   ENDIF
+   nCol0   := Val( ATail( aAtParts ) ) - 1
+   nLine   := Val( aAtParts[ Len( aAtParts ) - 1 ] )
+   cAtFile := aAtParts[ 1 ]
+   FOR nI := 2 TO Len( aAtParts ) - 2
+      cAtFile += ":" + aAtParts[ nI ]
+   NEXT
+   IF nLine < 1 .OR. nCol0 < 0
+      RETURN Refuse( "posição inválida: linha e coluna são 1-based" )
+   ENDIF
+
+   hProj := LoadProject( cSpec )
+   IF hProj == NIL
+      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+   ENDIF
+   cAtPath := ProjectMember( hProj, cAtFile )
+   IF cAtPath == ""
+      RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! AstDumps( hProj, cTmp )
+      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ( hAsts[ cPath ] := ReadAst( cTmp, cPath ) ) == NIL
+         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+      ENDIF
+   NEXT
+
+   hR := ResolveRenameAt( hAsts[ cAtPath ], hAsts, nLine, nCol0 )
+   IF hR == NIL
+      RETURN Refuse( "nenhum identificador de compilação em " + cAtFile + ":" + ;
+                     hb_ntos( nLine ) + ":" + hb_ntos( nCol0 + 1 ) )
+   ENDIF
+   IF hb_HHasKey( hR, "refuse" )
+      RETURN Refuse( hR[ "refuse" ] )
+   ENDIF
+
+   // reconstrói a argv EXATA do rename-* específico e delega para a MESMA
+   // função que o Main chamaria: a saída sai byte-idêntica por construção
+   DO CASE
+   CASE hR[ "cmd" ] == "rename-local" .OR. hR[ "cmd" ] == "rename-param"
+      aDel := { hR[ "cmd" ], cSpec, cAtFile, hR[ "func" ], hR[ "old" ], cNew }
+   CASE hR[ "cmd" ] == "rename-static"
+      aDel := { "rename-static", cSpec, cAtFile, hR[ "old" ], cNew }
+      IF hb_HHasKey( hR, "func" )
+         AAdd( aDel, "--func" )
+         AAdd( aDel, hR[ "func" ] )
+      ENDIF
+   CASE hR[ "cmd" ] == "rename-function"
+      aDel := { "rename-function", cSpec, hR[ "old" ], cNew }
+      // função STATIC é restrita ao módulo: --file com o arquivo do cursor
+      // desambigua statics homônimas em arquivos distintos (achado da revisão)
+      IF hb_HGetDef( hR, "static", .F. )
+         AAdd( aDel, "--file" )
+         AAdd( aDel, cAtFile )
+      ENDIF
+      IF lEditRules
+         AAdd( aDel, "--edit-rules" )
+      ENDIF
+      IF lForce
+         AAdd( aDel, "--force" )
+      ENDIF
+   CASE hR[ "cmd" ] == "rename-memvar"
+      aDel := { "rename-memvar", cSpec, hR[ "old" ], cNew }
+      IF lForce
+         AAdd( aDel, "--force" )
+      ENDIF
+   CASE hR[ "cmd" ] == "rename-method"
+      aDel := { "rename-method", cSpec, hR[ "target" ], cNew }
+      IF lForce
+         AAdd( aDel, "--force" )
+      ENDIF
+   CASE hR[ "cmd" ] == "rename-pp-marker"
+      aDel := { "rename-pp-marker", cSpec, hR[ "old" ], cNew }
+      IF lForce
+         AAdd( aDel, "--force" )
+      ENDIF
+   CASE hR[ "cmd" ] == "rename-dsl"
+      aDel := { "rename-dsl", cSpec, hR[ "old" ], cNew }
+   OTHERWISE
+      RETURN Refuse( "roteamento interno falhou para '" + hR[ "cmd" ] + "'" )
+   ENDCASE
+   IF lDryRun
+      AAdd( aDel, "--dry-run" )
+   ENDIF
+
+   DO CASE
+   CASE hR[ "cmd" ] == "rename-local" .OR. hR[ "cmd" ] == "rename-param"
+      RETURN RenameLocal( aDel )
+   CASE hR[ "cmd" ] == "rename-static"
+      RETURN RenameStatic( aDel )
+   CASE hR[ "cmd" ] == "rename-function"
+      RETURN RenameFunction( aDel )
+   CASE hR[ "cmd" ] == "rename-memvar"
+      RETURN RenameMemvar( aDel )
+   CASE hR[ "cmd" ] == "rename-method" .OR. hR[ "cmd" ] == "rename-pp-marker"
+      RETURN RenameMethod( aDel )
+   CASE hR[ "cmd" ] == "rename-dsl"
+      RETURN RenameDsl( aDel )
+   ENDCASE
+
+   RETURN Refuse( "roteamento interno falhou para '" + hR[ "cmd" ] + "'" )
 
 // ---------------------------------------------------------------------------
 // saída LSP Location[] (linhas/colunas 0-based)

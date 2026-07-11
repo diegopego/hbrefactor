@@ -2,7 +2,7 @@
   "name": "hbrefactor",
   "displayName": "hbrefactor - Harbour refactoring",
   "description": "Refatoração verificada para Harbour: rename (local/param/static/function/method/nome de match marker de pp/palavra de diretiva), reorder, extract, usages e relatórios via CLI hbrefactor (oráculo do compilador -x, projetos resolvidos pelo hbmk2).",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "publisher": "diegopego",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/diegopego/hbrefactor.git" },
@@ -13,6 +13,7 @@
   "contributes": {
     "commands": [
       { "command": "hbrefactor.usages", "title": "hbrefactor: Usages (all references)" },
+      { "command": "hbrefactor.rename", "title": "hbrefactor: Rename Symbol under cursor (kind resolved by fact)" },
       { "command": "hbrefactor.annotate", "title": "hbrefactor: Annotate report (type-declaration ladder, no edit)" },
       { "command": "hbrefactor.annotateApply", "title": "hbrefactor: Annotate apply (materialize DECLAREs + AS CLASS, verified)" },
       { "command": "hbrefactor.execRegistry", "title": "hbrefactor: Exec-registry snapshot (RUNS class-registration code in a sandbox, no edits)" },

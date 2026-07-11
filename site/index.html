@@ -372,7 +372,7 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
   <span class="warn">⚠ 2 hit another function's own nTotal</span>
   <span class="bad">✗ missed 4 call sites in vendas.prg</span>
 
-<span class="cmd">hbrefactor</span> rename-local vendas.hbp Main nTotal nTotalGeral
+<span class="cmd">hbrefactor</span> rename vendas.hbp vendas.prg:8:10 nTotalGeral
   3 occurrences — the right ones
   <span class="dim">strings · comments · homonyms: untouched</span>
   <span class="ok">✓ project recompiled, byte-identical</span></code></pre>
@@ -623,9 +623,9 @@ Eval( bPaga )
         <p>Everything lives in the <strong>command-line tool</strong> — fully usable on its own. Nothing is hidden behind an IDE.</p>
         <div class="code">
           <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> rename-function vendas.hbp Dupla Dobrar
-<span class="cmd">hbrefactor</span> usages         vendas.hbp nTotal --func Main
-<span class="cmd">hbrefactor</span> annotate       vendas.hbp --apply</code></pre>
+<pre><code><span class="cmd">hbrefactor</span> rename   vendas.hbp vendas.prg:42:8 Dobrar
+<span class="cmd">hbrefactor</span> usages   vendas.hbp nTotal --func Main
+<span class="cmd">hbrefactor</span> annotate vendas.hbp --apply</code></pre>
         </div>
         <p class="muted">A project is anything <span class="mono">hbmk2</span> accepts: a <span class="mono">.hbp</span>, a <span class="mono">.hbc</span>, or just a list of <span class="mono">.prg</span> files — including container / multi-target <span class="mono">.hbp</span> (<span class="mono">-hbcontainer</span>, sub-projects, <span class="mono">-target=</span>): sources of <em>all</em> targets count.</p>
       </div>
@@ -635,7 +635,7 @@ Eval( bPaga )
           <div class="bar">&gt; hbrefactor</div>
           <ul>
             <li><span><span class="pfx">hbrefactor:</span> Usages (all references)</span><span class="kb">⇧⌥F12</span></li>
-            <li><span><span class="pfx">hbrefactor:</span> Rename function under cursor</span></li>
+            <li><span><span class="pfx">hbrefactor:</span> Rename Symbol under cursor</span><span class="kb">F2</span></li>
             <li><span><span class="pfx">hbrefactor:</span> Extract selection to new function</span></li>
             <li><span><span class="pfx">hbrefactor:</span> Annotate apply (verified)</span></li>
             <li><span><span class="pfx">hbrefactor:</span> Unused locals (project report)</span></li>
@@ -693,6 +693,7 @@ Eval( bPaga )
       <tr><td>ast-9</td><td>exact written position of every declared name (the editor's anchor)</td></tr>
       <tr><td>ast-10</td><td><b>declared class parentage</b> (<span class="mono">_HB_SUPER</span>) — who inherits from whom, as fact</td></tr>
       <tr><td>ast-11</td><td>each codeblock carries its <b>own parameters</b> — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding)</td></tr>
+      <tr><td>ast-12</td><td>a directive marker is stamped <b>generates</b> when the name you wrote gets pasted/stringified into an artifact — telling "rename a name that becomes code" apart from "rename a symbol that just flows into a command"</td></tr>
     </table>
     </div>
     <p>Along the way: a <b>20-year-old segfault fixed</b> (annotating a code-block parameter with <span class="mono">AS CLASS</span> used to crash the compiler — stock Harbour still does), and a false <span class="mono">W0019</span> "duplicate declaration" warning silenced when a re-declaration merely completes a missing type — it had blocked 18 methods in <span class="mono">hbhttpd</span>.</p>
@@ -705,7 +706,7 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.11.0</span> (they version independently). The behavior contract is a suite of <strong>107 cases / 768 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.12.0</span> (they version independently). The behavior contract is a suite of <strong>108 cases / 797 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
     <div class="grid-2">
       <div>
@@ -760,10 +761,10 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (107 cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (108 cases)</span></code></pre>
         </div>
       </li>
-      <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.11.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>
+      <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.12.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>
     </ol>
   </div>
 </section>

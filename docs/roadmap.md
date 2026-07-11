@@ -253,7 +253,43 @@ Limite conhecido (não do escopo deste fix): se dois alvos compilam módulos
 de MESMO nome-base em diretórios distintos, o dump `.ast.json` é chaveado
 só pelo nome-base (`ReadAst`) e colidiria — só afeta análise, não a posse.
 
-### U — Verbos de refatoração unificados (`rename`/`extract`/`reorder`) — **PORTÃO: decisão do Diego**
+### U — Verbos de refatoração unificados (`rename`/`extract`/`reorder`) — **FATIA 1 ENTREGUE (2026-07-11; portão aberto pelo Diego, D-U1 descontinuar+remover, D-U2 os 8 de uma vez)**
+
+**Fatia 1 EXECUTADA:** `rename <projeto> <arq:linha:col> <novo>` — o KIND vem
+do FATO sob o cursor (papel estrutural do site + escopo declarado da função
+dona), despacha ao `rename-*` específico por dentro com saída **byte-idêntica
+por construção**. Peças: `ResolveAtQuery` ganha chaves aditivas `role`/`owner`
+(zero mudança nos consumidores antigos); `ResolveRenameAt`/`FuncAtLine`/
+`IsProjectFunction` classificam a posição nos oito alvos; `Rename` reconstrói
+a argv exata e delega. Recusa nomeando a exceção em posição ambígua/sem fato
+(D-U3, degrade honesto). Os oito `rename-*` ficam **descontinuados** no
+`--help` mas funcionais nesta fatia (são o motor da delegação E o oráculo do
+teste). Extensão 0.12.0: comando único "Rename Symbol" (estilo F2). Prova:
+**caso 107** (29 checks). **Endurecido por DUAS rodadas de revisão externa
+comparada (Codex gpt-5.5 + Claude) na mesma sessão.** A rodada 2 destravou um
+FATO NOVO DO CORE: distinguir "nome que a diretiva vira CÓDIGO" de "símbolo
+ligado num comando" é `'p'aste/'s'tringify × 'c'lone` — fato POR-MARKER que o
+pp já tem. **Decisão do Diego: expor como canal do core (`ast-12`)** —
+`hb_compAstMarkerGenerates` carimba `"generates": true` no recheio de marker
+que gera (reverse-scan do `from`, puro no dump); o `ResolveRenameAt` lê o fato
+e decide marker×binding. Fecha o cluster: mirror `REGISTRO Salva` (marker que
+gera + LOCAL homônimo que a expansão fabrica → pp-marker, não local), Codex #2
+(marker×local), #4 (dsl-word×local → dsl), #3 (chamada continuada por coluna),
+#1 (duas statics homônimas → `--file`). Param de método (clone, em função de
+nome gerado) segue `rename-param` — um flag "declaração gerada" o quebraria.
+Suíte **797/0** byte-idêntica paralelo; **lexdiff 0 divergências reais** (o
+canal ast-12 não muda pcode); rebuild harbour + hbmk2 (compast.c). § Revisão
+da spec tem o placar das duas rodadas. Specs:
+**[spec-u-verbos-unificados.md](spec-u-verbos-unificados.md)** +
+**[adr-002-rename-unificado.md](adr-002-rename-unificado.md)**;
+`generates`/ast-12 em [ast-schema.md](ast-schema.md). **O achado da operação
+de derivação do pp (clone × paste/stringify) como FATO de resolução —
+possivelmente arquitetural, com limites e perguntas em aberto honestos — tem
+ADR próprio: [adr-003-derivacao-pp-como-fato.md](adr-003-derivacao-pp-como-fato.md).**
+**Fatia 2 (próxima, mesmo portão):** REMOVER a superfície pública dos oito
+(`Main`/`Usage`; as funções `Rename*` viram delegados internos), migrar o
+harness (~40 invocações → `rename <pos>` ou golden congelado), CHANGELOG do
+corte. Registro completo da motivação abaixo (preservado).
 
 **A pergunta, firme**: por que a CLI expõe OITO comandos de rename
 (`rename-local`, `rename-static`, `rename-memvar`, `rename-param`,
