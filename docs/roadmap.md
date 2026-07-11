@@ -371,6 +371,47 @@ limpo. q1:13/14 seguem suspensos com rota futura registrada
 (anotação na regra da DSL / hbclass.ch no core). Commits do core sob
 autorização.
 
+### RD — Rota da diretiva (q1:13/14): tipo do receptor INLINE por FATO — ✅ **ENTREGUE (2026-07-10, mecanismo M-B; suíte 762/0)**
+
+O furo que sobrou da B9 fatia 3 (fato 8): o `Self` gerado pela diretiva
+`INLINE`/`OPERATOR`/`ACCESS`/`ASSIGN` do hbclass.ch NÃO tem token de
+fonte, então os sends `::Msg()` dentro do bloco degradavam para
+`possible` (q1:13/14 suspenso, caso 99). Alvo: o tipo do receptor
+INLINE vira FATO de compilação, **nascendo genérico** (regra da DSL do
+usuário; hbclass.ch = instância core). Experimento E0-E2 (2026-07-10):
+**(E0)** gap = 2 params `SELF` (declLine 13/14) com `class:None`;
+**(E2, empírico)** a ferramenta JÁ consome `type:'S'+class` num param de
+bloco → `confirmed send (receiver declared AS CLASS MOEDA, codeblock)`,
+ZERO mudança no consumidor (caminho vivo K2 do RE.5, TypeOf/DeclType);
+**inércia** provada byte-idêntica sem `-kt`; **custo -kt** confirmado
+(`__HB_CHKTYPE(Self,"S:MOEDA","MOEDA:SELF")` por Eval). O problema
+colapsa em: preencher `type:'S'+class` no dump SEM o cheque `-kt`.
+**Mecanismo M-B (canal dedicado, sem AS CLASS — escolha do Diego sobre
+M-A/M-C)**: `bType` sentinela `HB_VARTYPE_INLINE_SELF` para "classe
+fact-only" — flui `VarType→CBVAR→HVAR→pDecl` sozinho; `hb_compChkTypeGenCall`
+(único emissor do cheque) pula o sentinela → cobre bloco simples E
+estendido; `hb_compAstWriteType` mapeia sentinela→`'S'` só na escrita do
+dump (E2 de graça); keyword `_HB_INLINESELF` no léxico (molde `_HB_SUPER`)
+que hbclass.ch emite no `Self`, no-op sob `HB_CLS_NO_DECLARATIONS`.
+Bônus: sem resolução de classe (linha hbmain.c:471 pulada) → sem W0025,
+funciona até p/ classe de runtime não-registrada (DSL não-espelho).
+**EXECUTADO (2026-07-10)**: 6 edições no core — sentinela
+`HB_VARTYPE_INLINE_SELF` (hbcomp.h), keyword `_HB_INLINESELF` (complex.c),
+`%token`+2 produções `BlockVarList` (harbour.y, bison regen 0-conflitos),
+skip no `hb_compChkTypeGenCall` (hbmain.c), mapa sentinela→`'S'` no
+`hb_compAstWriteType` (compast.c), os 4 blocos `INLINE`/`OPERATOR` +
+no-op sob `HB_CLS_NO_DECLARATIONS` (hbclass.ch). Provas: **E1** dump
+com `type:'S'+class` e `.c` `-kt` **byte-idêntico** ao original (zero
+cheque); **E2** q1:13/14 = `confirmed` sem mudar a ferramenta (mesmo sob
+`-kt`: confirmed, nunca guaranteed — fact-only); **E3** caso 105 novo
+(DSL não-espelho fixself: FORGE/BELLOW/STOKE, receptor `oIt` gerado por
+diretiva tipado só pelo canal — régua do caso 64); **zero-impacto** 43
+módulos `-kt` M-B×original byte-idênticos; suíte **762/0**, lexdiff limpo.
+Casos 86/99 re-baselinados (q1:13/14 `possible`→`confirmed`, portão do
+Diego). Consumidor NÃO muda (canal declarado vivo, TypeOf/DeclType/K2).
+Commits do core sob autorização por-commit. Rebuild: harbour E hbmk2
+(libhbcplr). Fallback M-C (`AS CLASS` impõe) ficou desnecessário.
+
 **Resíduos em aberto (fatias futuras da B9, portão de ESCOPO do
 Diego)**: (1) anotação de PARÂMETRO de assinatura (colapsa em
 `tokens[]`, pede o idioma `SigParamHits`; rendimento auto-escrevível

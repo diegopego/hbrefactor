@@ -5,6 +5,60 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-10 — `usages`/find-references enxerga o receptor DENTRO de um método `INLINE`
+
+### O problema de todo dia
+
+Você usa `INLINE`, `OPERATOR`, `ACCESS ... INLINE`, `ASSIGN ... INLINE` nas
+suas classes (ou uma DSL sua que gera codeblocks parecidos):
+
+```
+CREATE CLASS Moeda
+   METHOD Total INLINE ::Soma( 0 ):nCents
+   OPERATOR "+" ARG nQ INLINE ::Soma( nQ )
+END CLASS
+```
+
+Aquele `::Soma()` DENTRO do `INLINE` é uma chamada real ao método `Soma` da
+`Moeda`. Mas ao pedir as referências de `Moeda:Soma` (comando `usages` ou o
+"find all references" da extensão), esse site saía como **`possible`
+(receiver unknown)** — ruído, porque o receptor do bloco é **gerado pela
+diretiva** e não tem um token escrito no seu fonte para a ferramenta ancorar.
+
+### O que mudou
+
+Agora esse send sai **`confirmed`**. O compilador passou a registrar a
+classe do receptor do bloco `INLINE` como **FATO** (um canal novo do
+`hbclass.ch`). Com isso a ferramenta resolve `::Soma()` pela regra da
+linguagem, sem chute:
+
+```
+oJ:Total()              // confirmed - já funcionava (receptor oJ tipado)
+// e agora, DENTRO do próprio INLINE:
+METHOD Total INLINE ::Soma( 0 ):nCents
+//                     ^^^^ ANTES: possible (receiver unknown)
+//                          AGORA: confirmed (receiver declared AS CLASS MOEDA, codeblock)
+```
+
+Vale para **qualquer** construto que gere esse tipo de bloco — não só o
+`hbclass`. Uma DSL SUA que registra comportamento como codeblock com um
+receptor tipado recebe o mesmo tratamento, sem ajuste na ferramenta.
+
+### O que a ferramenta NUNCA faz aqui
+
+- **Nunca vira `guaranteed`, nem sob `-kt`**: o receptor de um `INLINE` é
+  sempre da própria classe (o Harbour garante o despacho), então impor um
+  cheque de runtime nele seria custo redundante. A ferramenta entrega a
+  promessa do tipo declarado (`confirmed`) e **para aí** — **zero overhead
+  de `-kt`** adicionado ao seu build (provado byte-a-byte).
+- **Não adivinha**: se o bloco não é gerado por um construto que declara a
+  classe do receptor (um codeblock comum com parâmetro sem tipo), o send
+  continua **`possible`** (honesto).
+- **Não edita nada**: é só análise; o seu fonte fica intocado.
+
+O "como" interno (RD "rota da diretiva", canal `_HB_INLINESELF`) vive no
+[roadmap](docs/roadmap.md) § RD.
+
 ## 2026-07-10 — `usages Classe:Método` deixa de mostrar homônimos de outras classes
 
 ### O problema de todo dia

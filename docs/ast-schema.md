@@ -307,9 +307,18 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
                                // MATERIALIZAÇÃO, a última física do bloco)
       "type": "S",             // só quando declarado (AS <tipo>): caractere
                                // do compilador - N C D L B A O S; minúscula
-                               // = ARRAY do tipo ('s' = AS CLASS ARRAY)
-      "class": "CAIXA" } ],    // só em AS CLASS: o NOME COMO ESCRITO
-                               // (sobrevive à classe não registrada)
+                               // = ARRAY do tipo ('s' = AS CLASS ARRAY).
+                               // 'S'+class também vem do canal _HB_INLINESELF
+                               // (RD): o receptor de um bloco GERADO por
+                               // diretiva (Self de INLINE/OPERATOR do
+                               // hbclass, ou de uma DSL do usuário) - tipo
+                               // declarado de FATO, mas fact-only: nunca
+                               // ganha "chk" (o -kt não o impõe), então o
+                               // consumidor tipa como confirmed, nunca
+                               // guaranteed. Indistinguível de um AS CLASS
+                               // escrito EXCETO por nameLine ausente + sem chk
+      "class": "CAIXA" } ],    // só em AS CLASS / _HB_INLINESELF: o NOME COMO
+                               // ESCRITO (sobrevive à classe não registrada)
   "occurrences": [    // cada referência de variável (parse-time)
     { "sym": "NTOTAL", "scope": "local"|"detached"|"static"|"memvar"|
                         "field"|"memvar_implicit",

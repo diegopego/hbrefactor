@@ -150,6 +150,13 @@ freshkin() { # freshkin <case-name> -> fixture da generalidade do parentesco (RE
    echo "$d"
 }
 
+freshself() { # freshself <case-name> -> fixture da generalidade da rota da diretiva (RD)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixself/*.prg "$HERE"/fixself/*.hbp "$HERE"/fixself/*.ch "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -2546,10 +2553,12 @@ check "consulta espelho: o mesmo possible (nenhuma exclusão por inferência)" $
 unit_86() {
 echo "case 86: RE.3 - fixb7b: TODA a fatia B7b degrada para possible no produto"
 # a fixture da spec-b7b vira prova do contrato RE.3: retorno de método
-# pelos pushes ret, identidade de RETURN Self, Self de INLINE/OPERATOR
-# (1º param do bloco), detached de binding único e união dos sites de
-# Eval são INFERÊNCIA - todos os sends saem possible pleno, inclusive na
-# DSL não-espelho (a generalidade da degradação também é genérica). Os
+# pelos pushes ret, identidade de RETURN Self, detached de binding único
+# e união dos sites de Eval são INFERÊNCIA - saem possible pleno, inclusive
+# na DSL não-espelho (a generalidade da degradação também é genérica).
+# EXCEÇÃO (RD, 2026-07-10): o Self de INLINE/OPERATOR (1º param do bloco)
+# SAIU da inferência - virou FATO de compilação via o canal _HB_INLINESELF
+# do core, então q1:13/14 saem confirmed (rota da diretiva; ver caso 99). Os
 # venenos, que já eram possible, seguem possible - o contrato colapsou
 # inferência boa e veneno no MESMO rótulo honesto; a separação renasce
 # no materializador (fatia 2 da B9).
@@ -2560,9 +2569,9 @@ check "fixb7b/q2.prg clean under -w3 -es2" $?
 D=$(freshb7b case86)
 ( cd "$D" && "$BIN" usages fixb7b.hbp Moeda:Soma > ms.log 2>&1 )
 check "usages Moeda:Soma exit 0" $?
-grep -q "q1.prg:13: possible send (dynamic dispatch, receiver unknown, codeblock) in MOEDA" "$D/ms.log" && \
-   grep -q "q1.prg:14: possible send (dynamic dispatch, receiver unknown, codeblock) in MOEDA" "$D/ms.log"
-check "INLINE e OPERATOR (money): possible pleno (Self de bloco era inferência)" $?
+grep -q "q1.prg:13: confirmed send (receiver declared AS CLASS MOEDA, codeblock) in MOEDA" "$D/ms.log" && \
+   grep -q "q1.prg:14: confirmed send (receiver declared AS CLASS MOEDA, codeblock) in MOEDA" "$D/ms.log"
+check "INLINE e OPERATOR (money): confirmed por FATO (Self de bloco tipado via _HB_INLINESELF, RD - saiu da inferência)" $?
 grep -q "q1.prg:73: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/ms.log"
 check "send encadeado: possible pleno (pushes ret eram inferência)" $?
 [ "$(grep -c "q1.prg:75: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/ms.log")" = "2" ]
@@ -3023,7 +3032,10 @@ echo "case 99: B9 fatia 3 - materializador de PARAM DE BLOCO: q1:85 e q1:89-90 (
 # continuado desloca o declLine, os dois modos de quebra da régua de
 # unicidade). Venenos NUNCA anotados: bSolto (bloco atravessa função),
 # bMulti (detached multi-write), Self dos INLINE 13/14 (param gerado
-# por diretiva - sem token escrito, fora da fatia com registro).
+# por diretiva - sem token escrito, o materializador não o toca). O Self
+# de 13/14 é tipado pelo CORE (canal _HB_INLINESELF, RD 2026-07-10), não
+# pelo annotate - por isso sai confirmed no usages abaixo, mas continua
+# FORA do relatório de anotáveis.
 D=$(freshb7b case99)
 ( cd "$D" && "$BIN" annotate fixb7b.hbp > rep.log 2>&1 )
 check "annotate relatório exit 0" $?
@@ -3050,9 +3062,9 @@ check "q1:89-90 (semente 86, continuado): guaranteed no site da última linha f�
 grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bSolto" "$D/u1.log" && \
    grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bMulti" "$D/u1.log"
 check "venenos seguem possible honesto" $?
-grep -q "q1.prg:13: possible send (dynamic dispatch, receiver unknown, codeblock) in MOEDA" "$D/u1.log" && \
-   grep -q "q1.prg:14: possible send (dynamic dispatch, receiver unknown, codeblock) in MOEDA" "$D/u1.log"
-check "INLINE/OPERATOR (13/14): param de diretiva segue possible - fora da fatia, com registro" $?
+grep -q "q1.prg:13: confirmed send (receiver declared AS CLASS MOEDA, codeblock) in MOEDA" "$D/u1.log" && \
+   grep -q "q1.prg:14: confirmed send (receiver declared AS CLASS MOEDA, codeblock) in MOEDA" "$D/u1.log"
+check "INLINE/OPERATOR (13/14): rota da diretiva ENTREGUE (RD) - Self de FATO via _HB_INLINESELF; confirmed mesmo sob -kt (fact-only: nunca guaranteed, sem imposição)" $?
 ! grep -q "oPar AS CLASS" "$HERE/fixb7b/q1.prg"
 check "fixture ORIGINAL intocado" $?
 
@@ -3261,7 +3273,29 @@ check "consulta espelhada: oRogue confirma pelo próprio declarado" $?
 check "a ferramenta não menciona palavra da DSL kin (régua do caso 64)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104"
+unit_105() {
+echo "case 105: RD - GENERALIDADE da rota da diretiva: o tipo do receptor de um bloco GERADO por diretiva vira FATO via _HB_INLINESELF numa DSL inventada"
+# O canal _HB_INLINESELF não é do hbclass - é da LINGUAGEM. Esta DSL
+# (self.ch: FORGE/BELLOW/STOKE, vocabulário próprio) registra comportamento
+# como CODEBLOCK cujo 1º param é o RECEPTOR, gerado pela diretiva (sem token
+# de fonte, como o Self do INLINE) e chamado oIt (NÃO "Self" - o canal não
+# depende do nome). Só o _HB_INLINESELF carrega a classe Anvil; sem ele o
+# send dentro do bloco seria possible. Se o send sai confirmed aqui, a rota
+# da diretiva vale por FATO, não por forma-de-hbclass.
+D=$(freshself case105)
+"$HB_BIN/harbour" "$D/s1.prg" -n -q0 -w3 -es2 -s -I"$D" -I"$HB_BIN/../../../include" > /dev/null 2>&1
+check "fixture do caso 105 clean under -w3 -es2" $?
+( cd "$D" && "$BIN" usages fixself.hbp Anvil:Ring > a.log 2>&1 )
+check "usages Anvil:Ring exit 0" $?
+grep -q "s1.prg:13: confirmed send (receiver declared AS CLASS ANVIL, codeblock) in ANVIL" "$D/a.log"
+check "PROVA DO CANAL: o send oIt:Ring() DENTRO do bloco da diretiva (param gerado, sem token) - confirmed só pelo _HB_INLINESELF" $?
+grep -q "s1.prg:23: confirmed send (receiver declared AS CLASS ANVIL) in USAGIZ" "$D/a.log"
+check "oA:Ring() (AS CLASS de fonte) confirma pelo declarado escrito" $?
+! grep -qiwE "forge|bellow|stoke|ember|gizmake|inlineself" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona palavra da DSL self nem o marcador do core (régua do caso 64)" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -
