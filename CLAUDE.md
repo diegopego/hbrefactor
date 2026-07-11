@@ -52,6 +52,14 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   repassa `-prgflag=`. Todo parsing paralelo é cópia degradada que diverge —
   reescrever só o estritamente necessário.
 - Contrato executável: `make test` (deve permanecer verde).
+- **`make test JOBS=1` só ao mexer no RUNNER (Diego, 2026-07-10)**: o
+  contrato "paralelo × JOBS=1 byte-idêntico" é propriedade da INFRA de
+  paralelização (bin/parrun, modo `--unit` do run.sh, join), não do
+  conteúdo dos testes nem da ferramenta — re-rodá-lo a cada entrega é
+  desperdício. Rodar JOBS=1 apenas quando a mudança tocar o runner ou
+  introduzir saída potencialmente não-determinística na ferramenta
+  (ex.: imprimir na ordem de iteração de um hash). Para mudança de
+  conteúdo/lógica, o run paralelo verde basta.
 - **Drift em teste PRÉ-EXISTENTE → consultar o Diego (2026-07-10)**: o
   projeto é um experimento VIVO — quando uma mudança faz testes que já
   existiam divergirem, há motivos legítimos tanto para adaptar o código
