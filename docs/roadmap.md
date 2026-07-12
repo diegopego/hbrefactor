@@ -912,6 +912,29 @@ de compast.c:658 — tirar o `iType >= 0`; a linha andou com o ast-5);
 regen bison 3.8.2 documentado;
 split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 
+**LIMPEZA DO DIFF — achado em 2026-07-12, ao medir a proposta.** O branch
+`feature/compiler-ast-dump` carrega hoje **coisas que não são o trabalho de AST** e
+que entrariam no PR como ruído:
+- **4 commits de release para Windows** (`eac95cbf95`, `01a54fe431`, `bc4ea89e21`,
+  `6df4c08b98`): scripts `package/*win*`, `.github/workflows/release-*.yml`,
+  `doc/howtorel.txt`, `debian/changelog`, `README.md`, `include/hbver.h`… Nada disso
+  tem a ver com o dump nem com o `-kt`.
+- **`CLAUDE.md`** (+52) e **`.gitignore`**: instrumentos do nosso fluxo, não do
+  Harbour.
+- **`site/index.html`** (+436): a proposta aos mantenedores. Ela é a *embalagem* do
+  PR, não conteúdo dele — e agora vive publicada no
+  [gh-pages do fork](https://diegopego.github.io/harbour-core/), então pode sair.
+**Diff REAL do trabalho de AST, medido (2026-07-12):** 19 arquivos,
+**+4147 / −99** (metade num arquivo novo e isolado, o `compast.c`). O PR deve sair
+de um branch com **só isso**. Decisão de COMO (rebase seletivo, cherry-pick para um
+branch limpo) é do Diego.
+
+**Prova de impacto zero — agora com SCRIPT** (`tests/pcode-identity.sh`): era medida
+à mão, e por isso os números da proposta tinham envelhecido sem ninguém notar (ela
+afirmava `1085/1085` e `112/112`, irreproduzíveis). Medido em 2026-07-12: **889/889
+módulos com pcode byte-idêntico, ZERO divergências** (switches desligados,
+remendado vs `master`). A afirmação se sustenta; a contagem é que era fantasia.
+
 ## Backlog (por valor)
 
 - **Rename de DATA/VAR member — ✅ ENTREGUE (fatia 1, 2026-07-11; lacuna achada
