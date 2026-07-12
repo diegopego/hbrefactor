@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@c391408 -->
+<!-- changelog-baseline: hbrefactor@a74346f -->
 <!-- Ponteiro de delta. Tudo DEPOIS deste commit ainda NÃO está descrito aqui.
-     Para retomar:  git log c391408..HEAD   (ver § Manutenção, no fim).
+     Para retomar:  git log a74346f..HEAD   (ver § Manutenção, no fim).
 
 # Changelog
 
