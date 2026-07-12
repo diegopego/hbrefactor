@@ -644,12 +644,25 @@ suíte (responde ao critério de matar do adr-003).
   (i) `ResolveInclude` — re-implementa a busca de include do compilador (gatilho
   4); hoje inofensivo porque o dump já traz o caminho RESOLVIDO, mas é cópia
   degradada por design: ou morre, ou passa a consumir `harbour -gd`.
-  (ii) **Resíduo do `AbbrevClash`** — segue vivo para uma pergunta que o dump NÃO
-  responde ("o nome NOVO colidiria com a cabeça de outra regra sob abreviação
-  dBase?"): é predição de casamento FUTURO. Canal certo = **perguntar ao próprio
-  pp** (P11, `__pp_process`), não reescrever a aritmética do `ppcore.c:2533`.
+  (ii) ~~Resíduo do `AbbrevClash`~~ — **MORTO (P11, `c391408`)**. Ele reescrevia a
+  aritmética de abreviação do `ppcore.c:2533` para prever casamento FUTURO ("o nome
+  NOVO colidiria com outra cabeça?"). O `HeadClashWitness` agora sobe um **pp vivo**
+  (`__pp_init`/`__pp_process`) e deixa o próprio preprocessador responder. Zero
+  ocorrências de `AbbrevClash` no fonte — conferido, não lembrado.
+  **Mas o `HeadClashWitness` ENTRA na fila no lugar dele:** ele varre os prefixos do
+  nome novo apoiado numa propriedade que EU li do core ("toda grafia que casa uma
+  cabeça é prefixo dela"). Quem julga cada candidato é o pp — mas a **completude do
+  conjunto de candidatos** é raciocínio meu sobre o core, e isso é auditável.
   (iii) varrer os "se não é X, então é Y" (gatilho 3) e as comparações de texto
   onde o dump já tem número/id (gatilho 1).
+  (iv) o **`#un…` órfão** (`undoes: null`, `ast-16`): fato disponível, **sem
+  consumidor** — é código morto silencioso que a ferramenta poderia diagnosticar.
+  (v) toda chave OPCIONAL do dump lida SEM `hb_HGetDef` (`marker`, `ruletok`, `from`,
+  `col`, `undoes`) — acesso direto é `BASE/1132` em produção e a suíte não pega.
+
+  > **A P-AUDIT é para uma SESSÃO DEDICADA E LIMPA** — o prompt está pronto em
+  > [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristica.md). Não a rode
+  > como apêndice de uma entrega: quem acabou de escrever o código é o pior juiz dele.
 
 **P-DOC — corpus exploratório/explicativo do PP (ESSENCIAL, ordem do Diego,
 2026-07-11):** uma bateria de testes que casa diretivas REAIS do Harbour
