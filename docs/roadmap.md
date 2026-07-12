@@ -912,28 +912,29 @@ de compast.c:658 — tirar o `iType >= 0`; a linha andou com o ast-5);
 regen bison 3.8.2 documentado;
 split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 
-**LIMPEZA DO DIFF — achado em 2026-07-12, ao medir a proposta.** O branch
-`feature/compiler-ast-dump` carrega hoje **coisas que não são o trabalho de AST** e
-que entrariam no PR como ruído:
-- **SEIS commits de release/empacotamento** (contei 4 na primeira passada; são 6):
-  `01a54fe431` (doc do processo + workflow), `2ebdd689d4` (**Release Harbour
-  3.2.0**), `bb8f5264f6` (fix do workflow), `eac95cbf95` (scripts de release
-  Windows + CI), `bc4ea89e21` e `6df4c08b98` (fixes do release-windows). Tocam
-  `package/*win*`, `.github/workflows/release-*.yml`, `doc/howtorel.txt`,
-  `ChangeLog.txt`, `debian/changelog`, `README.md`, `include/hbver.h`… **Nada disso
-  tem a ver com o dump nem com o `-kt`** — e um "Release 3.2.0" no meio de um PR de
-  compilador é, sozinho, motivo para o mantenedor fechar a aba.
-- **`CLAUDE.md`** (+52) e **`.gitignore`**: instrumentos do nosso fluxo, não do
-  Harbour.
-- **`site/index.html`** (+436): a proposta aos mantenedores. Ela é a *embalagem* do
-  PR, não conteúdo dele — e agora vive publicada no
-  [gh-pages do fork](https://diegopego.github.io/harbour-core/), então pode sair.
-**Diff REAL do trabalho de AST, medido (2026-07-12):** 19 arquivos,
-**+4147 / −99** (metade num arquivo novo e isolado, o `compast.c`). O PR deve sair
-de um branch com **só isso**. Decisão de COMO (rebase seletivo, cherry-pick para um
-branch limpo) é do Diego.
+**LIMPEZA DO DIFF — o que REALMENTE sobra (2026-07-12).**
 
-**Prova de impacto zero — agora com SCRIPT** (`tests/pcode-identity.sh`): era medida
+> ⚠️ **RETRATAÇÃO.** Escrevi aqui que o branch carregava "6 commits alheios" (release
+> para Windows, `Release Harbour 3.2.0`…) e que isso queimaria o PR. **ERRADO: esses
+> commits são do UPSTREAM.** O `harbour/core` oficial tem o master em `6df4c08b98`
+> (confirmado pela API do GitHub). Eu comparei contra o **`master` LOCAL, 7 commits
+> atrasado**, e acusei o upstream de poluir o próprio código. Base errada → achado
+> errado, e publicado. É o mesmo pecado que a REGRA DO FATO existe para impedir, um
+> nível acima: **verificar a BASE antes de tirar conclusão dela.** Ao medir o branch,
+> a base é **`upstream/master`** (`git fetch upstream` primeiro), nunca o `master`
+> local.
+
+O que de fato não deve ir no PR é pequeno, e é **nosso**: `CLAUDE.md`, `.gitignore`,
+`NEWS.md`, o banner do `README.md` e o diretório `site/` (a proposta é a EMBALAGEM do
+PR, não conteúdo dele — e já vive publicada no
+[gh-pages do fork](https://diegopego.github.io/harbour-core/)). Fora isso, o branch é
+o trabalho de AST: `compast.c` (arquivo novo), `ppcore.c` (a maior intrusão),
+`hbmain.c`, `harbour.y`, `classes.c` e um punhado de headers — mais os `.yyc`/`.yyh`
+que o bison gera e que o Harbour commita.
+
+**A limpeza é executada só quando o Diego for abrir o PR** (ordem dele, 2026-07-12).
+
+**Prova de impacto zero — agora com SCRIPT** (`tools/pcode-identity.sh`): era medida
 à mão, e por isso os números da proposta tinham envelhecido sem ninguém notar (ela
 afirmava `1085/1085` e `112/112`, irreproduzíveis). Medido em 2026-07-12: **889/889
 módulos com pcode byte-idêntico, ZERO divergências** (switches desligados,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/pcode-identity.sh - A PROVA DE IMPACTO ZERO do branch do core.
+# tools/pcode-identity.sh - A PROVA DE IMPACTO ZERO do branch do core.
 #
 # Afirmação que a proposta aos mantenedores faz (harbour-core/site/index.html):
 # "com os switches DESLIGADOS, o compilador remendado gera pcode IDÊNTICO ao do
@@ -12,7 +12,7 @@
 # conta os módulos que os DOIS compilam - um .prg que não compila (falta de
 # header do próprio contrib, etc.) não diz nada sobre impacto.
 #
-#   uso: tests/pcode-identity.sh <harbour-STOCK> <harbour-REMENDADO> [raiz-do-core]
+#   uso: tools/pcode-identity.sh <harbour-STOCK> <harbour-REMENDADO> [raiz-do-core]
 
 set -uo pipefail
 
