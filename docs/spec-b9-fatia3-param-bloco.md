@@ -210,7 +210,7 @@ spec do schema corrige a nota "declLine na linha do {|": em continuado
 é a linha da MATERIALIZAÇÃO); Self de INLINE/`~1` SEM o campo;
 adversarial `LOCAL conta AS CLASS Conta` → col da VAR. **Zero impacto
 230/230** `.hrb` byte-idênticos (corpus work/tests, base worktree
-`6ef252e476` × fix; 6 não-compilam igual nos dois lados); lexdiff
+`29eb2aa940` × fix; 6 não-compilam igual nos dois lados); lexdiff
 0 divergências reais. Armadilha nova de build: dependência de HEADER
 não é rastreada pelo make — mudar `hbcompdf.h` deixou `libhbmacro`/
 objetos de expr STALE (layout velho do struct → segfault até sem

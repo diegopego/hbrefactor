@@ -1,9 +1,23 @@
+<!-- changelog-baseline: hbrefactor@0451e7f -->
+<!-- Ponteiro de delta. Tudo DEPOIS deste commit ainda NÃO está descrito aqui.
+     Para retomar:  git log 0451e7f..HEAD   (ver § Manutenção, no fim). -->
+
 # Changelog
 
-Escrito para o **programador Harbour final**: o que cada entrega muda no
-seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
-specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
-de `docs/`.
+**Público-alvo: o programador Harbour.** O que cada entrega muda no seu dia a dia,
+com exemplo e limite honesto.
+
+**Este NÃO é um changelog para contribuidores — para isso, o changelog é o próprio
+git.** O histórico de commits já é completo, preciso e datado; é lá que vive o
+*como* (qual função, qual canal, qual estrutura). Aqui mora a outra pergunta, a que
+o git não responde: *o que eu passo a poder fazer, e onde isso me morde?* Se você
+achar detalhe de implementação aqui, é bug deste arquivo — o "como" interno (fases,
+specs, decisões) fica em [docs/roadmap.md](docs/roadmap.md) e nas specs de `docs/`.
+
+O compilador que sustenta tudo isto tem o seu próprio: **[harbour-core/NEWS.md]
+(../harbour-core/harbour/NEWS.md)** (branch `feature/compiler-ast-dump`). Lá o nome
+é `NEWS` por convenção GNU — o Harbour já tem um `ChangeLog.txt`, que é o log do
+*desenvolvedor*; `NEWS` é o do *usuário*.
 
 ## 2026-07-12 — corrigido: uma diretiva podia ficar com a cabeça IRRENOMEÁVEL
 
@@ -1079,7 +1093,7 @@ prevalecer — mas emitia o warning **W0019 "Duplicate declaration of
 method"**, e quem compila com warnings-como-erro (`-es2`) via o build
 falhar por causa de uma linha que não muda nada.
 
-A alteração (branch `feature/compiler-ast-dump`, commit `00ccbc20b3`) é
+A alteração (branch `feature/compiler-ast-dump`, commit `b758cf376a`) é
 uma condição de cinco linhas: **completar um tipo que ainda não existia
 não é duplicata** — segue silencioso. Continua warnando o que deve
 warnar: re-declarar um método cujo tipo *já era conhecido* (conflito
@@ -1110,3 +1124,89 @@ projeto inteiro, e caiu com essa condição.
 
 Detalhes internos: [docs/spec-b9-fatia2-materializacao.md](docs/spec-b9-fatia2-materializacao.md)
 § "Entregue (F2.4)" e [docs/plano-b9-fatia2-escada.md](docs/plano-b9-fatia2-escada.md).
+
+---
+
+## 2026-07-04 → 07-08 — a FUNDAÇÃO *(entrada retroativa, escrita em 2026-07-12)*
+
+> **Por que esta entrada existe.** A regra do CHANGELOG nasceu em 2026-07-09 —
+> então tudo que foi entregue **antes** dela nunca ganhou entrada, e seis
+> comandos que você usa hoje estavam **documentados em lugar nenhum** para o
+> usuário final. Buraco encontrado numa auditoria (`git log` × CHANGELOG) e
+> fechado aqui. Não é entrega nova: é dívida paga.
+
+Nesta janela nasceu tudo o que sustenta o resto — primeiro sobre um protótipo,
+depois **refundado sobre a AST do compilador** (o `.ast.json` do branch
+`feature/compiler-ast-dump`), que é o que a ferramenta usa até hoje.
+
+### Renomear com verificação (a base)
+
+Renomear **local**, **param**, **static**, **memvar**, **função**, **método**,
+**palavra de DSL** e **marker de diretiva** — cada um por FATO do compilador, não
+por busca de texto. Em 2026-07-11 os oito viraram **um só `rename`** (você aponta,
+a ferramenta descobre o quê) — mas a máquina por baixo é desta fundação.
+
+O contrato que vale desde o primeiro dia: **a ferramenta recompila o projeto e
+compara o resultado**. Se o pcode/símbolos não fecharem, ela **desfaz tudo**. Um
+rename que "quase deu certo" não existe.
+
+### Ler o código sem tocar nele (três relatórios)
+
+```
+$ hbrefactor unused-locals app.hbp
+b.prg:12: local 'NNADA' declared but not used in COMSOBRAS
+b.prg:13: local 'NSOBRA' is assigned but not used in COMSOBRAS
+```
+Distingue **nunca usado** de **atribuído e nunca lido** — são problemas diferentes.
+
+```
+$ hbrefactor call-graph app.hbp
+a.prg: MAIN -> DUPLA  [b.prg]
+a.prg: MAIN -> QOUT   [external]
+```
+Quem chama quem, **atravessando módulos**, com a origem de cada alvo.
+
+```
+$ hbrefactor find-dynamic-calls app.hbp
+a.prg:34: string 'Dupla' names a project function [b.prg]
+a.prg:38: function DINAMICA uses & macros
+```
+O **ponto cego de todo refatorador**: nomes que viram chamada em tempo de execução
+(uma string que casa com o nome de uma função sua; uma zona de `&macro`). A
+ferramenta **não edita** esses sites — ela os **mostra**, para você decidir. Essa é
+a regra de ouro: *o que não é verificável, não é editado.*
+
+### Mexer na estrutura
+
+- **`extract-function`** — um trecho de linhas vira função nova; as variáveis que
+  atravessam a fronteira viram parâmetros/retorno por análise de fluxo, não por
+  chute. Dentro de um método, extrai para **método**.
+- **`inline-local`** — o inverso: uma variável local que só embrulha uma expressão
+  desaparece, e a expressão volta para os usos.
+- **`reorder-params`** — troca a ordem dos parâmetros de uma função **e de todas as
+  chamadas dela**, em todos os módulos.
+
+### E o resto da base
+
+`usages`/find-references (com `--json` no formato do LSP), a **extensão VSCode**, o
+suporte a `.hbp`/`.hbc` real via **hbmk2** (nada de parser paralelo de projeto), e
+a política de strings que vale até hoje: **detectar e relatar, nunca editar**.
+
+**O limite honesto, desde então:** a ferramenta só edita o que o compilador prova.
+Macro (`&var`), nome montado em runtime, string que por acaso casa com um símbolo —
+tudo isso ela **relata**. Não é limitação a corrigir: é a linha que separa
+refatoração de estrago.
+
+---
+
+## Manutenção deste arquivo
+
+Uma entrada por entrega, escrita para o programador Harbour. O comentário HTML no
+topo é o **ponteiro de delta**: nomeia o último commit já descrito aqui. Se um dia
+o fluxo não rodar, ninguém precisa adivinhar o que ficou para trás —
+`git log <baseline>..HEAD` diz exatamente o que falta. Depois de escrever, avance o
+ponteiro.
+
+O mesmo vale para o [NEWS.md do compilador](../harbour-core/harbour/NEWS.md),
+que tem o seu próprio ponteiro. Os dois são mantidos juntos pela skill
+`/update-manual` — **cada repositório com commit novo ganha a sua entrada**.

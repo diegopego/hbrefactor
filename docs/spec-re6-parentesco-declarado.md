@@ -372,7 +372,7 @@ mudança (o `usages --json` já deixa o excluded fora das `Location[]`,
 flag `.T.` - o "find references" não lista). Venenos cobertos: pai que
 escapa (69), descendente que sequestra (68 ha.log). CHANGELOG atualizado.
 Suíte **757/0**; `make lexdiff` 0 divergências reais. Commits: core
-`52ca3e0b6f` (F6.1) + `5a9ba73f91` (ast-10); consumidor+re-baseline
+`c2c26e5aa3` (F6.1) + `b07fef4060` (ast-10); consumidor+re-baseline
 `6df5c50`; generalidade (fixkin+caso 104)+CHANGELOG sob portão.
 
 ## Fora do escopo

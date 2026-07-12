@@ -12,9 +12,20 @@ HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
-.PHONY: build test ppcorpus clean hooks
+.PHONY: build test ppcorpus lexdiff clean hooks site-serve help
 
+## build       compila a ferramenta em bin/hbrefactor (alvo padrão)
 build: hooks $(BIN)
+
+# a lista sai dos comentários `## <alvo> <descrição>` dos próprios alvos:
+# uma fonte de verdade só, senão a ajuda envelhece caladinha
+help:
+	@echo "hbrefactor - alvos disponíveis:"
+	@echo
+	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## /  make /'
+	@echo
+	@echo "variáveis:  HB_BIN=$(HB_BIN)"
+	@echo "            JOBS=1 (test sequencial)  SITE=  PORT= (site-serve)"
 
 # ativa o pre-commit anti-binário (.githooks/pre-commit) sem exigir alvo
 # próprio: todo `make`/`make test` garante o core.hooksPath. Idempotente e
@@ -32,6 +43,7 @@ $(BIN): src/hbrefactor.prg
 # paralelo por padrão (pool por-caso, teto nproc - B-infra; Etapa 2:
 # despacho+join em Harbour via bin/parrun, asserts de JSON via bin/tcheck);
 # JOBS=1 força o modo sequencial com saída ao vivo, para depurar um caso
+## test        roda a suíte (contrato executável; JOBS=1 força sequencial)
 test: build bin/tcheck bin/parrun
 	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
 
@@ -39,6 +51,7 @@ test: build bin/tcheck bin/parrun
 # (docs/pp-corpus.md) casado com os quatro oraculos (.ppo/.ppt/ast dump/codigo
 # compilavel). SEPARADA do contrato de proposito - e exploratoria e o core sera
 # modificado durante a exploracao. Nao entra no `make test`.
+## ppcorpus    suíte EXPLORATÓRIA do pp (fora do contrato; não entra no test)
 ppcorpus: build
 	@HB_BIN=$(HB_BIN) tests/ppcorpus.sh
 
@@ -52,6 +65,7 @@ bin/parrun: tests/parrun.prg
 
 # porta de precisão da B1: dump ast vs TokenScan arquivado, corpus
 # fixtures + hbhttpd (0 divergências reais exigidas)
+## lexdiff     porta de precisão: dump ast vs TokenScan arquivado
 lexdiff: bin/lexdiff
 	@tests/lexdiff.sh $(HB_BIN)
 
@@ -59,5 +73,20 @@ bin/lexdiff: tests/lexdiff.prg
 	@mkdir -p bin
 	$(HBMK2) tests/lexdiff.prg -obin/lexdiff -q0 -w3 -es2 -gtcgi
 
+# pré-visualiza a landing page como o GitHub Pages a serve (raiz = site/,
+# `/` resolve para index.html), antes do push. SITE= aponta para outra pasta -
+# a proposta aos mantenedores mora no core:
+#   make site-serve SITE=$(HOME)/devel/harbour-core/harbour/site PORT=8001
+# Ctrl+C encerra. Lembrete: o nome do arquivo nunca muda, então o navegador
+# cacheia - recarregar com Ctrl+Shift+R depois de editar.
+SITE ?= site
+PORT ?= 8000
+
+## site-serve  pré-visualiza a landing page como o GitHub Pages a serve
+site-serve:
+	@echo "site: http://localhost:$(PORT)/  (servindo $(SITE), Ctrl+C encerra)"
+	@python3 -m http.server $(PORT) --directory $(SITE)
+
+## clean       remove bin/
 clean:
 	rm -rf bin

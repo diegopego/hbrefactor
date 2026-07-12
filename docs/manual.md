@@ -1,7 +1,7 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@437a6a6 · harbour-core@2738f97079 (feature/compiler-ast-dump)
+  baseline: hbrefactor@437a6a6 · harbour-core@0da1ee6277 (feature/compiler-ast-dump)
     — the CORE did not move this round (no new ast-N); everything below is tool-side.
       NEW CAPABILITY: renaming a class DATA/VAR member (commit 437a6a6, slice 1). What
       used to be an honest refusal ("that's a VAR/DATA, not a method" — a deliberate v1
@@ -129,6 +129,17 @@ A worry worth naming out loud: *does this turn my code into some weird dialect?*
 same code any Harbour programmer can read. It **reshapes** your code; it never replaces
 your language. Even when it adds type information (below), it uses words Harbour has
 understood forever.
+
+**…and it doesn't change your build either. Not one byte.** For the tool to work on *facts*,
+Harbour's compiler had to start handing them over — so we extended it. Which raises the fair
+question: *what did you do to my compiler?* Nothing, unless you ask. The new information is
+emitted only behind a switch; with that switch off — the state every existing project is in —
+the patched compiler produces the **same bytes** as the one you use today. Measured, not
+asserted: **1085 of 1085** compiled modules byte-identical, and every `.prg` in Harbour's own
+`src/` identical to the pre-patch binary. That work lives on a branch of Harbour itself and has
+**its own page**, written for the Harbour maintainers:
+**[extending the compiler without breaking anything](https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be)**
+(source: `harbour-core/site/index.html`; user-facing log: `harbour-core/NEWS.md`).
 
 ---
 
@@ -369,7 +380,7 @@ inherit it.
 <!-- prov: case 108 (14 checks, fixture fixgen — invented non-mirror DSL, plus the
      hbclass METHOD rules as the real-world proof); live-run 2026-07-11 (scratchpad
      probes, both outputs below verbatim); hbrefactor 5d8f108 + harbour-core
-     2738f97079 (ast-13 rule genealogy + derivation surviving clones). -->
+     0da1ee6277 (ast-13 rule genealogy + derivation surviving clones). -->
 
 Real code reuses names. Say your DSL labels something `Vendas` — and a function named
 `Vendas()` already exists, unrelated:
@@ -576,9 +587,12 @@ drifts). It asks the official tools and reads the answer:
 
 ### What we changed in Harbour's core
 
-<!-- prov: git log 0d3b4395..5a9ba73f91 on feature/compiler-ast-dump (25 commits, ~16
+<!-- prov: git log 0d3b4395..b07fef4060 on feature/compiler-ast-dump (25 commits, ~16
      substantive); schema ladder cross-checked with docs/ast-schema.md; W0019 commit
-     00ccbc20b3; segfault fix in 6ef252e476 (ast-8); parentage 52ca3e0b6f + 5a9ba73f91. -->
+     b758cf376a; segfault fix in 29eb2aa940 (ast-8); parentage c2c26e5aa3 + b07fef4060;
+     ast-14 c7100f8cdb, ast-15 4d6deca13d; the 1085/1085 and 112/112 byte-identity
+     figures are the core commits' own measured zero-impact proofs (not re-derived here);
+     the maintainer-facing page is harbour-core/site/index.html. -->
 
 For those facts to exist, the compiler had to *emit* them. That work lives on a branch
 of Harbour itself — `feature/compiler-ast-dump` — and grew as a ladder of dump schemas,
@@ -599,11 +613,28 @@ one fact at a time:
 | `ast-11` | each codeblock carries its **own parameters** — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding) |
 | `ast-12` | a directive marker is stamped **`generates`** when the name you wrote gets pasted/stringified into an artifact — so "rename a name that becomes code" is told apart from "rename a symbol that just flows into a command" |
 | `ast-13` | **rule genealogy**: a rule created by another rule's expansion records which application created it — and derivation now survives token clones, so a generated rule's artifacts stay traceable through its uses |
+| `ast-14` | a marker a rule *matches but never uses* is no longer indistinguishable from a word of the rule itself — the preprocessor stopped throwing the binding away |
+| `ast-15` | **which** word of the rule a token matched. `#command` accepts its keywords **abbreviated** (from 4 letters), so `GRAV` may be the rule's own keyword *or* `GRAVAR` cut short — only the preprocessor knows, and now it says so |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
 `W0019 "duplicate declaration"` warning silenced when a re-declaration merely completes
 a missing type (it had blocked 18 methods in `hbhttpd`).
+
+### Extending the compiler without breaking a single byte
+
+That is the whole bet, and it is the part both Harbour programmers and Harbour **maintainers**
+care about most: **the compiler gives more information, and your build does not change.**
+With `-x` and `-kt` off — the state every existing project is in — the patched compiler emits
+the **same bytes** as the one you have today. Measured, not asserted: **1085 of 1085** compiled
+modules byte-identical, and every `.prg` under Harbour's own `src/` identical to the pre-patch
+binary.
+
+The core branch has **its own page**, written for the Harbour maintainers — the consolidated
+case, the honest shape of the diff, the two bugs it fixes in *stock* Harbour, and what we still
+don't have good answers for:
+**[the core proposal](https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be)**
+(source: `harbour-core/site/index.html`; the user-facing log is `harbour-core/NEWS.md`).
 
 The founding principle in action: when a fact doesn't exist, **extend the core so it
 does** — never build a guess inside the tool.

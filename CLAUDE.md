@@ -97,7 +97,7 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   `.h`→`harbour.yyh`, senão um checkout limpo (build default, SEM a flag)
   usa a gramática VELHA; commitar os três juntos (.y + .yyc + .yyh) e
   conferir que um rebuild default (binários apagados) carrega a feature.
-  Provado na RD (`_HB_INLINESELF`, core `4d8d9af766`).
+  Provado na RD (`_HB_INLINESELF`, core `da61c647cb`).
 - **CORPUS DE MATURAÇÃO = código do CORE do Harbour; o código do Diego
   NÃO é régua (Diego, 2026-07-10)**: a ferramenta amadurece resolvendo
   problemas em código BEM ESCRITO E TESTADO do core (work/ = cópias de
@@ -151,6 +151,56 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   escopo + critério de pronto ANTES de executá-las; concluída uma fase,
   atualizar o status na mesma sessão; trabalho novo entra como fase/item.
   Decisões de produto e autorizações continuam com o Diego.
+- **DOIS changelogs de USUÁRIO, um por repositório — e o público é o PROGRAMADOR
+  HARBOUR, nunca o contribuidor (Diego, 2026-07-12)**. Aqui é o `CHANGELOG.md`; no
+  core é o **`NEWS.md`** — nome diferente de propósito: o Harbour já tem um
+  `ChangeLog.txt`, e a convenção GNU que ele segue é exatamente esta divisão
+  (**`ChangeLog` = desenvolvedor; `NEWS` = usuário**), então `CHANGELOG.md` ao lado
+  de `ChangeLog.txt` só criaria confusão (diferem por caixa e extensão). **No
+  hbrefactor fica `CHANGELOG.md` — decisão do Diego (2026-07-12), NÃO re-litigar**:
+  a convenção GNU é uma DESAMBIGUAÇÃO, e aqui não há o que desambiguar (não existe
+  `ChangeLog.txt`); `CHANGELOG.md` é o nome que o GitHub reconhece e destaca, então
+  adotar `NEWS.md` por simetria trocaria DESCOBERTA por uma elegância que não serve
+  a leitor nenhum. **A assimetria é deliberada.**
+  Tudo que se faz no core é feito
+  para esta ferramenta, e o programador Harbour merece saber o que o compilador
+  passou a lhe dar (`-x`, `-kt`, os fixes). **Regra: cada repositório com commit
+  novo ganha a sua entrada** — commitou no core, o changelog do core ganha entrada;
+  commitou nos dois, os dois ganham. **O changelog do contribuidor JÁ EXISTE e é o
+  git** (completo, preciso, datado): duplicá-lo em markdown não agrega e cria uma
+  segunda fonte de verdade que envelhece pior. O CHANGELOG só se justifica ao
+  responder o que o git NÃO responde: *"o que eu passo a poder fazer, e onde isso
+  me morde?"* **Reprova o CORPO da entrada que contiver**: nome de função C /
+  arquivo de implementação, nome de struct, jargão de build (`lexdiff`, `pcode`,
+  `gated`), número de caso da suíte, sigla de fase. *(Ponteiro para os docs
+  internos no FIM da entrada continua permitido — é a regra de 2026-07-09 abaixo;
+  e citar a saída REAL da ferramenta é sempre permitido, mesmo que ela mencione uma
+  fase: é o que o usuário vê no terminal.)* **Cada CHANGELOG carrega um PONTEIRO DE
+  DELTA** no topo (`<!-- changelog-baseline: <repo>@<sha> -->`) — o último commit já
+  descrito ali; é o que torna o serviço **retomável** se o fluxo não rodar
+  (`git log <baseline>..HEAD` diz o que falta). Fluxo e régua anti-buraco na skill
+  `/update-manual`. *(O buraco que gerou a regra: `extract-function`, `inline-local`,
+  `call-graph`, `unused-locals`, `find-dynamic-calls` e `reorder-params` — seis
+  comandos VIVOS — ficaram sem uma linha de changelog porque a regra nasceu depois
+  deles.)*
+- **PIPELINE DO CORE: `commit → NEWS.md → landing page` (Diego, 2026-07-12)**. O
+  core tem uma **proposta aos MANTENEDORES** em `harbour-core/site/index.html` — é
+  ela que decide se o PR (fase B6) é sequer avaliado, então é trabalho sério, não
+  enfeite. **Ela NÃO é um log**: não ganha seção por commit e não lista schema; ela
+  carrega o **conceito consolidado** (o argumento central, a forma do diff, os quatro
+  canais, os bugs do stock que o branch conserta, o que se pede ao mantenedor, e o
+  que ainda não sabemos). Muda **só quando o conceito muda** — e "não mudou" é
+  resposta legítima. **Nenhum número nela sem medição na hora**: o público é
+  mantenedor, e um número inflado ou um comando que não roda queima o PR inteiro.
+  Fluxo e checklist na skill `/update-manual` (§ 0.4b). Artifact de endereço fixo
+  para distribuir: republicar o mesmo `file_path` mantém a URL.
+- **TUDO no harbour-core é em INGLÊS (Diego, 2026-07-12)**: código, comentário,
+  documentação **e mensagem de commit**. É o projeto Harbour internacional e este
+  branch é upstreamável (fase B6) — um contribuidor de qualquer lugar tem de
+  conseguir ler. A língua de trabalho com o Diego é o português; o que ATERRISSA
+  naquela árvore, não. *(Custou um rewrite de histórico: 10 mensagens em português
+  foram traduzidas com `filter-branch` + force-push, e os SHAs citados nos docs do
+  hbrefactor tiveram de ser corrigidos.)*
 - **CHANGELOG.md para o programador final (Diego, 2026-07-09)**: toda
   capacidade/entrega ganha entrada no CHANGELOG.md escrita para o
   programador Harbour FINAL — o problema de todo dia, o que muda na

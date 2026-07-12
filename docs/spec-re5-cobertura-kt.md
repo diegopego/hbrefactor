@@ -18,7 +18,7 @@ ALCANCE: estende a emissão no core para os furos que valem a pena e —
 peça de doutrina — **substitui a réplica da matriz na ferramenta por
 FATO de dump** (o core, que emite o cheque, passa a DIZER onde emitiu).
 
-## Fatos verificados no fonte (2026-07-10, core `00ccbc20b3`)
+## Fatos verificados no fonte (2026-07-10, core `b758cf376a`)
 
 1. **Emissor único e stack-neutral**: `hb_compChkTypeGenCall`
    (hbmain.c:2758-2782) — `PUSHFUNCSYM __HB_CHKTYPE + PUSHLOCAL iVar +

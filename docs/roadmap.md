@@ -129,7 +129,7 @@ FECHADO por FATO.**
 § Executado — F6.1: canal `_HB_SUPER` no core (léxico+gramática
 0-conflitos+hbclass.ch, pai posicionado prov `s`; `.hrb` 356/0
 byte-idêntico; lição hbmk2 = 2º binário que embute o compilador,
-commit `52ca3e0b6f`). F6.2: schema `ast-10` (`5a9ba73f91`) + consumidor
+commit `c2c26e5aa3`). F6.2: schema `ast-10` (`b07fef4060`) + consumidor
 (`ClassSuperFacts`/`ResolveDispatchSuper`/`KinshipExcludes`, exclusão de
 send por parentesco de FATO com degrade honesto sob is-a). F6.3:
 re-baseline dos 16 asserts da Rota C + generalidade adversarial (caso
@@ -680,7 +680,7 @@ padrão-ouro por edição (inerte byte-idêntico sem `-kt` + compila limpo
 1) e [spec-b9-fatia2-materializacao.md](spec-b9-fatia2-materializacao.md)
 (fatia 2); plano executado F2.0-F2.5:
 [plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md); candidato (g)
-de core ADOTADO (`00ccbc20b3`). Casos 87-96 (execução real; round-trip
+de core ADOTADO (`b758cf376a`). Casos 87-96 (execução real; round-trip
 por semente [FATIA-2]; ROLLBACK PROVOCADO com recusa nomeando o
 BASE/3012); [testes-suspensos-re3.md](testes-suspensos-re3.md) Rotas
 A/B **RECONQUISTADAS**; extensão VSCode 0.9.0; corpus hbhttpd: 31

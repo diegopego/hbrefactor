@@ -1755,7 +1755,7 @@ plano-b9-fatia2-escada.md, executado F2.0-F2.5:
   W0019 de método silenciado SÓ quando a re-declaração COMPLETA tipo
   ausente (hbmain.c:1174-1180; conflito real segue warnando), provado
   nas seis pontas + re-medição (fixb7b 2→0, hbhttpd 18→0); core
-  `00ccbc20b3`. Candidato (f) ADIADO.
+  `b758cf376a`. Candidato (f) ADIADO.
 - **F2.4 núcleo (2026-07-09)**: `annotate --apply` — pipeline
   bottom-up (baseline → one-liners → padrão-ouro → re-análise →
   AS CLASS → padrão-ouro), âncoras ESTRUTURAIS resolvidas por fato do

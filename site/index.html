@@ -102,6 +102,9 @@ header.top {
 .nav .links { display:flex; gap:20px; margin-left:auto; }
 .nav .links a { color:var(--text-dim); font-size:.92rem; font-weight:550; }
 .nav .links a:hover { color:var(--text); text-decoration:none; }
+/* the one nav item that leaves the site — and the one that carries the thesis */
+.nav .links a.out { color:var(--accent); font-weight:650; }
+.nav .links a.out:hover { color:var(--accent-2); }
 .nav .actions { display:flex; align-items:center; gap:10px; margin-left:auto; }
 .nav .links + .actions { margin-left:14px; }
 .icon-btn {
@@ -157,6 +160,24 @@ header.top {
 .dual { display:flex; flex-wrap:wrap; gap:6px 20px; margin-top:22px; font-size:.92rem; }
 .dual a { color:var(--text-dim); font-weight:600; }
 .dual a b { color:var(--accent); }
+/* the guarantee, as a CREDENTIAL — not a second CTA. The pill is the only
+   saturated element: the number IS the promise. Quiet next to the primary button. */
+.corebar {
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:7px 12px;
+  margin-top:26px; padding-top:20px; font-size:.9rem; line-height:1.55;
+  border-top:1px solid var(--border);
+}
+.corebar .tag {
+  font-family:ui-monospace,"JetBrains Mono",Menlo,monospace; font-size:.64rem;
+  letter-spacing:.12em; text-transform:uppercase; font-weight:700;
+  color:var(--nord0); background:var(--green);
+  border-radius:100px; padding:4px 10px; flex:none; transform:translateY(-1px);
+}
+:root[data-theme="dark"] .corebar .tag { color:var(--nord0); }
+.corebar .t { color:var(--text-dim); }
+.corebar .t b { color:var(--text-soft); font-weight:650; }
+.corebar a { font-weight:650; color:var(--accent); white-space:nowrap; }
+.corebar a:hover { text-decoration:underline; }
 .avail { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
 .avail .av { display:inline-flex; align-items:center; gap:8px; font-size:.84rem; color:var(--text-soft); background:var(--bg-2); border:1px solid var(--border); border-radius:100px; padding:6px 14px; }
 .avail .av b { color:var(--accent); font-weight:700; }
@@ -326,6 +347,7 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
       <a href="#start">Start here</a>
       <a href="#deeper">Going deeper</a>
       <a href="#hood">Under the hood</a>
+      <a class="out" href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">Extending Harbour ↗</a>
       <a href="#status">Status</a>
       <a href="#install">Install</a>
     </nav>
@@ -360,6 +382,13 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
         <div class="dual">
           <a href="#start">New to refactoring? <b>Start here ↓</b></a>
           <a href="#deeper">Know the drill? <b>Jump to the tech ↓</b></a>
+        </div>
+
+        <div class="corebar">
+          <span class="tag">0 bytes</span>
+          <span class="t">We <b>extended the Harbour compiler</b> so it hands over the facts — and it
+          changes <b>nothing</b> in your build. <b>1085 of 1085</b> modules, byte-identical.</span>
+          <a href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">The core proposal ↗</a>
         </div>
       </div>
 
@@ -441,6 +470,24 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
     <h2>It's still 100% Harbour — we don't change the syntax</h2>
     <p>A worry worth naming out loud: <em>does this turn my code into some weird dialect?</em></p>
     <p><strong>No.</strong> hbrefactor never invents new syntax and never adds a language of its own. Your <span class="mono">.prg</span> stays plain Harbour — the same code the normal Harbour compiler builds, the same code any Harbour programmer can read. It <strong>reshapes</strong> your code; it never replaces your language. Even when it adds type information (next section), it uses words Harbour has understood forever — you can keep writing Harbour exactly as you always have.</p>
+
+    <div class="callout">
+      <h3>…and it doesn't change your build either. Not one byte.</h3>
+      <p>For the tool to work on <em>facts</em>, Harbour's compiler had to start handing them over — so
+      we extended the compiler. Which raises the fair question: <strong>what did you do to my
+      compiler?</strong></p>
+      <p>Nothing, unless you ask. The new information is emitted only behind a switch. With that switch
+      off — the state every existing project is in — the patched compiler produces the
+      <strong>same bytes</strong> as the one you use today. Measured, not asserted:
+      <b class="emph">1085 of 1085</b> compiled modules byte-identical, and every
+      <span class="mono">.prg</span> in Harbour's own <span class="mono">src/</span> identical to the
+      pre-patch binary.</p>
+      <p class="muted" style="margin-bottom:18px">That work lives on a branch of Harbour itself, and it
+      has <b>its own page</b> — written for the Harbour maintainers: the case, the honest shape of the
+      diff, the two bugs it fixes in <em>stock</em> Harbour, and what we still don't have good answers
+      for. If you maintain Harbour, that page is for you.</p>
+      <a class="btn btn-primary" href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">Extending the compiler without breaking anything &rarr;</a>
+    </div>
   </div>
 </section>
 
@@ -787,10 +834,23 @@ Eval( bPaga )
       <tr><td>ast-11</td><td>each codeblock carries its <b>own parameters</b> — types a send's receiver by the exact block (delegated getters/setters on one line stop colliding)</td></tr>
       <tr><td>ast-12</td><td>a directive marker is stamped <b>generates</b> when the name you wrote gets pasted/stringified into an artifact — telling "rename a name that becomes code" apart from "rename a symbol that just flows into a command"</td></tr>
       <tr><td>ast-13</td><td><b>rule genealogy</b>: a rule created by another rule's expansion records which application created it — and derivation now survives token clones, so a generated rule's artifacts stay traceable through its uses</td></tr>
+      <tr><td>ast-14</td><td>a marker a rule <em>matches but never uses</em> is no longer indistinguishable from a word of the rule itself — the preprocessor stopped throwing the binding away</td></tr>
+      <tr><td>ast-15</td><td><b>which</b> word of the rule a token matched. <span class="mono">#command</span> accepts its keywords <b>abbreviated</b> (from 4 letters), so <span class="mono">GRAV</span> may be the rule's own keyword <em>or</em> <span class="mono">GRAVAR</span> cut short — only the preprocessor knows, and now it says so</td></tr>
     </table>
     </div>
     <p>Along the way: a <b>20-year-old segfault fixed</b> (annotating a code-block parameter with <span class="mono">AS CLASS</span> used to crash the compiler — stock Harbour still does), and a false <span class="mono">W0019</span> "duplicate declaration" warning silenced when a re-declaration merely completes a missing type — it had blocked 18 methods in <span class="mono">hbhttpd</span>.</p>
     <p>This is the founding principle in action: when a fact doesn't exist, <strong>extend the core so it does</strong> — never build a guess inside the tool.</p>
+
+    <div class="callout">
+      <h3>Every one of those rungs is gated</h3>
+      <p>Fifteen schema versions, and <strong>none of them costs an existing project anything</strong>:
+      with the switches off, the compiled output is byte-identical to stock Harbour. That guarantee is
+      not a nice-to-have — it is the precondition for any of this ever reaching upstream Harbour.</p>
+      <p class="muted" style="margin-bottom:18px">The full case for the maintainers — the consolidated
+      argument, the honest shape of the diff, the two bugs it fixes in <em>stock</em> Harbour, and the
+      open questions we can't answer yet — lives on the branch's own page.</p>
+      <a class="btn btn-ghost" href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">The core proposal, in full &rarr;</a>
+    </div>
   </div>
 </section>
 
