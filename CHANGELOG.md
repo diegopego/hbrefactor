@@ -5,6 +5,38 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-11 — renomear um DATA/VAR member de classe
+
+Antes, se você tentasse renomear um dado de classe (`VAR`/`DATA`) a ferramenta
+recusava ("é VAR/DATA, não método"). Agora funciona: renomear o membro atualiza a
+**declaração**, todas as **leituras** (`::nSaldo`, `oConta:nSaldo`) E todas as
+**escritas** (`::nSaldo := x`) de uma vez, mais o registro interno da classe.
+
+```harbour
+CLASS Conta
+   VAR nSaldo INIT 0
+   METHOD Mostra()
+ENDCLASS
+METHOD Mostra() CLASS Conta
+   ::nSaldo := ::nSaldo + 1
+   RETURN ::nSaldo
+```
+
+Ponha o cursor em `nSaldo` (na declaração `VAR nSaldo`) e renomeie para `nTotal`:
+a declaração, o `::nSaldo := ::nSaldo + 1` (escrita E leitura) e o `RETURN
+::nSaldo` viram `nTotal`, e a classe passa a registrar `"nTotal"` — tudo
+verificado por recompilação (se algo não fechar, desfaz com rollback).
+
+**Salvaguarda:** se DUAS classes do projeto têm um membro com o MESMO nome
+(`Conta:nSaldo` e `Poupanca:nSaldo`), a ferramenta **recusa** e nomeia a outra
+classe — porque o acesso `:nSaldo` é dispatch dinâmico e o rename seria ambíguo.
+É a mesma regra que já vale para métodos homônimos.
+
+**Limites honestos (fatia 1):** cobre `VAR`/`DATA` simples. `VAR` com
+`ACCESS`/`ASSIGN` (getter/setter que você escreve como método) e DATA herdada de
+uma superclasse ficam para uma próxima fatia. Nome de CLASSE continua fora do
+escopo.
+
 ## 2026-07-11 — rename certo com nome repetido; DSL que cria DSL agora renomeia
 
 Duas situações que antes davam errado (uma recusava confuso, a outra nem

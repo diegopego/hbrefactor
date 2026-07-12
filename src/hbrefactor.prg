@@ -10623,7 +10623,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL aWarn := {}, hEdits := { => }, aE, nLine, aSpans, hOwn, aArts
    LOCAL hMap := { => }, hPredStr := { => }, aPS, cPred, cOwn, aArt, hTok
    LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
-   LOCAL hOpt := { => }
+   LOCAL hOpt := { => }, lData := .F.
 
    IF Len( aArgs ) < 4
       Usage()
@@ -10759,17 +10759,18 @@ STATIC FUNCTION RenameMethod( aArgs )
          RETURN Refuse( "'" + cMethod + "' também é membro de: " + cWhy + ;
                         " - send é despacho dinâmico, rename ambíguo; recuso" )
       ENDIF
-      // membro de DADOS (VAR/DATA): atribuição vira send '_NOME' que este
-      // comando não cobre - fora do escopo v1
+      // membro de DADOS (VAR/DATA): a atribuição vira o send '_NOME' (o
+      // setter). O getter (:NOME) e o setter (:_NOME) são o MESMO token
+      // textual :NOME no fonte - editá-lo cobre leitura e escrita; os DOIS
+      // símbolos (NOME e _NOME) entram no mapa de verificação. Antes fora do
+      // escopo v1; agora é a completude do rename para DATA member (spec-rename-data)
       FOR EACH cPath IN hProj[ "files" ]
          FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
             FOR EACH hItem IN hFunc[ "sends" ]
                IF Upper( hItem[ "sym" ] ) == "_" + cUpOld
-                  RETURN Refuse( "'" + cMethod + "' recebe atribuição (send _" + cUpOld + " em " + ;
-                                 hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                                 ") - é VAR/DATA, não método; fora do escopo do rename-method" )
+                  lData := .T.
                ENDIF
-               IF Upper( hItem[ "sym" ] ) == cUpNew
+               IF Upper( hItem[ "sym" ] ) == cUpNew .OR. Upper( hItem[ "sym" ] ) == "_" + cUpNew
                   RETURN Refuse( "'" + cNew + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
                                  ":" + hb_ntos( hItem[ "line" ] ) + " - o rename passaria a respondê-la" )
                ENDIF
@@ -10789,6 +10790,9 @@ STATIC FUNCTION RenameMethod( aArgs )
    // e a contagem de símbolos fecha o caso misto
    IF lMethod
       hMap[ cUpOld ] := cUpNew
+      IF lData
+         hMap[ "_" + cUpOld ] := "_" + cUpNew   // DATA: o setter também é símbolo
+      ENDIF
    ELSE
       hOpt[ cUpOld ] := cUpNew
    ENDIF
@@ -10854,7 +10858,11 @@ STATIC FUNCTION RenameMethod( aArgs )
       IF lMethod
          FOR EACH hFunc IN hAst[ "functions" ]
             FOR EACH hItem IN hFunc[ "sends" ]
-               IF Upper( hItem[ "sym" ] ) == cUpOld
+               // getter (:NOME) e, para DATA, também o setter (send _NOME):
+               // os dois são o MESMO texto :NOME no fonte - SendLineHits acha
+               // a grafia crua na linha; editá-la cobre leitura e escrita
+               IF Upper( hItem[ "sym" ] ) == cUpOld .OR. ;
+                  ( lData .AND. Upper( hItem[ "sym" ] ) == "_" + cUpOld )
                   FOR EACH aHit IN SendLineHits( hAst, hItem[ "line" ], cUpOld )
                      AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
                   NEXT
@@ -10892,7 +10900,8 @@ STATIC FUNCTION RenameMethod( aArgs )
       nTotal += Len( aE )
    NEXT
 
-   OutStd( "rename-" + iif( lMethod, "method: " + cUpClass + ":", "pp-marker: " ) + ;
+   OutStd( iif( lData, "rename-data: " + cUpClass + ":", ;
+           iif( lMethod, "rename-method: " + cUpClass + ":", "rename-pp-marker: " ) ) + ;
            cMethod + " -> " + cNew + hb_eol() )
    FOR EACH cPath IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cPath ]
@@ -10980,7 +10989,10 @@ STATIC FUNCTION RenameMethod( aArgs )
       NEXT
    NEXT
 
-   IF lMethod
+   IF lData
+      OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); DATA member getter+setter renamed, " + ;
+              "registration re-derived, other modules byte-identical" + hb_eol() )
+   ELSEIF lMethod
       OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
               "other modules byte-identical" + hb_eol() )
    ELSE

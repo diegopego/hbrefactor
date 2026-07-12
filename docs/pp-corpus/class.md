@@ -89,19 +89,22 @@ de registro por derivação).
 
 ## Lacunas (o que os oráculos NÃO mostram)
 
-- **[LACUNA de CAPACIDADE — decisão de produto do Diego] Renomear um DATA/VAR
-  member de classe.** A informação está TODA presente (o `usages Conta:nSaldo`
-  resolve a declaração `VAR nSaldo` + os `::nSaldo` como confirmed sends, escopo
-  Conta), mas o `rename` sobre `::nSaldo` **recusa honesto**: *"é VAR/DATA, não
-  método; fora do escopo do rename-method"*. Não há verbo para DATA member. Como
-  a INFO não falta (nada a estender no core), NÃO é experimento de core: é uma
-  **capacidade nova** (um "rename de DATA member") que precisa do portão do Diego
-  (regra "genérico > específico: comando dedicado só com razão forte"). Registrado
-  no [roadmap](../roadmap.md) como candidato; a exploração do corpus PAUSA aqui
-  até a direção do Diego (regra: lacuna pausa a exploração).
+- **[RESOLVIDA — capacidade rename-DATA entregue, 2026-07-11] Renomear um
+  DATA/VAR member de classe.** A lacuna que o corpus achou (o `rename` sobre um
+  DATA member recusava "é VAR/DATA, não método") virou EXPERIMENTO imediato (regra
+  do Diego) e depois CAPACIDADE, com portão aberto. A investigação provou que a
+  info bastava (o `usages Conta:nSaldo` já resolvia declaração + getter/setter
+  escopados à classe; o setter `_nSaldo` é o mesmo token textual `:nSaldo`; a
+  string de registro re-deriva). Foi a **completude natural do rename-method para
+  DATA** — sem comando novo: hoje o `rename` sobre `VAR nSaldo`/`::nSaldo` edita a
+  declaração + getter + setter, mapeia `NSALDO→novo` E `_NSALDO→_novo`, e recusa
+  homônimo entre classes (unicidade). Spec: [../spec-rename-data.md](../spec-rename-data.md);
+  provas: caso 48 re-baselinado + caso 110 (fixdata). Fatia 2 (`ACCESS`/`ASSIGN`,
+  DATA herdada) fica no backlog.
 - **[Consumo futuro] O `resolve-at` de `::nSaldo` devolve `nSaldo` cru** (send
-  dinâmico), sem escopar a Conta, embora o `usages Conta:nSaldo` saiba escopar. É
-  o mesmo fato (Self AS CLASS Conta) já no dump — falta o resolve-at consumi-lo.
-  Não é lacuna de core; alimentaria o rename-DATA acima quando/se existir.
+  dinâmico), sem escopar a Conta, embora o `usages Conta:nSaldo` saiba escopar.
+  A capacidade rename-DATA hoje opera a partir da DECLARAÇÃO `VAR nSaldo` (que
+  escopa); escopar o resolve-at do site de USO (`::nSaldo`) é a melhoria seguinte
+  (consumo de fato já no dump, sem core).
 - **[Fora de escopo] Nome de CLASSE** (`Conta`) não é renomeável (limite conhecido
   do roadmap, não deste corpus).

@@ -192,6 +192,13 @@ freshp2() { # freshp2 <case-name> -> marker que GERA e PASSA ADIANTE + multiplic
    echo "$d"
 }
 
+freshdata() { # freshdata <case-name> -> rename de DATA/VAR member (spec-rename-data): homonimo + unico
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixdata/*.prg "$HERE"/fixdata/*.hbp "$d"/
+   echo "$d"
+}
+
 freshcst() { # freshcst <case-name> -> fixture with the REAL xhb cstruct DSL
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -1245,13 +1252,25 @@ RC=$?
 check "new name already sent somewhere refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "passaria a respondê-la" "$D/r3.log"
 check "refusal explains the hijack"    $?
-( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:5:8 nTotal > r4.log 2>&1 )
-RC=$?
-check "VAR/DATA member (setter send _NTOT) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "send _NTOT" "$D/r4.log"
-check "refusal shows the assignment send" $?
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
-check "sources untouched by all refusals" $?
+check "sources untouched by the refusals" $?
+# VAR/DATA member agora RENOMEIA - completude do rename para DATA member
+# (spec-rename-data; era recusa v1 deliberada). O getter (:nTot) e o setter
+# (:nTot :=, send _NTOT) sao o mesmo texto :nTot; editar cobre os dois, e o
+# mapa de simbolos ganha NTOT->NTOTAL E _NTOT->_NTOTAL. Unico DATA de Caixa
+# (Outra tem nX) -> unicidade OK
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:5:8 nTotal > r4.log 2>&1 )
+check "VAR/DATA member rename-data: exit 0 (completude do rename para DATA)" $?
+grep -q "^rename-data: CAIXA:nTot -> nTotal" "$D/r4.log" && grep -q "predicted: _NTOT -> _NTOTAL" "$D/r4.log"
+check "getter+setter renamed; setter symbol _NTOT->_NTOTAL predicted" $?
+grep -q "predicted string: \"nTot\" -> \"nTotal\"" "$D/r4.log"
+check "registration string re-derived (\"nTot\" -> \"nTotal\")" $?
+grep -q "VAR nTotal INIT 0" "$D/c1.prg" && grep -q "::nTotal := ::nTotal + nQtd" "$D/c1.prg" && \
+   grep -q "INLINE ::nTotal \* 2" "$D/c1.prg"
+check "VAR decl + setter/getter + INLINE use all edited" $?
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:5:8 nTot > /dev/null 2>&1 )
+cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
+check "A->B->A round-trip byte-exact" $?
 
 }
 
@@ -3546,7 +3565,41 @@ cmp -s "$D/b.prg" "$HERE/fixp2/b.prg"
 check "A->B->A round-trip byte-exact" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109"
+unit_110() {
+echo "case 110: rename-DATA - completude do rename para DATA/VAR member (spec-rename-data)"
+# fixture fixdata: Conta e Poupanca compartilham o DATA member nSaldo
+# (homonimo -> recusa por unicidade); nLimite e UNICO de Conta (rename sucede,
+# inclusive os usos externos por local nao-tipado - a mensagem e global,
+# guardada pela unicidade). A lacuna achada pelo P-DOC (familia hbclass) fechada.
+for f in c1.prg c2.prg; do
+   "$HB_BIN/harbour" "$HERE/fixdata/$f" -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" > /dev/null 2>&1
+   check "fixdata/$f clean under -w3 -es2"  $?
+done
+D=$(freshdata case110)
+# homonimo: nSaldo em Conta E Poupanca -> recusa nomeando a outra classe
+( cd "$D" && "$BIN" rename fixdata.hbp c1.prg:15:8 nGuardado > ho.log 2>&1 )
+RC=$?
+check "DATA member homonym across classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "também é membro de: POUPANCA" "$D/ho.log" && grep -q "rename ambíguo" "$D/ho.log"
+check "refusal names the other class (unicidade herdada do rename-method)" $?
+cmp -s "$D/c1.prg" "$HERE/fixdata/c1.prg"
+check "sources untouched by the refusal" $?
+# unico: nLimite so em Conta -> rename-data sucede (decl + usos externos)
+( cd "$D" && "$BIN" rename fixdata.hbp c1.prg:16:8 nTeto > ok.log 2>&1 )
+check "unique DATA member rename-data: exit 0" $?
+grep -q "^rename-data: CONTA:nLimite -> nTeto" "$D/ok.log" && \
+   grep -q "predicted: _NLIMITE -> _NTETO" "$D/ok.log" && \
+   grep -q "predicted string: \"nLimite\" -> \"nTeto\"" "$D/ok.log"
+check "getter+setter + registration string all handled by fact" $?
+grep -q "VAR nTeto INIT 0" "$D/c1.prg" && grep -q "oC:nTeto := 500" "$D/c1.prg" && \
+   grep -q "oC:nSaldo, oC:nTeto" "$D/c1.prg"
+check "VAR decl + external setter/getter (untyped receiver) all edited" $?
+( cd "$D" && "$BIN" rename fixdata.hbp c1.prg:16:8 nLimite > /dev/null 2>&1 )
+cmp -s "$D/c1.prg" "$HERE/fixdata/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixdata/c2.prg"
+check "A->B->A round-trip byte-exact" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

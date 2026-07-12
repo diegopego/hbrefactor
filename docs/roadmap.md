@@ -461,9 +461,11 @@ de core imediato; consumo-futuro (fato derivável) NÃO pausa. **Famílias 1-4
 ENTREGUES (2026-07-11):** SET EXACT (restrict+smart-quote), @…SAY (grupos
 opcionais), STORE (grupo que repete), hbclass (OO é pp: paste + genealogia ast-13
 + `Self AS CLASS`); `make ppcorpus` 16/16, contrato 813/0 intocado. **LACUNA
-encontrada → exploração PAUSADA:** o `rename` de DATA/VAR member de classe recusa
-(não há verbo; a info não falta) — candidato a CAPACIDADE nova (ver abaixo), portão
-do Diego. Restante da ordem após a decisão: um contrib (medição).
+encontrada → experimentada → RESOLVIDA no mesmo dia (regra do Diego "lacuna pausa
+e experimenta"):** o `rename` de DATA/VAR member de classe recusava; virou a
+capacidade **rename-DATA** entregue (fatia 1, completude do rename-method, zero
+core — ver backlog + [spec-rename-data.md](spec-rename-data.md); suíte 825/0).
+Exploração do corpus RETOMÁVEL: próxima família na ordem = um contrib (medição).
 
 **Portões pontuais a submeter durante a execução:** D-P3 (fato provado vira
 `ast-N` OU fica computado do `from`?), D-P4 (restrict-validation e
@@ -696,16 +698,15 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 
 ## Backlog (por valor)
 
-- **Rename de DATA/VAR member de classe (LACUNA achada pelo P-DOC, família
-  hbclass, 2026-07-11 — aguarda portão do Diego)**: o `rename` sobre `::nSaldo`
-  recusa honesto ("é VAR/DATA, não método"). A INFO está toda presente (o
-  `usages Conta:nSaldo` resolve `VAR nSaldo` + os `::nSaldo` como confirmed sends,
-  escopo Conta pelo `Self AS CLASS`), então NÃO é experimento de core — é uma
-  CAPACIDADE nova (verbo de rename para DATA member). Sujeita à regra "genérico >
-  específico: comando dedicado só com razão forte" e ao portão do Diego. O
-  `resolve-at` de `::nSaldo` ainda não escopa à classe (consumo do fato já no
-  dump) — pré-requisito do verbo. Registro em
-  [pp-corpus/class.md](pp-corpus/class.md) § Lacunas.
+- **Rename de DATA/VAR member — ✅ ENTREGUE (fatia 1, 2026-07-11; lacuna achada
+  pelo P-DOC e fechada no MESMO dia pela regra "lacuna pausa e experimenta").**
+  O `rename` sobre `VAR nSaldo`/`::nSaldo` agora edita declaração + getter +
+  setter, mapeia `NOME→novo` E `_NOME→_novo`, e recusa homônimo entre classes
+  (unicidade). Completude do rename-method para DATA (sem comando novo), zero
+  mudança de core. Spec: [spec-rename-data.md](spec-rename-data.md); provas: caso
+  48 re-baselinado + caso 110 (fixdata); suíte 825/0. **Fatia 2 (backlog):**
+  `ACCESS`/`ASSIGN` (getter/setter explícitos), DATA herdada de superclasse, e o
+  `resolve-at` de `::membro` escopando a classe (rename a partir do site de USO).
 
 0. **Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
    verificação proporcional à edição quando o uso real doer.
