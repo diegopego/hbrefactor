@@ -387,7 +387,7 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
         <div class="corebar">
           <span class="tag">0 bytes</span>
           <span class="t">We <b>extended the Harbour compiler</b> so it hands over the facts — and it
-          changes <b>nothing</b> in your build. <b>1085 of 1085</b> modules, byte-identical.</span>
+          changes <b>nothing</b> in your build: with the switches off, <b>byte-identical</b> output.</span>
           <a href="https://diegopego.github.io/harbour-core/">The core proposal ↗</a>
         </div>
       </div>
@@ -478,10 +478,10 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
       compiler?</strong></p>
       <p>Nothing, unless you ask. The new information is emitted only behind a switch. With that switch
       off — the state every existing project is in — the patched compiler produces the
-      <strong>same bytes</strong> as the one you use today. Measured, not asserted:
-      <b class="emph">1085 of 1085</b> compiled modules byte-identical, and every
-      <span class="mono">.prg</span> in Harbour's own <span class="mono">src/</span> identical to the
-      pre-patch binary.</p>
+      <strong>same bytes</strong> as the one you use today. Measured, not asserted — and the
+      measurement is <b class="emph">a script you can run</b>: every <span class="mono">.prg</span> the
+      two compilers both accept is built to pcode by each and compared byte for byte, with
+      <b class="emph">zero divergences</b>.</p>
       <p class="muted" style="margin-bottom:18px">That work lives on a branch of Harbour itself, and it
       has <b>its own page</b> — written for the Harbour maintainers: the case, the honest shape of the
       diff, the two bugs it fixes in <em>stock</em> Harbour, and what we still don't have good answers
@@ -670,6 +670,54 @@ rename-pp-marker: Ponto -&gt; Marco
 <span class="ok">verified</span>: 2 edit(s); derived artifacts renamed as predicted</code></pre>
     </div>
     <p>Behind both: the compiler now records the <strong>genealogy</strong> of preprocessor rules — when a rule is created by another rule's expansion, the dump says which application created it — and the tool only edits an occurrence whose owner is proven. Honest limit: if one module mixes the two roles so tightly that even the symbol table can't separate them, the tool still refuses and rolls back rather than guess.</p>
+  </div>
+</section>
+
+<!-- §5b a directive has a lifetime (ast-16) -->
+<section>
+  <div class="narrow">
+    <p class="sec-eyebrow">Going deeper</p>
+    <h2>A directive can be switched off — and the rename follows it there</h2>
+    <p>A <span class="mono">#define</span> does not have to live to the end of the file. You can turn it off:</p>
+    <div class="code-card">
+      <div class="code-top">app.prg</div>
+<pre><code>#define RETRY_LIMIT 3
+
+PROCEDURE Main()
+   LOCAL nTries := RETRY_LIMIT
+   ? nTries
+   RETURN
+
+#undef RETRY_LIMIT      <span class="c">// from here on, RETRY_LIMIT means nothing again</span></code></pre>
+    </div>
+    <p>That is ordinary hygiene — and a <strong>trap for every refactoring tool</strong>, because renaming the constant is only half the job. Rename <span class="mono">RETRY_LIMIT</span> and forget the <span class="mono">#undef</span>, and the switch-off is left pointing at a name that no longer exists. It then turns off <strong>nothing</strong>, and the definition <b class="emph">leaks</b> past the line where you ended it — silently changing the meaning of code the rename never touched. Nothing catches it: if no site after the switch-off uses the word, the compiled output is byte-identical either way, so a "verified" check happily passes.</p>
+    <p>hbrefactor follows the directive to where it dies:</p>
+    <div class="code-card">
+      <div class="code-top">terminal</div>
+<pre><code>$ hbrefactor rename app.hbp app.prg:4:22 MAX_RETRIES
+rename-dsl: RETRY_LIMIT -&gt; MAX_RETRIES
+  app.prg:4:20
+  app.prg:1:9
+  app.prg:8:8
+<span class="ok">verified</span>: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical</code></pre>
+    </div>
+    <p>The <span class="mono">#undef</span> on line 8 was renamed with the rest, so the constant still ends exactly where you said it ends. The same holds for <span class="mono">#xuncommand</span> and <span class="mono">#xuntranslate</span> — a command or translate rule has a lifetime too. This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#undef</span> in your source — blind to the abbreviated spellings, to the six forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
+  </div>
+</section>
+
+<!-- §5c ask the preprocessor, don't guess (P11) -->
+<section>
+  <div class="narrow">
+    <p class="sec-eyebrow">Going deeper</p>
+    <h2>"Would this new name collide?" — it asks the preprocessor instead of guessing</h2>
+    <p>A <span class="mono">#command</span> matches its keywords <strong>abbreviated</strong>. <span class="mono">#command LISTAR</span> is also matched by <span class="mono">LIST</span>, <span class="mono">LISTA</span>, <span class="mono">LISTAR</span> — from four letters on. So renaming one directive can quietly <b class="emph">hijack</b> another: give a rule a new head that happens to be an abbreviation of a rule that already exists, and the preprocessor starts routing your calls to the wrong one.</p>
+    <p>The tool refuses, and names the rule you would have collided with:</p>
+    <div class="code-card">
+      <div class="code-top">terminal</div>
+<pre><code>$ hbrefactor rename app.hbp app.prg:4:4 LIST
+hbrefactor: 'LIST' colide por abreviação com a regra #command LISTAR (c.ch:2)</code></pre>
+    </div>
+    <p>What matters is <strong>who decided that</strong>. hbrefactor does not reimplement Harbour's matching rule — it starts a <strong>live preprocessor</strong>, feeds it the name you want, and watches whether the rule fires. The authority on "does this collide" is the same preprocessor that will compile your code tomorrow; when Harbour's rule changes, the answer changes with it, and nothing here has to be kept in sync. The difference is not academic: the earlier version <em>did</em> reimplement the rule — and it refused renames that were perfectly safe, because a hand-written copy of a compiler's logic is always a worse copy.</p>
   </div>
 </section>
 

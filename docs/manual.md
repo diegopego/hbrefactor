@@ -1,20 +1,25 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@437a6a6 · harbour-core@0da1ee6277 (feature/compiler-ast-dump)
-    — the CORE did not move this round (no new ast-N); everything below is tool-side.
-      NEW CAPABILITY: renaming a class DATA/VAR member (commit 437a6a6, slice 1). What
-      used to be an honest refusal ("that's a VAR/DATA, not a method" — a deliberate v1
-      limit) is now a verified rename: the declaration, every read, every write, and the
-      class's internal registration move together. Reading and writing a member are two
-      distinct messages to the compiler (NAME and _NAME) and BOTH are renamed and proven
-      against the symbol table; a member name shared by two classes is refused (dynamic
-      dispatch, genuinely ambiguous) exactly as homonymous methods already were. New
-      section "A class's data, not just its methods"; case 110 (fixture fixdata) plus
-      case 48 re-baselined. Phase P/P2 also landed (renaming a DSL word that both BUILDS
-      and REFERENCES is safe — rolls back or re-derives, never silently wrong): that is a
-      guarantee of the EXISTING rename, already covered in principle by "Same name,
-      different owner", so no new body text — it lives in CHANGELOG 2026-07-11.
+  baseline: hbrefactor@7021c89 · harbour-core@a465e85bd1 (feature/compiler-ast-dump)
+    — this round the CORE moved three schema steps (ast-14, ast-15, ast-16), and two of
+      them changed what the tool can promise the user:
+      * NEW SECTION "A directive can be switched off — and the rename follows it there"
+        (ast-16, case 117). A `#undef` / `#xuncommand` ends a directive's life. Renaming
+        the directive used to leave that switch-off behind, pointing at a name that no
+        longer existed — so it turned off NOTHING and the directive LEAKED past the line
+        where the programmer ended it, silently, with the compiled output byte-identical
+        either way. The removal directive is now renamed along with the rule it ends.
+      * NEW SECTION '"Would this new name collide?" — it asks the preprocessor instead of
+        guessing' (phase P/P11). `#command` matches its keywords abbreviated, so a rename
+        can hijack another rule. The tool used to REIMPLEMENT that matching rule and
+        therefore refused safe renames; it now starts a live preprocessor and lets the
+        real authority answer.
+      CORRECTED, and worth stating plainly: this file claimed "1085 of 1085 modules
+      byte-identical" as the zero-impact proof. That figure is NOT reproducible — it was
+      measured by hand, once, with no script. Re-measured 2026-07-12 with
+      tools/pcode-identity.sh: 889/889 identical, ZERO divergences. The claim holds; the
+      count was fantasy. The body now points at the measurement, not at a number.
   suite at baseline: 112 cases, 913 checks green
   updated: 2026-07-12
 
@@ -135,8 +140,9 @@ Harbour's compiler had to start handing them over — so we extended it. Which r
 question: *what did you do to my compiler?* Nothing, unless you ask. The new information is
 emitted only behind a switch; with that switch off — the state every existing project is in —
 the patched compiler produces the **same bytes** as the one you use today. Measured, not
-asserted: **1085 of 1085** compiled modules byte-identical, and every `.prg` in Harbour's own
-`src/` identical to the pre-patch binary. That work lives on a branch of Harbour itself and has
+asserted — and you can re-run the measurement yourself: every `.prg` in the Harbour tree is
+compiled by **both** compilers with the switches off and compared byte for byte, with **zero
+divergences**. That work lives on a branch of Harbour itself and has
 **its own page**, written for the Harbour maintainers:
 **[extending the compiler without breaking anything](https://diegopego.github.io/harbour-core/)**
 (source: `harbour-core/site/index.html`; user-facing log: `harbour-core/NEWS.md`).
@@ -442,6 +448,84 @@ it — and the tool only edits an occurrence whose owner is proven. Honest limit
 module mixes the two roles so tightly that even the symbol table can't separate them,
 the tool still refuses and rolls back rather than guess.
 
+### A directive can be switched off — and the rename follows it there
+
+<!-- prov: case 117 (fixture fixun, invented non-mirror DSL); harbour-core 611e0c45cc
+     (ast-16: the removal directive enters the rule table with its pattern POSITIONED,
+     and carries `undoes` = the id of the rule it removed, or null when it removed
+     nothing); live-run 2026-07-12 (scratchpad, output below verbatim). -->
+
+A `#define` does not have to live to the end of the file. You can turn it off:
+
+```harbour
+#define RETRY_LIMIT 3
+
+PROCEDURE Main()
+   LOCAL nTries := RETRY_LIMIT
+   ? nTries
+   RETURN
+
+#undef RETRY_LIMIT      // from here on, RETRY_LIMIT means nothing again
+```
+
+That is an ordinary hygiene idiom — and it is a **trap for every refactoring tool**,
+because renaming the constant is only half the job. Rename `RETRY_LIMIT` and forget the
+`#undef`, and the switch-off is left pointing at a name that no longer exists. It then
+turns off **nothing**, and the definition **leaks** past the line where you ended it —
+silently changing the meaning of code the rename never touched. Worse, nothing catches
+it: if no site after the switch-off uses the word, the compiled output is byte-identical
+either way, so a "verified" check happily passes.
+
+hbrefactor follows the directive to where it dies:
+
+```
+$ hbrefactor rename app.hbp app.prg:4:22 MAX_RETRIES
+rename-dsl: RETRY_LIMIT -> MAX_RETRIES
+  app.prg:4:20
+  app.prg:1:9
+  app.prg:8:8
+verified: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical
+```
+
+The `#undef` on line 8 was renamed with the rest, so the constant still ends exactly
+where you said it ends. The same holds for `#xuncommand` and `#xuntranslate` — a
+command or translate rule has a lifetime too.
+
+This works because the compiler now **says** that a directive was removed, and *which*
+one it removed. Before, the preprocessor performed the removal and reported nothing; the
+tool could only have gone looking for the text `#undef` in your source — which would be
+blind to the abbreviated spellings, to the six forms the removal takes, and to a
+directive that arrives from an included header. The fact was the whole problem.
+
+### "Would this new name collide?" — it asks the preprocessor instead of guessing
+
+<!-- prov: phase P/P11, hbrefactor c391408 (the live pp as an oracle: __pp_init +
+     __pp_process, from the core's own tests/hbpp/hbpptest.prg); live-run 2026-07-12
+     (scratchpad, both outputs below verbatim). -->
+
+A `#command` matches its keywords **abbreviated**. `#command LISTAR` is also matched by
+`LIST`, `LISTA`, `LISTAR` — from four letters on. So renaming one directive can quietly
+**hijack** another: give a rule a new head that happens to be an abbreviation of a rule
+that already exists, and the preprocessor will start routing your calls to the wrong
+one.
+
+The tool refuses, and names the rule you would have collided with:
+
+```
+$ hbrefactor rename app.hbp app.prg:4:4 LIST
+hbrefactor: 'LIST' colide por abreviação com a regra #command LISTAR (c.ch:2)
+```
+
+What matters is **who decided that**. hbrefactor does not reimplement Harbour's matching
+rule — it starts a **live preprocessor**, feeds it the name you want, and watches whether
+the rule fires. The authority on "does this collide" is the same preprocessor that will
+compile your code tomorrow; when Harbour's rule changes, the answer changes with it, and
+nothing here has to be kept in sync.
+
+The difference is not academic. The earlier version *did* reimplement the rule — and it
+refused renames that were perfectly safe, because a hand-written copy of a compiler's
+logic is always a worse copy.
+
 ### The certainty ladder
 
 <!-- prov: labels from src SendVerdict; layers exercised by cases 61–63, 66, 70, 87,
@@ -590,9 +674,15 @@ drifts). It asks the official tools and reads the answer:
 <!-- prov: git log 0d3b4395..b07fef4060 on feature/compiler-ast-dump (25 commits, ~16
      substantive); schema ladder cross-checked with docs/ast-schema.md; W0019 commit
      b758cf376a; segfault fix in 29eb2aa940 (ast-8); parentage c2c26e5aa3 + b07fef4060;
-     ast-14 c7100f8cdb, ast-15 4d6deca13d; the 1085/1085 and 112/112 byte-identity
-     figures are the core commits' own measured zero-impact proofs (not re-derived here);
-     the maintainer-facing page is harbour-core/site/index.html. -->
+     ast-14 c7100f8cdb, ast-15 4d6deca13d, ast-16 611e0c45cc.
+     ZERO-IMPACT: this section used to cite "1085/1085 and 112/112 byte-identical",
+     taken on faith from the core commits. Neither figure is reproducible - they were
+     measured by hand, once, with no script, and they aged in silence. RE-MEASURED
+     2026-07-12 with tools/pcode-identity.sh (which now exists precisely so that
+     re-measuring is cheap): every .prg both compilers accept, built to portable pcode
+     with the new switches OFF, compared byte for byte -> 889/889 identical, ZERO
+     divergences. The CLAIM holds; the counts were fantasy. The maintainer-facing page
+     no longer prints a count at all - it prints the command. -->
 
 For those facts to exist, the compiler had to *emit* them. That work lives on a branch
 of Harbour itself — `feature/compiler-ast-dump` — and grew as a ladder of dump schemas,
@@ -615,6 +705,7 @@ one fact at a time:
 | `ast-13` | **rule genealogy**: a rule created by another rule's expansion records which application created it — and derivation now survives token clones, so a generated rule's artifacts stay traceable through its uses |
 | `ast-14` | a marker a rule *matches but never uses* is no longer indistinguishable from a word of the rule itself — the preprocessor stopped throwing the binding away |
 | `ast-15` | **which** word of the rule a token matched. `#command` accepts its keywords **abbreviated** (from 4 letters), so `GRAV` may be the rule's own keyword *or* `GRAVAR` cut short — only the preprocessor knows, and now it says so |
+| `ast-16` | a directive has a **lifetime**. `#undef` and `#xuncommand` switch one off partway through a file — the preprocessor did that and told nobody, so a tool renaming the directive left the switch-off behind, pointing at a name that no longer existed, and the directive silently **leaked** past the point where you turned it off |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
@@ -626,9 +717,9 @@ a missing type (it had blocked 18 methods in `hbhttpd`).
 That is the whole bet, and it is the part both Harbour programmers and Harbour **maintainers**
 care about most: **the compiler gives more information, and your build does not change.**
 With `-x` and `-kt` off — the state every existing project is in — the patched compiler emits
-the **same bytes** as the one you have today. Measured, not asserted: **1085 of 1085** compiled
-modules byte-identical, and every `.prg` under Harbour's own `src/` identical to the pre-patch
-binary.
+the **same bytes** as the one you have today. Measured, not asserted — and the measurement is a
+script you can run: every `.prg` the two compilers both accept is built to pcode by each and
+compared byte for byte, with **zero divergences**.
 
 The core branch has **its own page**, written for the Harbour maintainers — the consolidated
 case, the honest shape of the diff, the two bugs it fixes in *stock* Harbour, and what we still

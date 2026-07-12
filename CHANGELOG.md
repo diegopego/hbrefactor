@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@a74346f -->
+<!-- changelog-baseline: hbrefactor@7021c89 -->
 <!-- Ponteiro de delta. Tudo DEPOIS deste commit ainda NÃO está descrito aqui.
-     Para retomar:  git log a74346f..HEAD   (ver § Manutenção, no fim).
+     Para retomar:  git log 7021c89..HEAD   (ver § Manutenção, no fim).
 
 # Changelog
 
@@ -18,6 +18,27 @@ O compilador que sustenta tudo isto tem o seu próprio: **[harbour-core/NEWS.md]
 (../harbour-core/harbour/NEWS.md)** (branch `feature/compiler-ast-dump`). Lá o nome
 é `NEWS` por convenção GNU — o Harbour já tem um `ChangeLog.txt`, que é o log do
 *desenvolvedor*; `NEWS` é o do *usuário*.
+
+## 2026-07-12 — `dump`: os fatos do compilador, para você olhar com os próprios olhos
+
+Entrada **retroativa**: o comando existe desde o começo e nunca teve uma linha aqui.
+
+```
+$ hbrefactor dump meuprojeto.hbp
+```
+
+Ele compila o seu projeto e grava, para cada `.prg`, o que o **compilador sabe** —
+cada nome com a linha e a coluna onde você o escreveu, cada declaração com o seu
+escopo real, cada chamada, cada mensagem a um objeto, e as regras de preprocessador
+que o seu código usa. É a mesma informação que todos os outros comandos consomem;
+o `dump` só a coloca num arquivo e diz onde.
+
+Serve para **conferir a ferramenta em vez de acreditar nela**: se um `rename` recusou
+e você quer saber por quê, ou se quer construir a sua própria análise em cima dos
+fatos, o material está ali. Não edita nada.
+
+**Limite honesto:** o formato é versionado (`"schema"`) e **ainda muda** —
+é um canal para quem quer investigar, não uma API estável.
 
 ## 2026-07-12 — corrigido: renomear uma diretiva podia fazê-la VAZAR para fora do escopo
 
