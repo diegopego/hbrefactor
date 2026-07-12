@@ -1,8 +1,6 @@
-<!-- changelog-baseline: hbrefactor@a4bcf1e -->
+<!-- changelog-baseline: hbrefactor@c391408 -->
 <!-- Ponteiro de delta. Tudo DEPOIS deste commit ainda NÃO está descrito aqui.
-     Para retomar:  git log a4bcf1e..HEAD   (ver § Manutenção, no fim).
-     NOTA: a entrada do topo (sequestro de diretiva) descreve trabalho AINDA NÃO
-     COMMITADO - ao commitar, avançar este ponteiro para o SHA novo. -->
+     Para retomar:  git log c391408..HEAD   (ver § Manutenção, no fim).
 
 # Changelog
 
