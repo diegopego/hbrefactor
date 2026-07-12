@@ -1,6 +1,8 @@
-<!-- changelog-baseline: hbrefactor@0451e7f -->
+<!-- changelog-baseline: hbrefactor@a4bcf1e -->
 <!-- Ponteiro de delta. Tudo DEPOIS deste commit ainda NÃO está descrito aqui.
-     Para retomar:  git log 0451e7f..HEAD   (ver § Manutenção, no fim). -->
+     Para retomar:  git log a4bcf1e..HEAD   (ver § Manutenção, no fim).
+     NOTA: a entrada do topo (sequestro de diretiva) descreve trabalho AINDA NÃO
+     COMMITADO - ao commitar, avançar este ponteiro para o SHA novo. -->
 
 # Changelog
 
@@ -18,6 +20,80 @@ O compilador que sustenta tudo isto tem o seu próprio: **[harbour-core/NEWS.md]
 (../harbour-core/harbour/NEWS.md)** (branch `feature/compiler-ast-dump`). Lá o nome
 é `NEWS` por convenção GNU — o Harbour já tem um `ChangeLog.txt`, que é o log do
 *desenvolvedor*; `NEWS` é o do *usuário*.
+
+## 2026-07-12 — corrigido: renomear uma diretiva podia SEQUESTRAR outra, em silêncio
+
+Este é o mais grave que já corrigimos: o rename **passava**, dizia `verified`, e
+deixava o seu projeto quebrado — só que a quebra ficava **adormecida**.
+
+Você tem duas diretivas, e uma delas ainda não é usada em lugar nenhum:
+
+```harbour
+#command ROTULA <t> => qq_( <t>, 0 )     // existe, mas ainda sem nenhum uso
+#command PAUTAR <x> => qq_( <x>, 1 )
+```
+
+Você renomeia `PAUTAR` para `ROTULAGEM`. A ferramenta aceitava:
+
+```
+$ hbrefactor rename app.hbp seq.prg:4:4 ROTULAGEM
+rename-dsl: PAUTAR -> ROTULAGEM
+verified: 1 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical
+```
+
+**E a partir daí a sua `ROTULA` tinha sido sequestrada.** Como `#command` aceita a
+palavra abreviada a partir de 4 letras, `ROTULAGEM` passou a casar `ROTU`, `ROTUL`
+— e até `ROTULA` **escrita por extenso**:
+
+```harbour
+ROTULA 9      // você escreve isto, esperando  qq_( 9, 0 )
+              // e recebe                      qq_( 9, 1 )   ← o corpo da OUTRA
+```
+
+Sem erro, sem aviso. E a verificação da própria ferramenta não pegava: como
+`ROTULA` **não tinha nenhum uso**, não havia nada que mudasse de lugar — o programa
+compilava idêntico. A bomba só estourava no dia em que alguém escrevesse o primeiro
+`ROTULA`, provavelmente meses depois.
+
+**Agora a ferramenta recusa, e mostra a palavra exata que ficaria ambígua:**
+
+```
+$ hbrefactor rename app.hbp seq.prg:4:4 ROTULAGEM
+hbrefactor: 'ROTULAGEM' colide por abreviação com a regra #command ROTULA (seq.ch:1)
+            - depois do rename, escrever 'ROTU' casaria com as DUAS regras
+```
+
+**O que mudou por dentro, e por que importa para você:** a ferramenta tinha uma
+cópia própria da regra de abreviação do Harbour — e cópia envelhece e diverge.
+Agora ela **pergunta ao próprio preprocessador** se as duas palavras colidiriam,
+em vez de refazer a conta. Se o Harbour mudar a regra amanhã, a resposta continua
+certa.
+
+**Limite honesto:** só se recusa a ambiguidade que **o rename cria**. Se o seu
+projeto já tem duas diretivas em conflito (duas cabeças que começam com as mesmas
+4 letras já se disputam **hoje**, sem rename nenhum), a ferramenta **não** se mete
+— aquilo é escolha sua e não foi ela que criou.
+
+### E o conselho que vale mais que a correção: use `#xcommand`/`#xtranslate`
+
+Tudo isto — o sequestro acima, o aviso confuso da entrada seguinte, o `MENU` que
+casa duas diretivas — nasce de **uma** propriedade do `#command` e do `#translate`:
+eles aceitam a palavra **abreviada** a partir de 4 letras (herança do dBase/Clipper).
+
+O `#xcommand` e o `#xtranslate` são **idênticos em tudo**, exceto por isso: exigem a
+palavra **inteira**. Não se perde nenhuma capacidade — não é uma versão "limitada",
+é a mesma coisa sem a armadilha.
+
+```harbour
+#command  ROTULA <t> => qq_( <t>, 0 )   // ROTU, ROTUL, ROTULA... todos casam
+#xcommand ROTULA <t> => qq_( <t>, 0 )   // só ROTULA casa. Ambiguidade impossível.
+```
+
+**Em diretiva nova, prefira sempre as formas com `x`.** As formas sem `x` existem
+para compatibilidade com código Clipper antigo — e é por isso que a ferramenta
+continua entendendo as duas (o `std.ch` e o `hbclass.ch` do próprio Harbour são
+cheios delas). Mas no código que **você** escreve hoje, não há razão para pagar o
+preço.
 
 ## 2026-07-12 — corrigido: uma diretiva podia ficar com a cabeça IRRENOMEÁVEL
 

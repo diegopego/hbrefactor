@@ -86,6 +86,8 @@ para não me perder e para não repetir erro.
 | **ESTRUTURA da regra** | fixp6 | regra **sem cabeça**; grupos opcionais **fora de ordem**; **multi-passe** (regra que expande em regra) e o limite da palavra emitida | [rule-structure.md](rule-structure.md) |
 | **ABREVIAÇÃO dBase** | ppcore.c:2533 | `#command` casa a keyword **pela metade** (>= 4 letras) — e por que só o pp sabe qual palavra é qual (`ast-15`/`ruletok`) | [abbreviation.md](abbreviation.md) |
 | **PP como INSTRUMENTO** | hbpptest.prg | os **canais do core** (`.ppo`/`.ppt`/`-u`/`-gd`/`-x`/`__pp_process`): o que cada um dá e o que **destrói** | [pp-as-instrument.md](pp-as-instrument.md) |
+| **PP como ENGENHO DE BUSCA** | *(plano — P12)* | casar para **ACHAR**, não para transformar: busca estrutural, lint e codemod na linguagem que o usuário já sabe | [pp-as-search.md](pp-as-search.md) |
+| **ESCOPO DE DIRETIVA** | ppcore.c:6394 | `#uncommand`/`#xuntranslate`: a regra tem **tempo de vida**. Um BUG e uma LACUNA (`ast-16`) já provados | [directive-scope.md](directive-scope.md) |
 
 Planejadas (ver [ROADMAP.md](ROADMAP.md)): um contrib rico (hbct) para MEDIÇÃO;
 `TEXT … ENDTEXT` (a maquinaria de *stream*, onde o `strdump`/`%s` vive de fato);

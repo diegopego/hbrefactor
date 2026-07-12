@@ -537,22 +537,61 @@ suíte (responde ao critério de matar do adr-003).
   [spec-p § P8](spec-p-pp-refatoracao.md).
 - **P9** custo do reverse-scan O(tokens×from) (adr-003:96-98); **P10**
   síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
-- **P11 — `__pp_process` / `hb_compileFromBuf`: o pp como motor IN-PROCESS
-  (ordem do Diego, 2026-07-12; REABRE o veredito do P7)**. Fonte:
+- **P11 — ENTREGUE (2026-07-12): o pp VIVO como oráculo; morre a última gramática
+  replicada, e com ela um SEQUESTRO DE REGRA silencioso.** A API está mapeada e a
+  **equivalência com o pp do build foi PROVADA** (mesma regra, mesmo site, mesmo
+  texto — `make ppcorpus`). O limite honesto: **o pp destrói o que você ALIMENTA**,
+  não "o arquivo" — a linha inteira entra e o comentário dela não volta; logo o
+  escritor alimenta o **span da statement** (posições que o dump já tem) e grava só
+  o span. Isso **confirma o Diego e derruba a minha recusa do P7** de vez.
+  **Consumo (caso 116):** o `AbbrevClash` — que replicava a aritmética dBase do
+  `ppcore.c` — foi substituído por uma **regra-sonda** perguntada ao pp. A réplica
+  era degradada em 3 frentes (ignorava o TIPO do token; passava `"?"` como tipo da
+  regra renomeada, desligando meia checagem; só via "uma cabeça é prefixo da
+  outra") e escondia um furo **provado, não deduzido**: renomear uma cabeça para um
+  nome que começa com 4+ letras da cabeça de outra regra **sequestrava** essa outra
+  regra — e como ela podia não ter **nenhum site**, o `.ppo`/`.hrb` saía
+  byte-idêntico e a ferramenta imprimia *"verified"*. Ambiguidade **latente**,
+  silenciosa. Agora recusa-se **só o que o rename CRIA** (a ambiguidade
+  pré-existente é do usuário — `MENUITEM`/`MENUBOX` já disputam `MENU` hoje) e a
+  recusa exibe a **grafia-testemunha**. Completude sem constante mágica: varre-se
+  **todo** prefixo do nome novo e o **pp** diz quais casam. Suíte **904/0**,
+  `ppcorpus` **42/0**, **zero core** (o canal certo já existia — era só parar de
+  replicá-lo). → [pp-corpus/pp-as-instrument.md](pp-corpus/pp-as-instrument.md) ·
+  [pp-corpus/abbreviation.md](pp-corpus/abbreviation.md). **Pendente: o portão
+  D-P5** (migração de DSL como verbo) — agora com o instrumento CERTO na mão.
+  A fonte que derrubou a recusa do P7 foi apontada pelo Diego:
   [`tests/hbpp/hbpptest.prg`](../../harbour-core/harbour/tests/hbpp/hbpptest.prg)
-  do core — `pp := __pp_init()` + `__pp_process( pp, cLinha )` expõem o pp
-  **vivo, em processo, dirigido por código Harbour, LINHA A LINHA**. Isso
-  **derruba a premissa da recusa do P7**: eu recusei "pp como escritor" porque o
-  `.ppo` apaga comentários/`#include`/formatação — mas isso é propriedade do
-  canal de ARQUIVO (`-p` despeja o módulo inteiro), **não do pp**. Com
-  `__pp_process` a ferramenta escolhe O QUE alimentar (só a statement do site,
-  cujas posições ela já tem do dump) e recebe só aquilo transformado — o resto do
-  arquivo nunca passa pelo pp, logo não pode ser destruído. "O pp calcula o QUE,
-  a ferramenta escreve o ONDE" vira uma chamada direta ao motor do core, sem o
-  desenho indireto `-u`+`.ppo`. Escopo: mapear a API (`__pp_init`/`__pp_process`
-  + `hb_compileFromBuf`, já fichado na [spec-b8](spec-b8-macros.md)), provar
-  equivalência com o pp do build, e decidir o **D-P5** (migração de DSL como
-  verbo) com o instrumento CERTO na mão.
+  do core — o `hb_compileFromBuf` (fichado na [spec-b8](spec-b8-macros.md)) NÃO foi
+  preciso: a fatia pedia o **pp**, não o compilador inteiro em buffer.
+- **P12 — o pp como ENGENHO DE BUSCA (ideia do Diego, 2026-07-12)**: usar o
+  casador do pp para **ACHAR**, não para transformar — busca estrutural, lint com
+  regras do usuário, codemod. O trunfo não é técnico e sim de adoção: a linguagem
+  de consulta seria a do `#xcommand`, que **todo programador Harbour já sabe
+  escrever** — e quem casa é o casador do CORE, não uma réplica. Hipótese central a
+  sondar: o canal de fato **já existe** (`ppApplications` + ast-13/14/15 dão site,
+  posições e o que casou em cada marker); o que falta é **injetar a regra de
+  consulta** — e uma regra **no-op** com o `<@>` (o guarda anti-recursão, já fichado
+  no corpus) pode registrar a aplicação **sem alterar o código**. Se confirmar,
+  a 1ª versão sai **sem mudança no core**. Plano de sondagem, usos candidatos e
+  limites honestos: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-search.md)**.
+  **NADA PROVADO AINDA** — o arquivo é plano, não registro.
+- **P13 — ESCOPO DE DIRETIVA / `#un*` (ideia do Diego, 2026-07-12)**: a diretiva NÃO
+  vale para o arquivo inteiro — ela tem **tempo de vida léxico** (`#xcommand` …
+  `#xuncommand`). A sondagem inicial já rendeu DOIS achados provados, antes de a
+  fatia começar: **(a) BUG no hbrefactor** — o `rename` de cabeça de DSL ignora o
+  `#un*`, deixa-o **órfão**, e a regra **VAZA** para além do ponto de desligamento
+  (provado por `.ppo`: um uso depois do `#xuncommand` que era código CRU passa a
+  EXPANDIR); a rede `.ppo`/`.hrb` **não pega**, o mesmo ponto cego do sequestro do
+  P11. **(b) LACUNA DO CORE (`ast-16`)** — o dump **não exporta** o `#un*`: o
+  `ppRules` traz só a regra criada, e a diretiva de remoção é **invisível**. O pp
+  SABE (ele executou a remoção); o dump descarta — **a mesma omissão do `ast-14` e
+  do `ast-15`, pela terceira vez**. Pela regra do Diego ("lacuna pausa e
+  experimenta"), o conserto do bug **espera o `ast-16`**: procurar `#xuncommand` por
+  TEXTO seria réplica de gramática (cega para as 6 grafias, para a abreviação
+  `#UNCOMM` e para o `.ch` incluído). Usos que o escopo promove (a explorar): é o
+  mecanismo de **injeção/remoção da regra de consulta** que faltava ao **P12**, e
+  habilita codemod com escopo. → [pp-corpus/directive-scope.md](pp-corpus/directive-scope.md)
 - **P-AUDIT — 1º achado ENTREGUE: `ast-15` (2026-07-12, caso 115)**. A varredura
   achou de cara **réplica de gramática + RECUSA FALSA**, o mesmo formato do bug do
   P5. `AbbrevClash` reescreve à mão a abreviação dBase do pp (regra real:
@@ -868,7 +907,21 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
   `ACCESS`/`ASSIGN` (getter/setter explícitos), DATA herdada de superclasse, e o
   `resolve-at` de `::membro` escopando a classe (rename a partir do site de USO).
 
-0. **Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
+0. **Manutenção de doc de USUÁRIO em atraso (2026-07-12)**: o `docs/manual.md` está
+   com baseline em `hbrefactor@437a6a6` — quatro entregas atrás (rename-DATA, fase
+   P/P3-P8, `ast-15`, `ast-16`/P11). A `site/index.html` deriva dele e segue junto.
+   Os DOIS CHANGELOGs estão em dia (têm ponteiro próprio); o manual não. Rodar a
+   `/update-manual` em modo catch-up — **o delta do manual exige o OK do Diego antes
+   de aplicar** (invariante 1 da skill). Não é bloqueante para nenhuma fase.
+
+0b. **Higiene da suíte: o compilador deixa lixo no repo (2026-07-12)**: cada
+   `make test` deixa um `sh1.c` na RAIZ do repositório (o `harbour` grava o `.c` no
+   **CWD**, não ao lado do fonte — a mesma armadilha do `.d` do `-gd`). Hoje some no
+   `git status` por sorte de ninguém ter commitado. Conserto: mandar a saída para
+   um tmp (`-o<dir>`) no site que roda o compilador a partir da raiz. Ecoa a regra
+   "ferramenta do core: PROBE, nunca memória" do CLAUDE.md.
+
+0c. **Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
    verificação proporcional à edição quando o uso real doer.
 1. **Análise de programa inteiro (tipos interprocedurais)** — **PROMOVIDA
    para a fase B7 (2026-07-08)**, spec no portão:

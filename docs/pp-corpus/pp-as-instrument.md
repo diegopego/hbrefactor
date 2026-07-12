@@ -24,7 +24,7 @@ Registro de fase: [spec-p § P7](../spec-p-pp-refatoracao.md).
 | `-u` | **isola**: aplica só as SUAS regras, deixa o resto da linguagem em paz | ainda passa pelo `.ppo` (mesma destruição) |
 | `-gd` (+ `-sm`) | **lista de dependências** (`.d`): quais includes o módulo usou, com o **caminho onde achou**, fecho transitivo | grava o `.d` no **CWD** (não ao lado do fonte) — use `-o<dir>` |
 | `-x` → **dump AST** | o rastro estruturado (`ppRules`/`ppApplications`/`from`) | é o canal do hbrefactor; descreve o que **casou**, não o que casaria |
-| **`__pp_init` / `__pp_process`** | o pp **vivo, em processo, LINHA A LINHA**, dirigido por código Harbour | *(a explorar — fatia P11)* |
+| **`__pp_init` / `__pp_process`** | o pp **vivo, em processo, LINHA A LINHA**, dirigido por código Harbour | destrói **o que você ALIMENTA** (comentário da linha entra no pp e não volta) — nada mais |
 
 ---
 
@@ -101,22 +101,61 @@ destruído.
 "O pp calcula o QUE, a ferramenta escreve o ONDE" deixa de exigir o desenho
 indireto `-u` + `.ppo` e vira uma **chamada direta ao motor do core**.
 
-**Consumidores candidatos (fatia P11):**
-1. **Migração de DSL** (portão D-P5): a regra de migração computa o texto novo, a
-   ferramenta escreve por posição de byte, comentários preservados.
-2. **Matar o resíduo do `AbbrevClash`** ([abbreviation.md](abbreviation.md)):
-   *"o nome NOVO colidiria com outra cabeça sob abreviação?"* é predição de
-   casamento FUTURO — em vez de replicar a aritmética do `ppcore.c:2533`,
-   **pergunte ao pp**: registre as regras, alimente o nome novo, veja se casa.
+### A API, mapeada (P11)
+
+| função | contrato |
+|---|---|
+| `__pp_init( [cIncPath], [cStdCh], [lArchDefs] ) --> pPP` | novo estado. `cStdCh = ""` → **nenhuma** regra padrão (só os defines dinâmicos); `lArchDefs = .F.` → nem esses. É o **isolamento total** |
+| `__pp_addRule( pPP, cDiretiva ) --> lOK` | registra uma diretiva (tem de começar com `#`) |
+| `__pp_process( pPP, cLinha ) --> cLinhaTransformada` | **uma linha** entra, a linha **transformada** sai. Diretiva também vai por aqui |
+| `__pp_reset( pPP )` / `__pp_path( pPP, cPath )` | zera as regras / acrescenta caminho de include |
+
+### EQUIVALÊNCIA com o pp do build — **PROVADA** (`make ppcorpus`)
+
+Mesma regra, mesmo site: o pp vivo devolve `MODERNO Alfa VALOR nX` — **o mesmo
+texto** que o `.ppo` do build produz. É o mesmo motor, não uma imitação.
+
+### O limite honesto: o pp destrói **o que você ALIMENTA** (não "o arquivo")
+
+Aqui a lição do P7 fica afiada. Alimentando a **linha inteira**:
+
+```
+'ANTIGO Alfa COM nX   // manter!'   -->   'MODERNO Alfa VALOR nX'
+```
+
+O comentário **morreu**. Ou seja: o pp *come comentário*, sim — mas só o da linha
+que entra nele. O `.ppo` apaga o arquivo todo porque **alimenta o arquivo todo**.
+
+Daí a **regra do escritor**, e é ela que separa o viável do recusado:
+
+> **alimente o SPAN da statement** (as posições de byte a ferramenta já tem do
+> dump) e **grave só aquele span**. Tudo que está fora — o comentário de fim de
+> linha, o resto do arquivo — **nunca passa pelo pp**, logo não pode ser destruído.
+
+Com isso, *"o pp calcula o QUE, a ferramenta escreve o ONDE"* deixa de ser desenho
+indireto (`-u` + `.ppo`) e vira **chamada direta ao motor do core**.
+
+### Consumidor #1 já em produção: a ambiguidade de cabeça (P11, caso 116)
+
+*"O nome NOVO colidiria com a cabeça de outra regra sob abreviação dBase?"* é
+predição de casamento **FUTURO** — o dump descreve o que **casou**, não o que
+casaria. Era o último pedaço de **gramática replicada** na ferramenta
+(`ppcore.c`, o `>= 4`). Agora **pergunta-se ao pp**: registra-se num pp isolado uma
+**regra-sonda** com aquela cabeça e aquele tipo, alimenta-se a grafia e vê-se se
+saiu transformada. Zero aritmética. Detalhes e o furo que isso fechou:
+[abbreviation.md](abbreviation.md).
 
 ---
 
 ## Lacunas (VERIFICADO)
 
-- **[A explorar — P11]** A API `__pp_init`/`__pp_process` (+ `hb_compileFromBuf`,
-  já fichada na [spec-b8](../spec-b8-macros.md)) não foi mapeada: falta provar
-  equivalência com o pp do build e medir o que ela expõe (erros? posições? o estado
-  de regras registradas?).
+- **[Consumo futuro]** `hb_compileFromBuf` (fichado na
+  [spec-b8](../spec-b8-macros.md)) segue sem consumidor: o P11 precisou do **pp**,
+  não do compilador inteiro em buffer.
+- **[Consumo futuro]** O que o pp vivo NÃO devolve: **posição** e **erro**. O
+  `__pp_process` entrega texto — quem quiser *onde casou* usa o dump
+  (`ppApplications`), não esta API. É o que a fatia **P12**
+  ([pp-as-search.md](pp-as-search.md)) terá de resolver para virar busca.
 - **[Fato, não lacuna]** `.ppt` é **traço**, não grafo: prova que a informação
   existe no pp, mas é texto sem identidade estável de token entre passes. Quem
   precisa de estrutura usa o `from` (ast-3), não re-roteia o `.ppt`.

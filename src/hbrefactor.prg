@@ -19,6 +19,13 @@
 #define EXIT_REFUSED  1
 #define EXIT_USAGE    2
 
+// sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
+#define PP_PROBE_HIT "__HBREF_PP_HIT__"
+
+// memória das sondas do pp: "tipo|cabeça" -> estado pp; "tipo|cabeça|grafia" -> casou?
+STATIC s_hPpProbe := NIL
+STATIC s_hPpHit := NIL
+
 PROCEDURE Main()
 
    LOCAL aArgs := hb_AParams()
@@ -2603,8 +2610,10 @@ STATIC FUNCTION RuleHeadCollision( hAst, cUpNew )
 
    IF hb_HHasKey( hAst, "ppRules" )
       FOR EACH hRule IN hAst[ "ppRules" ]
+         // o nome novo é um IDENTIFICADOR (não tem regra própria): a pergunta
+         // é só "escrever este nome casaria com esta regra?" - pergunta-se ao pp
          IF hRule[ "head" ] != NIL .AND. ;
-            AbbrevClash( cUpNew, "?", Upper( hRule[ "head" ] ), hRule[ "kind" ] )
+            PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew )
             RETURN hRule
          ENDIF
       NEXT
@@ -5890,6 +5899,7 @@ STATIC FUNCTION RenameDsl( aArgs )
    LOCAL hPpoBefore := { => }, cPpo, cCwd
    LOCAL lTarget, hTargetKeys := { => }, aMk
    LOCAL nRTok, lOurs                    // ast-15: QUAL literal da regra o site casou
+   LOCAL hTgt, cWitness                  // P11: ambiguidade julgada pelo pp VIVO
 
    IF Len( aArgs ) < 4
       Usage()
@@ -5971,14 +5981,14 @@ STATIC FUNCTION RenameDsl( aArgs )
                RETURN Refuse( "'" + cNew + "' já é cabeça de regra (" + RuleTag( hRule ) + ;
                               ", " + RuleWhere( hRule ) + ")" )
             ENDIF
-            // abreviação dBase: #command/#translate casam cabeça abreviada
-            // em 4+ letras - colisão nova OU velha com outra regra recusa
-            IF AbbrevClash( cUpNew, "?", Upper( hRule[ "head" ] ), hRule[ "kind" ] )
-               RETURN Refuse( "'" + cNew + "' colide por abreviação (4 letras) com a regra " + ;
+            // escrever o nome NOVO casaria com esta regra? (abreviação dBase
+            // inclusive) - quem responde é o pp, não aritmética local
+            IF PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew )
+               RETURN Refuse( "'" + cNew + "' colide por abreviação com a regra " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
             ENDIF
-            IF AbbrevClash( cUpOld, "?", Upper( hRule[ "head" ] ), hRule[ "kind" ] )
-               RETURN Refuse( "'" + cOld + "' colide por abreviação (4 letras) com a regra " + ;
+            IF PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpOld )
+               RETURN Refuse( "'" + cOld + "' colide por abreviação com a regra " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ") - " + ;
                               "ambiguidade pré-existente, resolva antes do rename" )
             ENDIF
@@ -6001,6 +6011,35 @@ STATIC FUNCTION RenameDsl( aArgs )
       RETURN Refuse( "'" + cOld + "' não é palavra de match de regra de pp do projeto " + ;
                      "(cabeça, keyword secundária ou restrição)" )
    ENDIF
+
+   // SEQUESTRO REVERSO: a cabeça RENOMEADA passa a casar grafias que hoje são
+   // de OUTRA regra. Só dá para perguntar isto aqui: a resposta depende do TIPO
+   // da regra renomeada (é ele que liga/desliga a abreviação), e o tipo só é
+   // fato depois que os alvos são conhecidos. Furo real que isto fecha: a
+   // outra regra pode não ter NENHUM site no projeto - aí o .ppo/.hrb não vê
+   // diferença nenhuma e a rede de verificação passa batido, deixando o
+   // projeto com uma ambiguidade latente (a regra sequestrada só quebra no
+   // próximo site que alguém escrever).
+   FOR EACH hTgt IN aTargets
+      IF hTgt[ "head" ] == NIL .OR. ! Upper( hTgt[ "head" ] ) == cUpOld
+         LOOP   // alvo não é cabeça: o rename não muda cabeça nenhuma
+      ENDIF
+      FOR EACH cPath IN hProj[ "files" ]
+         FOR EACH hRule IN hAsts[ cPath ][ "ppRules" ]
+            IF hRule[ "head" ] == NIL .OR. Upper( hRule[ "head" ] ) == cUpOld
+               LOOP
+            ENDIF
+            cWitness := HeadClashWitness( cUpNew, cUpOld, hTgt[ "kind" ], ;
+                                          Upper( hRule[ "head" ] ), hRule[ "kind" ] )
+            IF ! Empty( cWitness )
+               RETURN Refuse( "'" + cNew + "' colide por abreviação com a regra " + ;
+                              RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" + ;
+                              " - depois do rename, escrever '" + cWitness + ;
+                              "' casaria com as DUAS regras" )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
 
    // sequestro: o nome novo já vive no projeto como identificador ou como
    // palavra de outra regra em aplicações - a regra renomeada o capturaria
@@ -6519,24 +6558,78 @@ STATIC PROCEDURE AbsEditsAdd( hEdits, cPath, aNew )
 
    RETURN
 
-// colisão por abreviação dBase: cabeças de #command/#translate (famílias
-// sem 'x') casam abreviadas em >= 4 letras - uma palavra e uma cabeça
-// colidem quando uma é prefixo >= 4 da outra (ou iguais)
-STATIC FUNCTION AbbrevClash( cUpA, cKindA, cUpB, cKindB )
+// ---------------------------------------------------------------------------
+// O PP VIVO como oráculo de casamento de cabeça (__pp_init/__pp_process).
+//
+// Pergunta: "a grafia cUpWritten casaria com a cabeça cUpHead de uma regra
+// deste tipo?" Quem responde é o CASADOR DO CORE, não aritmética replicada
+// aqui: registramos num pp ISOLADO uma regra-sonda com aquela cabeça e
+// aquele tipo, alimentamos a grafia e vemos se saiu transformada.
+//
+// Por que a sonda SEM markers é fiel para a cabeça: a decisão de casamento de
+// um token de padrão é hb_pp_tokenEqual() sob o MODO da regra, e o modo é
+// propriedade do TIPO (pRule->mode) - o resto do padrão não participa da
+// decisão sobre a cabeça. Assim a sonda reproduz exatamente o que o pp fará.
+// ---------------------------------------------------------------------------
 
-   IF cUpA == cUpB
-      RETURN .T.
+STATIC FUNCTION PpHeadHit( cUpHead, cKind, cUpWritten )
+
+   LOCAL cKey := cKind + "|" + cUpHead
+   LOCAL cHitKey := cKey + "|" + cUpWritten
+   LOCAL pPp, cDir
+
+   IF s_hPpProbe == NIL
+      s_hPpProbe := { => }
+      s_hPpHit := { => }
    ENDIF
-   IF hb_BLen( cUpA ) >= 4 .AND. cUpA == Left( cUpB, hb_BLen( cUpA ) ) .AND. ;
-      ( cKindB == "command" .OR. cKindB == "translate" )
-      RETURN .T.
-   ENDIF
-   IF hb_BLen( cUpB ) >= 4 .AND. cUpB == Left( cUpA, hb_BLen( cUpB ) ) .AND. ;
-      ( cKindA == "command" .OR. cKindA == "translate" )
-      RETURN .T.
+   IF hb_HHasKey( s_hPpHit, cHitKey )
+      RETURN s_hPpHit[ cHitKey ]
    ENDIF
 
-   RETURN .F.
+   IF hb_HHasKey( s_hPpProbe, cKey )
+      pPp := s_hPpProbe[ cKey ]
+   ELSE
+      pPp := __pp_init( , "", .F. )   // isolado: sem std rules, sem arch defines
+      IF pPp == NIL
+         RETURN .F.
+      ENDIF
+      cDir := iif( cKind == "define", ;
+                   "#define " + cUpHead + " " + PP_PROBE_HIT, ;
+                   "#" + cKind + " " + cUpHead + " => " + PP_PROBE_HIT )
+      __pp_process( pPp, cDir )
+      s_hPpProbe[ cKey ] := pPp
+   ENDIF
+
+   s_hPpHit[ cHitKey ] := PP_PROBE_HIT $ Upper( __pp_process( pPp, cUpWritten ) )
+
+   RETURN s_hPpHit[ cHitKey ]
+
+// a GRAFIA que o rename tornaria ambígua entre a cabeça renomeada e a cabeça
+// de OUTRA regra - a testemunha concreta ("" quando o rename não cria nenhuma).
+//
+// Completude sem limiar mágico: toda grafia que casa uma cabeça é PREFIXO dela
+// (hb_pp_tokenValueCmp compara por prefixo no modo dBase e por igualdade nos
+// demais), logo varrer TODOS os prefixos da cabeça nova cobre todo candidato.
+// Quais deles casam, quem diz é o pp.
+//
+// Só conta a ambiguidade que o rename CRIA: se a grafia já era ambígua com o
+// nome VELHO, ela é do código do usuário e não fomos nós que a introduzimos -
+// recusar aí seria punir o usuário por uma condição pré-existente (acontece de
+// verdade: duas cabeças com prefixo comum de 4 letras já se disputam hoje).
+STATIC FUNCTION HeadClashWitness( cUpNew, cUpOld, cKindSelf, cUpOther, cKindOther )
+
+   LOCAL nI, cTry
+
+   FOR nI := 1 TO hb_BLen( cUpNew )
+      cTry := hb_BLeft( cUpNew, nI )
+      IF PpHeadHit( cUpNew, cKindSelf, cTry ) .AND. ;
+         PpHeadHit( cUpOther, cKindOther, cTry ) .AND. ;
+         ! PpHeadHit( cUpOld, cKindSelf, cTry )
+         RETURN cTry
+      ENDIF
+   NEXT
+
+   RETURN ""
 
 // resolve o arquivo da diretiva como o pp resolveu o include: caminho como
 // registrado (absoluto ou relativo ao cwd) ou pelos -i do projeto

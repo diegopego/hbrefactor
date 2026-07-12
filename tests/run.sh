@@ -2089,7 +2089,7 @@ RC=$?
 check "rename-function com o nome no CORPO da regra: recusa ACIONÁVEL (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 # B4g: a recusa deixou de ser cega - nomeia diretiva+posição (match[]/
 # result[] do ast-5) ANTES de qualquer edição e oferece --edit-rules
-grep -q "suga.ch:2:" "$D/rf.log" && grep -q "in rule result (#command DOBRA)" "$D/rf.log" && \
+grep -q "suga.ch:2:" "$D/rf.log" && grep -q "in rule result (#xcommand DOBRA)" "$D/rf.log" && \
    grep -q -- "--edit-rules" "$D/rf.log" && grep -q "FUNCTION Dobro( n )" "$D/sf1.prg" && \
    grep -q "Dobro( <v> )" "$D/suga.ch"
 check "recusa NOMEIA diretiva+posição, oferece --edit-rules; nada editado" $?
@@ -3834,6 +3834,60 @@ check "recusa legitima: fontes intactos" $?
 check "a ferramenta não menciona NENHUMA palavra da DSL fixabr (régua do caso 64)" $?
 }
 
+freshseq() { # freshseq <case-name> -> sequestro REVERSO da cabeca (P11)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixseq/*.prg "$HERE"/fixseq/*.ch "$HERE"/fixseq/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_116() {
+echo "case 116: P11 - o pp VIVO julga a ambiguidade de cabeca (__pp_init/__pp_process); morre a replica da aritmetica dBase"
+# O FURO PROVADO: a ferramenta replicava a abreviacao dBase (ppcore.c) e so
+# olhava "uma cabeca e prefixo da outra". Faltava o SEQUESTRO REVERSO: a cabeca
+# RENOMEADA passa a casar grafias que hoje sao de OUTRA regra. Como a regra
+# sequestrada (ROTULA) nao tem NENHUM site, o .ppo/.hrb sai byte-identico e a
+# rede de verificacao passa batido - o rename era ACEITO e deixava o projeto
+# com ambiguidade LATENTE (antes desta fatia: exit 0 e ROTULA sequestrada).
+"$HB_BIN/harbour" "$HERE/fixseq/seq.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixseq" > /dev/null 2>&1
+check "fixseq/seq.prg clean under -w3 -es2" $?
+
+# --- (1) o sequestro reverso e RECUSADO, e a recusa traz a TESTEMUNHA
+D=$(freshseq case116)
+( cd "$D" && "$BIN" rename seq.hbp seq.prg:4:4 ROTULAGEM > s.log 2>&1 )
+RC=$?
+check "sequestro reverso recusado (antes: exit 0, ambiguidade latente)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "ROTULA" "$D/s.log" && grep -q "abreviação" "$D/s.log"
+check "a recusa NOMEIA a regra sequestrada" $?
+grep -q "escrever 'ROTU' casaria com as DUAS regras" "$D/s.log"
+check "a recusa exibe a GRAFIA-TESTEMUNHA (fato do pp, nao aritmetica)" $?
+cmp -s "$D/seq.ch" "$HERE/fixseq/seq.ch" && cmp -s "$D/seq.prg" "$HERE/fixseq/seq.prg"
+check "recusa: fontes intactos" $?
+
+# --- (2) o rename LEGITIMO segue passando (nao viramos hostis)
+D=$(freshseq case116b)
+( cd "$D" && "$BIN" rename seq.hbp seq.prg:4:4 VINCULAR > v.log 2>&1 )
+check "nome sem ambiguidade: rename passa (exit 0)" $?
+grep -q "\.ppo and \.hrb byte-identical" "$D/v.log"
+check "editado e verificado (.ppo/.hrb byte-identicos)" $?
+grep -q "^#command VINCULAR <x>" "$D/seq.ch" && grep -q "^   VINCULAR 1" "$D/seq.prg"
+check "cabeca e site renomeados" $?
+grep -q "^#command ROTULA <t>" "$D/seq.ch"
+check "a regra vizinha (ROTULA) fica INTACTA" $?
+( cd "$D" && "$HB_BIN/harbour" seq.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "modulo segue limpo apos o rename" $?
+
+# --- (3) ambiguidade PRE-EXISTENTE nao e culpa nossa: nao recusamos por ela
+# (fixdsl: MENUITEM e MENUBOX ja disputam a grafia 'MENU' HOJE, sem rename)
+D=$(freshdsl case116c)
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM > p.log 2>&1 )
+check "ambiguidade PRE-EXISTENTE (MENU) nao bloqueia o rename" $?
+
+# regua do caso 64
+! grep -qiwE "pautar|rotula|rotulagem|vincular|qq_" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixseq (régua do caso 64)" $?
+}
+
 unit_114() {
 echo "case 114: P8 (Eixo C) - rename do nome de MARKER da regra (alpha-rename: match+result por NUMERO) + o .ch alcancavel por FATO"
 D=$(freshp6 case114)
@@ -3888,7 +3942,7 @@ check "projects-of num .ch acha o dono (posse de include = fato do compilador, -
 check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

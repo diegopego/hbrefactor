@@ -166,9 +166,21 @@ exploração + experimento no core, imediatamente**).
   alcançável por fato (`harbour -gd`). Caso 114.
 - **P-AUDIT ✅ (1º achado)** → **`ast-15`** (`ruletok`): matou a adivinhação por
   texto e a RECUSA FALSA. Caso 115. → [abbreviation.md](abbreviation.md)
+- **P11 ✅** — o pp **VIVO** (`__pp_init`/`__pp_process`). API mapeada;
+  **equivalência com o pp do build PROVADA**; o limite honesto achado (*o pp destrói
+  o que você **alimenta**, não "o arquivo"* → alimente o **span**, nunca a linha) —
+  o que **confirma o Diego e derruba a minha recusa do P7**. Matou o resíduo do
+  `AbbrevClash` (a última gramática replicada) e, com ele, um **sequestro de regra
+  silencioso** que a rede `.ppo`/`.hrb` não via. Caso 116, **zero core**.
+  → [pp-as-instrument.md](pp-as-instrument.md) · [abbreviation.md](abbreviation.md)
 - **P9** custo do reverse-scan · **P10** síntese/completude.
-- **P11** — **`__pp_process`/`hb_compileFromBuf`**: o pp **in-process**. Reabre o P7
-  e mata o resíduo do `AbbrevClash`. → [pp-as-instrument.md](pp-as-instrument.md) § 4
+- **P12** — **o pp como ENGENHO DE BUSCA** (ideia do Diego, 2026-07-12): usar o
+  casador do pp para **ACHAR**, não para transformar. → [pp-as-search.md](pp-as-search.md)
+- **P13** — **ESCOPO DE DIRETIVA / `#un*`** (ideia do Diego, 2026-07-12): a regra tem
+  **tempo de vida léxico**. Já rendeu, ANTES de virar fatia: um **BUG provado** (o
+  `rename` deixa o `#xuncommand` órfão → a regra **VAZA**, e o `.ppo`/`.hrb` não vê)
+  e a **LACUNA `ast-16`** (o dump não exporta o `#un*` — o pp sabe e descarta, pela
+  3ª vez). → [directive-scope.md](directive-scope.md)
 - **P-AUDIT (continua)** — `ResolveInclude`, os "se não é X então é Y", comparações
   de texto onde o dump já tem id.
 

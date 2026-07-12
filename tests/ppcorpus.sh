@@ -247,6 +247,39 @@ corpus_instrument() {
    check "-gd: o compilador reporta o include com o CAMINHO RESOLVIDO (nao o nome cru)" $?
 }
 
+# --------------------------------------------------------------------------
+# Familia PP VIVO (P11) - __pp_init/__pp_process: o pp do core EM PROCESSO.
+# Reabre o veredito do P7 (recusei "pp como escritor" olhando so o .ppo).
+# --------------------------------------------------------------------------
+corpus_pplive() {
+   echo "corpus: familia PP VIVO - __pp_init/__pp_process (o pp em processo, linha a linha)"
+   local D="$HERE/tmp/ppc-live"
+   rm -rf "$D"; mkdir -p "$D/inc"
+   cp "$HERE/ppc-live/live.prg" "$D/"
+   cp "$HERE/ppc-instr/far.ch" "$D/inc/"
+   cp "$HERE/ppc-instr/m.prg" "$D/"
+   # o pp do BUILD: expande o site via .ppo (canal de arquivo, com -u)
+   ( cd "$D" && "$HB" m.prg -n -q0 -p -u -s -Iinc > /dev/null 2>&1 )
+   # o pp VIVO: mesma regra, mesmo site, em processo
+   ( cd "$D" && "$HB_BIN/hbmk2" live.prg -o"$D/live" -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   ( cd "$D" && ./live > live.out 2>&1 )
+
+   # (1) EQUIVALENCIA: o pp vivo produz o MESMO texto que o pp do build
+   grep -q "SPAN=\[MODERNO Alfa VALOR nX\]" "$D/live.out"
+   check "pp VIVO expande o site igual ao pp do BUILD (.ppo): 'MODERNO Alfa VALOR nX'" $?
+   grep -q "MODERNO Alfa VALOR nX" "$D/m.ppo"
+   check "  ...e o .ppo do build concorda (a equivalencia e com o MESMO fato)" $?
+
+   # (2) O LIMITE HONESTO: o pp COME o comentario da linha que voce alimenta.
+   # A destruicao NAO e privilegio do canal de arquivo - e do que se ALIMENTA.
+   # Dai a regra do escritor: alimente o SPAN da statement (posicoes vem do
+   # dump) e grave so o span; o comentario vive FORA do span e nunca passa
+   # pelo pp. E o que separa "pp como escritor" (viavel) do .ppo (recusado).
+   grep -q "LINHA=\[MODERNO Alfa VALOR nX\]" "$D/live.out" && ! grep -q "manter!" "$D/live.out"
+   check "o pp COME o comentario da LINHA alimentada -> alimente o SPAN, nunca a linha" $?
+}
+
+corpus_pplive
 corpus_set
 corpus_say
 corpus_store

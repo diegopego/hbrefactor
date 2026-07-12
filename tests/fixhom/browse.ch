@@ -4,10 +4,10 @@
 // existir só na EXPANSÃO; o fonte escrito só tem o comando. Nenhuma
 // destas palavras existe no hbrefactor nem no core.
 
-#command MYBROWSE <var> AT <n> => <var> := Grade():New( <n> )
-#command MYLOUSA <var> AT <n> => <var> := Lousa():New( <n> )
-#command MYPAINT <var> => <var>:Pintar()
+#xcommand MYBROWSE <var> AT <n> => <var> := Grade():New( <n> )
+#xcommand MYLOUSA <var> AT <n> => <var> := Lousa():New( <n> )
+#xcommand MYPAINT <var> => <var>:Pintar()
 
 // embrulho de classe de FORA do projeto (TBrowse real, da RTL): o fato de
 // classificação não existe no projeto - camada honesta, nunca excluded
-#command MYTELA <var> AT <n> => <var> := TBrowse():New( <n> )
+#xcommand MYTELA <var> AT <n> => <var> := TBrowse():New( <n> )

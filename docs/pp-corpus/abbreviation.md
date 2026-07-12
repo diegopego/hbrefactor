@@ -93,12 +93,68 @@ Contrato completo: [../ast-schema.md](../ast-schema.md) § `ppApplications`.
 
 ---
 
+---
+
+## A predição de casamento FUTURO — e o SEQUESTRO REVERSO (P11, caso 116)
+
+O `ruletok` resolveu *"que literal este site casou?"*. Sobrava a pergunta gêmea, que
+o dump **não** responde: *"o nome NOVO colidiria com a cabeça de OUTRA regra sob
+abreviação?"* — casamento **futuro**, e o dump só descreve o que **casou**. A
+ferramenta respondia replicando a aritmética do `ppcore.c` (o `>= 4`) — e a réplica
+era **degradada em três frentes**: ignorava o **tipo do token** (o pp exige
+`KEYWORD`), passava `"?"` como tipo da regra renomeada (desligando meia checagem) e
+só enxergava *"uma cabeça é prefixo da outra"*.
+
+**O furo (provado, não deduzido):**
+
+```harbour
+#command ROTULA <t>  => qq_( <t>, 0 )    // 6 letras, SEM NENHUM site no projeto
+#command PAUTAR <x>  => qq_( <x>, 1 )
+```
+
+Renomear `PAUTAR` → `ROTULAGEM` era **ACEITO**. E aí as grafias de `ROTULA` passavam
+a casar a regra **renomeada** — perguntado ao próprio pp, com as duas regras
+registradas (`qq_( …, 1 )` é o corpo da regra RENOMEADA; o de `ROTULA` é
+`qq_( …, 0 )`):
+
+```
+ROTULA 9  -->  qq_( 9, 1 )     // ← nem o nome INTEIRO escapa
+ROTU 9    -->  qq_( 9, 1 )
+```
+
+A regra vizinha era **sequestrada**, em silêncio — inclusive quando escrita **por
+extenso**. E a rede de verificação
+(`.ppo`/`.hrb` byte-idênticos) **não via nada**: como a regra sequestrada não tinha
+**nenhum site**, não havia diferença a observar. A ferramenta chegava a imprimir
+*"verified: byte-identical"*. A ambiguidade ficava **latente** — quebrava no próximo
+site que alguém escrevesse.
+
+**O conserto: perguntar ao pp** ([pp-as-instrument.md](pp-as-instrument.md)). Num pp
+isolado registra-se uma **regra-sonda** com aquela cabeça e aquele tipo, alimenta-se
+a grafia, e vê-se se saiu transformada. Nenhum limiar no fonte da ferramenta.
+
+**Completude sem constante mágica:** toda grafia que casa uma cabeça é **prefixo**
+dela (o `hb_pp_tokenValueCmp` compara por prefixo no modo dBase e por igualdade nos
+demais) — então varre-se **todo** prefixo do nome novo e deixa-se o **pp** dizer
+quais casam. Se o limiar do Harbour mudasse amanhã, a ferramenta continuaria certa.
+
+**Só se recusa a ambiguidade que o rename CRIA.** A que já existia é do código do
+usuário — e existe de verdade: duas cabeças com prefixo comum de 4 letras já se
+disputam hoje (`MENUITEM`/`MENUBOX` → escrever `MENU` já é ambíguo **antes** de
+qualquer rename). Recusar por isso seria punir o usuário por uma condição que não
+foi a ferramenta que criou.
+
+A recusa agora exibe a **testemunha** — a grafia concreta:
+
+```
+$ hbrefactor rename seq.hbp seq.prg:4:4 ROTULAGEM
+hbrefactor: 'ROTULAGEM' colide por abreviação com a regra #command ROTULA (seq.ch:1)
+            - depois do rename, escrever 'ROTU' casaria com as DUAS regras
+```
+
+---
+
 ## Lacunas (VERIFICADO)
 
-- **[LACUNA real — em aberto]** *"O nome NOVO colidiria com a cabeça de OUTRA regra
-  sob abreviação dBase?"* é predição sobre casamento **FUTURO** — o dump descreve o
-  que **casou**, não o que casaria. Hoje o hbrefactor responde isso replicando a
-  aritmética do `ppcore.c:2533` numa função própria (`AbbrevClash`) — **réplica de
-  gramática**, divergência esperando acontecer. O canal correto é **perguntar ao
-  próprio pp** (`__pp_init`/`__pp_process`) em vez de reimplementá-lo: ver
-  [pp-as-instrument.md](pp-as-instrument.md) e a fatia **P11** do roadmap.
+- **[Fechada — P11]** A predição de casamento futuro deixou de ser réplica: quem
+  responde é o pp vivo. Fixture `tests/fixseq/`; prova: **caso 116**.

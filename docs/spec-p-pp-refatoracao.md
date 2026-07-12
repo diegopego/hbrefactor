@@ -124,9 +124,22 @@ padrão ao casar e **descartava** o par do literal (a mesma omissão do `ast-14`
 outro lado) → **`ruletok`**. `lexdiff` 0. Caso 115, fixture `fixabr`.
 Conhecimento: [abbreviation.md](pp-corpus/abbreviation.md).
 
-**Resíduo:** `AbbrevClash` segue vivo para a pergunta *diferente* ("o nome NOVO
-colidiria sob abreviação?") — predição de casamento **futuro**, que o dump não
-responde. Canal certo: perguntar ao pp (**P11**).
+**Resíduo → fechado no P11.**
+
+## P11 ✅ — o pp VIVO (`__pp_init`/`__pp_process`), 2026-07-12
+
+O resíduo do `AbbrevClash` (predição de casamento **futuro**: *"o nome novo colidiria
+sob abreviação?"*) morreu — não por aritmética melhor, mas **perguntando ao pp**:
+registra-se uma **regra-sonda** (mesma cabeça, mesmo tipo) num pp isolado, alimenta-se
+a grafia, vê-se se saiu transformada. A réplica escondia um **sequestro de regra
+silencioso** que a rede `.ppo`/`.hrb` **não via** (a regra sequestrada podia não ter
+site nenhum). Recusa-se só o que o rename **cria**; a recusa traz a **grafia-testemunha**.
+Também **provada a equivalência** do pp vivo com o pp do build, e achado o limite
+honesto — *o pp destrói o que você **alimenta**, não "o arquivo"* — o que **derruba de
+vez a minha recusa do P7** (o Diego estava certo). Caso 116, fixture `fixseq`;
+suíte 904/0, `ppcorpus` 42/0, **zero core**. Conhecimento:
+[pp-as-instrument.md](pp-corpus/pp-as-instrument.md) ·
+[abbreviation.md](pp-corpus/abbreviation.md).
 
 ---
 
@@ -136,6 +149,6 @@ responde. Canal certo: perguntar ao pp (**P11**).
 |---|---|
 | **P9** | custo do reverse-scan `O(tokens × from)` (adr-003:96-98) |
 | **P10** | síntese/completude da fase + atualização de adr-003, ast-schema, CHANGELOG |
-| **P11** | **`__pp_process`/`hb_compileFromBuf`** — o pp in-process; reabre o P7 e mata o resíduo do `AbbrevClash` |
+| **P12** | **o pp como ENGENHO DE BUSCA** (ideia do Diego) — casar para ACHAR; plano em [pp-as-search.md](pp-corpus/pp-as-search.md) |
 | **P-AUDIT** | continuar: `ResolveInclude`, os "se não é X então é Y", comparações de texto onde há id |
-| **D-P5** | *(portão do Diego)* migração de DSL ganha verbo próprio? — decidir **depois** do P11 |
+| **D-P5** | *(portão do Diego)* migração de DSL ganha verbo próprio? — **desbloqueado**: o instrumento (P11) está na mão |

@@ -208,6 +208,22 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   NUNCA faz, e os limites honestos da entrega. Sem jargão interno de
   fase (B9/F2.x ficam nos docs; a entrada só aponta para eles no fim).
   Atualizar na mesma sessão da entrega, como o roadmap.
+- **Código NOVO nosso usa `#xcommand`/`#xtranslate`, nunca `#command`/`#translate`
+  (Diego, 2026-07-12)**: provado no dispatch do core (`ppcore.c`, o `#[x]command` é a
+  MESMA chamada com um único argumento diferente) que o `x` significa **exatamente e
+  somente** "modo de comparação EXATO" em vez do **dBase** (que casa a palavra
+  abreviada a partir de 4 letras). Nada mais muda — nenhuma capacidade se perde. A
+  família dBase é a origem de uma CLASSE INTEIRA de ambiguidade (o sequestro de
+  regra do P11, a recusa falsa do P5, `MENUITEM` vs `MENUBOX` disputando `MENU`);
+  na família `x` esses bugs são **impossíveis**. Vale para fixture, exemplo, doc e
+  sonda que EU escrever. *(Existe ainda a família `y` — `#ycommand`/`#ytranslate` —
+  que é exata E case-sensitive.)*
+  **DUAS exceções, ambas obrigatórias:** (a) fixture cujo ASSUNTO é a abreviação
+  dBase (hoje `fixabr`/caso 115, `fixseq`/caso 116, o `MENUITEM`/`MENUBOX` do
+  `fixdsl`) — trocar para `x` faria o teste passar por VACUIDADE, provando nada;
+  (b) a FERRAMENTA jamais pode abandonar `#command`/`#translate`: ela refatora o
+  código dos OUTROS, e o `std.ch`, o `hbclass.ch` e toda a herança Clipper são
+  dBase. A política é sobre o que escrevemos, nunca sobre o que suportamos.
 - **Genérico > específico**: comando dedicado só com razão forte (o
   `usages-dsl` foi absorvido pelo `usages`); ao consumir fatos de pp, operar
   sobre o genérico (cabeça/kind/marker), nunca por DSL/família conhecida.
