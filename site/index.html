@@ -534,6 +534,46 @@ VAR nVia  AS Numeric IS nCount TO oPart</code></pre>
   </div>
 </section>
 
+<!-- §5c-bis a class's data (rename-DATA, commit 437a6a6, case 110 + case 48) -->
+<section>
+  <div class="narrow">
+    <p class="sec-eyebrow">Data, not just behavior</p>
+    <h2>A class's data, not just its methods</h2>
+    <p>A class is data plus behavior — and renaming the <em>data</em> used to be the gap: the tool would stop and say "that's a <span class="mono">VAR</span>/<span class="mono">DATA</span>, not a method". Now it does it. Take a balance you want to call something else:</p>
+    <div class="code">
+      <button class="copy" type="button">Copy</button>
+<pre><code>CLASS Conta
+   VAR nSaldo INIT 0
+   METHOD Mostra()
+ENDCLASS
+
+METHOD Mostra() CLASS Conta
+   ::nSaldo := ::nSaldo + 1     <span class="c">// a write…</span>
+   RETURN ::nSaldo              <span class="c">// …and a read</span></code></pre>
+    </div>
+    <p>Point at the member and rename. The declaration, every <b>read</b>, every <b>write</b>, and the class's own internal registration of the member all move together:</p>
+    <div class="code">
+      <button class="copy" type="button">Copy</button>
+<pre><code>$ hbrefactor rename app.hbp c1.prg:16:8 nTeto
+rename-data: CONTA:nLimite -&gt; nTeto
+  c1.prg:16:8
+  c1.prg:10:7
+  c1.prg:11:20
+  predicted: _NLIMITE -&gt; _NTETO
+  predicted string: "nLimite" -&gt; "nTeto" (c1.prg)
+verified: 3 edit(s); DATA member getter+setter renamed, registration re-derived, other modules byte-identical</code></pre>
+    </div>
+    <p>Reading a member and writing to it are two <em>different</em> messages as far as the compiler is concerned (<span class="mono">nSaldo</span> and <span class="mono">_nSaldo</span>) — the tool renames <b>both</b>, and proves it against the symbol table before keeping a single edit.</p>
+    <p>And the guard. If <b>two classes</b> in your project happen to have a member of the same name, the rename is genuinely ambiguous — <span class="mono">:nSaldo</span> is dynamic dispatch, and no fact says which class you meant. So it refuses, and names the other class:</p>
+    <div class="code">
+      <button class="copy" type="button">Copy</button>
+<pre><code>$ hbrefactor rename app.hbp c1.prg:15:8 nX
+hbrefactor: 'nSaldo' também é membro de: POUPANCA (c2.prg) - send é despacho dinâmico, rename ambíguo; recuso</code></pre>
+    </div>
+    <p>That's the same rule that has always governed homonymous <em>methods</em> — data members simply inherit it.</p>
+  </div>
+</section>
+
 <!-- §5d same name, different owner (phase P — ast-13 rule genealogy, case 108) -->
 <section>
   <div class="narrow">
@@ -650,7 +690,7 @@ Eval( bPaga )
     <h2>What it does</h2>
     <p class="lead narrow" style="margin-left:0">Every classic refactoring, re-seated on the compiler's facts — each one verified: recompile, compare, roll back.</p>
     <div class="cards">
-      <div class="cmd"><span class="nm">rename</span><p>Locals, parameters, statics, memvars, functions, methods — even a preprocessor directive word or match-marker. It renames the <em>symbol</em>, never the text.</p></div>
+      <div class="cmd"><span class="nm">rename</span><p>Locals, parameters, statics, memvars, functions, methods, a class's data member (<span class="mono">VAR</span>/<span class="mono">DATA</span>) — even a preprocessor directive word or match-marker. It renames the <em>symbol</em>, never the text.</p></div>
       <div class="cmd"><span class="nm">usages</span><p>Every reference to a symbol, scope-aware, with honest certainty labels; homonyms of other classes excluded by fact. Peek them right inside VSCode.</p></div>
       <div class="cmd"><span class="nm">extract-function</span><p>Pull a range of lines into a new function — or a new METHOD when you're inside one; the locals it needs move with it.</p></div>
       <div class="cmd"><span class="nm">inline-local</span><p>Fold a variable back into its uses — purity judged by the compiler's own tree, not a guess.</p></div>
@@ -759,12 +799,13 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong>104 cases / 796 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong>105 cases / 825 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
     <div class="grid-2">
       <div>
         <h3>Still rough</h3>
         <ul class="clean rough">
+          <li>Renaming a class <b>data member</b> covers plain <span class="mono">VAR</span>/<span class="mono">DATA</span>; members with explicit <span class="mono">ACCESS</span>/<span class="mono">ASSIGN</span> accessors, or inherited from a superclass, aren't covered yet.</li>
           <li>Function <b>parameters</b> aren't annotated yet — only local variables and code-block parameters.</li>
           <li>Some "maybe" is <b>irreducible</b>: a receiver whose class depends on runtime input honestly stays <em>possible</em> — the nature of the problem, not a bug. Library code keeps more <em>possible</em> than a closed program.</li>
           <li>In a chained call (<span class="mono">oM:Soma(1):Soma(2)</span>) the label stays <em>confirmed</em>, not <em>guaranteed</em>, even under <span class="mono">-kt</span>.</li>
@@ -813,7 +854,7 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (104 cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (105 cases)</span></code></pre>
         </div>
       </li>
       <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.13.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>

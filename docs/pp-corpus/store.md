@@ -60,12 +60,27 @@ achatado (reconstruível por pilha) e o `.ppo` prova o resultado.
 
 ## Lacunas (o que os oráculos NÃO mostram)
 
-- **[Consumo futuro] Cardinalidade do grupo no dump ESTÁTICO.** A regra
-  (`ppRules`) traz `opt-open`/`opt-close` sem dizer se repete; mas cada APLICAÇÃO
-  (`ppApplications`) traz os tokens consumidos — `a, b, c` aparecem lá, então a
-  cardinalidade REAL é derivável por aplicação. A regra estática não a prevê, o
-  dump da aplicação sim → não é info faltante. Vira `ast-N` só se P6/P8 pedir a
-  cardinalidade como fato de 1ª classe (consumidor ainda inexistente).
-- **[Consumo futuro] List marker verdadeiro (`<x,...>`, mkind `list`)** — outro
-  mecanismo (ex.: `DO … WITH <p,...>`), já exportável pelo ast-5; família futura
-  para contrastar com o grupo-que-repete.
+> Classificação por FATO (não por raciocínio — cada item abaixo foi VERIFICADO
+> rodando o dump; ver a evidência colada). Regra em [README.md](README.md).
+
+- **[Consumo futuro — VERIFICADO] Cardinalidade do grupo.** A regra (`ppRules`)
+  traz `opt-open`/`opt-close` sem dizer se repete; mas cada APLICAÇÃO
+  (`ppApplications`) traz os tokens CONSUMIDOS, e ali a repetição aparece: no
+  `STORE 9 TO a, b, c` o marker 2 (`vN`) surge **duas vezes**, cada uma com sua
+  posição. Evidência:
+  ```
+  app da linha 8 (STORE 9 TO a, b, c) — tokens consumidos:
+     marker=0 'STORE'   marker=3 '9'   marker=0 'TO'
+     marker=1 'a' col=14
+     marker=0 ','   marker=2 'b' col=17
+     marker=0 ','   marker=2 'c' col=20
+  ```
+  A cardinalidade REAL é derivável por aplicação, e cada repetição é editável por
+  posição → **não é info faltante**, é consumo que a ferramenta ainda não expõe
+  (P6/P8). Nada a estender no core.
+- **[Consumo futuro — VERIFICADO] List marker verdadeiro (`<x,...>`).** É um
+  mecanismo DIFERENTE do grupo-que-repete, e o dump JÁ o exporta: uma regra
+  `#xcommand PRINTALL <itens,...>` sai com `mkind='list'` no match, e os itens
+  chegam individualmente posicionados nos tokens consumidos (`1` col=12, `2`
+  col=15, `3` col=18). Fato presente, consumidor pendente (P4/P5) — família
+  futura para contrastar com o grupo-que-repete.

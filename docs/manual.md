@@ -1,19 +1,22 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@5d8f108 · harbour-core@2738f97079 (feature/compiler-ast-dump)
-    — phase P/P1 delivered rule GENEALOGY (ast-13): a rule created by another rule's
-      expansion records which application created it, and derivation now survives token
-      clones. Consumers shipped with the channel: seed collection edits only fact-owned
-      occurrences (a marker value colliding with a REAL homonym function no longer drags
-      the function in — that refusal became a correct rename), resolution routes "name
-      that BECOMES a rule" to the marker (rule-generating DSLs — hbclass's own inner
-      pattern — are now renameable at both positions), verification lets the raw name
-      legitimately stay (real homonym) or change (derived clone). Case 108, fixture
-      fixgen. Slice U-2 ("rename-* removed") was already described by the previous
-      baseline note and is now reflected in the body text.
-  suite at baseline: 104 cases, 796 checks green
-  updated: 2026-07-11
+  baseline: hbrefactor@437a6a6 · harbour-core@2738f97079 (feature/compiler-ast-dump)
+    — the CORE did not move this round (no new ast-N); everything below is tool-side.
+      NEW CAPABILITY: renaming a class DATA/VAR member (commit 437a6a6, slice 1). What
+      used to be an honest refusal ("that's a VAR/DATA, not a method" — a deliberate v1
+      limit) is now a verified rename: the declaration, every read, every write, and the
+      class's internal registration move together. Reading and writing a member are two
+      distinct messages to the compiler (NAME and _NAME) and BOTH are renamed and proven
+      against the symbol table; a member name shared by two classes is refused (dynamic
+      dispatch, genuinely ambiguous) exactly as homonymous methods already were. New
+      section "A class's data, not just its methods"; case 110 (fixture fixdata) plus
+      case 48 re-baselined. Phase P/P2 also landed (renaming a DSL word that both BUILDS
+      and REFERENCES is safe — rolls back or re-derives, never silently wrong): that is a
+      guarantee of the EXISTING rename, already covered in principle by "Same name,
+      different owner", so no new body text — it lives in CHANGELOG 2026-07-11.
+  suite at baseline: 105 cases, 825 checks green
+  updated: 2026-07-12
 
   This file is the single, current-state, user-facing description of hbrefactor.
   The landing page (site/) is GENERATED FROM this content — iterate the words here,
@@ -309,6 +312,58 @@ where it used to shrug `possible`. The compiler attaches each block's own parame
 that block, so the tool types the receiver by the exact block it sits in, never
 confusing the two.
 
+### A class's data, not just its methods
+
+<!-- prov: commit 437a6a6 (rename-DATA, slice 1) + docs/spec-rename-data.md; case 110
+     (fixture fixdata: homonym refused, unique member renamed incl. external uses) and
+     case 48 re-baselined (the old v1 refusal became a verified rename); live-run
+     2026-07-12 (fixdata scratchpad, both outputs below verbatim). -->
+
+A class is data plus behavior — and renaming the *data* used to be the gap: the tool
+would stop and say "that's a `VAR`/`DATA`, not a method". Now it does it. Take a balance
+you want to call something else:
+
+```harbour
+CLASS Conta
+   VAR nSaldo INIT 0
+   METHOD Mostra()
+ENDCLASS
+
+METHOD Mostra() CLASS Conta
+   ::nSaldo := ::nSaldo + 1     // a write…
+   RETURN ::nSaldo              // …and a read
+```
+
+Point at the member and rename. The declaration, every **read**, every **write**, and
+the class's own internal registration of the member all move together:
+
+```
+$ hbrefactor rename app.hbp c1.prg:16:8 nTeto
+rename-data: CONTA:nLimite -> nTeto
+  c1.prg:16:8
+  c1.prg:10:7
+  c1.prg:11:20
+  predicted: _NLIMITE -> _NTETO
+  predicted string: "nLimite" -> "nTeto" (c1.prg)
+verified: 3 edit(s); DATA member getter+setter renamed, registration re-derived, other modules byte-identical
+```
+
+Reading a member and writing to it are two *different* messages as far as the compiler is
+concerned (`nSaldo` and `_nSaldo`) — the tool renames **both**, and proves it against the
+symbol table before keeping a single edit.
+
+And the guard. If **two classes** in your project happen to have a member of the same
+name, the rename is genuinely ambiguous — `:nSaldo` is dynamic dispatch, and no fact says
+which class you meant. So it refuses, and names the other class:
+
+```
+$ hbrefactor rename app.hbp c1.prg:15:8 nX
+hbrefactor: 'nSaldo' também é membro de: POUPANCA (c2.prg) - send é despacho dinâmico, rename ambíguo; recuso
+```
+
+That's the same rule that has always governed homonymous *methods* — data members simply
+inherit it.
+
 ### Same name, different owner — it only edits yours
 
 <!-- prov: case 108 (14 checks, fixture fixgen — invented non-mirror DSL, plus the
@@ -436,7 +491,8 @@ per-call check has a cost in very hot loops).
 ### What it does — the command set
 
 <!-- prov: Usage() in src/hbrefactor.prg; per-command cases: renames 1–7/10–13/21/24/
-     27/32/37/45–49/74/77; usages 8–9/18/23/25–26/29/39/61–63/66/70/104/105; extract 16–17/
+     27/32/37/45–49/74/77/110 (110 = class data member, commit 437a6a6);
+     usages 8–9/18/23/25–26/29/39/61–63/66/70/104/105; extract 16–17/
      33/43/59–60/79; inline 35–36; reorder 14–15/31/34/56/76; unused-locals 19;
      call-graph 20/57/78; find-dynamic-calls 22/58; dsl/pp 38/40–41/50–53/82;
      annotate 89–100; exec-registry 101; projects-of 83/102/103. -->
@@ -446,7 +502,7 @@ Every classic refactoring, re-seated on the compiler's facts; each one verified
 
 | Command | What it does |
 |---|---|
-| `rename` | Point the cursor at a name; it renames the *symbol* — local, parameter, static, memvar, function, method, even a preprocessor directive word or match-marker. **You don't classify the target**: the kind comes from the compiler's fact at that position, not from picking one of eight commands. It renames the symbol, never the text. |
+| `rename` | Point the cursor at a name; it renames the *symbol* — local, parameter, static, memvar, function, method, a class's data member (`VAR`/`DATA`), even a preprocessor directive word or match-marker. **You don't classify the target**: the kind comes from the compiler's fact at that position, not from picking one of eight commands. It renames the symbol, never the text. |
 | `usages` | Every reference to a symbol, scope-aware, with honest certainty labels; homonyms of other classes excluded by fact. Peek them right inside VSCode. |
 | `extract-function` | Pull a range of lines into a new function — or a new METHOD when you're inside one; the locals it needs move with it. |
 | `inline-local` | Fold a variable back into its uses — purity judged by the compiler's own tree. |
@@ -564,8 +620,8 @@ does** — never build a guess inside the tool.
      library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.13.0`; they version independently). The behavior contract is a suite of **104 cases /
-796 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.13.0`; they version independently). The behavior contract is a suite of **105 cases /
+825 checks**, all green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
@@ -574,6 +630,8 @@ language); English is on the roadmap.
 
 **Still rough**
 
+- Renaming a class **data member** covers plain `VAR`/`DATA`; members with explicit
+  `ACCESS`/`ASSIGN` accessors, or inherited from a superclass, aren't covered yet.
 - Function *parameters* aren't annotated yet — only local variables and code-block
   parameters.
 - Some "maybe" is irreducible: a receiver whose class depends on runtime input (config,
@@ -629,7 +687,7 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (104 cases)
+   make test         # optional: the behavior suite (105 cases)
    ```
 3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.

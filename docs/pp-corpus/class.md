@@ -89,6 +89,9 @@ de registro por derivação).
 
 ## Lacunas (o que os oráculos NÃO mostram)
 
+> Classificação por FATO (não por raciocínio — o item de consumo futuro foi
+> VERIFICADO rodando o dump; ver a evidência colada). Regra em [README.md](README.md).
+
 - **[RESOLVIDA — capacidade rename-DATA entregue, 2026-07-11] Renomear um
   DATA/VAR member de classe.** A lacuna que o corpus achou (o `rename` sobre um
   DATA member recusava "é VAR/DATA, não método") virou EXPERIMENTO imediato (regra
@@ -101,10 +104,23 @@ de registro por derivação).
   homônimo entre classes (unicidade). Spec: [../spec-rename-data.md](../spec-rename-data.md);
   provas: caso 48 re-baselinado + caso 110 (fixdata). Fatia 2 (`ACCESS`/`ASSIGN`,
   DATA herdada) fica no backlog.
-- **[Consumo futuro] O `resolve-at` de `::nSaldo` devolve `nSaldo` cru** (send
-  dinâmico), sem escopar a Conta, embora o `usages Conta:nSaldo` saiba escopar.
-  A capacidade rename-DATA hoje opera a partir da DECLARAÇÃO `VAR nSaldo` (que
+- **[Consumo futuro — VERIFICADO] O `resolve-at` de `::nSaldo` devolve `nSaldo`
+  cru** (send dinâmico), sem escopar a Conta — embora o `usages Conta:nSaldo` já
+  saiba escopar. A assimetria foi PROVADA rodando os dois oráculos na fixture:
+  ```
+  resolve-at ::nSaldo (uso, linha 14)  -> query: nSaldo         (send; dispatch dinâmico)
+  resolve-at VAR nSaldo (decl, linha 9)-> query: Conta:nSaldo   (dona única, declared)
+
+  usages Conta:nSaldo:
+     clsx.prg:14  confirmed send (receiver declared AS CLASS CONTA) in CONTA_DEPOSITA
+     clsx.prg:14  confirmed send (receiver declared AS CLASS CONTA) in CONTA_DEPOSITA
+     clsx.prg:9   var declaration (class CONTA)
+  ```
+  O `usages` casa os dois `::nSaldo` como send confirmado NA classe certa, mas o
+  `resolve-at` sobre o mesmo `::nSaldo` ainda entrega `nSaldo` sem classe. A
+  capacidade rename-DATA hoje opera a partir da DECLARAÇÃO `VAR nSaldo` (que
   escopa); escopar o resolve-at do site de USO (`::nSaldo`) é a melhoria seguinte
-  (consumo de fato já no dump, sem core).
+  — **o fato já está no dump** (o `usages` prova), **sem core**, só falta o
+  resolve-at consumi-lo.
 - **[Fora de escopo] Nome de CLASSE** (`Conta`) não é renomeável (limite conhecido
   do roadmap, não deste corpus).

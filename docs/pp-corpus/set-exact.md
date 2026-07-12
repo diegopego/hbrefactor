@@ -80,10 +80,15 @@ command-set do Clipper sem ajuste.
 
 ## Lacunas (o que os oráculos NÃO mostram)
 
-- **[Consumo futuro] Restrição não-validada no consumo.** O dump JÁ traz as
-  alternativas do restrict (`ON`/`OFF`/`&`); só falta a ferramenta VALIDAR um
-  recheio contra elas. Fato existe → é o **P5** (ppcore.c:877-878), não mudança
-  de core.
-- **[Consumo futuro] `strsmart` vs `strdump`/`strstd`.** O smart-quote é um dos
-  result mkinds de stringify, todos já exportados no ast-5; o corpus ainda não os
-  contrastou (alvo do **P4**). Família futura, fato já presente.
+> Classificação por FATO (não por raciocínio). Regra em [README.md](README.md).
+
+- **[Consumo futuro — VERIFICADO] Restrição não-validada no consumo.** O dump JÁ
+  traz as alternativas do restrict — vistas no dump desta própria fixture (seção
+  "mkinds" acima: `role=restrict` com `ON`, `OFF`, `&`). Só falta a ferramenta
+  VALIDAR um recheio contra elas. Fato presente → é o **P5** (ppcore.c:877-878),
+  **não** mudança de core.
+- **[Consumo futuro — parcialmente verificado] `strsmart` vs `strdump`/`strstd`.**
+  O `strsmart` está PROVADO no dump desta fixture. Os irmãos (`strdump`, `strstd`)
+  são do mesmo vocabulário de result-mkind do ast-5 mas o corpus **ainda não os
+  viu rodando** — provar cada um numa fixture é justamente o **P4**. Até lá, o
+  honesto é: `strsmart` confirmado, os outros pendentes de prova (não de core).

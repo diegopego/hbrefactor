@@ -33,11 +33,19 @@ oráculos NÃO mostram que um refatorador iria querer?* Toda família tem uma se
    (c) só siga a exploração após a tentativa. Vira `ast-N` + caso se destravar,
    ou recusa documentada se a prova mostrar que não compensa.
 
+**A classificação em si tem de ser PROVADA, não afirmada** (lição de 2026-07-12, o
+Diego pegou): dizer "[Consumo futuro] — é derivável do `ppApplications`" SEM rodar
+o dump e mostrar a evidência é raciocínio, não fato — o mesmo pecado que a REGRA DO
+FATO proíbe no motor. Todo item de Lacuna traz o rótulo **VERIFICADO** e a
+evidência colada (o trecho do dump que prova que o dado está — ou não está — lá).
+Sem evidência, o item é uma hipótese, não uma classificação.
+
 Distinguir 1 de 2 é uma decisão de FATO (o dado é derivável dos oráculos, sim ou
 não?), não de conveniência — não rotular consumo-futuro como "sem lacuna" para
 evitar o experimento, nem inventar lacuna onde o dado é derivável. Uma lacuna de
 CAPACIDADE da ferramenta (info existe, verbo não) é decisão de produto do Diego,
-não experimento de core. Anotar tudo NO CORPUS/roadmap, nunca na memória.
+não experimento de core (foi o caso do rename-DATA: info presente, verbo ausente →
+portão → capacidade). Anotar tudo NO CORPUS/roadmap, nunca na memória.
 
 ## A tese (o achado que motiva o corpus)
 

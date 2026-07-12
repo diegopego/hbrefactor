@@ -67,9 +67,19 @@ opcionais — o dump reconstrói o grupo por pilha, editável na posição certa
 
 ## Lacunas (o que os oráculos NÃO mostram)
 
-- **[Consumo futuro] Qual grupo opcional casou, por aplicação.** O `.ppo` prova o
-  resultado e o `ppApplications` traz os tokens CONSUMIDOS com o nº do marker — de
-  onde "o `[PICTURE]` casou, o `[COLOR]` não" é DERIVÁVEL (presença do recheio
-  `pic`/`clr`). Não é info faltante; é consumo que a ferramenta ainda não expõe
-  como fato de 1ª classe (candidato a P5/P6). Verificado que é derivável do dump
-  atual → NÃO é lacuna de core.
+> Classificação por FATO (não por raciocínio — VERIFICADO rodando o dump; ver a
+> evidência). Regra em [README.md](README.md).
+
+- **[Consumo futuro — VERIFICADO] Qual grupo opcional casou, por aplicação.** O
+  `ppApplications` traz os tokens CONSUMIDOS, e a **keyword do grupo opcional
+  aparece lá quando (e só quando) o grupo casou**. Evidência (as 4 linhas da
+  fixture, `(marker, texto)`):
+  ```
+  linha 6  @ 1,1 SAY "Ola"              -> [(0,'@'),(1,'1'),(0,','),(2,'1'),(0,'SAY'),(3,'Ola')]
+  linha 7  ... PICTURE "999"            -> ... (0,'SAY'),(3,'nX'),(0,'PICTURE'),(4,'999')
+  linha 8  ... PICTURE "999" COLOR "R/W"-> ... (0,'PICTURE'),(4,'999'),(0,'COLOR'),(5,'R/W')
+  linha 9  ... COLOR "W/B"              -> ... (0,'SAY'),(3,'cName'),(0,'COLOR'),(4,'W/B')
+  ```
+  Dá para ler exatamente qual casou: linha 6 nenhum, linha 7 só `PICTURE`, linha 8
+  os dois, linha 9 só `COLOR`. **Não é info faltante** → nada a estender no core; é
+  consumo que a ferramenta ainda não expõe como fato de 1ª classe (P5/P6).
