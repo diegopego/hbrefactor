@@ -123,10 +123,71 @@ corpus_class() {
    check "ast-13: a regra METHOD gerada carrega genealogia ('from')" $?
 }
 
+# --------------------------------------------------------------------------
+# Familia MARKERS (hbpp.h/ppcore.c) - os 15 tipos de <x>. Fixture tests/fixmk
+# (a mesma do caso 111): exercita os 6 match-mkinds e os 7 result-mkinds
+# escriviveis. strdump e dynval tem RECUSA DOCUMENTADA (nao existem em regra).
+# --------------------------------------------------------------------------
+corpus_markers() {
+   echo "corpus: familia MARKERS - os 15 tipos de <x> do pp"
+   ( cd "$HERE/fixmk" && "$HB" mk.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+   check "fixmk/mk.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
+   local D; D=$(gen4 fixmk mk.prg -I"$HERE/fixmk")
+   # .ppo: cada mkind se revela na expansao
+   grep -q 'QOut( "LIGA" )' "$D/mk.ppo" && grep -q 'QOut( Eval( {|| n + 1} ) )' "$D/mk.ppo"
+   check ".ppo: restrict+smart-quote vira string; block EMBRULHA num codeblock" $?
+   # logical emite .T. (nao o valor) e nul nao emite nada - os dois DESCARTAM
+   grep -q 'QOut( .T. )' "$D/mk.ppo" && grep -q 'QOut( 42 )' "$D/mk.ppo" && \
+      grep -q 'QOut( "wild" )' "$D/mk.ppo"
+   check ".ppo: logical/nul/wild-nao-usado DESCARTAM o valor que o usuario escreveu" $?
+   # ast-14: todo marker de match e numerado -> o recheio vem LIGADO ao marker
+   grep -q '"mkind": "wild"' "$D/mk.ast.json" && grep -q '"mkind": "restrict"' "$D/mk.ast.json" && \
+      grep -q '"mkind": "logical"' "$D/mk.ast.json" && grep -q '"mkind": "nul"' "$D/mk.ast.json" && \
+      grep -q '"mkind": "block"' "$D/mk.ast.json"
+   check "ast dump: os mkinds wild/restrict/logical/nul/block todos exportados" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia <@> (reference) - o guarda anti-recursao de regras circulares
+# --------------------------------------------------------------------------
+corpus_ref() {
+   echo "corpus: familia <@> - o guarda anti-recursao (regra circular)"
+   ( cd "$HERE/ppc-ref" && "$HB" refx.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+   check "ppc-ref/refx.prg compila limpo (o <@> IMPEDIU o loop infinito)" $?
+   local D; D=$(gen4 ppc-ref refx.prg)
+   # o guarda e INVISIVEL ao compilador: some da saida expandida
+   grep -q 'PUBLIC nA, nB' "$D/refx.ppo" && ! grep -q '<@>' "$D/refx.ppo"
+   check ".ppo: a regra circular expandiu, e o <@> sumiu antes do compilador" $?
+   # mas o dump o EXPORTA (mkind reference), sem nome e sem posicao
+   grep -q '"mkind": "reference"' "$D/refx.ast.json"
+   check "ast dump: o guarda vem como mkind 'reference' (sem nome, sem posicao)" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia REGRA QUE GERA REGRA - a diretiva que cria outra diretiva (ast-13)
+# --------------------------------------------------------------------------
+corpus_gen() {
+   echo "corpus: familia REGRA QUE GERA REGRA - diretiva que cria diretiva"
+   ( cd "$HERE/ppc-gen" && "$HB" genx.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+   check "ppc-gen/genx.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
+   local D; D=$(gen4 ppc-gen genx.prg)
+   # .ppt: a regra NASCE e ja e USADA na mesma compilacao (multi-passe)
+   grep -q '#xcommand >#xcommand USA Ponto' "$D/genx.ppt"
+   check ".ppt: DEFREGRA EMITE uma diretiva nova (#xcommand USA Ponto)" $?
+   grep -q 'genx.prg(9) >USA Ponto<' "$D/genx.ppt" && grep -q 'Marca( "Ponto" )' "$D/genx.ppo"
+   check ".ppt/.ppo: a regra recem-nascida ja casa na linha seguinte" $?
+   # ast-13: a regra gerada carrega a genealogia (from -> a app que a criou)
+   grep -q '"from"' "$D/genx.ast.json"
+   check "ast-13: a regra gerada carrega genealogia ('from' -> a app criadora)" $?
+}
+
 corpus_set
 corpus_say
 corpus_store
 corpus_class
+corpus_markers
+corpus_ref
+corpus_gen
 
 echo
 echo "ppcorpus: passed: $PASS  failed: $FAIL"

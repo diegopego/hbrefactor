@@ -5,6 +5,64 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-12 — a ferramenta entende TODOS os tipos de marker do preprocessador
+
+Um `<x>` de diretiva não é uma coisa só. O pp tem **15 tipos de marker**, e agora
+todos têm veredito: 13 a ferramenta usa, 2 ela recusa dizendo por quê. Três coisas
+mudam no seu dia a dia:
+
+**1. Valor restrito é validado ANTES de mexer no arquivo.**
+
+```harbour
+#xcommand SET MODO <x: RAPIDO, LENTO> => ...
+```
+
+Se você tentar renomear `RAPIDO` para algo que **não é uma das alternativas**, a
+regra deixaria de casar. Antes, a ferramenta editava, recompilava, levava um
+`syntax error` e desfazia tudo (rollback) — você ficava sem entender. Agora:
+
+```
+$ hbrefactor rename app.hbp a.prg:6:10 zzz
+hbrefactor: 'zzz' não é uma das alternativas do marker RESTRITO da regra
+            (RAPIDO, LENTO) - a regra deixaria de casar; recuso
+```
+Recusa **antes de tocar no arquivo**, e diz quais valores são aceitos.
+
+**2. O que a diretiva engole e joga fora não é confundido com palavra da regra.**
+
+```harbour
+#xcommand ANOTA <*x*> => QOut( "nota" )   // o <*x*> engole tudo e DESCARTA
+
+ANOTA ANOTA        // o 2o 'ANOTA' é conteúdo SEU; o 1o é a palavra da diretiva
+```
+Os dois são o mesmo texto na mesma linha — e a ferramenta agora **os distingue por
+fato do compilador**, não por adivinhação. Clicar no segundo diz: *"conteúdo
+consumido e DESCARTADO pela diretiva"*, e o rename recusa (não há o que renomear —
+aquilo não chega ao compilador).
+
+**3. Renomear uma variável avisa quando uma diretiva descarta uma ocorrência.**
+
+Markers como `<.x.>` (emite `.T.`/`.F.`) e `<-x->` (não emite nada) **consomem o
+valor e o jogam fora**. Se você renomeia uma variável e ela aparece num desses
+lugares, a ferramenta **não edita** (não há fato ligando aquele texto à sua
+variável — editar seria por coincidência de nome) mas **avisa**:
+
+```
+warning: a.prg:12:10: 'n' é consumido e DESCARTADO pela diretiva (#xcommand R_LOG)
+         - não chega ao compilador; NÃO renomeado
+```
+
+**Curiosidade que talvez você nunca tenha visto:** o marker `<@>` existe para
+resolver **regras circulares** — uma diretiva cujo resultado começa com a própria
+palavra que ela casa (como o `PUBLIC` do hbfoxpro). Ele marca a saída para o pp não
+re-aplicar a regra nela, e some antes do compilador. A ferramenta o **preserva
+intacto** ao editar a regra.
+
+**Limite honesto:** dois tipos de marker não existem dentro de uma regra e a
+ferramenta diz isso: `%s` só vive no `TEXT…ENDTEXT` (maquinaria de *stream*), e o
+canal de `__FILE__`/`__LINE__` é interno do preprocessador — você não pode
+escrevê-lo.
+
 ## 2026-07-11 — renomear um DATA/VAR member de classe
 
 Antes, se você tentasse renomear um dado de classe (`VAR`/`DATA`) a ferramenta

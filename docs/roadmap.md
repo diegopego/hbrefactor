@@ -420,7 +420,19 @@ suíte (responde ao critério de matar do adr-003).
 - **Eixo A (fonte de fato):** P1 ✅ granularidade `paste`×`stringify`
   (adr-003:82-86, `genOp` recusado; `ast-13` foi para a genealogia);
   P2 ✅ marker que gera E passa adiante (adr-003:87-90, veredito estrutural,
-  caso 109); P3 `generates` para
+  caso 109); **P4 ✅ + P5 ✅ os 15 mkinds EXAURIDOS (2026-07-12, caso 111,
+  fixture fixmk)**: sintaxe de cada um tirada do PARSER; 13 com consumo provado,
+  2 com recusa documentada (`strdump` só em stream `#pragma __text`; `dynval`
+  interno do pp); `<@>` (reference) desvendado — é o GUARDA ANTI-RECURSÃO de
+  regras circulares (ChangeLog do core 2010; uso real hbfoxpro.ch:63) e a
+  ferramenta o preserva por construção. TRÊS consumos: `restrict` VALIDADO
+  (recusa antes de editar, nomeando as alternativas — re-baseline do caso 82),
+  `wild`/marker-não-usado separado de palavra-de-regra **POR FATO** (canal novo
+  **`ast-14`** no core: todo marker de match é numerado, gated, `lexdiff` 0 —
+  matou uma heurística de texto minha que o Diego pegou), `logical`/`nul`
+  RELATADOS (valor descartado: não edita, avisa). Suíte 835/0;
+  [spec-p § P4+P5](spec-p-pp-refatoracao.md); commit do core sob autorização.
+  P3 `generates` para
   `usages`/find-references (a hipótese grande, adr-003:60-63); P4 mkinds de
   RESULT marker como veredito (`block`/`reference`/stringify… já exportados,
   não consumidos); P5 mkinds de MATCH (`wild`/`extexp`/`restrict` — validação

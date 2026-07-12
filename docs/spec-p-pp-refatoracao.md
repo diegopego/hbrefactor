@@ -336,9 +336,58 @@ compilador muda). O registro destes achados É a entrega tanto quanto a prova
 [adr-004](adr-004-grafo-transformacao-pp.md) e no
 [limites-e-alavancas.md](limites-e-alavancas.md).
 
+## Eixo A — P4 + P5: os 15 mkinds EXAURIDOS — ENTREGUE (2026-07-12)
+
+Critério da fase: *cada match-mkind e result-mkind com fixture provando CONSUMO
+ou RECUSA documentada*. Cumprido: os 15 exercitados em DSL não-espelho
+(`tests/fixmk`, **caso 111**), vereditos no
+[ast-schema § mkind](ast-schema.md). Sintaxe de cada um tirada do PARSER
+(`hb_pp_matchMarkerNew`/`hb_pp_resultMarkerNew`), não de memória.
+
+**Recusas documentadas (2):** `strdump` (`%s`) não existe em regra — vive na
+maquinaria de STREAM (`#pragma __text`, o `TEXT…ENDTEXT`); `dynval` não é
+escrivível — é o canal interno do pp para `__FILE__`/`__LINE__` (ppcore.c:5209).
+
+**`reference` (`<@>`) — o achado que o Diego mandou perseguir.** Eu havia dito
+"não tem uso nenhum" com base num `grep` que FALHOU (erro de glob) — silêncio de
+comando quebrado não é evidência. Refeito: é o **guarda anti-recursão**
+(ChangeLog do core, 2010-08-19, Przemysław Czerpak: *"creates token significant
+for PP but invisible for compiler … allows to resolve problem with circular
+rules"*), emite um token que carrega o padrão de match da regra e é descartado
+antes do compilador (ppcore.c:5234/6712); uso real em `hbfoxpro.ch:63`. **Consumo
+provado:** a ferramenta o PRESERVA por construção — edita regra por posição de
+byte e o guarda não tem posição; `rename-dsl` numa regra circular guardada manteve
+o `<@>`, o projeto seguiu compilando sem loop, `.ppo`/`.hrb` byte-idênticos.
+
+### Três consumos entregues (todos por FATO)
+
+1. **`restrict` validado (P5).** O dump traz as ALTERNATIVAS (`role: "restrict"`).
+   O rename agora **recusa ANTES de editar**, nomeando-as ("`zzz` não é uma das
+   alternativas … a regra deixaria de casar"). Antes: editava, recompilava, levava
+   um `E0030 syntax error` opaco e fazia rollback. *(Re-baseline do caso 82: o
+   check que exigia "rollback" passou a exigir a recusa antecipada — a mesma
+   proteção, sem tocar no arquivo.)*
+2. **`wild` / marker não-usado (P5) — e a LIÇÃO DA FASE.** O recheio de um marker
+   que o result não usa chegava com `marker: 0`, **igual a uma palavra da regra**.
+   Meu primeiro conserto foi na FERRAMENTA, adivinhando por comparação de texto —
+   e o Diego pegou. Furo provado em 1 linha: `ANOTA ANOTA` (com
+   `#xcommand ANOTA <*x*>`) classifica o conteúdo do usuário como palavra de regra.
+   **O fato faltava no CORE** (`hb_pp_patternMatch` só registra o casamento quando
+   o marker tem índice; sem índice, a ligação é DESCARTADA). Conserto onde devia
+   ser: **`ast-14`** — todo marker de match é numerado (gated por `fTrackPos`;
+   `lexdiff` 0). A heurística morreu; `marker: 0` passou a significar UMA coisa só.
+3. **`logical`/`nul` relatados (P4).** Esses markers consomem o valor e NÃO o
+   emitem (`<.x.>` emite `.T.`/`.F.`; `<-x->` não emite nada). O compilador nunca
+   liga aquele token a símbolo nenhum, então editá-lo seria por coincidência de
+   nome — a ferramenta **não edita e RELATA**: *"'n' é consumido e DESCARTADO pela
+   diretiva (#xcommand R_LOG) — não chega ao compilador; NÃO renomeado"*.
+
+Suíte **835/0**; `lexdiff` 0 divergências reais; `make ppcorpus` 16/16. Core:
+`ppcore.c` (indexação gated) + `compast.c` (bump `ast-14`) — **commit do core sob
+autorização por-commit do Diego**.
+
 ## Fatias seguintes (roadmap § P, ordem)
 
-P3 (`generates` para `usages`/find-references — a hipótese grande) · P4 (mkinds de
-RESULT marker) · P5 (mkinds de MATCH) · P6 (estrutura da regra, regra sem cabeça)
-· Eixo B: P7 (pp como instrumento — o enquadramento acima aterrissa aqui) · Eixo
-C: P8 (rename da palavra na regra) · P9 (custo reverse-scan) · P10 (síntese).
+P3 (`generates` para `usages`/find-references — a hipótese grande) · P6 (estrutura
+da regra, regra sem cabeça) · Eixo B: P7 (pp como instrumento) · Eixo C: P8 (rename
+da palavra na regra) · P9 (custo reverse-scan) · P10 (síntese).

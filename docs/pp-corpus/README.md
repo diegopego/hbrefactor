@@ -65,14 +65,24 @@ Como ler o `.ppt`: pares `arquivo(linha) >entrada<` / `#tipo >saída<`; aplicaç
 em cascata (uma regra sobre o resultado de outra) aparecem em sequência — é o
 multi-passe visível. O `(concatenate)` é a colagem (paste) anotada por linha.
 
+## ⚠️ ANTES DE RETOMAR: leia o [ROADMAP.md](ROADMAP.md)
+
+Estado da exploração, plano das fatias **e o CHECKLIST ANTI-ERRO** (sete regras,
+cada uma nascida de um erro real). A exploração do pp é longa — o roadmap existe
+para não me perder e para não repetir erro.
+
 ## Famílias
 
-| Família | `.ch` (origem) | Ensina (o FATO principal) | Arquivo |
+| Família | origem | Ensina (o FATO principal) | Arquivo |
 |---|---|---|---|
 | SET EXACT | std.ch:121 | marker `restrict` + result `strsmart` (smart-quote); multi-passe com `#define` | [set-exact.md](set-exact.md) |
 | `@ … SAY` | std.ch:249 | grupos OPCIONAIS (`opt-open`/`opt-close`) + seleção de forma | [say.md](say.md) |
 | STORE | std.ch:78 | grupo opcional que REPETE (multi-atribuição) | [store.md](store.md) |
 | hbclass | hbclass.ch:235+ | o dialeto OO É pp: paste do nome, diretiva que gera diretiva, `AS CLASS Self` | [class.md](class.md) |
+| **MARKERS** | hbpp.h / ppcore.c | **os 15 tipos de `<x>`** (6 match + 9 result): sintaxe, o que cada um faz, veredito de consumo/recusa | [markers.md](markers.md) |
+| **`<@>`** | hbfoxpro.ch:63 | **o guarda anti-recursão**: como uma regra emite a própria palavra que casa sem loop infinito | [reference-guard.md](reference-guard.md) |
+| **regra que gera regra** | gen.ch / hbclass.ch | genealogia (`ast-13`) + os LIMITES do pp: `#xtranslate` gerado **não registra**; keyword colada não casa | [generated-rules.md](generated-rules.md) |
 
-Planejadas: um contrib rico (hbct/Clipper Tools) para MEDIÇÃO; wild `<*x*>` (SET
-ECHO/ENDDO); list marker verdadeiro `<x,...>` (DO … WITH).
+Planejadas (ver [ROADMAP.md](ROADMAP.md)): um contrib rico (hbct) para MEDIÇÃO;
+`TEXT … ENDTEXT` (a maquinaria de *stream*, onde o `strdump`/`%s` vive de fato);
+`#define` dinâmico (`__FILE__`/`__LINE__`, o `dynval`).

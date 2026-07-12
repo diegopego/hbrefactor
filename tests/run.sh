@@ -192,6 +192,13 @@ freshp2() { # freshp2 <case-name> -> marker que GERA e PASSA ADIANTE + multiplic
    echo "$d"
 }
 
+freshmk() { # freshmk <case-name> -> TODOS os mkinds do pp (fase P, P4+P5)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixmk/*.prg "$HERE"/fixmk/*.ch "$HERE"/fixmk/*.hbp "$d"/
+   echo "$d"
+}
+
 freshdata() { # freshdata <case-name> -> rename de DATA/VAR member (spec-rename-data): homonimo + unico
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -2406,9 +2413,13 @@ check "ida-e-volta da restrição byte-exata" $?
 ( cd "$D" && "$BIN" rename forja.hbp forja.prg:9:64 VELOZ > rd4.log 2>&1 )
 RC=$?
 check "restrição que vaza: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "rollback" "$D/rd4.log" && cmp -s "$D/forja.ch" "$D/forja.ch.antes" && \
-   cmp -s "$D/forja.prg" "$D/forja.prg.antes"
-check "rollback preservou diretiva e fonte (expansão teria mudado)" $?
+# P5: a recusa agora vem ANTES de qualquer edição - o dump traz as ALTERNATIVAS
+# do marker restrito (ast-5), então a ferramenta sabe que o nome novo faria a
+# regra deixar de casar e diz isso, em vez de editar/recompilar/rollback com um
+# "syntax error" opaco. Arquivos nem chegam a ser tocados (era: rollback)
+grep -q "não é uma das alternativas do marker RESTRITO" "$D/rd4.log" && \
+   cmp -s "$D/forja.ch" "$D/forja.ch.antes" && cmp -s "$D/forja.prg" "$D/forja.prg.antes"
+check "recusa ANTES de editar, nomeando as alternativas; fontes intactos" $?
 # resolve-at DENTRO de diretiva (camada 4): a posição vira palavra de regra
 ( cd "$D" && "$BIN" resolve-at molde.hbp molde.prg 6 51 > ra.log 2>&1 )
 RC=$?
@@ -3599,7 +3610,47 @@ cmp -s "$D/c1.prg" "$HERE/fixdata/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixdata/c
 check "A->B->A round-trip byte-exact" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110"
+unit_111() {
+echo "case 111: P4+P5 - os 15 mkinds do pp: consumo provado OU recusa documentada"
+# fixture fixmk (DSL inventada nao-espelho): exercita os 6 match-mkinds e os 7
+# result-mkinds escriviveis. strdump (so em stream `#pragma __text`) e dynval
+# (interno do pp: __FILE__/__LINE__) tem RECUSA DOCUMENTADA no ast-schema.
+# ast-14: TODO marker de match e numerado no core (gated), entao o recheio de um
+# marker que o result NAO usa deixa de se confundir com palavra da regra - o
+# fato substitui a adivinhacao por texto.
+"$HB_BIN/harbour" "$HERE/fixmk/mk.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixmk" > /dev/null 2>&1
+check "fixmk/mk.prg clean under -w3 -es2"  $?
+D=$(freshmk case111)
+# --- P5 restrict: o rename VALIDA contra as alternativas (fato ast-5)
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:6:10 zzz > rst.log 2>&1 )
+RC=$?
+check "restrict: novo nome fora das alternativas recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "não é uma das alternativas do marker RESTRITO" "$D/rst.log" && grep -q "LIGA, DESLIGA" "$D/rst.log"
+check "recusa NOMEIA as alternativas, antes de recompilar" $?
+cmp -s "$D/mk.prg" "$HERE/fixmk/mk.prg"
+check "fonte intacto (nem chegou a editar)" $?
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:6:10 DESLIGA --dry-run > ok.log 2>&1 )
+grep -q "^rename-pp-marker: LIGA -> DESLIGA" "$D/ok.log"
+check "restrict: alternativa VALIDA passa" $?
+# --- P5 wild (ast-14): conteudo engolido por marker nao-usado != palavra da regra
+( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 7 10 > w1.log 2>&1 )
+grep -q "consumido e DESCARTADO pela diretiva" "$D/w1.log"
+check "wild: recheio de marker nao-usado e conteudo DESCARTADO, nao palavra de regra" $?
+( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 7 4 > w2.log 2>&1 )
+grep -q "palavra de regra de pp" "$D/w2.log"
+check "wild: a palavra da regra DE VERDADE segue sendo palavra de regra" $?
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:7:10 outra > w3.log 2>&1 )
+RC=$?
+check "wild: rename do conteudo descartado recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+# --- P4 logical/nul: o valor NAO e emitido -> rename do local RELATA o descarte
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:3:10 zzz --dry-run > loc.log 2>&1 )
+grep -q "mk.prg:12:10: 'n' é consumido e DESCARTADO" "$D/loc.log" &&    grep -q "mk.prg:13:10: 'n' é consumido e DESCARTADO" "$D/loc.log"
+check "logical/nul: rename do local RELATA as ocorrencias descartadas (nao as edita)" $?
+grep -q "mk.prg:11:10" "$D/loc.log" && grep -q "mk.prg:8:12" "$D/loc.log"
+check "block/extexp: o valor E emitido, entao esses sitios SAO editados" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

@@ -283,7 +283,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
    // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12", "ast-13" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12", "ast-13", "ast-14" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -1148,6 +1148,10 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
    // sob o cursor GERA artefato (paste/stringify, fato do core ast-12);
    // lGenRule = o nome vira token de REGRA GERADA (genealogia, ast-13)
    LOCAL cRole := NIL, cOwner := NIL, lGen := .F., lGenRule := .F., hFrom
+   // P5: conteúdo do usuário engolido por um marker NÃO-NUMERADO (casado mas
+   // não usado no result - ex.: wild descartado). Vem com marker 0, igual a uma
+   // palavra da regra; o texto NÃO ser literal do match é o fato que os separa
+   LOCAL cDisc := NIL, hR2
 
    // camadas 1/2: o site escrito nas aplicações de pp (a assinatura de um
    // construto gerado só tem posição byte-exata AQUI - tokens[] colapsa)
@@ -1158,11 +1162,36 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
             hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
             nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
             IF hTok[ "marker" ] >= 1
-               cMk := hTok[ "text" ]
-               lGen := hb_HGetDef( hTok, "generates", .F. )
-               hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
-               AAdd( aPosApps, nApp )
+               // ast-14: TODO marker de match é numerado, então marker >= 1 é
+               // recheio de marker POR FATO (antes, um marker casado e não usado
+               // no result não era numerado e o recheio dele caía no balde do 0,
+               // junto das palavras da regra - e a ferramenta tinha de adivinhar
+               // por comparação de texto). Três destinos, todos por fato:
+               hR2 := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
+               DO CASE
+               CASE MarkerEmitsValue( hR2, hTok[ "marker" ] )
+                  // (1) o marker EMITE o valor: recheio normal de marker
+                  cMk := hTok[ "text" ]
+                  lGen := hb_HGetDef( hTok, "generates", .F. )
+                  hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
+                  AAdd( aPosApps, nApp )
+               CASE MarkerMkind( hR2, hTok[ "marker" ] ) == "restrict"
+                  // (2) marker RESTRITO que não emite: o que o usuário escreveu
+                  //     ali é uma das ALTERNATIVAS da própria regra - palavra da
+                  //     DSL, editável na diretiva E no uso (caso 82)
+                  IF cWd == NIL
+                     cWd   := hTok[ "text" ]
+                     hRule := hR2
+                  ENDIF
+               CASE cDisc == NIL
+                  // (3) o marker não emite e não restringe: a diretiva ENGOLIU e
+                  //     DESCARTOU o que o usuário escreveu - não chega ao
+                  //     compilador, nenhum fato o liga a símbolo nenhum
+                  cDisc := hTok[ "text" ]
+               ENDCASE
             ELSEIF cWd == NIL
+               // ast-14: marker == 0 agora significa UMA coisa só - palavra
+               // literal da própria regra. O fato vem do pp, não de comparar texto
                cWd   := hTok[ "text" ]
                hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
             ENDIF
@@ -1323,6 +1352,15 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                 RuleWhere( hRule ) + ")"
       cQuery := cWd
       cRole  := "dsl"
+   ELSEIF cDisc != NIL
+      // P5: a diretiva ENGOLIU este texto num marker que não numerou (casado e
+      // não usado no result) - ele não chega ao compilador. Não é palavra de
+      // regra (mentiríamos) nem símbolo ligado (o compilador nunca o ligou)
+      cKind  := "conteúdo consumido e DESCARTADO pela diretiva " + ;
+                "(marker não usado no resultado; não chega ao compilador)"
+      cQuery := cDisc
+      cRole  := "ppdiscard"
+      cMk    := cDisc
    ELSE
       // camada 3 (B4g): posição DENTRO do texto de uma diretiva do próprio
       // módulo - vem ANTES do stream: linhas de diretiva não têm tokens
@@ -1513,6 +1551,13 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
                "nenhum verbo de rename cobre campos de RDD" }
    CASE cRole == "dsl"
       RETURN { "cmd" => "rename-dsl", "old" => cTok }
+   CASE cRole == "ppdiscard"
+      // P5: a diretiva engoliu este texto e o DESCARTOU (marker casado mas não
+      // usado no resultado). Não chega ao compilador, logo não há fato que o
+      // ligue a nada - renomeá-lo seria editar por coincidência de nome
+      RETURN { "refuse" => "'" + cTok + "' é consumido e DESCARTADO pela diretiva " + ;
+               "(marker não usado no resultado) - não chega ao compilador, " + ;
+               "nenhum fato o liga a um símbolo; recuso" }
    ENDCASE
 
    // (2) o nome GERA artefato (paste/stringify, fato do core ast-12) OU vira
@@ -1820,6 +1865,7 @@ STATIC FUNCTION RenameLocal( aArgs )
    LOCAL hProj, cTmp, cSrcPath, hAst, hFunc, hItem, hTok, hRule
    LOCAL hDecl := NIL, aEdits := {}, nSpanEnd := 0, nI
    LOCAL cText, cUpOld, cUpNew, aPrev, cPrevType, nLine, aIdent
+   LOCAL aDisc   // P4/P5: ocorrências que a diretiva descarta (relato honesto)
 
    IF Len( aArgs ) < 6
       Usage()
@@ -1975,6 +2021,17 @@ STATIC FUNCTION RenameLocal( aArgs )
    FOR nI := 1 TO Len( aEdits )
       OutStd( "  " + hb_FNameNameExt( cSrcPath ) + ":" + hb_ntos( aEdits[ nI ][ 1 ] ) + ;
               ":" + hb_ntos( aEdits[ nI ][ 2 ] ) + hb_eol() )
+   NEXT
+   // P4/P5 - relato honesto: ocorrências que uma DIRETIVA consome e DESCARTA
+   // (marker `logical`/`nul`, ou casado e não usado no result) não chegam ao
+   // compilador; nenhum fato as liga ao símbolo, então NÃO são renomeadas -
+   // mas o usuário precisa saber que o fonte ficou com o nome velho ali
+   aDisc := DiscardedFills( hAst, cUpOld, aEdits )
+   FOR nI := 1 TO Len( aDisc )
+      OutErr( "warning: " + hb_FNameNameExt( cSrcPath ) + ":" + ;
+              hb_ntos( aDisc[ nI ][ 1 ] ) + ":" + hb_ntos( aDisc[ nI ][ 2 ] ) + ": '" + cOld + ;
+              "' é consumido e DESCARTADO pela diretiva (" + aDisc[ nI ][ 3 ] + ") - " + ;
+              "não chega ao compilador; NÃO renomeado" + hb_eol() )
    NEXT
    IF lDryRun
       OutStd( "dry run - nada foi escrito" + hb_eol() )
@@ -10170,6 +10227,140 @@ STATIC FUNCTION SendVerdict( hType, cClass, lBlock, cUpMsg, hGraph )
 STATIC FUNCTION PairKey( nApp, nMarker )
    RETURN hb_ntos( nApp ) + "|" + hb_ntos( nMarker )
 
+// P5 - o mkind do marker N no MATCH da regra (fato ast-5): "restrict", "wild",
+// "list", "extexp", "name" ou "regular"; "" se não achar
+STATIC FUNCTION MarkerMkind( hRule, nMarker )
+
+   LOCAL hTok
+
+   IF hRule == NIL
+      RETURN ""
+   ENDIF
+   FOR EACH hTok IN hb_HGetDef( hRule, "match", {} )
+      IF hb_HGetDef( hTok, "role", "" ) == "marker" .AND. ;
+         hb_HGetDef( hTok, "marker", 0 ) == nMarker
+         RETURN hb_HGetDef( hTok, "mkind", "" )
+      ENDIF
+   NEXT
+
+   RETURN ""
+
+// P4 - o marker N emite o VALOR no resultado da regra? Emitem: `regular`,
+// `strstd`, `strsmart`, `block`, `strdump`. NÃO emitem o valor: `logical`
+// (emite .T./.F. - só o FATO de ter casado) e `nul` (não emite nada); marker
+// ausente do result também não emite
+STATIC FUNCTION MarkerEmitsValue( hRule, nMarker )
+
+   LOCAL hTok, cK
+
+   IF hRule == NIL
+      RETURN .F.
+   ENDIF
+   FOR EACH hTok IN hb_HGetDef( hRule, "result", {} )
+      IF hb_HGetDef( hTok, "role", "" ) == "marker" .AND. ;
+         hb_HGetDef( hTok, "marker", 0 ) == nMarker
+         cK := hb_HGetDef( hTok, "mkind", "" )
+         IF cK == "regular" .OR. cK == "strstd" .OR. cK == "strsmart" .OR. ;
+            cK == "block" .OR. cK == "strdump"
+            RETURN .T.
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// P4/P5 - ocorrências do nome que uma DIRETIVA consome e DESCARTA: o marker que
+// as engoliu não emite o VALOR (mkind `logical`/`nul`, ou marker casado e não
+// usado no result - que nem numerado é). Elas NÃO chegam ao compilador, então
+// nenhum fato as liga ao símbolo e a ferramenta NÃO pode editá-las (seria por
+// coincidência de nome - o que a REGRA DO FATO proíbe). Mas calar deixaria o
+// fonte incoerente em silêncio: daí o relato honesto
+STATIC FUNCTION DiscardedFills( hAst, cUp, aEdits )
+
+   LOCAL hApp, hTok, hRule, aHits := {}, nMk, nI, lIn
+
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
+      FOR EACH hTok IN hApp[ "tokens" ]
+         IF hTok[ "type" ] != 21 .OR. !( hTok[ "prov" ] == "s" ) .OR. ;
+            hTok[ "col" ] == NIL .OR. !( Upper( hTok[ "text" ] ) == cUp )
+            LOOP
+         ENDIF
+         // ast-14: o fato basta - marker 0 é palavra da própria regra (não é o
+         // símbolo); marker >= 1 é recheio, e só é DESCARTADO se não emitir o
+         // valor no resultado. Um marker RESTRITO que não emite também não é
+         // "descarte": o valor é uma alternativa da regra (palavra da DSL)
+         nMk := hb_HGetDef( hTok, "marker", 0 )
+         IF nMk == 0 .OR. MarkerEmitsValue( hRule, nMk ) .OR. ;
+            MarkerMkind( hRule, nMk ) == "restrict"
+            LOOP
+         ENDIF
+         lIn := .F.
+         FOR nI := 1 TO Len( aEdits )
+            IF aEdits[ nI ][ 1 ] == hTok[ "line" ] .AND. ;
+               aEdits[ nI ][ 2 ] == hTok[ "col" ] + 1
+               lIn := .T.
+               EXIT
+            ENDIF
+         NEXT
+         IF ! lIn
+            AAdd( aHits, { hTok[ "line" ], hTok[ "col" ] + 1, RuleTag( hRule ) } )
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN aHits
+
+// P5 - as ALTERNATIVAS de um marker RESTRICT (`<x: LIGA, DESLIGA>`), fato do
+// ast-5: o marker sai com mkind "restrict" e cada alternativa vem como um item
+// role "restrict" com o marker# do dono (as vírgulas do grupo incluídas - ver
+// ast-schema). Devolve o array de textos aceitos, ou NIL se o marker do par
+// (aplicação, marker#) NÃO é restrito. É o fato que permite recusar ANTES de
+// recompilar um rename que faria a regra deixar de casar
+STATIC FUNCTION RestrictAlts( hAst, nApp, nMarker )
+
+   LOCAL hRule, hTok, aAlts := {}, lRestrict := .F., cTxt
+
+   IF nApp < 0 .OR. nApp >= Len( hAst[ "ppApplications" ] ) .OR. nMarker < 1
+      RETURN NIL
+   ENDIF
+   hRule := hAst[ "ppRules" ][ hAst[ "ppApplications" ][ nApp + 1 ][ "rule" ] + 1 ]
+   FOR EACH hTok IN hb_HGetDef( hRule, "match", {} )
+      IF hb_HGetDef( hTok, "role", "" ) == "marker" .AND. ;
+         hb_HGetDef( hTok, "marker", 0 ) == nMarker .AND. ;
+         hb_HGetDef( hTok, "mkind", "" ) == "restrict"
+         lRestrict := .T.
+      ENDIF
+   NEXT
+   IF ! lRestrict
+      RETURN NIL
+   ENDIF
+   FOR EACH hTok IN hb_HGetDef( hRule, "match", {} )
+      IF hb_HGetDef( hTok, "role", "" ) == "restrict" .AND. ;
+         hb_HGetDef( hTok, "marker", 0 ) == nMarker
+         cTxt := hb_HGetDef( hTok, "text", "" )
+         IF !( cTxt == "," ) .AND. Len( cTxt ) > 0
+            AAdd( aAlts, cTxt )
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN aAlts
+
+// o novo nome é aceito pelo marker restrito? `&` entre as alternativas =
+// a regra aceita um macro ali, o que NÃO ajuda um nome cru
+STATIC FUNCTION RestrictAccepts( aAlts, cUpNew )
+
+   LOCAL cAlt
+
+   FOR EACH cAlt IN aAlts
+      IF Upper( cAlt ) == cUpNew
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
 // a faixa [at, at+len) de um item de "from" soletra o nome? A precisão vem
 // daqui: o fecho por (aplicação, marker) é grosso - um marker carrega a
 // expressão inteira - e o recorte byte-exato devolve só o nome
@@ -10624,6 +10815,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL hMap := { => }, hPredStr := { => }, aPS, cPred, cOwn, aArt, hTok
    LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
    LOCAL hOpt := { => }, lData := .F.
+   LOCAL cKey, aKParts, nApp, nMarker, aAlts, cAltList   // P5: validação do restrict
 
    IF Len( aArgs ) < 4
       Usage()
@@ -10689,7 +10881,8 @@ STATIC FUNCTION RenameMethod( aArgs )
       hF     := PpMarkerSeeds( hAst, cUpOld )
       aArts  := PpMarkerArtifacts( hAst, hF[ "pairs" ], cUpOld )
       hOwn   := PpMarkerOwners( hAst, aArts, aSpans, cUpOld )
-      hFacts[ cPath ] := { "sites" => hF[ "sites" ], "arts" => aArts, "own" => hOwn }
+      hFacts[ cPath ] := { "sites" => hF[ "sites" ], "arts" => aArts, "own" => hOwn, ;
+                           "pairs" => hF[ "pairs" ] }
       // o nome NOVO com vida derivada em qualquer classe = mensagem viva
       hF    := PpMarkerSeeds( hAst, cUpNew )
       aArts := PpMarkerArtifacts( hAst, hF[ "pairs" ], cUpNew )
@@ -10699,6 +10892,32 @@ STATIC FUNCTION RenameMethod( aArgs )
          RETURN Refuse( "'" + cNew + "' já é membro/mensagem registrada da classe " + cOwn + ;
                         " (" + hb_FNameNameExt( cPath ) + ") - o rename fundiria mensagens" )
       ENDIF
+   NEXT
+
+   // P5 - marker RESTRITO (`<x: LIGA, DESLIGA>`): o novo nome tem de ser uma das
+   // ALTERNATIVAS, senão a regra deixa de casar. O fato está no ast-5 (mkind
+   // "restrict" + os itens role "restrict"), então a recusa vem ANTES de
+   // recompilar - nomeando as alternativas, em vez de deixar o usuário levar um
+   // "syntax error" opaco e um rollback sem explicação
+   FOR EACH cPath IN hProj[ "files" ]
+      FOR EACH cKey IN hb_HKeys( hFacts[ cPath ][ "pairs" ] )
+         aKParts := hb_ATokens( cKey, "|" )
+         IF Len( aKParts ) != 2
+            LOOP
+         ENDIF
+         nApp    := Val( aKParts[ 1 ] )
+         nMarker := Val( aKParts[ 2 ] )
+         aAlts   := RestrictAlts( hAsts[ cPath ], nApp, nMarker )
+         IF aAlts != NIL .AND. ! Empty( aAlts ) .AND. ! RestrictAccepts( aAlts, cUpNew )
+            cAltList := ""
+            FOR EACH cPred IN aAlts
+               cAltList += iif( Empty( cAltList ), "", ", " ) + cPred
+            NEXT
+            RETURN Refuse( "'" + cNew + "' não é uma das alternativas do marker RESTRITO da regra (" + ;
+                           cAltList + ") em " + hb_FNameNameExt( cPath ) + " - a regra deixaria de " + ;
+                           "casar; recuso" )
+         ENDIF
+      NEXT
    NEXT
 
    // donos agregados; a forma sem classe resolve no primeiro dono

@@ -1,9 +1,38 @@
-# Schema `ast-13` — o dump AST do compilador (spec)
+# Schema `ast-14` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
-com `-x`. O `ast-13` (fase P) = `ast-12` + a **GENEALOGIA DE REGRA**:
+com `-x`.
+
+O **`ast-14` (fase P / P5) = `ast-13` + TODO MARKER DE MATCH É NUMERADO.**
+Antes, o pp só dava índice a um marker de match que o RESULT referenciasse
+(`usPCount`); um marker casado e **não usado no resultado** ficava com índice
+0 — e, pior, o casamento dele era **DESCARTADO** (`hb_pp_patternMatch` só
+chama `hb_pp_patternAddResult` quando `pMatch->index` está setado). Efeito no
+rastro: o recheio desse marker chegava ao `ppApplications[].tokens[]` com
+`marker: 0`, **indistinguível de uma palavra literal da regra** — o comentário
+do `hb_pp_trackApply` afirmava exatamente isso ("everything not covered by a
+marker result is a literal word of the rule itself") e estava ERRADO. Um
+consumidor só podia separar os dois ADIVINHANDO pelo texto, e a adivinhação tem
+furo demonstrável: conteúdo do usuário igual a uma keyword da regra
+(`ANOTA ANOTA`, com `#xcommand ANOTA <*x*>`) classifica errado.
+**O conserto foi no CORE, onde o fato tinha de nascer** (ppcore.c,
+`hb_pp_directiveNew`, **gated por `fTrackPos`** — build default do Harbour
+byte-a-byte intocado): todo marker de match ganha índice, o casamento passa a
+ser registrado, e o rastreador exporta a ligação REAL. Consequências para o
+consumidor:
+- **`marker: 0` agora significa UMA coisa só**: palavra literal da própria
+  regra (cabeça, keyword secundária, alternativa de restrição).
+- **`marker: N >= 1` é recheio de marker POR FATO** — inclusive de markers que
+  o resultado nunca usa (`<*x*>` wild descartado, `<x: A, B>` restrito que não
+  vaza). Combinado com o `mkind` do `match[]` e com os mkinds do `result[]`, o
+  consumidor decide sem heurística: o marker EMITE o valor? é RESTRITO? senão,
+  o que o usuário escreveu ali é **consumido e descartado** pela diretiva.
+- A expansão NÃO muda (o result nunca referencia esses markers): `lexdiff` 0
+  divergências reais.
+
+O `ast-13` (fase P) = `ast-12` + a **GENEALOGIA DE REGRA**:
 (a) `"from"` (mesmo formato do ast-3) nos tokens de `match[]`/`result[]`
 de uma regra **GERADA pela expansão de outra regra** — a linha de diretiva
 dela foi SINTETIZADA, então seus tokens carregam de qual aplicação/marker
@@ -308,12 +337,36 @@ ADR-001.
   dono; vírgulas do grupo incluídas, col null), `opt-open`/`opt-close`
   (grupo opcional achatado, reconstruível por pilha; o match pode
   ANINHAR — o result não).
-- **`mkind`** (vocabulário do pp, hbpp.h): match
-  `regular|list|restrict|wild|extexp|name`; result
-  `regular|strdump|strstd|strsmart|block|logical|nul|dynval|reference`.
-  Marker de match casado mas NÃO usado no result fica com `marker: 0`
-  (não numerado) — e o recheio dele em `ppApplications` também vem com
-  `marker: 0` (comportamento do rastreador, não deste snapshot).
+- **`mkind`** (vocabulário do pp, hbpp.h). **Fase P4/P5 exauriu os 15**: cada um
+  foi exercitado em fixture e recebeu veredito (consumo provado OU recusa
+  documentada). **Desde o ast-14, TODO marker de match é numerado** — a nota
+  antiga ("marker casado mas não usado no result fica com `marker: 0`") está
+  MORTA: era o próprio defeito que o ast-14 consertou.
+
+  **MATCH (6)** — sintaxe (parser: `hb_pp_matchMarkerNew`, ppcore.c) e consumo:
+
+  | mkind | sintaxe | veredito |
+  |---|---|---|
+  | `regular` | `<x>` | consumido (recheio comum) |
+  | `list` | `<x,...>` | consumido; os itens chegam **individualmente posicionados** nos tokens consumidos |
+  | `restrict` | `<x: A, B>` | consumido; as ALTERNATIVAS vêm como itens `role: "restrict"` com o `marker` do dono → o rename **VALIDA contra elas** e recusa antes de recompilar (P5) |
+  | `wild` | `<*x*>` | consumido; se o result não usa o marker, o recheio é **descartado** — a ferramenta o relata, nunca o edita |
+  | `extexp` | `<(x)>` | consumido (expressão estendida) |
+  | `name` | `<!x!>` | consumido (só casa identificador) |
+
+  **RESULT (9)** — sintaxe (parser: `hb_pp_resultMarkerNew`) e consumo:
+
+  | mkind | sintaxe | veredito |
+  |---|---|---|
+  | `regular` | `<x>` | emite o valor → recheio é símbolo ligado |
+  | `strstd` | `<"x">` | stringify sempre → gera artefato (`generates`) |
+  | `strsmart` | `<(x)>` | smart-quote: bareword vira string, expressão passa crua |
+  | `block` | `<{x}>` | embrulha o valor num codeblock; o valor É emitido |
+  | `logical` | `<.x.>` | emite `.T.`/`.F.` — **o VALOR não é emitido**: o recheio é consumido e DESCARTADO (relato honesto, nunca edição) |
+  | `nul` | `<-x->` | não emite nada — recheio DESCARTADO (idem) |
+  | `reference` | `<@>` | **guarda anti-recursão**: token significativo para o pp e INVISÍVEL ao compilador, que carrega o padrão de match da regra e impede uma regra circular de re-casar a própria saída (ChangeLog do core 2010-08-19; uso real: `hbfoxpro.ch:63`). Sem nome e sem posição (`text: "~"`, `col: null`) → nada a renomear; a ferramenta o **preserva por construção** (edita regra por posição de byte, e o guarda não tem posição). |
+  | `strdump` | `%s` | **RECUSA DOCUMENTADA**: não existe em `match[]`/`result[]` de regra — vive na maquinaria de STREAM (`#pragma __text`, o `TEXT…ENDTEXT`). Nada a consumir numa regra. |
+  | `dynval` | — | **RECUSA DOCUMENTADA**: não é escrivível pelo usuário — é o canal INTERNO do pp para os `#define` dinâmicos (`__FILE__`, `__LINE__`, `__DATE__`…; ppcore.c:5209/7190). Nenhum `#xcommand` pode produzi-lo. |
 - **Posições**: `line`/`col`/`len`/`prov` como em `tokens[]`, com UMA
   diferença deliberada: **col é emitida também para token de include**
   (`prov 'i'`) — a posTbl guarda coluna de qualquer arquivo (fato 8 da

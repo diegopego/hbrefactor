@@ -19,6 +19,22 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   pedir. O único freio é o de sempre: **commit no core continua sob
   autorização por-commit do Diego** (não editar ≠ não commitar). É a
   perna concreta da REGRA DO FATO ("estender o core para o fato existir").
+- **FALTA DE INFORMAÇÃO → VÁ AO CORE, IMEDIATAMENTE (Diego, 2026-07-12)**:
+  a missão é fazer o core do Harbour **gerar o MÁXIMO de informação
+  necessária**. Ao detectar QUALQUER falta de fato, a primeira reação é
+  ir ao core estendê-lo — **nunca** remendar na ferramenta com
+  heurística, inferência ou comparação de texto. **"Zero mudança no core"
+  NÃO é virtude — é sinal de alerta**: se um conserto precisou de
+  esperteza na ferramenta, quase sempre o fato faltava no core e a
+  esperteza é o sintoma. Anti-padrão FLAGRADO pelo Diego (P5, 2026-07-12,
+  o erro que gerou esta regra): o recheio de um marker de match
+  NÃO-NUMERADO (casado mas não usado no result) chega ao dump com
+  `marker=0`, colidindo com "palavra literal da regra" — o pp SABE a
+  diferença (ele casou!) e não exportava. Em vez de estender o
+  rastreador, inferi por COMPARAÇÃO DE TEXTO ("se não é palavra da regra,
+  é recheio") — furo provado em 1 linha: conteúdo do usuário igual a uma
+  keyword da regra classifica errado. Fato que o core sabe e não exporta
+  é lacuna DO CORE, não problema a contornar.
 - **Buildar o core após editar — 3 armadilhas que custam diagnóstico
   (Diego, 2026-07-11; consolida notas espalhadas em specs)**: (a) mudança
   no COMPILADOR (harbour.y, hbmain.c, compast.c, complex.c…) exige
