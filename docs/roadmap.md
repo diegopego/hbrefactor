@@ -915,10 +915,14 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
 **LIMPEZA DO DIFF — achado em 2026-07-12, ao medir a proposta.** O branch
 `feature/compiler-ast-dump` carrega hoje **coisas que não são o trabalho de AST** e
 que entrariam no PR como ruído:
-- **4 commits de release para Windows** (`eac95cbf95`, `01a54fe431`, `bc4ea89e21`,
-  `6df4c08b98`): scripts `package/*win*`, `.github/workflows/release-*.yml`,
-  `doc/howtorel.txt`, `debian/changelog`, `README.md`, `include/hbver.h`… Nada disso
-  tem a ver com o dump nem com o `-kt`.
+- **SEIS commits de release/empacotamento** (contei 4 na primeira passada; são 6):
+  `01a54fe431` (doc do processo + workflow), `2ebdd689d4` (**Release Harbour
+  3.2.0**), `bb8f5264f6` (fix do workflow), `eac95cbf95` (scripts de release
+  Windows + CI), `bc4ea89e21` e `6df4c08b98` (fixes do release-windows). Tocam
+  `package/*win*`, `.github/workflows/release-*.yml`, `doc/howtorel.txt`,
+  `ChangeLog.txt`, `debian/changelog`, `README.md`, `include/hbver.h`… **Nada disso
+  tem a ver com o dump nem com o `-kt`** — e um "Release 3.2.0" no meio de um PR de
+  compilador é, sozinho, motivo para o mantenedor fechar a aba.
 - **`CLAUDE.md`** (+52) e **`.gitignore`**: instrumentos do nosso fluxo, não do
   Harbour.
 - **`site/index.html`** (+436): a proposta aos mantenedores. Ela é a *embalagem* do
