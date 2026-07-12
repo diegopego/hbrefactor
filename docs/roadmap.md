@@ -576,10 +576,27 @@ suíte (responde ao critério de matar do adr-003).
   a 1ª versão sai **sem mudança no core**. Plano de sondagem, usos candidatos e
   limites honestos: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-search.md)**.
   **NADA PROVADO AINDA** — o arquivo é plano, não registro.
-- **P13 — ESCOPO DE DIRETIVA / `#un*` (ideia do Diego, 2026-07-12)**: a diretiva NÃO
-  vale para o arquivo inteiro — ela tem **tempo de vida léxico** (`#xcommand` …
-  `#xuncommand`). A sondagem inicial já rendeu DOIS achados provados, antes de a
-  fatia começar: **(a) BUG no hbrefactor** — o `rename` de cabeça de DSL ignora o
+- **P13 — 1º achado ENTREGUE: `ast-16` (2026-07-12, caso 117)**. A diretiva tem
+  **tempo de vida léxico**, e o dump agora o exporta: a diretiva de **remoção** entra
+  em `ppRules` como registro próprio (com `match[]` POSICIONADO, logo editável por
+  posição), com **`undoes`** = id da regra que removeu (`null` = **órfão**, não
+  removeu nada) e **`removed`** na regra que morreu. Caiu junto um **bug de schema
+  pré-existente**: o modo de comparação era um BOOLEANO (`é x?`), então a família
+  **`y`** (exata e case-sensitive) saía rotulada `"command"` — o dump **afirmava que
+  uma regra exata casa abreviado**, e a sonda do P11 acreditaria nele. Agora o `kind`
+  carrega a família como o pp a vê (`command`/`xcommand`/`ycommand` × `un…`).
+  **O conserto do vazamento custou ZERO linha de lógica na ferramenta** — com o fato,
+  a remoção virou "mais uma regra com aquela cabeça" e a maquinaria de rename por
+  posição que já existia passou a editá-la sozinha. É a demonstração mais limpa da
+  REGRA DO FATO na fase inteira. Core: `ppcore.c`, `hbpp.h` (os `HB_PP_CMP_*` viram
+  públicos — a API de rastreio agora reporta o modo), `compast.c`. **`lexdiff` 0**,
+  suíte **913/0**, `ppcorpus` 42/0. **Commit do core sob autorização.**
+  → [pp-corpus/directive-scope.md](pp-corpus/directive-scope.md)
+  **Resíduos (a explorar):** o escopo como MECANISMO (injetar regra → casar →
+  remover) alimenta o **P12**; e o `#un…` órfão é fato SEM consumidor (diagnóstico de
+  código morto).
+- **P13 (registro do achado original)**: a sondagem rendeu DOIS achados provados
+  antes de a fatia começar: **(a) BUG no hbrefactor** — o `rename` de cabeça de DSL ignora o
   `#un*`, deixa-o **órfão**, e a regra **VAZA** para além do ponto de desligamento
   (provado por `.ppo`: um uso depois do `#xuncommand` que era código CRU passa a
   EXPANDIR); a rede `.ppo`/`.hrb` **não pega**, o mesmo ponto cego do sequestro do

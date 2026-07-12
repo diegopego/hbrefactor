@@ -6,6 +6,36 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 
 ## Regras de trabalho
 
+- **PORTÃO DE AUTORIZAÇÃO — heurística e réplica são PROIBIDAS por padrão, e a
+  exploração do core vem ANTES de projetar a solução (Diego, 2026-07-12; a regra
+  existia e vinha sendo quebrada "de tempos em tempos" — o que faltava não era
+  regra, era PORTÃO)**. A ordem é OBRIGATÓRIA e não se pula:
+  1. **Explorar PRIMEIRO se o core pode dar o fato.** Antes de desenhar qualquer
+     solução no hbrefactor, a pergunta é *"dá para o Harbour gerar essa
+     informação?"*. Projetar a solução na ferramenta e só depois perguntar isso é
+     ordem invertida — quando a solução já está desenhada, a heurística já venceu.
+  2. **Se o core pode → o core faz.** Estender/usar o core é o caminho, sempre.
+  3. **Se você concluir que o core NÃO pode → isso é uma RECUSA, e recusa exige
+     varredura registrada** (a regra abaixo: `--help`, API pública, `tests/` do
+     core, ChangeLog). "Não achei" quase sempre é "não procurei".
+  4. **Só então, e SÓ COM AUTORIZAÇÃO EXPLÍCITA DO DIEGO PARA AQUELE CASO**, pode
+     existir heurística/inferência/réplica de gramática no hbrefactor. É um portão
+     por-caso, igual ao de commit: aprovar um não aprova o próximo.
+  **Como pedir:** apresentar (a) o fato que falta, (b) a varredura feita no core,
+  (c) por que o core não pode dar, (d) a heurística proposta e **onde ela erra**.
+  **É PROIBIDO** implementar a heurística "provisoriamente" e pedir depois — o
+  código provisório é o que fica. Na dúvida sobre se algo É heurística, veja os
+  **GATILHOS** abaixo; se bater um gatilho, PARE e pergunte.
+  **O portão é EXECUTÁVEL, não só escrito:** o hook
+  `.claude/hooks/anti-heuristica.sh` (PreToolUse/Bash) intercepta o `git commit` e
+  **recusa** quando o diff staged de `src/hbrefactor.prg` adiciona linhas com os
+  cheiros dos gatilhos. Autorizado pelo Diego, sela-se a linha com
+  `// FATO-OK(diego,AAAA-MM-DD): <por que o core não pode dar este fato>` — e o selo
+  só se escreve DEPOIS do "ok" dele. Auditoria periódica do fonte inteiro: o prompt
+  de sessão dedicada está em `docs/prompt-revisao-anti-heuristica.md`.
+  *(Histórico do custo: `ast-14`, `ast-15` e `ast-16` foram os três casos em que o
+  fato faltava no core e eu remendei/ia remendar na ferramenta. Nos três, o core
+  sabia e não exportava.)*
 - **O hbrefactor CONSTRÓI a AST de que precisa — editar o harbour-core
   não é só permitido, é DEVER (Diego, 2026-07-09)**: o preceito fundador
   é que a ferramenta age só sobre FATO da AST do compilador; a AST é

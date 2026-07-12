@@ -3888,6 +3888,62 @@ check "ambiguidade PRE-EXISTENTE (MENU) nao bloqueia o rename" $?
 check "a ferramenta não menciona NENHUMA palavra da DSL fixseq (régua do caso 64)" $?
 }
 
+freshun() { # freshun <case-name> -> diretiva com TEMPO DE VIDA (#xuncommand) - P13/ast-16
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixun/*.prg "$HERE"/fixun/*.ch "$HERE"/fixun/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_117() {
+echo "case 117: P13/ast-16 - a diretiva tem TEMPO DE VIDA; o rename acompanha o #xuncommand"
+# O FURO: o dump nao exportava a diretiva de REMOCAO. O rename da cabeca trocava
+# so o #xcommand, deixando o #xuncommand ORFAO - ele passava a desligar uma regra
+# inexistente e a regra VAZAVA para depois do ponto de desligamento. Silencioso: a
+# rede .ppo/.hrb nao via, porque nada DEPOIS do #xuncommand usava a palavra.
+"$HB_BIN/harbour" "$HERE/fixun/un.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixun" > /dev/null 2>&1
+check "fixun/un.prg clean under -w3 -es2" $?
+
+# (1) o FATO existe no dump: a remocao, o vinculo por ID, e o tempo de vida
+D=$(freshun case117)
+( cd "$D" && "$BIN" dump un.hbp > d.log 2>&1 )
+AST=$(sed -n 's/^dumps em: //p' "$D/d.log")/un.ast.json
+python3 - "$AST" <<'PY'
+import json,sys
+rs=json.load(open(sys.argv[1]))["ppRules"]
+mk=[r for r in rs if r.get("head")=="LACRA" and "undoes" not in r]
+un=[r for r in rs if r.get("head")=="LACRA" and "undoes" in r]
+ok = (len(mk)==1 and len(un)==1
+      and mk[0].get("removed") is True          # a regra criada foi REMOVIDA
+      and un[0]["undoes"] == mk[0]["id"]        # o vinculo e por ID, nao por texto
+      and un[0]["kind"] == "xuncommand")
+sys.exit(0 if ok else 1)
+PY
+check "ast-16: o dump traz a remocao ('xuncommand'), o vinculo 'undoes' por ID e 'removed'" $?
+
+# (2) o rename acompanha o #xuncommand -> o escopo NAO vaza
+( cd "$D" && "$BIN" rename un.hbp un.prg:4:4 CIFRA > r.log 2>&1 )
+check "rename da cabeca: exit 0" $?
+grep -q "2 directive occurrence(s)" "$D/r.log"
+check "as DUAS diretivas foram editadas (a criacao E a remocao)" $?
+grep -q "^#xcommand CIFRA <x>" "$D/un.ch" && grep -q "^#xuncommand CIFRA <x>" "$D/un.prg"
+check "o #xuncommand acompanhou o rename (antes: ficava ORFAO)" $?
+! grep -q "LACRA" "$D/un.ch" && ! grep -q "LACRA" "$D/un.prg"
+check "nenhum vestigio do nome velho" $?
+( cd "$D" && "$HB_BIN/harbour" un.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "modulo segue limpo apos o rename" $?
+
+# (3) o DESLIGAMENTO sobrevive: uso apos o #xuncommand fica CRU (nao expande)
+printf 'PROCEDURE Depois()\n   CIFRA 5\n   RETURN\n' >> "$D/un.prg"
+( cd "$D" && "$HB_BIN/harbour" un.prg -n -q0 -p -u -I. > /dev/null 2>&1 )
+grep -q "CIFRA 5" "$D/un.ppo" && ! grep -q "uu_( 5" "$D/un.ppo"
+check "a regra segue DESLIGADA apos o #xuncommand (antes do conserto: VAZAVA)" $?
+
+# regua do caso 64
+! grep -qiwE "lacra|cifra|uu_" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixun (régua do caso 64)" $?
+}
+
 unit_114() {
 echo "case 114: P8 (Eixo C) - rename do nome de MARKER da regra (alpha-rename: match+result por NUMERO) + o .ch alcancavel por FATO"
 D=$(freshp6 case114)
@@ -3942,7 +3998,7 @@ check "projects-of num .ch acha o dono (posse de include = fato do compilador, -
 check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

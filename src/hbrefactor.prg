@@ -2612,7 +2612,7 @@ STATIC FUNCTION RuleHeadCollision( hAst, cUpNew )
       FOR EACH hRule IN hAst[ "ppRules" ]
          // o nome novo é um IDENTIFICADOR (não tem regra própria): a pergunta
          // é só "escrever este nome casaria com esta regra?" - pergunta-se ao pp
-         IF hRule[ "head" ] != NIL .AND. ;
+         IF hRule[ "head" ] != NIL .AND. ! IsRuleDel( hRule ) .AND. ;
             PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew )
             RETURN hRule
          ENDIF
@@ -5976,7 +5976,8 @@ STATIC FUNCTION RenameDsl( aArgs )
                hTargetKeys[ cKey ] := .T.
             ENDIF
          ENDIF
-         IF hRule[ "head" ] != NIL .AND. ! Upper( hRule[ "head" ] ) == cUpOld
+         IF hRule[ "head" ] != NIL .AND. ! Upper( hRule[ "head" ] ) == cUpOld .AND. ;
+            ! IsRuleDel( hRule )
             IF Upper( hRule[ "head" ] ) == cUpNew
                RETURN Refuse( "'" + cNew + "' já é cabeça de regra (" + RuleTag( hRule ) + ;
                               ", " + RuleWhere( hRule ) + ")" )
@@ -6021,12 +6022,14 @@ STATIC FUNCTION RenameDsl( aArgs )
    // projeto com uma ambiguidade latente (a regra sequestrada só quebra no
    // próximo site que alguém escrever).
    FOR EACH hTgt IN aTargets
-      IF hTgt[ "head" ] == NIL .OR. ! Upper( hTgt[ "head" ] ) == cUpOld
-         LOOP   // alvo não é cabeça: o rename não muda cabeça nenhuma
+      IF hTgt[ "head" ] == NIL .OR. ! Upper( hTgt[ "head" ] ) == cUpOld .OR. ;
+         IsRuleDel( hTgt )
+         LOOP   // alvo não é cabeça de regra viva: não muda cabeça nenhuma
       ENDIF
       FOR EACH cPath IN hProj[ "files" ]
          FOR EACH hRule IN hAsts[ cPath ][ "ppRules" ]
-            IF hRule[ "head" ] == NIL .OR. Upper( hRule[ "head" ] ) == cUpOld
+            IF hRule[ "head" ] == NIL .OR. Upper( hRule[ "head" ] ) == cUpOld .OR. ;
+               IsRuleDel( hRule )
                LOOP
             ENDIF
             cWitness := HeadClashWitness( cUpNew, cUpOld, hTgt[ "kind" ], ;
@@ -6571,6 +6574,13 @@ STATIC PROCEDURE AbsEditsAdd( hEdits, cPath, aNew )
 // propriedade do TIPO (pRule->mode) - o resto do padrão não participa da
 // decisão sobre a cabeça. Assim a sonda reproduz exatamente o que o pp fará.
 // ---------------------------------------------------------------------------
+
+// a regra é uma diretiva de REMOÇÃO (#[x|y]uncommand / #...untranslate)? FATO
+// do ast-16: só o registro de remoção carrega `undoes` (o id da regra que ele
+// tira da mesa, ou NIL quando não tirou nenhuma - um #un... ÓRFÃO). Uma
+// remoção não é regra que se aplique: nada colide com ela, nada casa nela.
+STATIC FUNCTION IsRuleDel( hRule )
+   RETURN hb_HHasKey( hRule, "undoes" )
 
 STATIC FUNCTION PpHeadHit( cUpHead, cKind, cUpWritten )
 

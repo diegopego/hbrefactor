@@ -19,6 +19,52 @@ O compilador que sustenta tudo isto tem o seu próprio: **[harbour-core/NEWS.md]
 é `NEWS` por convenção GNU — o Harbour já tem um `ChangeLog.txt`, que é o log do
 *desenvolvedor*; `NEWS` é o do *usuário*.
 
+## 2026-07-12 — corrigido: renomear uma diretiva podia fazê-la VAZAR para fora do escopo
+
+Se você **desliga** uma diretiva sua no meio do arquivo — e o Harbour deixa, é para
+isso que existem o `#xuncommand` e o `#xuntranslate` — renomear a diretiva quebrava o
+desligamento.
+
+```harbour
+#xcommand LACRA <x> => uu_( <x>, 1 )
+
+PROCEDURE Main()
+   LACRA 1
+   RETURN
+
+#xuncommand LACRA <x> => uu_( <x>, 1 )    // daqui pra frente, LACRA é código comum
+```
+
+Ao renomear `LACRA` para `CIFRA`, a ferramenta trocava só a linha de cima. O
+`#xuncommand LACRA` **ficava para trás**, tentando desligar uma diretiva que já não
+existe com esse nome — ou seja, **não desligava nada**. A diretiva passava a valer
+até o fim do arquivo, e código que era para ser comum voltava a ser expandido. Sem
+erro, sem aviso.
+
+**Agora o rename leva as duas juntas:**
+
+```
+$ hbrefactor rename un.hbp un.prg:4:4 CIFRA
+rename-dsl: LACRA -> CIFRA
+  un.prg:4:4
+  un.ch:6:11
+  un.prg:8:13          ← o #xuncommand, acompanhando
+verified: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical
+```
+
+**O que o compilador passou a contar.** Esta era uma informação que o preprocessador
+tinha e não entregava a ninguém: ele *sabe* que uma diretiva foi desligada — ele
+mesmo faz isso — mas não dizia. Agora diz, e com ela veio um segundo conserto: o
+Harbour tem **três** famílias de diretiva (a que aceita a palavra abreviada, a `x`
+que exige a palavra inteira, e a `y` que ainda diferencia maiúsculas de minúsculas),
+e a informação que chegava até aqui **não distinguia a terceira** — uma diretiva `y`
+era descrita como se aceitasse abreviação, o que é falso. *(Exige o compilador do
+branch com o dump de AST.)*
+
+**Limite honesto:** um `#xuncommand` que não desliga nada — porque ninguém definiu
+aquela diretiva — continua sendo aceito em silêncio pelo Harbour, e a ferramenta
+ainda **não avisa** sobre ele. O dado já existe; falta o comando que o mostre.
+
 ## 2026-07-12 — corrigido: renomear uma diretiva podia SEQUESTRAR outra, em silêncio
 
 Este é o mais grave que já corrigimos: o rename **passava**, dizia `verified`, e

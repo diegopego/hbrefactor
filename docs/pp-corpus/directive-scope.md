@@ -20,11 +20,15 @@ variando dois argumentos: o **modo de comparação** e um flag de **remoção**
 
 | criar | remover | modo | casamento |
 |---|---|---|---|
+| `#define` | **`#undef`** | (nome exato) | a CONSTANTE também tem tempo de vida |
 | `#command` / `#translate` | `#uncommand` / `#untranslate` | `HB_PP_CMP_DBASE` | abreviado (≥ 4 letras) |
 | `#xcommand` / `#xtranslate` | `#xuncommand` / `#xuntranslate` | `HB_PP_CMP_STD` | **exato** |
 | `#ycommand` / `#ytranslate` | `#yuncommand` / `#yuntranslate` | `HB_PP_CMP_CASE` | exato **e case-sensitive** |
 
-A sintaxe do `#un*` é a **mesma da diretiva** (`match => result`) — não é só o nome.
+São **TRÊS** famílias de remoção, não duas — o `#undef` conta, e foi a que eu esqueci
+na primeira volta (o Diego pegou).
+
+A sintaxe do `#un*` de regra é a **mesma da diretiva** (`match => result`) — não é só o nome.
 Uso real no core: `include/hblang.hbx:73` (`#uncommand DYNAMIC <fncs,...> =>
 EXTERNAL <fncs>`), `contrib/xhb/hbcompat.ch:281` (`#xuntranslate NetName( =>`).
 
@@ -69,7 +73,7 @@ O rename mudou a semântica de código que ele **nem tocou**. E a rede
 a palavra — **o mesmo ponto cego** do sequestro de cabeça (ver
 [abbreviation.md](abbreviation.md)).
 
-## 3. A LACUNA DO CORE (VERIFICADO — é `ast-16`)
+## 3. A LACUNA DO CORE — **FECHADA: `ast-16`** (2026-07-12, caso 117)
 
 O dump **não enxerga o `#un*`**. Compilando a fixture acima com `-x`, o `ppRules`
 traz **uma só** regra:
@@ -93,7 +97,57 @@ sabe e não exporta é lacuna DO CORE.* → **`ast-16`**.
 > (`#un`/`#xun`/`#yun` × `command`/`translate`), para a abreviação (`#UNCOMM` casa!)
 > e para o `.ch` incluído.
 
-## 4. Usos que o escopo de diretiva PROMOVE [A PROVAR — P13]
+### O que o `ast-16` passou a exportar
+
+Compilando a fixture do § 2 com `-x`, agora (**VERIFICADO**):
+
+```
+id=0 kind=xcommand     head=PINTA        line=1  removed=True
+id=1 kind=ycommand     head=Seca         line=2               ← era "command"!
+id=2 kind=xuncommand   head=PINTA        line=9  undoes=0     ← vínculo por ID
+id=3 kind=xuncommand   head=NUNCAEXISTIU line=10 undoes=None  ← ÓRFÃO
+```
+
+Quatro fatos, e o `id=1` é um **bug de schema pré-existente** que caiu junto: o modo
+de comparação era guardado num **booleano** (`é x?`), então a família `y`
+(case-sensitive, exata) saía rotulada `"command"` — o dump **afirmava que uma regra
+exata casa abreviado**. Agora o `kind` carrega a família como o pp a vê.
+
+O `undoes: null` do `id=3` é o **`#un...` órfão**: ele não remove regra nenhuma. É
+código morto silencioso — e é exatamente o que o rename desatento **produzia**.
+
+### O conserto do bug do § 2: **zero linha de lógica nova**
+
+Este é o argumento mais forte que a fase P produziu a favor da REGRA DO FATO. Com a
+remoção virando **uma regra como outra qualquer** em `ppRules` — com `head` e com
+`match[]` **posicionado** —, a maquinaria que a ferramenta já tinha ("renomeie por
+posição toda regra cuja cabeça é a palavra velha") passou a editar o `#xuncommand`
+**sozinha**:
+
+```
+$ hbrefactor rename un.hbp un.prg:4:4 CIFRA
+rename-dsl: LACRA -> CIFRA
+  un.prg:4:4
+  un.ch:6:11
+  un.prg:8:13          ← o #xuncommand, acompanhando
+verified: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical
+```
+
+E o desligamento **sobrevive**: um uso depois do `#xuncommand` renomeado continua
+saindo **cru** do pp. *O fato era o problema inteiro.*
+
+## 4. Usos que o escopo de diretiva PROMOVE — **EXPLORAR (P13, ordem do Diego)**
+
+> Pedido do Diego (2026-07-12), textual: *"dar uma atenção especial a explorar casos
+> de uso que os **`#undefine`**, **`#xuntranslate`**, **`#xuncommand`** podem
+> promover. (…) assim como é possível usar os comandos de pp para criar novos
+> escopos de diretivas, é possível controlar coisas avançadas como **injeção de
+> diretivas em um bloco, e depois desativar as diretivas**."*
+>
+> **Isto é EXPLORAÇÃO A FAZER, não trabalho feito.** O `ast-16` só entregou o
+> *fato* (o dump vê a remoção); o que estes verbos **habilitam** ainda não foi
+> sondado. As três famílias de remoção — **`#undef`** (de `#define`),
+> **`#un[x|y]command`** e **`#un[x|y]translate`** — contam igual.
 
 1. **É o mecanismo que faltava para o P12** ([pp-as-search.md](pp-as-search.md)):
    injetar a regra de **consulta**, deixá-la casar, e **removê-la** — a consulta não
@@ -105,12 +159,27 @@ sabe e não exporta é lacuna DO CORE.* → **`ast-16`**.
    fazer com segurança, porque a ferramenta não vê o escopo.
 4. **Diagnóstico**: `#un*` órfão (que não desliga regra nenhuma) é **código morto
    silencioso** — e o exemplo do § 2 mostra que ele nasce de um rename.
+5. **`#undef` como escopo de CONSTANTE** (a família que eu tinha esquecido): um
+   `#define` que vale só num trecho é um idioma real de higiene — e o `#undef` de um
+   define que ninguém definiu é igualmente órfão. O mesmo vazamento vale aqui, e o
+   `ast-16` agora o cobre.
+6. **A pergunta em aberto**: dá para injetar diretiva num **bloco arbitrário** de
+   código (não só "do ponto X ao ponto Y do arquivo")? O pp é linha-a-linha, então
+   *escopo* aqui é **posicional**, não sintático. Sondar o limite honesto disso é
+   parte da fatia.
 
 ---
 
 ## Lacunas (VERIFICADO)
 
-- **[LACUNA real — `ast-16`, em aberto]** O dump não exporta o `#un*`: nem a
-  diretiva de remoção, nem o tempo de vida da regra. Enquanto isso, **o `rename` de
-  cabeça de DSL corrompe o escopo em silêncio** (§ 2). Pausa a exploração e vira
-  experimento de core — é a regra do Diego ("lacuna pausa e experimenta").
+- **[FECHADA — `ast-16`, caso 117]** O dump exporta a remoção (`kind` de `un...`), o
+  vínculo `undoes` (por **id**), o `removed` da regra que morreu, e a família real
+  (`x`/`y`/dBase). O vazamento de escopo do `rename` está consertado. `lexdiff` 0.
+- **[Consumo futuro]** O **`#un...` órfão** (`undoes: null`) é fato disponível e
+  **ainda sem consumidor**: dá um diagnóstico honesto de código morto (*"esta
+  diretiva não desliga nada"*). Cabe no P12 (o pp como inspeção).
+- **[A explorar — P13]** O escopo como **mecanismo** (injetar regra, casar, remover)
+  para o P12 e para codemod por região: **não sondado ainda**.
+- **[Fato, não lacuna]** A família `y` (`#ycommand`/`#ytranslate`, case-sensitive)
+  **não tem UM uso** em toda a árvore do core. Existe, agora o dump a reporta
+  corretamente, e provavelmente ninguém a usará.

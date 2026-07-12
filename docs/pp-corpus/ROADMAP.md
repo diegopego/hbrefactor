@@ -176,11 +176,16 @@ exploração + experimento no core, imediatamente**).
 - **P9** custo do reverse-scan · **P10** síntese/completude.
 - **P12** — **o pp como ENGENHO DE BUSCA** (ideia do Diego, 2026-07-12): usar o
   casador do pp para **ACHAR**, não para transformar. → [pp-as-search.md](pp-as-search.md)
-- **P13** — **ESCOPO DE DIRETIVA / `#un*`** (ideia do Diego, 2026-07-12): a regra tem
-  **tempo de vida léxico**. Já rendeu, ANTES de virar fatia: um **BUG provado** (o
-  `rename` deixa o `#xuncommand` órfão → a regra **VAZA**, e o `.ppo`/`.hrb` não vê)
-  e a **LACUNA `ast-16`** (o dump não exporta o `#un*` — o pp sabe e descarta, pela
-  3ª vez). → [directive-scope.md](directive-scope.md)
+- **P13 (1º achado) ✅** — **ESCOPO DE DIRETIVA / `#un*`** (ideia do Diego,
+  2026-07-12): a regra tem **tempo de vida léxico**. **`ast-16`** entregue: o dump
+  exporta a remoção, o vínculo `undoes` (por id), o `removed`, e a **família real**
+  (caiu junto um bug de schema: o modo era um booleano, e a família `y` saía como
+  `"command"` — o dump dizia "casa abreviado" sobre regra exata). Consertou um
+  **vazamento de escopo silencioso** do `rename` — e o conserto custou **zero linha
+  de lógica** na ferramenta: com o fato, a remoção virou "mais uma regra com aquela
+  cabeça". Caso 117, `lexdiff` 0. → [directive-scope.md](directive-scope.md)
+  **Resta explorar:** o escopo como MECANISMO (injetar/remover regra) para o P12 e
+  codemod por região; e o `#un...` órfão como diagnóstico.
 - **P-AUDIT (continua)** — `ResolveInclude`, os "se não é X então é Y", comparações
   de texto onde o dump já tem id.
 

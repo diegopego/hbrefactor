@@ -216,7 +216,18 @@ no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
 "ppRules": [
   { "id": 2,               // índice estável no módulo; referenciado por
                            // ppApplications[].rule
-    "kind": "command",     // define|translate|xtranslate|command|xcommand
+    "kind": "command",     // ast-16: a FAMÍLIA como o pp a vê. Prefixo de MODO
+                           // de comparação + (opcional) "un" de REMOÇÃO:
+                           //   define     undef        -> a CONSTANTE e seu fim
+                           //   command    translate    -> dBase: casa ABREVIADO
+                           //   xcommand   xtranslate   -> exato
+                           //   ycommand   ytranslate   -> exato E case-sensitive
+                           //   uncommand  untranslate  -> REMOVE a regra
+                           //   xuncommand xuntranslate  (idem, por família)
+                           //   yuncommand yuntranslate
+                           // ATÉ o ast-16 o modo era um BOOLEANO ("é x?") e a
+                           // família y saía rotulada como "command" - ou seja, o
+                           // dump dizia "casa abreviado" sobre uma regra EXATA.
     "file": "menu.ch",     // arquivo da DIRETIVA; null = regra builtin
                            // (std rules compiladas, -D, dyn defines)
     "line": 3,             // linha da diretiva (0 quando builtin); para
@@ -227,6 +238,43 @@ no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
     "markers": 4,          // nº de match markers da regra
     "match": [ ... ],      // ast-5: a regra POR DENTRO (abaixo)
     "result": [ ... ] } ],
+
+// ------------------------------------------------------------------------
+// ast-16: a regra tem TEMPO DE VIDA. Ela vale do `#[x|y]command` até o
+// `#[x|y]uncommand` correspondente - depois disso a palavra volta a ser código
+// cru. O pp SABIA disso (ele executa a remoção) e o dump DESCARTAVA: a diretiva
+// de remoção não deixava rastro nenhum.
+//
+// A diretiva de REMOÇÃO entra em ppRules como um registro próprio (com o seu
+// `match`/`result` POSICIONADOS, como qualquer regra - logo é editável por
+// posição, sem procurar `#xuncommand` por TEXTO):
+// ------------------------------------------------------------------------
+  { "id": 3,
+    "kind": "xuncommand",  // é uma REMOÇÃO (ver o vocabulário de kind acima)
+    "file": "un.prg",
+    "line": 9,
+    "head": "PINTA",
+    "undoes": 0,           // id da regra que ela REMOVEU -- vínculo por FATO.
+                           // null = não removeu NADA: um #un... ÓRFÃO, que é
+                           // código morto silencioso (e é exatamente o que um
+                           // rename desatento PRODUZ, ver abaixo)
+    "markers": 1,
+    "match": [ ... ], "result": [ ... ] },
+
+// ...e a regra removida ganha, do outro lado do vínculo:
+  { "id": 0, "kind": "xcommand", "head": "PINTA",
+    "removed": true,       // um #un... tirou esta regra da mesa
+    ... }
+
+// POR QUE ISSO É CORRETUDE, não enfeite: sem o fato, o `rename` da cabeça
+// trocava só o `#xcommand` e deixava o `#xuncommand` ÓRFÃO - ele passava a
+// desligar uma regra que não existe mais, e a regra VAZAVA para além do ponto
+// de desligamento, mudando a semântica de código que ninguém tocou. E era
+// SILENCIOSO: a rede `.ppo`/`.hrb` não vê diferença quando nada DEPOIS do
+// desligamento usa a palavra. Prova executável: caso 117 (fixture `fixun`).
+// Com o fato, o conserto não custou UMA LINHA de lógica nova na ferramenta: a
+// remoção é só mais uma regra com aquela cabeça, e a maquinaria de rename por
+// posição que já existia passou a editá-la sozinha.
 
 "ppApplications": [        // UMA entrada por aplicação, na ORDEM em que o
                            // pp as fez (multi-passe visível: aplicação
