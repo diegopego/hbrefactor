@@ -185,6 +185,13 @@ freshgen() { # freshgen <case-name> -> genealogia de regra: homônimo de marker 
    echo "$d"
 }
 
+freshp6() { # freshp6 <case-name> -> estrutura da regra: sem cabeca, opcionais fora de ordem, multi-passe (fase P, P6)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixp6/*.prg "$HERE"/fixp6/*.ch "$HERE"/fixp6/*.hbp "$d"/
+   echo "$d"
+}
+
 freshp2() { # freshp2 <case-name> -> marker que GERA e PASSA ADIANTE + multiplicidade (fase P, P2)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -3650,7 +3657,238 @@ grep -q "mk.prg:11:10" "$D/loc.log" && grep -q "mk.prg:8:12" "$D/loc.log"
 check "block/extexp: o valor E emitido, entao esses sitios SAO editados" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111"
+unit_112() {
+echo "case 112: P3 - usages --at estreita por PAPEL do site (generates/genrule ja usados pelo rename, agora tambem pelo usages)"
+# fixture fixgen/hom.ch (a mesma do caso 108): LABEL Vendas (stringify,
+# marker SEM dona) e MAKE Vendas (paste, regra INDEPENDENTE) coexistem com
+# FUNCTION Vendas() REAL so por coincidencia de texto. Antes da P3, usages
+# --at devolvia o MESMO blob de 4 hits em QUALQUER um dos quatro sites - o
+# --at calculava o papel do site (ResolveAtQuery) e jogava fora, caindo no
+# mesmo pipeline global por-nome de 'usages <nome>' sem --at.
+D=$(freshgen case112)
+# --- cursor no marker STRINGIFY (LABEL Vendas): so a propria aplicacao
+( cd "$D" && "$BIN" usages hom.hbp --at h.prg:5:10 > m1.log 2>&1 )
+check "usages --at no marker LABEL Vendas: exit 0" $?
+grep -q "^1 result(s) for 'Vendas'$" "$D/m1.log" && \
+   grep -q "h.prg:5:10: name through pp rule" "$D/m1.log" && \
+   ! grep -q "call in MAIN" "$D/m1.log" && ! grep -q "make definition" "$D/m1.log" && \
+   ! grep -q "definition (function)" "$D/m1.log"
+check "LABEL Vendas exclui a funcao real E o MAKE Vendas independente (regra diferente)" $?
+# --- cursor na FUNCAO real: so a propria definicao + chamada, sem os markers
+( cd "$D" && "$BIN" usages hom.hbp --at h.prg:11:10 > m2.log 2>&1 )
+check "usages --at na funcao real Vendas(): exit 0" $?
+grep -q "^2 result(s) for 'Vendas'$" "$D/m2.log" && \
+   grep -q "call in MAIN" "$D/m2.log" && grep -q "definition (function)" "$D/m2.log" && \
+   ! grep -q "name through pp rule" "$D/m2.log" && ! grep -q "make definition" "$D/m2.log"
+check "FUNCTION Vendas() exclui LABEL Vendas E MAKE Vendas (nao sao a mesma entidade)" $?
+# --- cursor na CHAMADA '? Vendas()': '?' tambem e #command, o argumento e
+# marker - mas CLONE (generates/genrule ambos .F.), o MESMO simbolo
+# atravessando, nao um valor de macro (a mesma distincao que o ast-12 ja
+# prova pro rename: '? nTotal' com nTotal local vira rename-local, nao
+# rename-pp-marker, caso 107) - cai no MESMO balde da funcao real
+( cd "$D" && "$BIN" usages hom.hbp --at h.prg:6:6 > m3.log 2>&1 )
+check "usages --at na chamada '? Vendas()' (clone/pass-through): exit 0" $?
+grep -q "^2 result(s) for 'Vendas'$" "$D/m3.log" && \
+   grep -q "call in MAIN" "$D/m3.log" && grep -q "definition (function)" "$D/m3.log"
+check "clone e tratado como o simbolo real, mesmo resultado do site 11:10" $?
+# --- cursor no marker PASTE (MAKE Vendas): so a propria aplicacao
+( cd "$D" && "$BIN" usages hom.hbp --at h.prg:9:6 > m4.log 2>&1 )
+check "usages --at no marker MAKE Vendas: exit 0" $?
+grep -q "^1 result(s) for 'Vendas'$" "$D/m4.log" && grep -q "make definition Vendas" "$D/m4.log"
+check "MAKE Vendas exclui a funcao real E o LABEL Vendas independente" $?
+# --- sem --at (so o nome digitado): comportamento ANTIGO preservado -
+# agrega tudo, --at so estreita quando ha POSICAO para desambiguar
+( cd "$D" && "$BIN" usages hom.hbp Vendas > m5.log 2>&1 )
+grep -q "^4 result(s) for 'Vendas'$" "$D/m5.log"
+check "usages <nome> sem --at continua agregando tudo (comportamento antigo intacto)" $?
+}
+
+unit_113() {
+echo "case 113: P6 - ESTRUTURA da regra: sem cabeca, opcionais FORA DE ORDEM, multi-passe, e a guarda de orfao por FATO"
+# fixture fixp6 (DSL inventada NAO-espelho): (1) regra SEM CABECA (match comeca
+# com marker -> "head": null no dump, ppcore.c:1161); (2) dois grupos OPCIONAIS
+# que o pp casa em QUALQUER ORDEM; (3) MULTI-PASSE (GLIMER expande em VULK, que
+# e reaplicada sobre o resultado); (4) a guarda de orfao passa a ler o FATO da
+# op de derivacao (ast-12) em vez de "token sem from".
+"$HB_BIN/harbour" "$HERE/fixp6/p6.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixp6" > /dev/null 2>&1
+check "fixp6/p6.prg clean under -w3 -es2"  $?
+D=$(freshp6 case113)
+# --- (1) REGRA SEM CABECA: fecha o item 3 do backlog (o dump ja registrava;
+#     a ferramenta a resolve/renomeia por CONSTRUCAO - nunca chaveia no head)
+( cd "$D" && "$BIN" resolve-at p6.hbp p6.prg 11 17 > hl.log 2>&1 )
+grep -q "palavra de regra de pp (#xtranslate <sem cabeça>, p6.ch:10)" "$D/hl.log"
+check "sem cabeca: o site resolve como palavra de regra, rotulado <sem cabeça>" $?
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:11:17 TRIPLADO > hr.log 2>&1 )
+check "sem cabeca: rename-dsl exit 0" $?
+grep -q "^rename-dsl: ZORBADO -> TRIPLADO" "$D/hr.log" && \
+   grep -q "p6.prg:11:17" "$D/hr.log" && grep -q "p6.ch:10:17" "$D/hr.log"
+check "sem cabeca: edita o USO e a REGRA no .ch (as duas posicoes)" $?
+( cd "$D" && "$HB_BIN/harbour" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "sem cabeca: modulo editado segue limpo" $?
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:11:17 ZORBADO > /dev/null 2>&1 )
+cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg" && cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch"
+check "sem cabeca: A->B->A byte-exato (fonte E regra)" $?
+# --- (2) OPCIONAIS FORA DE ORDEM: a keyword renomeada A PARTIR da linha fora de
+#     ordem pega as DUAS ordens (17 declarada, 18 invertida) + a regra
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:11 CARGA --dry-run > kw.log 2>&1 )
+grep -q "^rename-dsl: PLIX -> CARGA" "$D/kw.log" && grep -q "p6.prg:17:24" "$D/kw.log" && \
+   grep -q "p6.prg:18:11" "$D/kw.log" && grep -q "p6.ch:13:38" "$D/kw.log"
+check "opcionais fora de ordem: a keyword pega AS DUAS ordens + a regra" $?
+# clone/pass-through: um LOCAL de verdade DENTRO do grupo fora de ordem - a
+# posicao do site sobrevive a reordenacao (o binding vence, nao vira pp-marker)
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:13:30 cPote --dry-run > cl.log 2>&1 )
+grep -q "^rename-local: cVaso -> cPote in MAIN" "$D/cl.log" && \
+   grep -q "p6.prg:8:10" "$D/cl.log" && grep -q "p6.prg:13:30" "$D/cl.log"
+check "opcionais fora de ordem: LOCAL que ATRAVESSA o grupo resolve rename-local" $?
+# o marker GERADOR na linha fora de ordem: rename real + recompila + round-trip
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:6 Capacete > mk.log 2>&1 )
+check "opcionais fora de ordem: rename do marker gerador exit 0" $?
+grep -q "predicted: VK_ELMO -> VK_CAPACETE" "$D/mk.log" && \
+   grep -q 'predicted string: "Elmo" -> "Capacete"' "$D/mk.log"
+check "opcionais fora de ordem: paste E stringify previstos do site invertido" $?
+( cd "$D" && "$HB_BIN/harbour" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "opcionais fora de ordem: modulo editado segue limpo" $?
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:6 Elmo > /dev/null 2>&1 )
+cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg"
+check "opcionais fora de ordem: A->B->A byte-exato" $?
+# --- (3) MULTI-PASSE: Broquel entra por GLIMER e a VULK e reaplicada sobre o
+#     RESULTADO - o fecho de derivacao atravessa as duas passadas
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:20:8 Pavise --dry-run > mp.log 2>&1 )
+grep -q "^rename-pp-marker: Broquel -> Pavise" "$D/mp.log" && \
+   grep -q "predicted: VK_BROQUEL -> VK_PAVISE" "$D/mp.log" && \
+   grep -q 'predicted string: "Broquel" -> "Pavise"' "$D/mp.log"
+check "multi-passe: o artefato nascido da 2a passada (GLIMER->VULK) e previsto" $?
+# LIMITE HONESTO do multi-passe: a keyword KRAN tambem e EMITIDA no result da
+# GLIMER - aquela ocorrencia NAO tem posicao no fonte (foi fabricada), entao
+# nao ha o que editar: a ferramenta RECUSA em vez de corromper
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:18 LIGA > kr.log 2>&1 )
+RC=$?
+check "multi-passe: keyword emitida por OUTRA regra recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "sem posição no fonte" "$D/kr.log"
+check "multi-passe: a recusa NOMEIA o motivo (aplicacao sem posicao no fonte)" $?
+cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg" && cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch"
+check "multi-passe: fontes intactos apos a recusa" $?
+# --- (4) GUARDA DE ORFAO POR FATO (o conserto da P6): o fonte soletra a mao o
+#     nome GERADO 'vk_Escudo' - e o faz DENTRO de um '?' (que e #command e CLONA
+#     o argumento, entao o token chega COM "from"). O teste antigo ("token sem
+#     from" = grafia manual) ficava CEGO: o --dry-run APROVAVA e o apply real
+#     desfazia tarde, com "contagem de simbolos mudou". Agora recusa ANTES,
+#     nomeando o site - e dry-run e apply CONCORDAM
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:6 Pavesado --dry-run > o1.log 2>&1 )
+RC=$?
+check "orfao: --dry-run recusa (exit != 0) - nao aprova mais o que o apply desfaz" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "o fonte soletra o nome gerado 'vk_Escudo' (p6.prg:14)" "$D/o1.log" && \
+   grep -q "deixaria órfão" "$D/o1.log"
+check "orfao: a recusa NOMEIA o nome gerado e o site exato da grafia manual" $?
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:6 Pavesado > o2.log 2>&1 )
+RC=$?
+check "orfao: o apply real recusa igual ao --dry-run (concordam)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+! grep -qi "rollback" "$D/o2.log"
+check "orfao: recusa ANTES de editar - nao ha rollback tardio nem erro opaco" $?
+cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg"
+check "orfao: fonte intacto (nem chegou a editar)" $?
+# regua do caso 64: nenhuma palavra da DSL da fixture vive no fonte da ferramenta
+! grep -qiwE "zorbado|vulk|kran|plix|glimer|rega|agua|sol|broquel|pavise" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixp6 (régua do caso 64)" $?
+}
+
+freshabr() { # freshabr <case-name> -> keyword secundaria que e prefixo dBase da cabeca (P-AUDIT/ast-15)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixabr/*.prg "$HERE"/fixabr/*.ch "$HERE"/fixabr/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_115() {
+echo "case 115: P-AUDIT - ast-15: QUAL literal da regra o site casou (mata a adivinhacao por texto)"
+# O furo: #command (familia SEM 'x') casa keyword abreviada a partir de 4 letras.
+# A ferramenta ADIVINHAVA por prefixo se um literal era "abreviacao da minha
+# palavra" - e a keyword secundaria GRAV, escrita POR EXTENSO, e prefixo de 4
+# letras da cabeca GRAVAR: o rename de GRAVAR dava RECUSA FALSA. O pp sabe qual
+# literal casou (ele casou!) e descartava o fato; ast-15 o exporta ("ruletok").
+"$HB_BIN/harbour" "$HERE/fixabr/abr.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixabr" > /dev/null 2>&1
+check "fixabr/abr.prg clean under -w3 -es2" $?
+D=$(freshabr case115)
+# (1) O FURO: renomear a CABECA quando a regra tem keyword-prefixo dela
+( cd "$D" && "$BIN" rename abr.hbp abr.prg:5:4 SALVAR > g.log 2>&1 )
+check "rename da cabeca GRAVAR: exit 0 (antes: recusa FALSA por 'uso abreviado')" $?
+grep -q "^rename-dsl: GRAVAR -> SALVAR" "$D/g.log" &&    grep -q "\.ppo and \.hrb byte-identical" "$D/g.log"
+check "editado e verificado (.ppo/.hrb byte-identicos)" $?
+grep -q "^   SALVAR 1 GRAV 2" "$D/abr.prg"
+check "a keyword secundaria GRAV fica INTACTA (e literal #2 da regra, nao abreviacao)" $?
+grep -q "^#command SALVAR <x> GRAV <y>" "$D/abr.ch"
+check "a regra ficou coerente (so a cabeca mudou)" $?
+( cd "$D" && "$HB_BIN/harbour" abr.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "modulo segue limpo apos o rename" $?
+# (2) a recusa LEGITIMA sobrevive: uso REALMENTE abreviado (APAG = APAGAR)
+D=$(freshabr case115b)
+( cd "$D" && "$BIN" rename abr.hbp abr.ch:9:10 REMOVER > a.log 2>&1 )
+RC=$?
+check "uso REALMENTE abreviado (APAG) ainda recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "uso abreviado 'APAG' da regra" "$D/a.log"
+check "a recusa legitima NOMEIA o site abreviado" $?
+cmp -s "$D/abr.ch" "$HERE/fixabr/abr.ch" && cmp -s "$D/abr.prg" "$HERE/fixabr/abr.prg"
+check "recusa legitima: fontes intactos" $?
+# regua do caso 64
+! grep -qiwE "gravar|grav|apagar|apag|zz_" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixabr (régua do caso 64)" $?
+}
+
+unit_114() {
+echo "case 114: P8 (Eixo C) - rename do nome de MARKER da regra (alpha-rename: match+result por NUMERO) + o .ch alcancavel por FATO"
+D=$(freshp6 case114)
+# --- (1) o marker e VARIAVEL LOCAL da diretiva: usages lista as ocorrencias
+#     DELE naquela regra (match + result), nao uma busca global por texto
+( cd "$D" && "$BIN" usages p6.hbp --at p6.ch:13:17 > u.log 2>&1 )
+check "usages --at no marker <n> dentro do .ch: exit 0" $?
+grep -q "p6.ch:13:17: marker 1 in match (regular)" "$D/u.log" && \
+   grep -q "p6.ch:14:24: marker 1 in result (regular)" "$D/u.log" && \
+   grep -q "p6.ch:14:43: marker 1 in result (strstd)" "$D/u.log"
+check "lista os 3 sites do marker 1: match, o PASTE e o STRINGIFY (com o mkind)" $?
+grep -q "3 result(s) for 'n' (marker local à diretiva #xcommand VULK)" "$D/u.log"
+check "o relato diz que o marker e LOCAL a diretiva (nao e simbolo do projeto)" $?
+# marker HOMONIMO de OUTRA regra e OUTRA variavel - nao pode misturar
+( cd "$D" && "$BIN" usages p6.hbp --at p6.ch:22:17 > u2.log 2>&1 )
+grep -q "2 result(s) for 'n' (marker local à diretiva #xcommand REGA)" "$D/u2.log" && \
+   ! grep -q "VULK" "$D/u2.log"
+check "o <n> da REGA NAO mistura com o <n> homonimo da VULK (regra-local)" $?
+# --- (2) rename: os DOIS lados coerentes, por NUMERO de marker (nao por texto)
+( cd "$D" && "$BIN" rename p6.hbp p6.ch:13:17 nome > r.log 2>&1 )
+check "rename do marker <n> (mirando DENTRO do .ch): exit 0" $?
+grep -q "^rename-rule-marker: <n> -> <nome> em #xcommand VULK" "$D/r.log" && \
+   grep -q "p6.ch:13:17" "$D/r.log" && grep -q "p6.ch:14:24" "$D/r.log" && \
+   grep -q "p6.ch:14:43" "$D/r.log"
+check "edita match + paste + stringify (diretiva CONTINUADA por ';', 2 linhas)" $?
+grep -q "\.ppo and \.hrb byte-identical (alpha-rename)" "$D/r.log"
+check "verificado como ALPHA-RENAME: expansao e pcode byte-identicos" $?
+grep -q "VULK <nome> \[ KRAN <cMat> \]" "$D/p6.ch" && \
+   grep -q 'FUNCTION vk_<nome>() ;; RETURN { <"nome">' "$D/p6.ch"
+check "a regra ficou coerente nos dois lados" $?
+grep -q "^VULK Lamina KRAN \"aco\" PLIX 7" "$D/p6.prg"
+check "os USOS ficam INTACTOS (marker nao aparece no uso - e local a regra)" $?
+( cd "$D" && "$HB_BIN/harbour" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "modulo segue limpo apos o rename do marker" $?
+( cd "$D" && "$BIN" rename p6.hbp p6.ch:13:17 n > /dev/null 2>&1 )
+cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch" && cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg"
+check "A->B->A byte-exato (.ch e .prg)" $?
+# --- (3) colisao: fundir dois markers da MESMA regra recusa, nomeando o motivo
+( cd "$D" && "$BIN" rename p6.hbp p6.ch:13:28 n > c.log 2>&1 )
+RC=$?
+check "colisao: renomear <cMat> para 'n' (ja e o marker 1) recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "já é outro marker da mesma diretiva" "$D/c.log" && grep -q "fundiria dois markers" "$D/c.log"
+check "a recusa NOMEIA o motivo (antes de editar)" $?
+cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch"
+check "colisao: .ch intacto (nem chegou a editar)" $?
+# --- (4) o .ch e alcancavel POR FATO: quem responde "de quem e este include" e
+#     o CORE (harbour -gd = lista de dependencias), nao a ferramenta
+( cd "$D" && "$BIN" projects-of p6.ch --root "$D" > po.log 2>&1 )
+grep -q "p6.hbp" "$D/po.log"
+check "projects-of num .ch acha o dono (posse de include = fato do compilador, -gd)" $?
+! ls "$D"/*.d > /dev/null 2>&1
+check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

@@ -416,7 +416,8 @@ por prova). **D-P2** — **investigação + capacidade**: todo fato que sobreviv
 suíte (responde ao critério de matar do adr-003).
 
 **Fatias** (ordem: U-2 → Eixo A P1–P6 → Eixo B P7 → Eixo C P8 → P9 → P10;
-**P1 ✅ + P2 ✅ ENTREGUES (2026-07-11)**):
+**P1 ✅ + P2 ✅ ENTREGUES (2026-07-11); P4 ✅ + P5 ✅ + P3 ✅ ENTREGUES
+(2026-07-12)**):
 - **Eixo A (fonte de fato):** P1 ✅ granularidade `paste`×`stringify`
   (adr-003:82-86, `genOp` recusado; `ast-13` foi para a genealogia);
   P2 ✅ marker que gera E passa adiante (adr-003:87-90, veredito estrutural,
@@ -432,20 +433,167 @@ suíte (responde ao critério de matar do adr-003).
   matou uma heurística de texto minha que o Diego pegou), `logical`/`nul`
   RELATADOS (valor descartado: não edita, avisa). Suíte 835/0;
   [spec-p § P4+P5](spec-p-pp-refatoracao.md); commit do core sob autorização.
-  P3 `generates` para
-  `usages`/find-references (a hipótese grande, adr-003:60-63); P4 mkinds de
-  RESULT marker como veredito (`block`/`reference`/stringify… já exportados,
-  não consumidos); P5 mkinds de MATCH (`wild`/`extexp`/`restrict` — validação
-  por alternativas do restrict [ppcore.c:877-878]); P6 estrutura da regra
-  (multi-passe, opcionais reordenados, regra-em-expansão, **regra sem cabeça**
-  — fecha o relato pendente do backlog, linha 644).
-- **Eixo B (instrumento):** P7 pp do core como motor de migração de DSL /
-  oráculo de equivalência (`.ppo`/`.ppt` como conferência humana, não canal) —
-  veredito provável parcial ou recusa honesta.
-- **Eixo C (editar a regra):** P8 rename da palavra de marker na regra (match+
-  result coerentes, canal ast-5) + limites de edição estrutural da regra.
+  **P3 ✅ `generates` para `usages`/find-references ENTREGUE (2026-07-12,
+  caso 112, fixture `fixgen/hom.*` reaproveitada do caso 108)**: achado
+  adversarial provou que `usages --at` misturava um marker de pp com um
+  símbolo homônimo do programa (`LABEL Vendas`, stringify, `generates:
+  true`, sem dono × `FUNCTION Vendas()` real) — o mesmo blob de 4 hits em
+  qualquer um dos quatro sites, porque `--at` calculava `role`/`generates`/
+  `genrule` via `ResolveAtQuery` e os descartava (`src/hbrefactor.prg:425`),
+  caindo no pipeline global por-nome de `usages <nome>` sem `--at`. Diego
+  decidiu ESTREITAR (portão): `Usages()` agora consome esses três campos —
+  `lAtPp` (site é mecânica de pp: `dsl`/`ppdiscard`/`ppmarker`+`generates`
+  ou `genrule`) desliga as categorias que só casam por texto contra um
+  símbolo DECLARADO; `lAtSym` (identificador comum OU `ppmarker` CLONE sem
+  `generates`/`genrule` — o próprio símbolo atravessando um `#command`,
+  ex. `? Vendas()`) desliga as categorias que só existem para achar
+  mecânica de pp; `role == "method"` fica fora dos dois, intocado (já tinha
+  filtro por `cClass`/`cOwnerQ`). `hAtPairs` (o fecho de derivação do site
+  ESPECÍFICO clicado, exposto por `ResolveAtQuery` como novo campo
+  `"pairs"`) restringe `PpMarkerHits`/`PpMarkerLift`/`PpMarkerSeeds`/
+  `MethodImplOf` via parâmetro OPCIONAL (default NIL — zero impacto nos
+  chamadores do `rename`) para não misturar OUTRA aplicação independente
+  que colou o mesmo texto alhures (`MAKE Vendas`, regra diferente). Zero
+  canal novo de core — tudo já existia no dump, só passou a ser consumido.
+  `usages <nome>` sem `--at` fica byte-idêntico ao de sempre. Suíte
+  **844/0** (835 + 9 checks), zero regressão nos casos 50/107-111.
+  **Resíduo aberto (não bloqueou):** artefatos derivados (paste/stringify)
+  como `Location` estruturada no `--json` (item 2 do escopo original) —
+  hoje só texto colado sob `--show-expansion`, fica para quando doer.
+  [spec-p § P3](spec-p-pp-refatoracao.md#eixo-a--p3-generates-para-usagesfind-references--entregue-2026-07-12).
+  **P6 ✅ ESTRUTURA da regra ENTREGUE (2026-07-12, caso 113, fixture
+  `fixp6` não-espelho)**: o miolo "regra-em-expansão" já caíra na P1
+  (ast-13); os três restantes têm veredito. (a) **Regra sem cabeça**
+  (`head: null`, match começa com marker — `ppcore.c:1161`): funciona
+  **por CONSTRUÇÃO**, zero código novo — a ferramenta nunca chaveou no
+  `head`, só em `marker == 0` e nas posições de `match[]`/`result[]`;
+  resolve, lista e RENOMEIA (uso + regra no `.ch`, round-trip byte-exato).
+  **Fecha o item 3 do backlog** com algo melhor que o "relato" que ele
+  pedia. *(Corpus: zero regras sem cabeça em `include/`+`contrib/` do
+  core — forma legal, ninguém usa.)* (b) **Opcionais reordenados**: o pp
+  casa os grupos `[ ]` em QUALQUER ordem (e ausentes); a partir da linha
+  INVERTIDA a keyword pega as duas ordens + a regra, o LOCAL que só
+  atravessa resolve `rename-local`, o marker gerador prevê paste E
+  stringify — nenhuma posição se perde (elas vêm do que o pp CONSUMIU,
+  não da ordem declarada). (c) **Multi-passe**: o fecho de derivação
+  atravessa as passadas (regra reaplicada sobre o resultado de outra);
+  **limite honesto registrado** — palavra de DSL EMITIDA no result de
+  outra regra não tem posição no fonte, e a ferramenta **recusa nomeando
+  o motivo** em vez de editar só o visível. (d) **A guarda de órfão
+  estava CEGA e foi consertada POR FATO** (achado ao sondar (b), mas
+  geral): ela testava "grafia manual = token SEM `from`" e não via a
+  grafia manual dentro de um comando — `? vk_Escudo()` passa pelo `?`
+  (que é `#command` e CLONA), então o token chega COM `from`. Medido: o
+  `--dry-run` **APROVAVA** um rename que o apply desfazia tarde com
+  *"contagem de símbolos mudou"* (dry-run e apply DISCORDAVAM). O fato
+  que separa já existia (ast-12: `clone` = grafia do usuário, orfanável;
+  `paste`/`stringify` = texto FABRICADO = o artefato que o rename
+  re-deriva) — a guarda passou a excluir por índice de ARTEFATO. Agora
+  recusa antes de tocar no arquivo, nomeando o site, e dry-run == apply
+  (mesmo padrão do `restrict`/P5). Suíte **866/0** (+22), zero core, zero
+  regressão.
+  [spec-p § P6](spec-p-pp-refatoracao.md#eixo-a--p6-estrutura-da-regra--entregue-2026-07-12).
+- **Eixo B (instrumento):** **P7 ✅ VEREDITO PARTIDO (2026-07-12), decidido por
+  execução — [spec-p § P7](spec-p-pp-refatoracao.md#eixo-b--p7-o-pp-do-core-como-instrumento--veredito-partido-2026-07-12)**.
+  (a) **pp como ESCRITOR de fonte: RECUSA PROVADA.** Existe o instrumento que
+  parecia salvar a ideia — **`-u`** (sem o command def set padrão) ISOLA de
+  verdade: o pp aplica só as regras de migração e deixa o resto da linguagem em
+  paz (`? "oi"` NÃO vira `QOut`). Mas o `.ppo` é **irreversivelmente
+  destrutivo**: medido, 4 comentários → **0**, `#include` destruído, formatação
+  normalizada. Guarda o código e SÓ o código. Colide com o contrato executável
+  (caso 107 exige *"comentário com o nome velho INTACTO"*) e com a regra
+  fundadora (**nunca editar o não-verificável**). Um canal que apaga comentário
+  não pode gravar arquivo. (b) **pp como ORÁCULO: VIÁVEL — e uma perna JÁ ESTAVA
+  EM PRODUÇÃO, só não nomeada**: o padrão-ouro do `rename-dsl` (*expansão
+  idêntica → `.ppo` e `.hrb` byte-idênticos; diferença = rollback*,
+  [hbrefactor.prg:5715](../src/hbrefactor.prg)). O pp é ótimo **calculador do
+  QUE**, péssimo **escritor do ONDE**. (c) **Migração de DSL — desenho pronto,
+  NÃO construída:** o pp computa o texto novo (`-u` + regra), a FERRAMENTA
+  escreve por posição de byte (sites já posicionados em `ppApplications[]`),
+  preservando comentário/formatação. Barrada por DUAS regras do projeto, não por
+  dificuldade: é **verbo novo → portão D-P5 do Diego**, e o **critério de matar
+  do adr-003** (*"fato sem consumidor = fato local, não arquitetura"*) — o
+  isolamento por `-u` é fato novo mas **hoje sem cliente**.
+- **Eixo C (editar a regra):** **P8 ✅ ENTREGUE (2026-07-12, caso 114)** — rename
+  do nome de MARKER da regra. O `<n>` é **variável local da diretiva** (não vira
+  símbolo; o `<n>` de outra regra é OUTRA variável), então: identidade =
+  **(regra, NÚMERO do marker)**, nunca o texto — o conjunto de edição sai do
+  `ast-5` (todo token com `role: "marker"` e o mesmo `marker: N`, dos DOIS
+  lados), o que mantém match e result coerentes por construção (o `<"n">`
+  stringify é o MESMO marker 1 do match). É um **ALPHA-RENAME**, e isso dá a
+  verificação mais forte da ferramenta **de graça**: `.ppo` e `.hrb` byte-
+  idênticos obrigatórios (nada pode mudar), usos intactos, round-trip byte-exato,
+  colisão (fundir dois markers) recusada antes de editar. **O `.ch` deixou de ser
+  inalcançável** — e aqui o Diego corrigiu um desvio meu: eu ia responder "de quem
+  é este include" pelo DUMP (mais barato); a regra é **usar o canal correto, e
+  estender o core se ele não der a informação**. O canal correto já existia:
+  **`harbour -gd`** (dependencies list, `-sm` = mínimo), que dá o **caminho
+  resolvido** (`inc/far.ch`, não o `far.ch` cru — resolução do CORE, a ferramenta
+  não re-implementa busca de include) e o **fecho transitivo**. Armadilha achada:
+  o harbour grava o `.d` **no CWD**, não ao lado do fonte — adivinhar deixava
+  **lixo no projeto**; conserto `-o<tmp>`. `projects-of` num `.ch` agora responde
+  o dono por fato, e a **extensão VSCode passa a funcionar com o include em foco
+  sem código novo**. Suíte **882/0**, zero core.
+  [spec-p § P8](spec-p-pp-refatoracao.md).
 - **P9** custo do reverse-scan O(tokens×from) (adr-003:96-98); **P10**
   síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
+- **P11 — `__pp_process` / `hb_compileFromBuf`: o pp como motor IN-PROCESS
+  (ordem do Diego, 2026-07-12; REABRE o veredito do P7)**. Fonte:
+  [`tests/hbpp/hbpptest.prg`](../../harbour-core/harbour/tests/hbpp/hbpptest.prg)
+  do core — `pp := __pp_init()` + `__pp_process( pp, cLinha )` expõem o pp
+  **vivo, em processo, dirigido por código Harbour, LINHA A LINHA**. Isso
+  **derruba a premissa da recusa do P7**: eu recusei "pp como escritor" porque o
+  `.ppo` apaga comentários/`#include`/formatação — mas isso é propriedade do
+  canal de ARQUIVO (`-p` despeja o módulo inteiro), **não do pp**. Com
+  `__pp_process` a ferramenta escolhe O QUE alimentar (só a statement do site,
+  cujas posições ela já tem do dump) e recebe só aquilo transformado — o resto do
+  arquivo nunca passa pelo pp, logo não pode ser destruído. "O pp calcula o QUE,
+  a ferramenta escreve o ONDE" vira uma chamada direta ao motor do core, sem o
+  desenho indireto `-u`+`.ppo`. Escopo: mapear a API (`__pp_init`/`__pp_process`
+  + `hb_compileFromBuf`, já fichado na [spec-b8](spec-b8-macros.md)), provar
+  equivalência com o pp do build, e decidir o **D-P5** (migração de DSL como
+  verbo) com o instrumento CERTO na mão.
+- **P-AUDIT — 1º achado ENTREGUE: `ast-15` (2026-07-12, caso 115)**. A varredura
+  achou de cara **réplica de gramática + RECUSA FALSA**, o mesmo formato do bug do
+  P5. `AbbrevClash` reescreve à mão a abreviação dBase do pp (regra real:
+  `ppcore.c:2533`), e o `RenameDsl` a usava para **adivinhar por prefixo** se um
+  literal consumido era "a minha palavra abreviada" — porque o dump só dizia
+  `marker: 0` ("é literal"), nunca QUAL literal. Furo provado em 6 linhas: numa
+  regra cuja keyword SECUNDÁRIA é prefixo de 4+ letras da CABEÇA, a secundária
+  **escrita por extenso** era lida como abreviação da cabeça, e o rename da cabeça
+  **recusava falsamente** (*"normalize para X"* num site já normalizado) — a cabeça
+  daquela DSL ficava **irrenomeável**. Conserto onde o fato nasce: o pp PAREIA
+  token-fonte com token do padrão ao casar e **descartava** o par do literal (a
+  mesma omissão do `ast-14`, do outro lado); agora cada token consumido carrega
+  **`ruletok`** = índice do literal no `match[]` da regra. Core: `ppcore.c` (gated
+  por `fTrackPos`), `hbpp.h`, `compast.c` (**ast-14 → ast-15**). **`lexdiff` 0**,
+  suíte **892/0**, `ppcorpus` 27/0. **Commit do core sob autorização.** Resíduo: o
+  `AbbrevClash` segue vivo para a pergunta DIFERENTE ("o nome NOVO colidiria com
+  outra cabeça sob abreviação?") — predição de casamento FUTURO, que o dump não
+  responde; canal certo = perguntar ao pp (**P11**).
+- **P-AUDIT (continua) — varredura anti-heurística (ordem do Diego, 2026-07-12)**: revisar o
+  `src/hbrefactor.prg` inteiro atrás de código que (a) voltou a se apoiar em
+  **heurística/inferência**, ou (b) pegou o **caminho mais barato** em vez de
+  extrair a informação correta do core (estendendo-o quando preciso). O gatilho
+  foi flagrante e é a régua: no P8 eu ia responder posse de include pelo dump
+  porque era mais barato, quando o canal certo (`harbour -gd`) já existia — e no
+  P5 o Diego já tinha pego uma classificação por COMPARAÇÃO DE TEXTO que virou o
+  `ast-14`. Alvos conhecidos a auditar: `ResolveInclude` (re-implementa a busca
+  de include do compilador — hoje inofensivo porque o dump já traz o caminho
+  resolvido, mas é cópia degradada por design); qualquer casamento por texto onde
+  exista número/id no dump; qualquer "se não é X, então é Y" sem fato que separe.
+  Saída: lista site a site (arquivo:linha) com veredito — fato disponível, fato a
+  criar no core, ou recusa honesta.
+  **Fila NOMEADA (do catálogo de erros de 2026-07-12, CLAUDE.md § GATILHOS):**
+  (i) `ResolveInclude` — re-implementa a busca de include do compilador (gatilho
+  4); hoje inofensivo porque o dump já traz o caminho RESOLVIDO, mas é cópia
+  degradada por design: ou morre, ou passa a consumir `harbour -gd`.
+  (ii) **Resíduo do `AbbrevClash`** — segue vivo para uma pergunta que o dump NÃO
+  responde ("o nome NOVO colidiria com a cabeça de outra regra sob abreviação
+  dBase?"): é predição de casamento FUTURO. Canal certo = **perguntar ao próprio
+  pp** (P11, `__pp_process`), não reescrever a aritmética do `ppcore.c:2533`.
+  (iii) varrer os "se não é X, então é Y" (gatilho 3) e as comparações de texto
+  onde o dump já tem número/id (gatilho 1).
 
 **P-DOC — corpus exploratório/explicativo do PP (ESSENCIAL, ordem do Diego,
 2026-07-11):** uma bateria de testes que casa diretivas REAIS do Harbour
@@ -742,8 +890,15 @@ split opcional em 2 PRs; ChangeLog via `bin/commit.hb`; uncrustify.
    (2026-07-08)**: spec própria com fatos re-auditados
    ([spec-d-evidencia-execucao.md](spec-d-evidencia-execucao.md));
    ver a seção da fase acima.
-3. **Regra sem cabeça** (`head null`, hbcompat legado): dump já registra;
-   candidata a fixture de RELATO se um projeto real trouxer o caso.
+3. ~~**Regra sem cabeça** (`head null`, hbcompat legado): dump já registra;
+   candidata a fixture de RELATO se um projeto real trouxer o caso.~~
+   ✅ **FECHADO pela P6 (2026-07-12, caso 113)** — e com algo melhor que o
+   relato que este item pedia: a ferramenta **resolve, lista e RENOMEIA** a
+   regra sem cabeça **por construção** (nunca chaveou no `head`; opera em
+   `marker == 0` e nas posições de `match[]`/`result[]`), com round-trip
+   byte-exato. Zero código novo. *(Corpus: zero ocorrências em
+   `include/`+`contrib/` do core — forma legal que ninguém usa, daí nunca
+   ter aparecido.)*
 4. Dedup pré/pós-decremento: não-fazer mantido (v2).
 5. **Projetos grandes de produção** (quando o Diego liberar): dogfooding
    final — só depois de suíte + hbhttpd verdes. **Recalibrada (Diego,

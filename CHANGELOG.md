@@ -5,6 +5,158 @@ seu dia a dia, com exemplos e limites honestos. O "como" interno (fases,
 specs, decisões) vive em [docs/roadmap.md](docs/roadmap.md) e nas specs
 de `docs/`.
 
+## 2026-07-12 — corrigido: uma diretiva podia ficar com a cabeça IRRENOMEÁVEL
+
+Se a sua diretiva tem uma palavra secundária que começa igual à palavra principal,
+renomear a principal **falhava** — com uma mensagem que não fazia sentido:
+
+```harbour
+#command GRAVAR <x> GRAV <y> => zz_( <x>, <y> )   // GRAV começa igual a GRAVAR
+...
+   GRAVAR 1 GRAV 2
+```
+```
+$ hbrefactor rename app.hbp a.prg:5:4 SALVAR
+hbrefactor: uso abreviado 'GRAV' ... - normalize para 'GRAVAR' antes do rename
+```
+
+Ela mandava você "normalizar" um trecho que **já estava normalizado**. Na prática:
+a cabeça daquela diretiva não podia ser renomeada, ponto.
+
+**Por que acontecia.** Em `#command`/`#translate` (as famílias sem `x`), o Harbour
+aceita a palavra **abreviada** a partir de 4 letras — então `GRAV` *poderia* ser
+uma abreviação de `GRAVAR`. Só que ali não era: era a palavra `GRAV` da própria
+regra, escrita inteira. A ferramenta não tinha como saber e **chutava pelo texto**.
+
+Agora ela **não chuta**: o preprocessador passou a informar qual palavra da regra
+cada trecho do seu código casou. O rename da cabeça funciona, a palavra secundária
+fica intacta, e o aviso de **uso realmente abreviado** continua existindo (aí ele é
+legítimo). *(Exige o compilador do branch com o dump de AST.)*
+
+## 2026-07-12 — renomear o `<marker>` de uma diretiva, e o `.ch` finalmente alcançável
+
+Você tem uma diretiva sua com um marker de nome ruim:
+
+```harbour
+#xcommand VULK <n> [ KRAN <cMat> ] => ;
+          FUNCTION vk_<n>() ;; RETURN { <"n">, <cMat> }
+```
+
+Trocar `<n>` por `<nome>` é chato e perigoso à mão: o nome aparece no **match** e
+em cada uso no **result** (inclusive colado, `vk_<n>`, e dentro de string,
+`<"n">`), e esquecer um quebra a diretiva. Agora é `rename` normal, com o cursor
+em cima do marker — **dentro do próprio `.ch`**:
+
+```
+$ hbrefactor rename app.hbp regras.ch:13:17 nome
+rename-rule-marker: <n> -> <nome> em #xcommand VULK (regras.ch:14)
+  regras.ch:13:17
+  regras.ch:14:24
+  regras.ch:14:43
+verified: 3 marker occurrence(s) na diretiva; .ppo and .hrb byte-identical (alpha-rename)
+```
+
+O nome do marker é **variável local da diretiva** — não aparece em nenhum uso e
+não é símbolo do programa. Por isso: **seus usos não mudam** (`VULK Lamina ...`
+fica como está), e o marker `<n>` de **outra** diretiva é outra variável e não é
+tocado. E como a troca não pode mudar NADA no programa, a ferramenta exige a
+prova mais forte que tem: **a expansão e o pcode do projeto inteiro têm de sair
+byte-idênticos** — se mudar qualquer coisa, ela desfaz. Renomear para um nome que
+já é outro marker da mesma diretiva é recusado antes de tocar no arquivo.
+
+**Bônus, e talvez o mais útil no dia a dia:** os seus `.ch` deixaram de ser
+invisíveis. Antes, com um `.ch` aberto no editor, a ferramenta dizia *"não é
+fonte do projeto"* — porque um include realmente não está na lista de fontes do
+`.hbp`. Agora ela **pergunta ao compilador** quais includes o projeto usa
+(`harbour -gd`, a lista de dependências oficial — pega include de include também)
+e descobre o dono. Na prática: **rename e find-references funcionam com o cursor
+dentro do `.ch`**, inclusive pelo VSCode.
+
+## 2026-07-12 — o `--dry-run` deixa de aprovar um rename que o apply desfaz
+
+Se uma diretiva sua GERA uma função e você chama essa função pelo nome gerado,
+renomear o gerador deixaria a chamada órfã:
+
+```harbour
+#xcommand VULK <n> [ ... ] => FUNCTION vk_<n>() ;; RETURN ...
+
+VULK Escudo          // gera FUNCTION vk_Escudo()
+...
+? vk_Escudo()        // você escreveu o nome GERADO, à mão
+```
+
+A ferramenta já sabia recusar isso — mas ficava **cega quando a grafia manual
+estava dentro de um comando**. E `? ...` *é* um comando (`#command`), como quase
+tudo em Harbour. O sintoma era feio: `--dry-run` dizia que ia dar certo, e o
+apply real editava, recompilava, batia num erro e desfazia tudo com uma mensagem
+que não explicava nada (*"contagem de símbolos/funções mudou - rollback"*). Ou
+seja: o dry-run **mentia**.
+
+Agora recusa **antes de tocar no arquivo**, apontando o site exato:
+
+```
+$ hbrefactor rename app.hbp a.prg:19:6 Pavesado
+hbrefactor: o fonte soletra o nome gerado 'vk_Escudo' (a.prg:14)
+            - renomear 'Escudo' o deixaria órfão; recuso
+```
+E `--dry-run` e o apply real **concordam** — o que o dry-run diz é o que acontece.
+
+**Também nesta entrega** (dois cantos do preprocessador que agora têm prova):
+
+- **Regra sem cabeça** — uma diretiva que começa com um marker em vez de uma
+  palavra (`#xtranslate <x> ZORBADO => ( <x> * 2 )`) é resolvida, listada e
+  renomeada normalmente. Funcionava desde sempre; agora está provado.
+- **Grupos opcionais fora de ordem** — o pp casa `[ COM ... ] [ PESO ... ]` em
+  qualquer ordem, e o rename encontra todos os sites nas duas ordens.
+- **Limite honesto:** uma palavra de DSL que **outra diretiva emite** (uma regra
+  que expande em outra) não tem posição no seu fonte — não há o que editar.
+  A ferramenta recusa dizendo isso, em vez de editar pela metade.
+
+## 2026-07-12 — `usages --at` para de misturar um marker do preprocessador com um símbolo homônimo do seu código
+
+Imagine que seu projeto tem uma função de verdade, `FUNCTION Vendas()`, e também
+usa uma diretiva de terceiro que não tem nada a ver com ela:
+
+```harbour
+#xtranslate LABEL <n> => RegLabel( <"n"> )   // vira uma STRING, "Vendas"
+
+LABEL Vendas          // só um rótulo de tela - texto, não referência à função
+? Vendas()             // ISTO SIM chama a função
+```
+
+Antes, clicar em `Vendas` dentro de `LABEL Vendas` e pedir "onde isso é usado"
+(`usages --at`) devolvia a definição e a chamada da função `Vendas()` **junto**
+com o rótulo — como se fossem a mesma coisa. E o inverso também acontecia:
+clicar na função de verdade trazia de brinde o `LABEL Vendas` (e qualquer outra
+diretiva não relacionada que por acaso usasse o mesmo texto). O `--at` calculava
+corretamente **o que** estava sob o cursor (o `resolve-at` já acertava — é o
+mesmo fato que o `rename` já usava), mas jogava essa informação fora e caía
+numa busca cega pelo texto "Vendas" no projeto inteiro.
+
+Agora `usages --at` **usa** esse fato para escolher só o que pertence ao site
+clicado:
+
+```
+$ hbrefactor usages app.hbp --at a.prg:5:10        # cursor no LABEL Vendas
+a.prg:5:10: Vendas - nome de marker (sem dona identificável)
+a.prg:5:10: name through pp rule (#xtranslate LABEL, ...)
+1 result(s) for 'Vendas'
+
+$ hbrefactor usages app.hbp --at a.prg:11:10       # cursor na FUNÇÃO real
+a.prg:6: call in MAIN
+a.prg:11: definition (function)
+2 result(s) for 'Vendas'
+```
+
+**O que NÃO muda:** `usages Vendas` digitado sem `--at` continua igual — uma
+busca ampla por todo o texto "Vendas", já que sem posição não há como saber
+qual dos dois você quer. E um valor que só **atravessa** uma diretiva sem virar
+artefato novo (ex.: `? nTotal`, onde `?` também é uma diretiva mas `nTotal` é o
+seu LOCAL de verdade passando por ela) continua contando como o símbolo real —
+a mesma distinção que o rename já usa desde a entrega anterior.
+
+Investigação + prova: [docs/spec-p-pp-refatoracao.md § P3](docs/spec-p-pp-refatoracao.md).
+
 ## 2026-07-12 — a ferramenta entende TODOS os tipos de marker do preprocessador
 
 Um `<x>` de diretiva não é uma coisa só. O pp tem **15 tipos de marker**, e agora

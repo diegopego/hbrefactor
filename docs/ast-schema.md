@@ -236,6 +236,21 @@ no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
       { "line": 8, "col": 3, "len": 8, "type": 21, "prov": "s",
         "marker": 0,       // 0 = palavra/literal DA PRÓPRIA REGRA;
                            // N = recheio do match marker N (1-based)
+        "ruletok": 2,      // ast-15: QUAL literal da regra este token casou -
+                           // índice no `match[]` DA REGRA. SÓ em `marker: 0`
+                           // (palavra literal); ausente para recheio de marker.
+                           // O pp pareia cada token-fonte com o token do padrão
+                           // enquanto casa, e DESCARTAVA o par do literal
+                           // (hb_pp_patternMatch só registrava quando o padrão
+                           // tinha índice de marker). Sem ele o consumidor só
+                           // podia ADIVINHAR o literal pelo TEXTO - e a
+                           // adivinhação QUEBRA na abreviação dBase: família sem
+                           // `x` casa keyword abreviada em >= 4 letras
+                           // (ppcore.c:2533), então uma keyword SECUNDÁRIA que
+                           // seja prefixo de 4+ letras da CABEÇA, escrita por
+                           // extenso, é indistinguível de uma cabeça abreviada.
+                           // Furo real: o rename da cabeça dava RECUSA FALSA
+                           // (caso 115). Gated por fTrackPos; lexdiff 0.
         "generates": true, // ast-12: SÓ em recheio de marker (N>=1) cujo NOME
                            // ESCRITO alimenta um 'p'aste ou 's'tringify -
                            // GERA artefato (um símbolo colado dele, uma string

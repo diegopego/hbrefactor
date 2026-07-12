@@ -35,6 +35,53 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   é recheio") — furo provado em 1 linha: conteúdo do usuário igual a uma
   keyword da regra classifica errado. Fato que o core sabe e não exporta
   é lacuna DO CORE, não problema a contornar.
+- **GATILHOS da REGRA DO FATO — os CHEIROS que obrigam a parar e ir ao core
+  (catálogo de erros, 2026-07-12; o Diego me pegou 3× no MESMO dia)**. A
+  regra acima já existia e eu a violei assim mesmo — logo o que faltava não
+  era regra, era **gatilho**. Ao escrever QUALQUER uma destas linhas, PARE e
+  pergunte "o core sabe isto e não me conta?" antes de continuar:
+  1. **Comparação de TEXTO para decidir PAPEL/IDENTIDADE** (`Upper(a) == Upper(b)`,
+     prefixo, `Left()`, `$`) quando o dump já tem número/id/índice. *(P5: recheio
+     de marker vs palavra da regra → `ast-14`.)*
+  2. **Constante mágica de gramática** (`>= 4`, `Len() > N`) — é réplica de regra
+     do compilador. *(P-AUDIT: `AbbrevClash` reescrevia `ppcore.c:2533` → RECUSA
+     FALSA, cabeça de DSL irrenomeável → `ast-15`.)*
+  3. **"se não é X, então é Y"** sem um fato que SEPARE X de Y. *(A guarda de
+     órfão do P6: "grafia manual = token sem `from`" — cega para todo site
+     dentro de um comando.)*
+  4. **Re-implementar resolução/busca que o core faz** (achar include, casar
+     nome, expandir): `ResolveInclude` varre os `-i` à mão. Cópia degradada.
+  5. **Casar arquivo por BASENAME** em vez de caminho canônico. *(Diego pegou:
+     dois `.ch` homônimos colidem.)*
+  6. **Escolher o canal MAIS BARATO** (Diego, 2026-07-12): *"tem que usar o canal
+     CORRETO, não apenas o mais barato"*. Eu ia responder posse de include pelo
+     dump porque era barato; o canal certo (`harbour -gd`, lista de dependências
+     oficial, com caminho RESOLVIDO e fecho transitivo) já existia e eu não tinha
+     procurado. **Barato ≠ correto; e "não achei" quase sempre = "não procurei".**
+- **NÃO declare IMPOSSÍVEL/RECUSA sem VARRER a superfície do core (2026-07-12)**:
+  toda recusa ("o pp não consegue X") é uma afirmação sobre o CORE e exige
+  varredura ANTES, com o que foi varrido REGISTRADO na spec: (a) `harbour`/`hbmk2`
+  `--help` inteiro (flags existem e são esquecidas: `-gd` deps, `-sm`, `-u`,
+  `-p`/`-p+`); (b) a **API pública** (`include/hbpp.h` e afins); (c) **`tests/` do
+  core** — é lá que a API viva aparece; (d) ChangeLog. Custou um VEREDITO ERRADO
+  publicado: recusei "pp como motor de reescrita" (P7) olhando só o `.ppo`
+  destrutivo; o Diego apontou `tests/hbpp/hbpptest.prg` → `__pp_init()` +
+  `__pp_process()` (pp vivo, in-process, LINHA A LINHA) derrubam a premissa.
+  Ecoa o P4 ("não tem uso nenhum" com base num `grep` quebrado): **silêncio de
+  busca minha NÃO é evidência de ausência.**
+- **Ferramenta do core: PROBE, nunca memória (2026-07-12)**: antes de consumir a
+  saída de um utilitário do core, sonde ONDE ele escreve e O QUE reporta — com
+  fonte em SUBDIRETÓRIO (o caso que quebra). Assumi que `harbour -gd` grava o
+  `.d` ao lado do fonte (como o `.ppo`); ele grava no **CWD** → deixei **lixo no
+  repo** (`hbrefactor.d`) e a função devolvia vazio para fonte em subdir. Conserto:
+  `-o<tmp>` (não se adivinha o destino: manda-se). **Depois de qualquer comando que
+  rode o compilador ao lado dos fontes, conferir `git status`** — `.d`/`.ppo`/`.c`
+  vazam para o repo.
+- **Chave OPCIONAL do dump: sempre `hb_HGetDef` (2026-07-12)**: campo que só existe
+  em ALGUNS papéis (`marker` não vem em token literal; `ruletok` só em `marker: 0`;
+  `from`, `generates`, `col`) acessado direto é `BASE/1132` em produção — e a suíte
+  não pega (custou um crash no `rename` dentro de `.ch`). Ler o contrato no
+  ast-schema.md ANTES; na dúvida, `hb_HGetDef`.
 - **Buildar o core após editar — 3 armadilhas que custam diagnóstico
   (Diego, 2026-07-11; consolida notas espalhadas em specs)**: (a) mudança
   no COMPILADOR (harbour.y, hbmain.c, compast.c, complex.c…) exige
@@ -196,6 +243,22 @@ Os fixtures da suíte são `.prg` idiomático (o "caso 0" exige saída limpa sob
 - **Verificar comportamento no fonte do Harbour ANTES de afirmar** (não
   teorizar): ler/grep o `src/` relevante. `Empty(" ")` é `.T.` — usar
   `Len(c) == 0` para "vazia".
+- **`LOCAL x := 0` seguido de `x := <valor>` é DEAD STORE → W0032 → quebra
+  sob `-es2`** (2026-07-12): o Harbour avisa que o INICIALIZADOR nunca é lido,
+  mesmo que a variável seja lida depois. Reproduz em 4 linhas. Idioma: declarar
+  **sem** inicializador (`LOCAL nEdits`), ou usar `+=` (que LÊ). *(A mensagem
+  "assigned but not used" engana — parece que a variável é inútil, e não é.)*
+- **Régua do caso 64 vale para COMENTÁRIO também** (2026-07-12): a régua
+  (`! grep -qiwE "palavras|da|dsl" src/hbrefactor.prg`) é textual — citar a DSL
+  de uma fixture num comentário do fonte QUEBRA a suíte, e está certa em quebrar:
+  o fonte da ferramenta não deve conter vocabulário de DSL nenhuma, nem de
+  exemplo. Ilustre o formato genericamente ("keyword secundária prefixo da
+  cabeça"), nunca com as palavras da fixture.
+- **Coluna de probe/teste: COMPUTAR, nunca contar na cabeça** (2026-07-12): errei
+  4× nesta sessão (inclusive fazendo a suíte falhar), e uma delas por ler a coluna
+  de um arquivo que o rename ANTERIOR já tinha mudado. Extrair sempre do arquivo
+  no estado CORRENTE (`python3 -c "...l.index('<n>')+1"`). Lembrar: dump é 0-based,
+  CLI é 1-based; o `col` de um marker aponta o NOME, não o `<`.
 - **Diagnóstico do IDE ≠ veredito**: o lint do VSCode usa o harbour do
   SISTEMA (`/usr/local/bin`, sem os patches do branch — ex.: acusa
   W0019 em `_HB_MEMBER` que completa tipo, silenciado pelo candidato

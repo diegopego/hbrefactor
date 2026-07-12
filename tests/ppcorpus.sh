@@ -181,6 +181,72 @@ corpus_gen() {
    check "ast-13: a regra gerada carrega genealogia ('from' -> a app criadora)" $?
 }
 
+# --------------------------------------------------------------------------
+# Familia ESTRUTURA DA REGRA - sem cabeca, opcionais fora de ordem, multi-passe
+# (docs/pp-corpus/rule-structure.md)
+# --------------------------------------------------------------------------
+corpus_rulestruct() {
+   echo "corpus: familia ESTRUTURA DA REGRA - sem cabeca / opcionais fora de ordem / multi-passe"
+   ( cd "$HERE/fixp6" && "$HB" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+   check "fixp6/p6.prg compila limpo sob -w3 -es2" $?
+   local D; D=$(gen4 fixp6 p6.prg -I"$HERE/fixp6")
+   # regra SEM CABECA: o match comeca com um MARKER -> head null (ppcore.c:1161)
+   grep -q '"head": null' "$D/p6.ast.json"
+   check "ast dump: regra SEM CABECA existe e vem com head null" $?
+   # opcionais FORA DE ORDEM: o valor cai no slot certo mesmo invertido
+   grep -q 'RETURN { "Elmo", "bronze", 3 }' "$D/p6.ppo"
+   check ".ppo: grupos opcionais INVERTIDOS casam e caem no slot certo" $?
+   grep -q 'RETURN { "Escudo",, }' "$D/p6.ppo"
+   check ".ppo: grupos opcionais AUSENTES viram argumento vazio" $?
+   # MULTI-PASSE: a regra VULK e reaplicada sobre o RESULTADO da GLIMER
+   grep -q 'FUNCTION vk_Broquel() ;; RETURN { "Broquel", "base", }' "$D/p6.ppo"
+   check ".ppo: MULTI-PASSE - o resultado de uma regra e re-consumido por outra" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia ABREVIACAO dBase - a keyword pela metade, e o fato ruletok (ast-15)
+# (docs/pp-corpus/abbreviation.md)
+# --------------------------------------------------------------------------
+corpus_abbrev() {
+   echo "corpus: familia ABREVIACAO dBase - keyword pela metade + ruletok (ast-15)"
+   ( cd "$HERE/fixabr" && "$HB" abr.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+   check "fixabr/abr.prg compila limpo (inclui uso ABREVIADO: APAG = APAGAR)" $?
+   local D; D=$(gen4 fixabr abr.prg -I"$HERE/fixabr")
+   # o pp ACEITA a keyword abreviada (>= 4 letras) nas familias SEM 'x'
+   grep -q 'zz_( 3, 0 )' "$D/abr.ppo"
+   check ".ppo: #command casa a keyword ABREVIADA (APAG -> APAGAR, ppcore.c:2533)" $?
+   # ast-15: o dump diz QUAL literal da regra cada token casou
+   grep -q '"ruletok"' "$D/abr.ast.json"
+   check "ast dump: ast-15 exporta ruletok (QUAL literal da regra o site casou)" $?
+   # o furo que o ast-15 matou: a keyword secundaria GRAV, escrita POR EXTENSO,
+   # casa o literal #2 do match[] - e NAO a cabeca (indice 0) abreviada
+   python3 "$HERE/ppc-ruletok.py" "$D/abr.ast.json"
+   check "ast-15: a keyword secundaria casa o literal #2 - NAO e a cabeca abreviada" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia PP COMO INSTRUMENTO - os canais do core e o que cada um DESTROI
+# (docs/pp-corpus/pp-as-instrument.md)
+# --------------------------------------------------------------------------
+corpus_instrument() {
+   echo "corpus: familia PP COMO INSTRUMENTO - canais do core (.ppo / -u / -gd)"
+   local D="$HERE/tmp/ppc-instr"
+   rm -rf "$D"; mkdir -p "$D/inc"
+   cp "$HERE/ppc-instr/far.ch" "$D/inc/"
+   cp "$HERE/ppc-instr/m.prg" "$D/"
+   ( cd "$D" && "$HB" m.prg -n -q0 -p -u -s -Iinc > /dev/null 2>&1 )
+   # -u ISOLA: aplica so as regras do usuario; o resto da linguagem passa intacto
+   grep -q "MODERNO Alfa VALOR nX" "$D/m.ppo" && grep -q '? "oi"' "$D/m.ppo"
+   check "-u: o pp aplica so as MINHAS regras (o '?' NAO vira QOut)" $?
+   # ...mas o .ppo DESTROI tudo que nao e codigo -> nao pode ser FONTE (recusa do P7)
+   [ "$(grep -c '//' "$D/m.ppo")" = "0" ] && ! grep -q '#include' "$D/m.ppo"
+   check ".ppo DESTROI comentarios e #include - nao serve como FONTE (recusa do P7)" $?
+   # -gd: o CORE diz quais includes usou, com o caminho ONDE ACHOU
+   ( cd "$D" && "$HB" m.prg -n -q0 -sm -gd -Iinc > /dev/null 2>&1 )
+   grep -q "inc/far.ch" "$D/m.d"
+   check "-gd: o compilador reporta o include com o CAMINHO RESOLVIDO (nao o nome cru)" $?
+}
+
 corpus_set
 corpus_say
 corpus_store
@@ -188,6 +254,9 @@ corpus_class
 corpus_markers
 corpus_ref
 corpus_gen
+corpus_rulestruct
+corpus_abbrev
+corpus_instrument
 
 echo
 echo "ppcorpus: passed: $PASS  failed: $FAIL"

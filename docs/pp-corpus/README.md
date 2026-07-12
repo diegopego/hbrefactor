@@ -82,6 +82,10 @@ para não me perder e para não repetir erro.
 | **MARKERS** | hbpp.h / ppcore.c | **os 15 tipos de `<x>`** (6 match + 9 result): sintaxe, o que cada um faz, veredito de consumo/recusa | [markers.md](markers.md) |
 | **`<@>`** | hbfoxpro.ch:63 | **o guarda anti-recursão**: como uma regra emite a própria palavra que casa sem loop infinito | [reference-guard.md](reference-guard.md) |
 | **regra que gera regra** | gen.ch / hbclass.ch | genealogia (`ast-13`) + os LIMITES do pp: `#xtranslate` gerado **não registra**; keyword colada não casa | [generated-rules.md](generated-rules.md) |
+| **DERIVAÇÃO** | ast-3/12/13 | **`clone` × `paste` × `stringify`**: o que a diretiva FAZ com o nome (atravessa × vira código). A distinção que explicou 3 bugs diferentes | [derivation.md](derivation.md) |
+| **ESTRUTURA da regra** | fixp6 | regra **sem cabeça**; grupos opcionais **fora de ordem**; **multi-passe** (regra que expande em regra) e o limite da palavra emitida | [rule-structure.md](rule-structure.md) |
+| **ABREVIAÇÃO dBase** | ppcore.c:2533 | `#command` casa a keyword **pela metade** (>= 4 letras) — e por que só o pp sabe qual palavra é qual (`ast-15`/`ruletok`) | [abbreviation.md](abbreviation.md) |
+| **PP como INSTRUMENTO** | hbpptest.prg | os **canais do core** (`.ppo`/`.ppt`/`-u`/`-gd`/`-x`/`__pp_process`): o que cada um dá e o que **destrói** | [pp-as-instrument.md](pp-as-instrument.md) |
 
 Planejadas (ver [ROADMAP.md](ROADMAP.md)): um contrib rico (hbct) para MEDIÇÃO;
 `TEXT … ENDTEXT` (a maquinaria de *stream*, onde o `strdump`/`%s` vive de fato);

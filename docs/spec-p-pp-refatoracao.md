@@ -1,393 +1,141 @@
 # Spec P — investigação exaustiva do pp para refatoração
 
+**Este arquivo é o REGISTRO DE FASE: um veredito por fatia, curto.**
+O **conhecimento sobre o pp** (mecânica, oráculos, limites) mora no corpus —
+**[docs/pp-corpus/](pp-corpus/README.md)**, um arquivo por tema. O **contrato
+técnico** dos canais mora no [ast-schema.md](ast-schema.md). As **regras de
+trabalho** moram no [CLAUDE.md](../CLAUDE.md).
+
+> **Regra de organização (ordem do Diego, 2026-07-12; esta spec já foi
+> monolito e virou 832 linhas):** fato novo sobre o **pp** → **corpus**
+> (família própria). Canal novo → **ast-schema**. Veredito de fatia → **aqui**,
+> em um parágrafo, com link. Regra durável → **CLAUDE.md**. Não duplicar.
+
 Portão aberto pelo Diego (2026-07-11); pré-requisito D-P0 (fase U fatia 2)
-FECHADO na sessão anterior. Escopo, eixos e critério de pronto no roadmap § P.
-Molde: [spec-u](spec-u-verbos-unificados.md). O achado que abriu a fase tem
-registro próprio em [adr-003](adr-003-derivacao-pp-como-fato.md); a tese
-arquitetural que a investigação P1 destravou — o grafo de transformação do pp
-como raiz da AST, e as recomendações do Diego — está no
-**[adr-004](adr-004-grafo-transformacao-pp.md)**.
+FECHADO. Escopo, eixos e critério de pronto no [roadmap § P](roadmap.md).
+Achado que abriu a fase: [adr-003](adr-003-derivacao-pp-como-fato.md); tese
+arquitetural (grafo de transformação): [adr-004](adr-004-grafo-transformacao-pp.md).
 
 ## O enquadramento (nota do Diego, 2026-07-11) — o pp É, em muitas formas, um refatorador
 
 Não é uma boutade. O preprocessador do Harbour é um **motor de reescrita de
-termos** em tempo de compilação: `#define`/`#translate`/`#xtranslate`/
-`#command`/`#xcommand` são regras **padrão → substituição** — casa uma FORMA
-no fonte, emite uma forma TRANSFORMADA. Isso é a definição de um refatorador:
-reconhecer um shape e produzir outro shape equivalente. Duas consequências que
-esta fase leva a sério:
+termos** em tempo de compilação: `#define`/`#[x]translate`/`#[x]command` são
+regras **padrão → substituição** — casa uma FORMA no fonte, emite uma forma
+TRANSFORMADA. É a definição de um refatorador. Duas consequências:
 
-1. **O pp transforma padrões extremamente complexos.** A prova está no próprio
-   corpus: uma única palavra escrita (`METHOD Info`) o pp deriva, em MÚLTIPLOS
-   passes, em (a) um símbolo colado (`CAIXA_INFO`, a função gerada), (b) uma
-   string de registro (`"Info"`, stringify), (c) a entrada de `__clsAddMsg` que
-   liga os dois. Uma transformação multi-sítio, determinística, disparada por
-   um token. Um refatorador manual que fizesse isso à mão erraria; o pp não.
-2. **O pp já opera sobre TODO código Harbour.** Toda compilação passa pelo pp —
-   é universal e canônico. Uma transformação expressa COMO regra de pp fala a
-   MESMA língua que todo o ecossistema já usa e confia. Isso é o insumo do
-   **Eixo B** (pp como INSTRUMENTO de reescrita, roadmap § P): se o motor de
-   reescrita que já roda em todo build puder ser o oráculo/motor de uma
-   migração de DSL, a ferramenta não precisa reimplementar um reescritor —
-   reusa o do core (é o preceito da REGRA DO FATO aplicado à AÇÃO, não só ao
-   fato). Veredito de viabilidade fica para P7; aqui só se registra a direção.
+1. **O pp transforma padrões extremamente complexos.** De uma palavra escrita
+   (`METHOD Info`) ele deriva, em múltiplos passes, um símbolo colado
+   (`CAIXA_INFO`), uma string de registro (`"Info"`) e a entrada de
+   `__clsAddMsg` que liga os dois. Multi-sítio, determinístico, disparado por
+   um token.
+2. **O pp já opera sobre TODO código Harbour** — é universal e canônico. Uma
+   transformação expressa COMO regra de pp fala a mesma língua que o ecossistema
+   inteiro já usa. É o insumo do **Eixo B**.
 
-Esta observação NÃO afrouxa o preceito: o hbrefactor continua agindo só sobre
-FATO. O ponto é que o "fato" e o "instrumento" que a fase persegue moram no
-mesmo lugar — o motor de reescrita que o pp já é.
+Isso NÃO afrouxa o preceito: o hbrefactor continua agindo só sobre FATO. O ponto
+é que o "fato" e o "instrumento" moram no mesmo lugar — o motor de reescrita que
+o pp já é.
 
-## Eixo A — P1: granularidade `paste` × `stringify`
+---
 
-**A pergunta (adr-003:82-86).** O `generates` (ast-12) funde `paste` (gera
-SÍMBOLO, verificável por recompilação) e `stringify` (gera STRING) num único
-booleano. Existe caso em que os dois precisam de vereditos DIFERENTES? Se sim,
-o booleano é grosso demais e vira dois fatos (candidato `ast-13` `genOp`) ou o
-stringify precisa de guarda `--force`.
+# Vereditos por fatia
 
-**Método.** Observação por FATO no corpus (fixppm — DSL inventada não-espelho)
-e por PROVA ADVERSARIAL (probes com colisão deliberada), não teoria. Cada
-afirmação abaixo foi vista rodando (`bin/hbrefactor` sobre dumps `-x` reais).
+## Eixo A — fonte de fato
 
-### Achado 1 — a resolução do KIND não distingue paste de stringify (e não deve)
+### P1 ✅ granularidade `paste` × `stringify` (2026-07-11)
+`genOp` isolado **RECUSADO**: a resolução do kind usa o booleano `generates`
+(ast-12) e a predição já lê a granularidade fina do rastro `from`; stringify não
+exige `--force`. O `ast-13` foi para outra coisa — a **genealogia de regra** —
+depois que a prova adversarial revelou a colisão de homônimo e **duas hipóteses
+minhas caíram por execução**; a visão do Diego venceu: *o conserto era completar o
+GRAFO*. Casos 51/52/107/108. Conhecimento: [derivation.md](pp-corpus/derivation.md),
+[generated-rules.md](pp-corpus/generated-rules.md).
 
-Nos oito alvos, um marker que **gera** (paste OU stringify) resolve para
-`rename-pp-marker` — o mesmo veredito. A resolução ([hbrefactor.prg:1490](../src/hbrefactor.prg#L1490))
-consome o booleano `generates`, e o booleano é a granularidade CERTA aqui: a
-decisão é "é o marker OU é um símbolo ligado", e essa decisão é idêntica para
-paste e stringify (ambos = "o nome vira código/dado, é o marker"). Provas:
+### P2 ✅ marker que GERA **e** passa adiante (2026-07-11)
+Veredito **sem canal novo**: não há corrupção silenciosa porque a segurança é
+**ESTRUTURAL** — a rede dupla (recompilação `-es2` + símbolos/identidade do `.hrb`)
+confere o ARTEFATO COMPILADO FINAL, indiferente à multiplicidade e ao aninhamento.
+Todo caso é rollback honesto OU re-derivação verificada. Caso 109 (fixture `fixp2`).
+Conhecimento: [derivation.md](pp-corpus/derivation.md).
 
-- **stringify puro**: `? EVENTO Pronto` (`#xtranslate EVENTO <n> => Anota(<"n">)`)
-  → `Pronto` só existe como a string `"Pronto"`. `rename ... Pronto Feito` →
-  `rename-pp-marker`, exit 0, `predicted string: "Pronto" -> "Feito"`, verificado.
-  Sem `--force`, sem recusa. (caso 51)
-- **paste+clone+stringify na MESMA regra**: `REGISTRO Salva` → `rename-pp-marker`,
-  prediz `REG_SALVA -> REG_GRAVA` (símbolo) E `"Salva" -> "Grava"` (string). (caso 52)
+### P3 ✅ `generates` para `usages`/find-references (2026-07-12)
+A hipótese grande do adr-003 **confirmada**: `usages --at` calculava o papel do site
+e **jogava fora**, caindo numa busca cega por texto — um marker de pp e um símbolo
+homônimo do seu código voltavam no MESMO blob. Agora estreita pelo papel. Zero core
+(o fato já estava no dump). Caso 112. Resíduo: artefatos derivados como `Location`
+no `--json`. Conhecimento: [derivation.md](pp-corpus/derivation.md).
 
-### Achado 2 — a granularidade fina que a PREDIÇÃO precisa já vem do rastro `from`, não do booleano
+### P4 + P5 ✅ os 15 mkinds EXAURIDOS (2026-07-12)
+13 com consumo provado, 2 com recusa documentada (`strdump` vive na maquinaria de
+STREAM; `dynval` é canal interno do pp). O `<@>` desvendado: é o **guarda
+anti-recursão**. Três consumos: `restrict` validado, `logical`/`nul` relatados, e
+`wild`/marker-não-usado separado de palavra-de-regra **por FATO** — canal novo
+**`ast-14`** no core, que **matou uma heurística de texto minha que o Diego pegou**.
+Caso 111. Conhecimento: [markers.md](pp-corpus/markers.md),
+[reference-guard.md](pp-corpus/reference-guard.md).
 
-A distinção paste↔stringify que o usuário VÊ (símbolo previsto vs string
-prevista) é lida DIRETO do `from` op (ast-3): o stringify em
-[hbrefactor.prg:3989](../src/hbrefactor.prg#L3989) (`hFrom["op"] == "stringify"`),
-o paste pelo mapa de artefatos. O booleano `generates` NÃO participa dessa
-predição. Ou seja: onde a granularidade paste/stringify importa, ela **já está
-disponível** — na granularidade MAIS FINA do rastro, não no carimbo.
+### P6 ✅ ESTRUTURA da regra (2026-07-12)
+Três vereditos + um bug consertado. (a) **Regra sem cabeça**: funciona **por
+construção** (a ferramenta nunca chaveou no `head`) — fecha o item 3 do backlog com
+mais do que o "relato" que ele pedia. (b) **Opcionais reordenados**: o pp casa em
+qualquer ordem; nenhuma posição se perde. (c) **Multi-passe**: o fecho atravessa as
+passadas; **limite honesto** — palavra emitida no result de outra regra não tem
+posição no fonte e a ferramenta recusa nomeando o motivo. (d) **A guarda de órfão
+estava CEGA dentro de comando** (`--dry-run` aprovava o que o apply desfazia) —
+consertada pelo fato `clone` × `paste`. Caso 113, fixture `fixp6`.
+Conhecimento: [rule-structure.md](pp-corpus/rule-structure.md),
+[derivation.md](pp-corpus/derivation.md).
 
-### Achado 3 — stringify NÃO exige `--force`
+## Eixo B — instrumento
 
-A regra "nunca editar o não-verificável" guarda a edição de CONTEÚDO de string
-no fonte por coincidência de nome. A string derivada de um stringify é OUTRA
-coisa: ela **não existe no fonte** — é REGENERADA pelo pp a partir do
-identificador editado, e a recompilação CONFIRMA (caso 51:
-`verified: derived artifacts renamed as predicted`; o runtime regenera `[Feito]`).
-O `from` prova, por byte-range, que a string deriva daquele marker — a edição é
-por FATO, jamais por coincidência. Logo o stringify é tão verificável quanto o
-paste; a diferença é o MODELO de verificação, não a segurança:
+### P7 ✅ o pp como INSTRUMENTO — **veredito PARTIDO, e CORRIGIDO pelo Diego** (2026-07-12)
+- **Oráculo: VIÁVEL** — e uma perna **já estava em produção** sem ter sido nomeada:
+  o padrão-ouro do `rename-dsl` (`.ppo` + `.hrb` byte-idênticos → rollback).
+- **Escritor: recusei — e a recusa estava MAL FUNDAMENTADA.** Provei que o `.ppo`
+  destrói comentários/`#include`/formatação (4 comentários → 0) e concluí
+  "o pp não escreve fonte". O Diego apontou `tests/hbpp/hbpptest.prg`:
+  **`__pp_init`/`__pp_process`** expõem o pp **vivo, in-process, LINHA A LINHA**.
+  A destruição é propriedade do canal de **arquivo**, **não do pp** → a premissa
+  cai. **Veredito corrigido:** a recusa vale para *`.ppo` como fonte*, e só.
+  O pp como motor de reescrita é **viável** e vira a fatia **P11**.
+- Conhecimento (e o catálogo dos canais): [pp-as-instrument.md](pp-corpus/pp-as-instrument.md).
 
-- **paste** → gera SÍMBOLO; a rede é "a recompilação tem que resolver o novo
-  símbolo, senão recusa/rollback".
-- **stringify** → gera STRING; a recompilação sempre passa (string é sempre
-  válida), então a rede é a **predição divulgada** (`predicted string: X -> Y`,
-  mostrada ao usuário) + a regeneração conferida. Ambas honestas; garantias de
-  NATUREZA diferente, ambas já implementadas.
+## Eixo C — editar a regra
 
-### Veredito P1 sobre o `ast-13` (recomendação ao portão D-P3)
+### P8 ✅ rename do nome de MARKER da regra (2026-07-12)
+O `<n>` é **variável local da diretiva** → identidade = **(regra, NÚMERO do
+marker)**, nunca o texto; o conjunto de edição sai do `ast-5` e mantém match e
+result coerentes por construção. É um **alpha-rename**, o que dá a verificação mais
+forte da ferramenta **de graça** (`.ppo`/`.hrb` obrigatoriamente byte-idênticos).
+**O `.ch` deixou de ser inalcançável** — e aqui o Diego corrigiu um desvio meu: eu ia
+responder "de quem é este include" pelo canal **mais barato** (o dump); o canal
+**correto** já existia (**`harbour -gd`**, com caminho resolvido e fecho transitivo).
+Caso 114. Conhecimento: [pp-as-instrument.md](pp-corpus/pp-as-instrument.md) § `-gd`.
 
-O split `genOp` (paste vs stringify como carimbo separado) **não se justifica
-por si**: a resolução do KIND não o usa (achado 1) e a predição já tem a
-distinção numa granularidade MAIS FINA — o próprio rastro `from`, cujo `op` é
-`clone`/`paste`/`stringify` por FAIXA DE BYTES (achado 2); stringify não pede
-`--force` (achado 3). Mas o **caminho certo não é "recusar e fechar"** — é ver
-que paste e stringify são **ARESTAS de um grafo maior** (a intuição do Diego,
-abaixo). O veredito honesto: **não investir num `genOp` isolado; investir no
-GRAFO**, do qual os `op` já são os rótulos das arestas. Fecha adr-003:82-86 sem
-gastar um canal por um booleano de nicho.
+## P-AUDIT — varredura anti-heurística
 
-## A intuição do Diego — o grafo de transformação (pré-pp ↔ pós-pp)
+### 1º achado ✅ `ast-15` — e era um BUG (2026-07-12)
+`AbbrevClash` **replicava a gramática** (abreviação dBase, `ppcore.c:2533`) e o
+`RenameDsl` a usava para **adivinhar por prefixo** qual literal um site casou —
+porque o dump só dizia `marker: 0`, nunca QUAL literal. Furo provado: keyword
+secundária que é prefixo da cabeça → **recusa FALSA** → cabeça da DSL
+**irrenomeável**. Conserto onde o fato nasce: o pp pareia token-fonte com token do
+padrão ao casar e **descartava** o par do literal (a mesma omissão do `ast-14`, do
+outro lado) → **`ruletok`**. `lexdiff` 0. Caso 115, fixture `fixabr`.
+Conhecimento: [abbreviation.md](pp-corpus/abbreviation.md).
 
-> "se mapear as transformações, obviamente se tem um grafo do que houve e
-> acaba-se por ser possível mapear onde um token foi recriado, então passamos a
-> ter as posições originais pré-passagem do processador e pós passagem."
-> (Diego, 2026-07-11)
+**Resíduo:** `AbbrevClash` segue vivo para a pergunta *diferente* ("o nome NOVO
+colidiria sob abreviação?") — predição de casamento **futuro**, que o dump não
+responde. Canal certo: perguntar ao pp (**P11**).
 
-Está certíssimo, e a investigação (por FATO, com `.ppo`/`.ppt` — a régua que o
-Diego mandou usar) prova três coisas:
+---
 
-### 1. O rastro `from` (ast-3) JÁ É esse grafo — e reconstrói pré→pós
+# Fatias em aberto
 
-Andando o `from` com aritmética de faixa, cada token sintetizado devolve suas
-âncoras de FONTE (pré-pp). Provado rodando o walker sobre dumps reais:
-
-| pós-pp (gerado) | op | pré-pp (fonte) |
-|---|---|---|
-| `Caixa_Info` (função) | paste | `Caixa`@4:13 **+** `Info`@8:10 |
-| `"Info"` (string de registro) | stringify | `Info`@8:10 |
-| `mk_Vendas` (probe) | paste | `Vendas`@7:5 (o sítio `MAKE`) |
-| `Vendas` no `? Vendas()` | clone | `Vendas`@4:5 (pass-through, **gera nada**) |
-
-O grafo separa por FATO o que a granularidade sozinha não separa: `mk_Vendas`
-vem de `@7:5`; o homônimo `? Vendas()` só clona a si mesmo e **não alimenta
-artefato nenhum** do marker. Os `op` (clone/paste/stringify) são as arestas.
-
-### 2. O `.ppt` é o grafo NO PRÓPRIO pp — anotado por linha-fonte (o oráculo)
-
-O `harbour -p+` emite o `.ppt`: o traço passo-a-passo, cada linha `c1.prg(N)
->entrada<` → `#xcommand/#xtranslate/(concatenate) >saída<`. É o grafo de
-transformação COMPLETO, com a posição-fonte em cada passo — inclusive a
-`(concatenate)` (a paste) explícita. É o oráculo humano do Eixo B e a régua
-desta investigação.
-
-### 3. O grafo é DUAS relações — e a diretiva complexa expôs a diferença (CORREÇÃO pelo spike)
-
-O spike (autorizado pelo Diego) investigou "por que a impl de método @17 não
-aparece no grafo" e **corrigiu a hipótese** — é para isso que serve um spike.
-Um diagnóstico gated no `hb_pp_drvMerge` (o funil da paste no `ppcore.c`)
-mostrou, na colagem da impl:
-
-```
-DRVMERGE @line 17  'Caixa_'+'Info'  drv2=1  pos2 -> 8:10
-```
-
-O `Info` que entra no `Caixa_Info` DA IMPL carrega posição **8:10 — a
-DECLARAÇÃO**, não 17. Por quê: o hbclass **GERA uma regra** na declaração
-(`METHOD … Info CLASS Caixa => DECLARED METHOD … Info …`) com o nome ASSADO de
-`@8`; a implementação @17 **CASA** essa regra, e o próprio `Info`@17 é
-consumido-e-descartado — a saída reusa o literal derivado da declaração. Logo
-`CAIXA_INFO(impl)` = `Caixa`@4:13 + `Info`@**8**:10, **fielmente**. Não há
-lacuna de rastreamento: @17 é um sítio de **CASAMENTO**, e o `from` ancora os
-BYTES DE SAÍDA em @8 corretamente.
-
-Então o grafo de transformação vive como **DUAS relações** no dump, e juntas
-são mais completas do que a primeira leitura creditou:
-
-- **`from` (ast-3)** = derivação de BYTES: token de saída → faixa de fonte de
-  onde os bytes vieram. Fiel (a impl → @8 é o correto).
-- **`ppApplications[].tokens` (ast-2)** = CONSUMO: quais SÍTIOS-fonte cada
-  regra comeu, com posição. É aqui que `Info`@17 aparece (app da METHOD, marker
-  1, pos 17) — e é por aqui que a ferramenta edita @17. Editar @17 é NECESSÁRIO
-  (senão a regra gerada não casa mais o nome novo), mesmo os bytes de @17 não
-  sobrevivendo à saída.
-
-**A ferramenta já usa as duas** (from para artefatos+strings; ppApplications
-para os sítios de casamento). `rename-method` funciona. **Não há bug no caso de
-método.** A hipótese "grafo incompleto em @17" estava ERRADA; o spike a
-derrubou — e o registro honesto disso vale mais que a hipótese bonita.
-
-### Achado adversarial — colisão de homônimo → CONSERTADO pela GENEALOGIA (a 2ª hipótese também caiu)
-
-Um probe (DSL não-espelho `LABEL <n> => RegLabel(<"n">)` e `MAKE <n> =>
-FUNCTION mk_<n>()`) com o valor do marker COINCIDINDO com uma função real
-homônima (`Vendas`) revelou o defeito real: a coleta
-([`PpMarkerSeeds`](../src/hbrefactor.prg)) casava por NOME lexical em todas as
-aplicações e arrastava `? Vendas()` (chamada da função REAL) como sítio do
-marker — degrade seguro (rollback), mas recusa confusa onde devia haver rename.
-
-O arco das hipóteses, registrado porque é a lição da fase:
-
-1. **"`generates` filtra a coleta"** — FALSA: derruba a impl de método (clone
-   multi-passe; 3 checks caíram, revertida).
-2. **"o conserto pede consciência de BINDING, não o grafo"** (a correção
-   intermediária desta spec) — TAMBÉM FALSA: o que separa `? Vendas()` (fora)
-   de `Info`@17 e `USA Ponto` (dentro) **é o grafo, faltava um pedaço dele**.
-   A impl de método é aplicação de uma regra **GERADA** pela declaração; o
-   `USA Ponto` é aplicação de uma regra gerada pelo `DEFREGRA Ponto`. O elo
-   "regra → aplicação criadora" (a GENEALOGIA) existia no pp e não era
-   emitido. **A visão do Diego (mapear o grafo de transformação) era o
-   conserto** — zero binding no resultado final.
-
-**A fatia entregue (ast-13 + consumidores, caso 108, 796/0):**
-
-- **Canal `ast-13` no core**: tokens de `match[]`/`result[]` de regra GERADA
-  carregam `from` (a app/marker criadora), capturado no registro
-  (`ppcore.c`: `pFrom` em `HB_PP_RULETOKEN`, copiado de `hb_pp_drvFind` no
-  snapshot; accessors `hb_pp_trackRuleTokenFrom*`; emissão em `compast.c`).
-  Probes: DSL inventada (`DEFREGRA`→`USA`) **e** hbclass real (as regras
-  `METHOD` por-método apontam a app da declaração).
-- **Derivação sobrevive ao clone** (`hb_pp_tokenClone` copia as entradas de
-  derivação junto com a posição): o literal de result de regra gerada mantém
-  a origem através das aplicações — a string `"Ponto"` da expansão vira
-  artefato previsível (`predicted string`), fechando a verificação.
-- **Coleta v2** (`PpMarkerSeeds`): PARES (fecho interno) sem gate; SEMENTES
-  (sítios de edição) só com pertencimento por FATO — gera (ast-12), vira
-  token de regra gerada (ast-13, `hGenRef`) ou pertence a aplicação de regra
-  genealogia-ligada (`lLinked`). `? Vendas()` fica fora; `Info`@17 e
-  `USA Ponto` entram pelo elo da genealogia.
-- **Resolução** (`ResolveAtQuery`/`ResolveRenameAt`): fato irmão `genrule` —
-  o nome que VIRA regra é do marker mesmo com `generates` ausente (a
-  derivação de uma diretiva gerada entra no REGISTRO da regra, não no
-  stream; o reverse-scan do ast-12 não a vê).
-- **Verificação** (`HrbSymbolsRenamed`): expectativa do nome CRU vira
-  OPCIONAL para marker puro (`hOpt` — homônimo real FICA, clone derivado
-  VIRA o novo; método continua estrito), com contagem+strings+compostos
-  fechando o contrato.
-- **Prova**: caso 108 (14 checks — homônimo stringify/paste editando SÓ o
-  sítio da DSL, round-trips byte-exatos, a via inversa rename-function sem
-  tocar markers, rename do marker que vira regra nas DUAS posições). Suíte
-  **796/0**, `lexdiff 0`, ZERO drift nos 782 checks pré-existentes.
-
-## Critério de pronto do P1 — status (FECHADO)
-
-- [x] pergunta adr-003:82-86 com veredito registrado: `genOp` isolado
-      recusado; o número `ast-13` foi para o fato CERTO — a genealogia de
-      regra, primeiro pedaço do grafo do adr-004, entregue COM consumidores.
-- [x] prova em DSL inventada NÃO-espelho (fixppm, fixgen) + diretiva
-      complexa REAL (hbclass, regras METHOD por-método).
-- [x] portões respondidos POR EXECUÇÃO com aval do Diego ("spike incremental
-      agora"): a colisão de homônimo deixou de ser degrade e virou rename
-      correto; o fio do grafo aterrissou como canal+consumo.
-- [x] caso na suíte: **108** (14 checks). Suíte **796/0**, `lexdiff 0`.
-- [x] commit do core: PENDENTE de autorização por-commit do Diego (ppcore.c,
-      hbpp.h, compast.c — árvore do core editada, não commitada).
-
-## Eixo A — P2: marker que GERA E passa adiante (adr-003:87-90) — VEREDITO FECHADO
-
-**A pergunta.** Um marker `<n>` usado ao mesmo tempo como GERADOR (`s_<n>` paste
-/ `<"n">` stringify) **e** como PASS-THROUGH (`<n>` clone) na MESMA regra — hoje
-o fato `generates` (ast-12) vence e o `rename` resolve para `rename-pp-marker`.
-Pode estar errado num caso que ainda não vi? A investigação foi feita com o
-método-oráculo que o Diego mandou usar (adr-004 #5): observar o `.ppo` (saída
-expandida) e o `.ppt` (traço passo a passo) do que o pp REALMENTE faz, e provar
-por execução, nunca por teoria.
-
-### O que o pp faz — lido do `.ppo`/`.ppt` (a evidência)
-
-Uma palavra ESCRITA UMA VEZ no fonte o pp transforma em VÁRIAS coisas. Duas
-formas, ambas em DSL inventada não-espelho (régua do caso 64):
-
-**stringify + clone** — `#xtranslate LOG <n> => QOut( <"n">, <n> )`:
-```
-a.prg(6)  LOG Preco
-   │ (pp)
-   ▼
-a.ppo     QOut( "Preco", Preco )
-a.ppt     a.prg(6) >LOG Preco<
-          #xtranslate >QOut( "Preco", Preco )<
-```
-`Preco` vira a STRING `"Preco"` (stringify — **gera**, o literal perde a ligação
-com o nome) E a referência à variável local `Preco` (clone — **passa adiante**).
-
-**paste + clone** — `#xcommand WRAP <n> => FUNCTION w_<n>() ;; RETURN <n>()`:
-```
-b.prg(3)  WRAP Soma
-   │ (pp)
-   ▼
-b.ppo     FUNCTION w_Soma() ;; RETURN Soma()
-b.ppt     b.prg(3) >WRAP Soma<
-          #xcommand >FUNCTION w_Soma() ;; RETURN Soma()<
-          b.prg(3) >w_ Soma<
-          (concatenate) >w_Soma<     ← a COLAGEM: "w_" + "Soma" = "w_Soma"
-```
-`Soma` é COLADA em `w_Soma` (o passo `(concatenate)` do traço, **gera** um nome
-de função novo) E vira a CHAMADA a `Soma()`, a função que já existe (clone —
-**passa adiante**). *Nota Harbour:* o `(concatenate)` no `.ppt` é exatamente onde
-o pp executa a paste; renomear a palavra do marker re-executa essa colagem.
-
-### Os cantos extremos (levantados pelo Diego no portão) — todos provados
-
-- **(a) Colado mais de uma vez / (b) multiplicidade sem teto.** O pp não limita
-  quantos usos no destino. O fecho de artefatos da ferramenta (`PpMarkerArtifacts`,
-  reverse-scan sobre TODO o rastro `from`) também não tem teto — a predição é
-  proporcional às ocorrências. Provado: `BUILD <n> => FUNCTION a_<n>()… b_<n>()…
-  c_<n>()` (3 pastes) prevê `A_FOO→A_BAR`, `B_FOO→B_BAR`, `C_FOO→C_BAR`; `SNAP`
-  (2 pastes + 2 stringify, caso 109) prevê `G_`, `H_` e a string, tudo (stringify
-  deduplicado).
-- **(c) Diretivas que geram diretivas — o PRÓPRIO pp restringe.** Descoberta por
-  `.ppt`: uma diretiva que gera `#xtranslate` **NÃO registra** a regra (`DEFT <n>
-  => #xtranslate T_<n> => 999` deixa `T_Foo` literal, `W0001`); só `#[x]command`
-  gerado entra no grafo (é o que a fixgen/caso 108 e o hbclass usam), e comando de
-  keyword COLADA (`SHOW_<n>`) nem casa (`E0020`). O que de fato compila cai na
-  genealogia ast-13/P1, já provado no caso 108.
-
-### O veredito — a segurança é ESTRUTURAL
-
-| Caso (DSL não-espelho) | forma / alvo do clone | `rename` no marker | resultado |
-|---|---|---|---|
-| `REGISTRO <n>` (fixppm, caso 52) | LOCAL fabricado pela expansão | exit 0 | **CORRETO** (re-deriva paste+string+local interno) |
-| `WRAP Soma → Multiplica` (ausente) | função externa inexistente | rollback | degrade honesto ("contagem de símbolos mudou") |
-| `LOG Preco → Zzz` (ausente) | local externo inexistente | rollback | degrade honesto ("parou de compilar", W0001+`-es2`) |
-| `LOG Preco → Custo` (existe) | local externo existente | exit 0 | correto-por-semântica (re-target verificado compilando) |
-| `SNAP`/`BUILD` multi-paste, chamador não-derivado | referência escrita à mão | rollback | degrade honesto (multiplicidade completa na predição) |
-
-`generates`-vence é **SEGURO**. A razão de fundo não é o fato fino (paste vs
-stringify) — é a **rede dupla** que confere o ARTEFATO COMPILADO FINAL:
-(1) recompilação sob `-es2` (`AstDumps`) pega toda referência quebrada;
-(2) comparação posicional de símbolos/funções do `.hrb` (`HrbSymbolsRenamed`,
-[hbrefactor.prg:10999](../src/hbrefactor.prg#L10999)) pega todo delta não-previsto.
-Essa rede é **indiferente à multiplicidade e ao aninhamento de diretivas** —
-confere o resultado, não a forma da regra. Logo:
-- clone que alcança símbolo EXTERNO ausente → rollback;
-- clone que re-aponta para símbolo EXTERNO existente → compila e a diretiva passa
-  a operar sobre ele (é o que "renomear o argumento da diretiva" significa);
-- predição incompleta (se o fecho errasse um artefato) → o pp regenera TUDO do
-  marker renomeado → delta não-previsto → rollback. Pior caso = rollback espúrio
-  (provado NÃO acontecer), **jamais corrupção silenciosa**.
-
-### Decisão do portão (Diego) e entrega
-
-Portão submetido em duas rodadas (a 1ª com exemplo textual, a 2ª com os artefatos
-`.ppo`/`.ppt` a pedido do Diego). **Decisão: opção A — fechar como o P1**: sem
-canal novo, sem `genOp`, sem tocar o core ou o motor. O achado CONVERGE para "a
-rede já cobre" — uma recusa de canal DOCUMENTADA, resultado legítimo do critério
-de exaurir a fase (adr-003: fato sem consumidor claro = fato local, não
-arquitetura). Entrega = a PROVA: fixture `tests/fixp2` (LOG/WRAP/SNAP, DSL
-inventada) + **caso 109** (17 checks, incluindo re-target, os dois rollbacks e a
-multiplicidade). Suíte **813/0** byte-idêntica, `lexdiff` não requerido (nada no
-compilador muda). O registro destes achados É a entrega tanto quanto a prova
-(ordem do Diego) — mecânica do pp e o princípio estrutural ficam no
-[adr-004](adr-004-grafo-transformacao-pp.md) e no
-[limites-e-alavancas.md](limites-e-alavancas.md).
-
-## Eixo A — P4 + P5: os 15 mkinds EXAURIDOS — ENTREGUE (2026-07-12)
-
-Critério da fase: *cada match-mkind e result-mkind com fixture provando CONSUMO
-ou RECUSA documentada*. Cumprido: os 15 exercitados em DSL não-espelho
-(`tests/fixmk`, **caso 111**), vereditos no
-[ast-schema § mkind](ast-schema.md). Sintaxe de cada um tirada do PARSER
-(`hb_pp_matchMarkerNew`/`hb_pp_resultMarkerNew`), não de memória.
-
-**Recusas documentadas (2):** `strdump` (`%s`) não existe em regra — vive na
-maquinaria de STREAM (`#pragma __text`, o `TEXT…ENDTEXT`); `dynval` não é
-escrivível — é o canal interno do pp para `__FILE__`/`__LINE__` (ppcore.c:5209).
-
-**`reference` (`<@>`) — o achado que o Diego mandou perseguir.** Eu havia dito
-"não tem uso nenhum" com base num `grep` que FALHOU (erro de glob) — silêncio de
-comando quebrado não é evidência. Refeito: é o **guarda anti-recursão**
-(ChangeLog do core, 2010-08-19, Przemysław Czerpak: *"creates token significant
-for PP but invisible for compiler … allows to resolve problem with circular
-rules"*), emite um token que carrega o padrão de match da regra e é descartado
-antes do compilador (ppcore.c:5234/6712); uso real em `hbfoxpro.ch:63`. **Consumo
-provado:** a ferramenta o PRESERVA por construção — edita regra por posição de
-byte e o guarda não tem posição; `rename-dsl` numa regra circular guardada manteve
-o `<@>`, o projeto seguiu compilando sem loop, `.ppo`/`.hrb` byte-idênticos.
-
-### Três consumos entregues (todos por FATO)
-
-1. **`restrict` validado (P5).** O dump traz as ALTERNATIVAS (`role: "restrict"`).
-   O rename agora **recusa ANTES de editar**, nomeando-as ("`zzz` não é uma das
-   alternativas … a regra deixaria de casar"). Antes: editava, recompilava, levava
-   um `E0030 syntax error` opaco e fazia rollback. *(Re-baseline do caso 82: o
-   check que exigia "rollback" passou a exigir a recusa antecipada — a mesma
-   proteção, sem tocar no arquivo.)*
-2. **`wild` / marker não-usado (P5) — e a LIÇÃO DA FASE.** O recheio de um marker
-   que o result não usa chegava com `marker: 0`, **igual a uma palavra da regra**.
-   Meu primeiro conserto foi na FERRAMENTA, adivinhando por comparação de texto —
-   e o Diego pegou. Furo provado em 1 linha: `ANOTA ANOTA` (com
-   `#xcommand ANOTA <*x*>`) classifica o conteúdo do usuário como palavra de regra.
-   **O fato faltava no CORE** (`hb_pp_patternMatch` só registra o casamento quando
-   o marker tem índice; sem índice, a ligação é DESCARTADA). Conserto onde devia
-   ser: **`ast-14`** — todo marker de match é numerado (gated por `fTrackPos`;
-   `lexdiff` 0). A heurística morreu; `marker: 0` passou a significar UMA coisa só.
-3. **`logical`/`nul` relatados (P4).** Esses markers consomem o valor e NÃO o
-   emitem (`<.x.>` emite `.T.`/`.F.`; `<-x->` não emite nada). O compilador nunca
-   liga aquele token a símbolo nenhum, então editá-lo seria por coincidência de
-   nome — a ferramenta **não edita e RELATA**: *"'n' é consumido e DESCARTADO pela
-   diretiva (#xcommand R_LOG) — não chega ao compilador; NÃO renomeado"*.
-
-Suíte **835/0**; `lexdiff` 0 divergências reais; `make ppcorpus` 16/16. Core:
-`ppcore.c` (indexação gated) + `compast.c` (bump `ast-14`) — **commit do core sob
-autorização por-commit do Diego**.
-
-## Fatias seguintes (roadmap § P, ordem)
-
-P3 (`generates` para `usages`/find-references — a hipótese grande) · P6 (estrutura
-da regra, regra sem cabeça) · Eixo B: P7 (pp como instrumento) · Eixo C: P8 (rename
-da palavra na regra) · P9 (custo reverse-scan) · P10 (síntese).
+| fatia | o que é |
+|---|---|
+| **P9** | custo do reverse-scan `O(tokens × from)` (adr-003:96-98) |
+| **P10** | síntese/completude da fase + atualização de adr-003, ast-schema, CHANGELOG |
+| **P11** | **`__pp_process`/`hb_compileFromBuf`** — o pp in-process; reabre o P7 e mata o resíduo do `AbbrevClash` |
+| **P-AUDIT** | continuar: `ResolveInclude`, os "se não é X então é Y", comparações de texto onde há id |
+| **D-P5** | *(portão do Diego)* migração de DSL ganha verbo próprio? — decidir **depois** do P11 |

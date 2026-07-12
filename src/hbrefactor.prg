@@ -283,7 +283,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
    // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
    // clara (FromReady/Ast4Ready/RuleToksReady)
    IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12", "ast-13", "ast-14" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12", "ast-13", "ast-14", "ast-15" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
       RETURN NIL
    ENDIF
 
@@ -340,6 +340,22 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
    LOCAL aDecl, aSite, cCur, nState, hOwnV
    LOCAL cAtSpec := NIL, aAtParts, cAtFile, cAtPath, nAtLine, nAtCol0, hResAt
+   // P3 (adr-003:60-63): --at resolve o PAPEL do site (generates/genrule já
+   // usados pelo rename) - usages passa a ESTREITAR por ele, não só extrair
+   // o nome. lAtPp = o site é mecânica de pp (marker/descarte/palavra de
+   // regra), NÃO um símbolo do programa - as categorias que só casam por
+   // texto contra um símbolo DECLARADO (função/local/param/send/string) não
+   // fazem sentido aqui e ficam de fora. lAtSym = o oposto, o site é um
+   // identificador comum do stream (camada 4, "ident"/"field") sem NENHUM
+   // envolvimento de pp na sua própria resolução - as categorias que só
+   // existem para achar mecânica de pp (DSL/regra/marker) ficam de fora.
+   // "method" (função-de-classe direta OU marker com dona única) fica FORA
+   // dos dois - já tem o próprio filtro por cClass/cOwnerQ, intocado.
+   // hAtPairs = fecho de derivação do site clicado (só quando role ==
+   // "ppmarker" - é o único ramo onde ResolveAtQuery de fato o constrói);
+   // restringe PpMarkerHits/PpMarkerLift para não misturar OUTRA aplicação
+   // independente (regra diferente) que colou o MESMO texto alhures.
+   LOCAL lAtPp, lAtSym, hAtPairs
 
    IF Len( aArgs ) < 3
       Usage()
@@ -412,9 +428,15 @@ STATIC FUNCTION Usages( aArgs )
    IF cAtSpec != NIL
       cAtPath := ProjectMember( hProj, cAtFile )
       IF cAtPath == ""
-         RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + "'" )
+         // P8: pode ser um ARQUIVO DE REGRA (.ch) - onde as DSLs reais moram
+         hResAt := ResolveAtRuleFile( hProj, hAsts, cAtFile, nAtLine, nAtCol0 )
+         IF hResAt == NIL
+            RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + ;
+                           "' nem arquivo de diretiva com regra nesta posição" )
+         ENDIF
+      ELSE
+         hResAt := ResolveAtQuery( hAsts[ cAtPath ], hAsts, nAtLine, nAtCol0 )
       ENDIF
-      hResAt := ResolveAtQuery( hAsts[ cAtPath ], hAsts, nAtLine, nAtCol0 )
       IF hResAt == NIL
          RETURN Refuse( "nenhum identificador de compilação em " + cAtFile + ":" + ;
                         hb_ntos( nAtLine ) + ":" + hb_ntos( nAtCol0 + 1 ) )
@@ -423,8 +445,35 @@ STATIC FUNCTION Usages( aArgs )
               ": " + hResAt[ "name" ] + " - " + hResAt[ "kind" ] + hb_eol() )
       OutStd( "query: " + hResAt[ "query" ] + hb_eol() )
       cName := hResAt[ "query" ]
+      // P8: nome de MARKER é VARIÁVEL LOCAL da diretiva - não tem uso fora dela
+      // e não é símbolo. A busca global por texto devolveria 0 (ou, pior, sites
+      // homônimos sem relação). Os "usos" são as ocorrências DAQUELE marker
+      // NAQUELA regra (match[] + result[], por NÚMERO) - o mesmo estreitamento
+      // por papel do site que o P3 trouxe para o usages
+      IF hResAt[ "role" ] == "rulemarker"
+         RETURN RuleMarkerUsages( hProj, hAsts, hResAt, cJsonOut )
+      ENDIF
    ENDIF
    cUp := Upper( cName )
+   // "ppmarker" sozinho NÃO basta - um marker CLONE/pass-through (`? nTotal`
+   // com nTotal local, `? Vendas()` com Vendas função real: o `?` também é
+   // #command, o argumento é marker) tem role "ppmarker" mas é O PRÓPRIO
+   // símbolo atravessando, não um valor de macro (a mesma distinção que o
+   // ast-12/rename já faz - ResolveRenameAt exige generates .OR. genrule
+   // antes de tratar como pp-marker; ppdiscard/dsl não têm esse risco, são
+   // sempre não-símbolo por construção). Um clone (generates/genrule ambos
+   // .F.) é o símbolo verdadeiro atravessando - cai no balde SYM, não fica
+   // sem balde nenhum (a classificação é exaustiva pelas duas condições)
+   lAtPp    := hResAt != NIL .AND. ;
+               ( hResAt[ "role" ] == "ppdiscard" .OR. hResAt[ "role" ] == "dsl" .OR. ;
+                 ( hResAt[ "role" ] == "ppmarker" .AND. ;
+                   ( hResAt[ "generates" ] .OR. hResAt[ "genrule" ] ) ) )
+   lAtSym   := hResAt != NIL .AND. ;
+               ( hResAt[ "role" ] $ "ident,field" .OR. ;
+                 ( hResAt[ "role" ] == "ppmarker" .AND. ;
+                   ! ( hResAt[ "generates" ] .OR. hResAt[ "genrule" ] ) ) )
+   hAtPairs := iif( lAtPp .AND. hResAt[ "role" ] == "ppmarker" .AND. ;
+                     ! hResAt[ "genrule" ], hResAt[ "pairs" ], NIL )
 
    // forma Classe:Método (backlog 5): a DEFINIÇÃO filtra pela classe (mesma
    // resolução por rastro do PickFunc); sends continuam por MENSAGEM - o
@@ -484,13 +533,13 @@ STATIC FUNCTION Usages( aArgs )
             LOOP
          ENDIF
 
-         IF Upper( hFunc[ "name" ] ) == cUp
+         IF ! lAtPp .AND. Upper( hFunc[ "name" ] ) == cUp
             nHits++
             LocAdd( aLoc, cPath, hFunc[ "line" ], TokenCols( hAst, hFunc[ "line" ], cName ), Len( cName ) )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
-         ELSEIF FromReady( hAst ) .AND. ;
-            ( aLift := PpMarkerLift( hAst, hFunc, cUpMeth ) ) != NIL
+         ELSEIF ! lAtSym .AND. FromReady( hAst ) .AND. ;
+            ( aLift := PpMarkerLift( hAst, hFunc, cUpMeth, hAtPairs ) ) != NIL
             // lifting B4d: o programador escreveu METHOD Paint() CLASS
             // UWMenu (ou HANDLER Click de qualquer DSL); a função gerada é
             // detalhe da expansão - a resposta vem no vocabulário do fonte
@@ -533,7 +582,7 @@ STATIC FUNCTION Usages( aArgs )
          ENDIF
 
          FOR EACH hItem IN hFunc[ "declarations" ]
-            IF Upper( hItem[ "sym" ] ) == cUp
+            IF ! lAtPp .AND. Upper( hItem[ "sym" ] ) == cUp
                nHits++
                LocAdd( aLoc, cPath, hItem[ "declLine" ], TokenCols( hAst, hItem[ "declLine" ], cName ), Len( cName ) )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "declLine" ] ) + ": declaration (" + ;
@@ -543,7 +592,7 @@ STATIC FUNCTION Usages( aArgs )
          NEXT
 
          FOR EACH hItem IN hFunc[ "occurrences" ]
-            IF Upper( hItem[ "sym" ] ) == cUp
+            IF ! lAtPp .AND. Upper( hItem[ "sym" ] ) == cUp
                nHits++
                LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cName ), Len( cName ) )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + hItem[ "access" ] + ;
@@ -553,7 +602,7 @@ STATIC FUNCTION Usages( aArgs )
          NEXT
 
          FOR EACH hItem IN hFunc[ "calls" ]
-            IF Upper( hItem[ "sym" ] ) == cUp
+            IF ! lAtPp .AND. Upper( hItem[ "sym" ] ) == cUp
                nHits++
                LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cName ), Len( cName ) )
                OutStd( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": call" + ;
@@ -570,8 +619,8 @@ STATIC FUNCTION Usages( aArgs )
             // Sem fato, a camada honesta é "possible" - nunca "uso" seco.
             // A ESCRITA `o:x := v` envia a mensagem `_X` (fato 11) - o
             // site escrito é do MESMO nome; casa e resolve pelo par
-            IF Upper( hItem[ "sym" ] ) == cUpMeth .OR. ;
-               Upper( hItem[ "sym" ] ) == "_" + cUpMeth
+            IF ! lAtPp .AND. ( Upper( hItem[ "sym" ] ) == cUpMeth .OR. ;
+               Upper( hItem[ "sym" ] ) == "_" + cUpMeth )
                nHits++
                aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl, hInter, hAst ), ;
                                      cClass, hItem[ "block" ], cUpMeth, hGraph )
@@ -686,7 +735,7 @@ STATIC FUNCTION Usages( aArgs )
       // Posições já respondidas pelo passe de declaração acima (a string de
       // registro É o artefato da declaração) não se repetem aqui
       FOR EACH hItem IN hAst[ "tokens" ]
-         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
+         IF ! lAtPp .AND. hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
             Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
             ( hItem[ "col" ] == NIL .OR. ;
               ! hb_HHasKey( hDone, hb_ntos( hItem[ "line" ] ) + "|" + hb_ntos( hItem[ "col" ] ) ) )
@@ -699,17 +748,23 @@ STATIC FUNCTION Usages( aArgs )
       NEXT
 
       // o nome pode ser palavra de DSL de pp (consumida antes do yylex e
-      // portanto invisível em tokens[]): diretivas e aplicações (ast-2)
-      nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ) )
+      // portanto invisível em tokens[]): diretivas e aplicações (ast-2).
+      // P3: irrelevante quando o site resolvido É um identificador comum
+      // (lAtSym) - vocabulário de pp não tem nada a ver com aquele símbolo
+      IF ! lAtSym
+         nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ) )
+      ENDIF
 
       // o nome citado DENTRO do texto das regras (match[]/result[], B4g):
       // keyword de match, identificador em result, palavra de restrição
-      nHits += RuleSiteHits( hAst, cUp, aRuleSeen )
+      IF ! lAtSym
+         nHits += RuleSiteHits( hAst, cUp, aRuleSeen )
+      ENDIF
 
       // sites do NOME DE MARKER que atravessam diretivas (B4d): posições
       // escritas que nenhum relator acima cobriu (decl. de método/handler...)
-      IF FromReady( hAst )
-         nHits += PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, Len( cName ), lShowExp )
+      IF ! lAtSym .AND. FromReady( hAst )
+         nHits += PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, Len( cName ), lShowExp, hAtPairs )
       ENDIF
    NEXT
 
@@ -793,6 +848,81 @@ STATIC FUNCTION FileOwnedBy( hProj, cAbs, cCwd )
 
    RETURN .F.
 
+// P8 - o arquivo é INCLUDE do projeto? Um `.ch` não é fonte (não está na lista
+// do .hbp), mas é onde as DSLs moram - sem responder isto, `rename`/`usages`
+// com o cursor DENTRO da diretiva ficam inalcançáveis pela extensão.
+//
+// Quem responde é o CORE, não a ferramenta (regra do fato, Diego 2026-07-12):
+// o compilador SABE quais includes usou e onde os achou, e JÁ REPORTA - é o
+// `-gd` (generate dependencies list, formato make: `mod.c: mod.prg a.ch b.ch`),
+// com `-sm` (syntax check MÍNIMO para a lista) = barato, sem codegen. Cobre o
+// FECHO TRANSITIVO (include de include entra) e independe de a diretiva
+// registrar regra. "Mora num diretório do -i" seria INFERÊNCIA - um include no
+// path que ninguém inclui não é do projeto; aqui a posse é a do compilador.
+STATIC FUNCTION IncludeOwnedBy( hProj, cAbs )
+
+   LOCAL cPath, cDep
+
+   FOR EACH cPath IN hProj[ "files" ]
+      FOR EACH cDep IN ModuleDeps( hProj, cPath )
+         IF AbsOf( cDep ) == cAbs
+            RETURN .T.
+         ENDIF
+      NEXT
+   NEXT
+
+   RETURN .F.
+
+// dependências REAIS de um módulo, pelo canal oficial do compilador (`-gd` =
+// generate dependencies list; `-sm` = syntax check mínimo p/ a lista). Formato
+// make: `<obj>: <fonte> <inc> <inc>...`, com o caminho ONDE O COMPILADOR ACHOU
+// cada include (`inc/far.ch`, não o `far.ch` cru) - resolução do CORE, não da
+// ferramenta. O destino do `.d` NÃO se adivinha: o harbour o grava no CWD (não
+// ao lado do fonte, ao contrário do .ppo), então `-o<tmp>` o manda para o
+// diretório de trabalho - sem lixo no projeto e sem pisar num .d do usuário.
+// {} em falha: sem fato, não afirma nada
+STATIC FUNCTION ModuleDeps( hProj, cPath )
+
+   LOCAL cTmp := hb_DirSepAdd( WorkDir() )
+   LOCAL cDepPath := cTmp + hb_FNameName( cPath ) + ".d"
+   LOCAL cFlags := "", cTok, cOut := "", cErr := "", cTxt, nAt, aDeps := {}
+
+   FOR EACH cTok IN hProj[ "flags" ]
+      cFlags += " " + cTok
+   NEXT
+   IF hb_processRun( HarbourBin() + " " + cPath + " -q0 -n -sm -gd -o" + cTmp + ;
+                     cFlags,, @cOut, @cErr ) != 0 .OR. ! hb_vfExists( cDepPath )
+      RETURN {}
+   ENDIF
+   cTxt := hb_MemoRead( cDepPath )
+   hb_vfErase( cDepPath )
+   IF ( nAt := At( ":", cTxt ) ) == 0
+      RETURN {}
+   ENDIF
+   FOR EACH cTok IN hb_ATokens( StrTran( StrTran( SubStr( cTxt, nAt + 1 ), ;
+                                Chr( 13 ), " " ), Chr( 10 ), " " ) )
+      IF ! Empty( cTok )
+         AAdd( aDeps, cTok )
+      ENDIF
+   NEXT
+
+   RETURN aDeps
+
+// extensão de include (o alvo do probe de posse acima)
+STATIC FUNCTION IsIncludeFile( cAbs )
+   LOCAL cExt := Lower( hb_FNameExt( cAbs ) )
+   RETURN cExt == ".ch" .OR. cExt == ".hbh"
+
+// o diretório do candidato é o do arquivo, ou um ANCESTRAL dele? bounda o probe
+// de posse de include à mesma localidade que a descoberta já usa (caminhar os
+// ancestrais), em vez de compilar todo .hbp do workspace
+STATIC FUNCTION DirAtOrAbove( cSpec, cAbs )
+
+   LOCAL cSpecDir := hb_DirSepAdd( hb_FNameDir( cSpec ) )
+   LOCAL cFileDir := hb_DirSepAdd( hb_FNameDir( cAbs ) )
+
+   RETURN Left( cFileDir, Len( cSpecDir ) ) == cSpecDir
+
 STATIC FUNCTION ProjectsOf( aArgs )
 
    LOCAL cFile, cAbs, cCwd, cJsonOut := "", aCand := {}, aRoots := {}, nI
@@ -842,6 +972,26 @@ STATIC FUNCTION ProjectsOfFilter( aCand, cAbs, cCwd, cJsonOut )
 
    IF nResolved == 0
       RETURN Refuse( "nenhum candidato resolveu no hbmk2 - a pergunta ficou sem resposta" )
+   ENDIF
+
+   // P8: nenhum projeto tem o arquivo como FONTE, mas ele pode ser um INCLUDE
+   // (.ch: onde as DSLs moram). Posse por FATO - o projeto REGISTRA regra vinda
+   // dele. Custa uma compilação por candidato, então só roda quando a pergunta
+   // por fonte já falhou e só nos projetos do diretório do include ou ACIMA (a
+   // mesma localidade da descoberta); os demais ficam de fora e são RELATADOS
+   IF Empty( aOwn ) .AND. IsIncludeFile( cAbs )
+      FOR EACH cSpec IN aCand
+         IF ! DirAtOrAbove( cSpec, cAbs )
+            LOOP
+         ENDIF
+         IF ( hProj := LoadProject( cSpec ) ) != NIL .AND. IncludeOwnedBy( hProj, cAbs )
+            AAdd( aOwn, cSpec )
+         ENDIF
+      NEXT
+      IF Empty( aOwn )
+         OutErr( "hbrefactor: '" + hb_FNameNameExt( cAbs ) + "' é include, mas nenhum " + ;
+                 "projeto no diretório dele (ou acima) registra regra vinda dele" + hb_eol() )
+      ENDIF
    ENDIF
 
    FOR EACH cSpec IN aOwn
@@ -912,6 +1062,22 @@ STATIC FUNCTION ProjectsOfDiscover( cAbs, aRoots, cCwd, cJsonOut )
    // resolveu nenhum: a pergunta ficou sem resposta (exit != 0)
    IF ! Empty( aCand ) .AND. nResolved == 0
       RETURN Refuse( "nenhum projeto próximo resolveu no hbmk2 - a pergunta ficou sem resposta" )
+   ENDIF
+
+   // P8: o arquivo não é FONTE de ninguém - mas um `.ch` (onde as DSLs moram)
+   // nunca é. Posse de include por FATO: o projeto REGISTRA regra vinda dele
+   // (ppRules[].file). Custa uma compilação por candidato, então só roda quando
+   // a posse por fonte falhou, e só nos projetos do diretório do include ou
+   // ACIMA - a mesma localidade que a descoberta já usa
+   IF Empty( aOwn ) .AND. IsIncludeFile( cAbs )
+      FOR EACH cSpec IN aCand
+         IF ! DirAtOrAbove( cSpec, cAbs )
+            LOOP
+         ENDIF
+         IF ( hProj := LoadProject( cSpec ) ) != NIL .AND. IncludeOwnedBy( hProj, cAbs )
+            AAdd( aOwn, cSpec )
+         ENDIF
+      NEXT
    ENDIF
 
    aOwn := RankByProximity( aOwn, cFileDir )
@@ -1152,6 +1318,8 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
    // não usado no result - ex.: wild descartado). Vem com marker 0, igual a uma
    // palavra da regra; o texto NÃO ser literal do match é o fato que os separa
    LOCAL cDisc := NIL, hR2
+   // P8: identidade do marker DA REGRA sob o cursor (nome é local à regra)
+   LOCAL nRuleId := NIL, nRuleMk := NIL, cRuleFil := NIL
 
    // camadas 1/2: o site escrito nas aplicações de pp (a assinatura de um
    // construto gerado só tem posição byte-exata AQUI - tokens[] colapsa)
@@ -1389,7 +1557,20 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                                     "palavra no " + cSide + " da regra (" ) ) + ;
                                RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")"
                      cQuery := cMk
-                     cRole  := "dsl"
+                     // P8: o nome de MARKER é "variável local" da regra - não é
+                     // palavra da DSL (não aparece no uso) nem símbolo ligado.
+                     // Renomeá-lo é um ALPHA-RENAME: coerente entre match[] e
+                     // result[] da MESMA regra, e invisível na expansão. Carrega
+                     // a identidade (regra + NÚMERO do marker) porque o nome
+                     // sozinho é ambíguo - `<n>` de outra regra é outra variável
+                     IF hTok[ "role" ] == "marker"
+                        cRole    := "rulemarker"
+                        nRuleId  := hRule[ "id" ]
+                        nRuleMk  := hTok[ "marker" ]
+                        cRuleFil := hRule[ "file" ]
+                     ELSE
+                        cRole  := "dsl"
+                     ENDIF
                      EXIT
                   ENDIF
                NEXT
@@ -1428,9 +1609,14 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
       ENDIF
    ENDIF
 
+   // "pairs": o fecho de derivação (aplicação,marker) DESTE site específico
+   // (só populado no ramo cMk != NIL - role "ppmarker"/"method"); P3 - o
+   // usages --at usa como restrição para não misturar OUTRAS aplicações de
+   // marker (mesmo texto, regra independente) no mesmo resultado
    RETURN { "name" => iif( cMk != NIL, cMk, cWd ), "kind" => cKind, ;
             "query" => cQuery, "role" => cRole, "owner" => cOwner, ;
-            "generates" => lGen, "genrule" => lGenRule }
+            "generates" => lGen, "genrule" => lGenRule, "pairs" => hPairs, ;
+            "ruleid" => nRuleId, "rulemarker" => nRuleMk, "rulefile" => cRuleFil }
 
 // ---------------------------------------------------------------------------
 // rename unificado (fase U): `rename <projeto> <arq:linha:col> <novo>` - o
@@ -1551,6 +1737,12 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
                "nenhum verbo de rename cobre campos de RDD" }
    CASE cRole == "dsl"
       RETURN { "cmd" => "rename-dsl", "old" => cTok }
+   CASE cRole == "rulemarker"
+      // P8 (Eixo C): o nome de MARKER dentro da regra. Rule-local: a identidade
+      // é (regra, NÚMERO do marker) - o texto sozinho não identifica nada
+      RETURN { "cmd" => "rename-rule-marker", "old" => cTok, ;
+               "ruleid" => hR[ "ruleid" ], "marker" => hR[ "rulemarker" ], ;
+               "rulefile" => hR[ "rulefile" ] }
    CASE cRole == "ppdiscard"
       // P5: a diretiva engoliu este texto e o DESCARTOU (marker casado mas não
       // usado no resultado). Não chega ao compilador, logo não há fato que o
@@ -1704,9 +1896,6 @@ STATIC FUNCTION Rename( aArgs )
       RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
    ENDIF
    cAtPath := ProjectMember( hProj, cAtFile )
-   IF cAtPath == ""
-      RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + "'" )
-   ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
@@ -1717,13 +1906,31 @@ STATIC FUNCTION Rename( aArgs )
       ENDIF
    NEXT
 
-   hR := ResolveRenameAt( hAsts[ cAtPath ], hAsts, nLine, nCol0 )
+   IF cAtPath == ""
+      // P8: não é membro do projeto - pode ser um ARQUIVO DE REGRA (.ch). As
+      // DSLs reais moram em include; sem isto a diretiva é inalcançável por
+      // posição. Só resolve se o arquivo REGISTRA regra do projeto (fato)
+      hR := ResolveAtRuleFile( hProj, hAsts, cAtFile, nLine, nCol0 )
+      IF hR == NIL
+         RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + ;
+                        "' nem arquivo de diretiva com regra nesta posição" )
+      ENDIF
+      hR := ResolveRenameKind( hR )
+   ELSE
+      hR := ResolveRenameAt( hAsts[ cAtPath ], hAsts, nLine, nCol0 )
+   ENDIF
    IF hR == NIL
       RETURN Refuse( "nenhum identificador de compilação em " + cAtFile + ":" + ;
                      hb_ntos( nLine ) + ":" + hb_ntos( nCol0 + 1 ) )
    ENDIF
    IF hb_HHasKey( hR, "refuse" )
       RETURN Refuse( hR[ "refuse" ] )
+   ENDIF
+
+   // P8: marker DA REGRA não tem forma por-nome (é local à diretiva) - o motor
+   // recebe a identidade resolvida (regra + número do marker), não uma argv
+   IF hR[ "cmd" ] == "rename-rule-marker"
+      RETURN RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    ENDIF
 
    // reconstrói a argv EXATA do rename-* específico e delega para a MESMA
@@ -2164,7 +2371,13 @@ STATIC FUNCTION PickFunc( hAst, cFunc )
 // da função é um artefato composto cujas faixas de "from" soletram o método
 // (e a classe, quando dada). Devolve { cClasse, cMetodo, aFrom } ou NIL -
 // os textos na grafia REAL do composto (a colagem preserva caixa)
-STATIC FUNCTION MethodImplOf( hAst, hFunc, cUpClass, cUpMethod )
+// hRestrict (P3, opcional): quando dado, só aceita o casamento se o par
+// (aplicação,marker) de ORIGEM do pedaço-método pertencer a ele - o fecho
+// de derivação de UM site específico (ResolveAtQuery), não "qualquer
+// aplicação de qualquer regra que colou este texto em algum lugar do
+// módulo". NIL preserva o comportamento antigo (sem restrição) para os
+// chamadores do rename, que não passam este argumento.
+STATIC FUNCTION MethodImplOf( hAst, hFunc, cUpClass, cUpMethod, hRestrict )
 
    LOCAL hTok, hFrom, cPart, cM, cC, aFromM
    LOCAL cUpName := Upper( hFunc[ "name" ] )
@@ -2183,7 +2396,9 @@ STATIC FUNCTION MethodImplOf( hAst, hFunc, cUpClass, cUpMethod )
                cC := cPart
             ENDIF
          NEXT
-         IF ! Empty( cM ) .AND. ( Empty( cUpClass ) .OR. Upper( cC ) == cUpClass )
+         IF ! Empty( cM ) .AND. ( Empty( cUpClass ) .OR. Upper( cC ) == cUpClass ) .AND. ;
+            ( hRestrict == NIL .OR. ;
+              hb_HHasKey( hRestrict, PairKey( aFromM[ "app" ], aFromM[ "marker" ] ) ) )
             RETURN { cC, cM, aFromM }
          ENDIF
       ENDIF
@@ -5674,6 +5889,7 @@ STATIC FUNCTION RenameDsl( aArgs )
    LOCAL nSites := 0, nDirEdits := 0, nLine
    LOCAL hPpoBefore := { => }, cPpo, cCwd
    LOCAL lTarget, hTargetKeys := { => }, aMk
+   LOCAL nRTok, lOurs                    // ast-15: QUAL literal da regra o site casou
 
    IF Len( aArgs ) < 4
       Usage()
@@ -5834,6 +6050,27 @@ STATIC FUNCTION RenameDsl( aArgs )
             IF ! ( hTok[ "marker" ] == 0 .OR. hb_AScan( aMk, hTok[ "marker" ] ) > 0 )
                LOOP
             ENDIF
+            // QUAL literal da regra este token casou? é FATO do core (ast-15:
+            // `ruletok` = índice no match[] da regra). Antes a ferramenta
+            // ADIVINHAVA por texto ("é prefixo >= 4 da minha palavra? então é
+            // uso abreviado dela") - réplica da aritmética de abreviação dBase
+            // do pp, e com furo PROVADO (caso 115): quando uma keyword
+            // SECUNDÁRIA da regra é prefixo de 4+ letras da CABEÇA, ela escrita
+            // POR EXTENSO era lida como "abreviação da cabeça" e o rename da
+            // cabeça dava RECUSA FALSA - o usuário não conseguia renomeá-la.
+            // O pp sabe qual literal casou (ele casou!); agora o fato vem dele
+            nRTok := hb_HGetDef( hTok, "ruletok", -1 )
+            IF nRTok >= 0 .AND. nRTok < Len( hRule[ "match" ] )
+               // fato: a palavra da regra que este site casou
+               lOurs := Upper( hb_HGetDef( hRule[ "match" ][ nRTok + 1 ], "text", "" ) ) == cUpOld
+            ELSE
+               // dump antigo (sem ast-15) ou token sem pareamento: degrada para
+               // o teste de texto - honesto, e não é o caminho do dump atual
+               lOurs := Upper( hTok[ "text" ] ) == cUpOld
+            ENDIF
+            IF ! lOurs
+               LOOP                       // é OUTRA palavra da regra - não é minha
+            ENDIF
             IF Upper( hTok[ "text" ] ) == cUpOld
                IF !( hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL )
                   RETURN Refuse( "aplicação de " + RuleTag( hRule ) + " em " + ;
@@ -5841,10 +6078,9 @@ STATIC FUNCTION RenameDsl( aArgs )
                                  " sem posição no fonte (include ou expansão de outra regra) - recuso" )
                ENDIF
                AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
-            ELSEIF hb_BLen( hTok[ "text" ] ) >= 4 .AND. ;
-               Upper( hTok[ "text" ] ) == Left( cUpOld, hb_BLen( hTok[ "text" ] ) )
-               // uso ABREVIADO da palavra (dBase 4 letras): o texto do site
-               // não é a palavra inteira - edição cega deixaria site órfão
+            ELSE
+               // é a MINHA palavra (fato), mas escrita ABREVIADA (dBase): o texto
+               // do site não é a palavra inteira - edição cega deixaria site órfão
                RETURN Refuse( "uso abreviado '" + hTok[ "text" ] + "' da regra em " + ;
                               hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
                               " - normalize para '" + cOld + "' antes do rename" )
@@ -5955,6 +6191,315 @@ STATIC FUNCTION RenameDsl( aArgs )
 
    OutStd( "verified: " + hb_ntos( nSites ) + " application site(s) + " + ;
            hb_ntos( nDirEdits ) + " directive occurrence(s); .ppo and .hrb byte-identical" + hb_eol() )
+
+   RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// P8 - resolve-at DENTRO de um ARQUIVO DE REGRA (.ch). As DSLs reais moram em
+// include, e o `--at` só aceitava membro do projeto (.prg) - a diretiva ficava
+// inalcançável por posição. Aqui a resolução olha SÓ os ppRules cujo arquivo é
+// o alvo: nada de varrer tokens[]/ppApplications (as posições daquelas seções
+// são do MÓDULO - casar por linha/coluna num .ch daria falso positivo por
+// coincidência). Devolve o MESMO formato do ResolveAtQuery.
+// ---------------------------------------------------------------------------
+
+// P8 - "usos" de um nome de MARKER: as ocorrências DELE na PRÓPRIA regra (é
+// variável local da diretiva; não existe fora dela). Por NÚMERO de marker, dos
+// dois lados - o mesmo fato que o rename edita, então listagem e edição não
+// podem divergir. O papel de cada site sai do lado (match = onde CASA; result =
+// onde é EMITIDO) e do mkind (paste/stringify já vêm rotulados no ast-5)
+STATIC FUNCTION RuleMarkerUsages( hProj, hAsts, hResAt, cJsonOut )
+
+   LOCAL cPath, hRule := NIL, hTok, cSide, nHits := 0, aLoc := {}, cChPath
+   LOCAL nMk := hResAt[ "rulemarker" ], cName := hResAt[ "name" ], aSrc
+   LOCAL cWant := AbsOf( ResolveInclude( hProj, hResAt[ "rulefile" ] ) )
+
+   FOR EACH cPath IN hb_HKeys( hAsts )
+      IF ! RuleToksReady( hAsts[ cPath ] )
+         LOOP
+      ENDIF
+      FOR EACH hTok IN hAsts[ cPath ][ "ppRules" ]
+         IF hTok[ "id" ] == hResAt[ "ruleid" ] .AND. hTok[ "file" ] != NIL .AND. ;
+            AbsOf( ResolveInclude( hProj, hTok[ "file" ] ) ) == cWant
+            hRule := hTok
+            EXIT
+         ENDIF
+      NEXT
+      IF hRule != NIL
+         EXIT
+      ENDIF
+   NEXT
+   IF hRule == NIL
+      RETURN Refuse( "não achei a regra do marker '" + cName + "' no dump" )
+   ENDIF
+
+   cChPath := ResolveInclude( hProj, hRule[ "file" ] )
+   aSrc    := hb_ATokens( StrTran( hb_MemoRead( cChPath ), Chr( 13 ), "" ), Chr( 10 ) )
+
+   FOR EACH cSide IN { "match", "result" }
+      FOR EACH hTok IN hRule[ cSide ]
+         IF hTok[ "role" ] == "marker" .AND. hTok[ "marker" ] == nMk .AND. ;
+            hTok[ "line" ] != NIL .AND. hTok[ "col" ] != NIL
+            nHits++
+            LocAdd( aLoc, cChPath, hTok[ "line" ], { hTok[ "col" ] + 1 }, ;
+                    hb_BLen( hTok[ "text" ] ) )
+            OutStd( hb_FNameNameExt( cChPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ":" + ;
+                    hb_ntos( hTok[ "col" ] + 1 ) + ": marker " + hb_ntos( nMk ) + " in " + ;
+                    cSide + " (" + hb_HGetDef( hTok, "mkind", "?" ) + ")" + ;
+                    SrcLine( aSrc, hTok[ "line" ] ) + hb_eol() )
+         ENDIF
+      NEXT
+   NEXT
+
+   OutStd( hb_ntos( nHits ) + " result(s) for '" + cName + "' " + ;
+           "(marker local à diretiva " + RuleTag( hRule ) + ")" + hb_eol() )
+   IF ! Empty( cJsonOut )
+      hb_MemoWrit( cJsonOut, LocationsJson( aLoc ) )
+   ENDIF
+
+   RETURN iif( nHits > 0, EXIT_OK, EXIT_REFUSED )
+
+// caminho absoluto normalizado ("" se vazio) - identidade de arquivo
+STATIC FUNCTION AbsOf( cPath )
+   RETURN iif( Empty( cPath ), "", ;
+               hb_PathNormalize( hb_PathJoin( hb_DirSepAdd( hb_cwd() ), cPath ) ) )
+
+// mapeia o site resolvido DENTRO de um arquivo de regra para o verbo. Um .ch
+// só produz dois papéis: palavra da DSL (cabeça/keyword/restrição) e nome de
+// MARKER (local à diretiva) - nenhum símbolo ligado mora ali
+STATIC FUNCTION ResolveRenameKind( hR )
+
+   IF hR[ "role" ] == "rulemarker"
+      RETURN { "cmd" => "rename-rule-marker", "old" => hR[ "name" ], ;
+               "ruleid" => hR[ "ruleid" ], "marker" => hR[ "rulemarker" ], ;
+               "rulefile" => hR[ "rulefile" ] }
+   ENDIF
+
+   RETURN { "cmd" => "rename-dsl", "old" => hR[ "name" ] }
+
+STATIC FUNCTION ResolveAtRuleFile( hProj, hAsts, cRuleFile, nLine, nCol0 )
+
+   LOCAL cPath, hRule, hTok, cSide, cWant, cGot
+
+   // identidade do arquivo por CAMINHO CANÔNICO, não por basename: o caminho de
+   // busca de include é o do hbmk2 (hProj["inc"] = os `-i` da linha real do
+   // compilador, via -traceonly) e é ele que decide QUAL `p6.ch` é este. Casar
+   // por nome curto confundiria dois includes homônimos de diretórios distintos
+   cWant := AbsOf( ResolveInclude( hProj, cRuleFile ) )
+   IF Empty( cWant )
+      RETURN NIL
+   ENDIF
+
+   FOR EACH cPath IN hb_HKeys( hAsts )
+      IF ! RuleToksReady( hAsts[ cPath ] )
+         LOOP
+      ENDIF
+      FOR EACH hRule IN hAsts[ cPath ][ "ppRules" ]
+         IF hRule[ "file" ] == NIL
+            LOOP
+         ENDIF
+         cGot := AbsOf( ResolveInclude( hProj, hRule[ "file" ] ) )
+         IF Empty( cGot ) .OR. ! cGot == cWant
+            LOOP
+         ENDIF
+         FOR EACH cSide IN { "match", "result" }
+            FOR EACH hTok IN hRule[ cSide ]
+               IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+                  hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+                  nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+                  RETURN { "name" => hTok[ "text" ], ;
+                     "kind" => iif( hTok[ "role" ] == "marker", ;
+                                    "nome de marker da regra (local à diretiva; ", ;
+                               iif( hTok[ "role" ] == "restrict", ;
+                                    "palavra de restrição (", ;
+                                    "palavra no " + cSide + " da regra (" ) ) + ;
+                               RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")", ;
+                     "query" => hTok[ "text" ], ;
+                     "role" => iif( hTok[ "role" ] == "marker", "rulemarker", "dsl" ), ;
+                     "owner" => NIL, "generates" => .F., "genrule" => .F., ;
+                     "pairs" => { => }, "ruleid" => hRule[ "id" ], ;
+                     "rulemarker" => hb_HGetDef( hTok, "marker", 0 ), ;
+                     "rulefile" => hRule[ "file" ] }
+               ENDIF
+            NEXT
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN NIL
+
+// ---------------------------------------------------------------------------
+// P8 (fase P, Eixo C) - rename do nome de MARKER DENTRO da regra.
+//
+// O nome de um marker (`<n>`, `<"n">`, `<*n*>`...) é VARIÁVEL LOCAL da diretiva:
+// não aparece em nenhum uso, não vira símbolo, e um `<n>` de outra regra é
+// outra variável. Logo renomeá-lo é um ALPHA-RENAME - a expansão do projeto
+// NÃO PODE mudar. Isso dá a verificação padrão-ouro de graça: `.ppo` e `.hrb`
+// de TODOS os módulos byte-idênticos; qualquer diferença = rollback.
+//
+// Conjunto de edição 100% FATO (ast-5): todo token da regra - dos DOIS lados,
+// match[] E result[] - com role "marker" e o MESMO NÚMERO de marker. Nada de
+// casar por texto: o número é o fato que o pp já atribuiu, e é ele que mantém
+// os dois lados COERENTES (o result de um `<"n">` stringify é o mesmo marker 1
+// do match). Marker sem posição no fonte (regra nascida de expansão) recusa.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
+
+   LOCAL hProj, cTmp, cPath, hAsts := { => }, hRule, hTok, cSide
+   LOCAL cOld := hR[ "old" ], nMk := hR[ "marker" ], nRuleId := hR[ "ruleid" ]
+   LOCAL cUpNew := Upper( cNew )
+   LOCAL cChPath, cCwd, aE := {}, hEdits := { => }, hOrig := { => }
+   // nEdits SEM inicializador: `LOCAL x := 0` seguido de `x := <valor>` sem
+   // leitura no meio é DEAD STORE e o Harbour avisa W0032 (quebra sob -es2)
+   LOCAL hPpoBefore := { => }, cPpo, cText, nLine := 0, cKey, nEdits
+
+   IF ! OneWord( cNew )
+      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+   ENDIF
+   hProj := LoadProject( cSpec )
+   IF hProj == NIL
+      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! AstDumps( hProj, cTmp )
+      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ( hAsts[ cPath ] := ReadAst( cTmp, cPath ) ) == NIL
+         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+      ENDIF
+   NEXT
+
+   // a regra: o dump é POR MÓDULO, mas a diretiva é UMA só (o mesmo .ch/.prg).
+   // Basta a visão de um módulo que a registre - as posições são do arquivo
+   hRule := NIL
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ! RuleToksReady( hAsts[ cPath ] )
+         LOOP
+      ENDIF
+      FOR EACH hTok IN hAsts[ cPath ][ "ppRules" ]
+         IF hTok[ "id" ] == nRuleId .AND. hTok[ "file" ] != NIL .AND. ;
+            hR[ "rulefile" ] != NIL .AND. ;
+            Lower( hb_FNameNameExt( hTok[ "file" ] ) ) == ;
+            Lower( hb_FNameNameExt( hR[ "rulefile" ] ) )
+            hRule := hTok
+            EXIT
+         ENDIF
+      NEXT
+      IF hRule != NIL
+         EXIT
+      ENDIF
+   NEXT
+   IF hRule == NIL
+      RETURN Refuse( "não achei a regra do marker '" + cOld + "' no dump" )
+   ENDIF
+
+   // colisão: o nome novo já é OUTRO marker da MESMA regra? o alpha-rename
+   // fundiria duas variáveis distintas - a expansão mudaria (e a rede pegaria),
+   // mas a recusa antecipada NOMEIA o motivo em vez de deixar o rollback opaco
+   FOR EACH cSide IN { "match", "result" }
+      FOR EACH hTok IN hRule[ cSide ]
+         IF hTok[ "role" ] == "marker" .AND. hTok[ "marker" ] != nMk .AND. ;
+            Upper( hb_HGetDef( hTok, "text", "" ) ) == cUpNew
+            RETURN Refuse( "'" + cNew + "' já é outro marker da mesma diretiva " + ;
+                           RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ") - " + ;
+                           "o rename fundiria dois markers; recuso" )
+         ENDIF
+      NEXT
+   NEXT
+
+   cChPath := ResolveInclude( hProj, hRule[ "file" ] )
+   IF Empty( cChPath )
+      RETURN Refuse( "não achei o arquivo da diretiva '" + hRule[ "file" ] + "'" )
+   ENDIF
+   cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
+   IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
+      RETURN Refuse( "diretiva em '" + cChPath + "' fora do diretório do projeto - " + ;
+                     "recuso editar include de sistema/compartilhado" )
+   ENDIF
+
+   // os sites: os DOIS lados da regra, por NÚMERO de marker (o fato)
+   FOR EACH cSide IN { "match", "result" }
+      FOR EACH hTok IN hRule[ cSide ]
+         IF hTok[ "role" ] == "marker" .AND. hTok[ "marker" ] == nMk
+            IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
+               RETURN Refuse( "marker '" + cOld + "' no " + cSide + " da diretiva " + ;
+                              RuleTag( hRule ) + " sem posição no fonte " + ;
+                              "(diretiva nascida de expansão) - recuso editar" )
+            ENDIF
+            AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
+         ENDIF
+      NEXT
+   NEXT
+   IF Empty( aE )
+      RETURN Refuse( "marker '" + cOld + "' não encontrado na diretiva " + RuleTag( hRule ) )
+   ENDIF
+   DedupHits( aE )
+   nEdits := Len( aE )
+   AbsEditsAdd( hEdits, cChPath, aE )
+
+   OutStd( "rename-rule-marker: <" + cOld + "> -> <" + cNew + "> em " + ;
+           RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" + hb_eol() )
+   FOR EACH cKey IN hb_HKeys( hEdits )
+      FOR EACH aE IN hEdits[ cKey ]
+         OutStd( "  " + hb_FNameNameExt( cKey ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;
+                 hb_ntos( aE[ 2 ] ) + hb_eol() )
+      NEXT
+   NEXT
+   IF lDryRun
+      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   // padrão-ouro: alpha-rename é INVISÍVEL - a expansão e o pcode de todos os
+   // módulos têm de sair byte-idênticos. Qualquer diferença = rollback honesto
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ( cPpo := PpoGen( hProj, cPath ) ) == NIL
+         RETURN Refuse( "falha ao gerar .ppo de referência para '" + cPath + "'" )
+      ENDIF
+      hPpoBefore[ cPath ] := cPpo
+   NEXT
+   IF ! CompileHrbAll( hProj, cTmp, "before" )
+      RETURN Refuse( "falha ao compilar o estado de referência" )
+   ENDIF
+
+   FOR EACH cKey IN hb_HKeys( hEdits )
+      cText := hb_MemoRead( cKey )
+      hOrig[ cKey ] := cText
+      hb_MemoWrit( cKey, ApplyTokenEdits( cText, hEdits[ cKey ], cOld, cNew, @nLine ) )
+      IF nLine > 0
+         RollbackAll( hOrig )
+         RETURN Refuse( "texto em " + hb_FNameNameExt( cKey ) + ":" + hb_ntos( nLine ) + ;
+                        " não confere - rollback" )
+      ENDIF
+   NEXT
+
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ( cPpo := PpoGen( hProj, cPath ) ) == NIL
+         RollbackAll( hOrig )
+         RETURN Refuse( "o projeto parou de pré-processar após o rename - rollback" )
+      ENDIF
+      IF !( cPpo == hPpoBefore[ cPath ] )
+         RollbackAll( hOrig )
+         RETURN Refuse( "expansão (.ppo) de " + hb_FNameNameExt( cPath ) + ;
+                        " mudou - o rename do marker não é alpha-equivalente - rollback" )
+      ENDIF
+   NEXT
+   IF ! CompileHrbAll( hProj, cTmp, "after" )
+      RollbackAll( hOrig )
+      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+   ENDIF
+   FOR EACH cPath IN hProj[ "files" ]
+      IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
+            hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
+         RollbackAll( hOrig )
+         RETURN Refuse( "pcode (.hrb) de " + hb_FNameName( cPath ) + " mudou - rollback" )
+      ENDIF
+   NEXT
+
+   OutStd( "verified: " + hb_ntos( nEdits ) + " marker occurrence(s) na diretiva; " + ;
+           ".ppo and .hrb byte-identical (alpha-rename)" + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -10377,8 +10922,16 @@ STATIC FUNCTION FromSpells( hTok, hFrom, cUp )
 // impl de método, o uso da DSL gerada; nesses o nome é palavra LITERAL da
 // regra gerada, marker 0). Um clone pass-through homônimo (`? Vendas()` com
 // FUNCTION Vendas real) casa a grafia mas é OUTRO símbolo - fica FORA das
-// sementes; o binding fica com o dono verdadeiro (caso 108)
-STATIC FUNCTION PpMarkerSeeds( hAst, cUp )
+// sementes; o binding fica com o dono verdadeiro (caso 108).
+// hRestrict (P3, opcional): fecho de UM site específico (ResolveAtQuery) -
+// quando dado, um SITE só entra se o par (aplicação,marker) que o gera
+// pertencer a ele. Não mexe no PARES (hPairs sai completo sempre - quem usa
+// artefatos/donos continua vendo o módulo inteiro); só filtra o que é
+// reportado como HIT, para `usages --at` num marker não misturar OUTRA
+// aplicação independente (regra diferente) que colou o MESMO texto em
+// outro lugar do módulo (ex.: dois #xcommand distintos usando "Vendas"
+// como valor, sem relação nenhuma entre si).
+STATIC FUNCTION PpMarkerSeeds( hAst, cUp, hRestrict )
 
    LOCAL hPairs := { => }, aSites := {}, hApp, hTok, nApp
    LOCAL hGenRef := { => }, hRuleRef := { => }, hRule, aSide, hFrom
@@ -10428,9 +10981,11 @@ STATIC FUNCTION PpMarkerSeeds( hAst, cUp )
             IF hTok[ "marker" ] >= 1
                hPairs[ PairKey( nApp, hTok[ "marker" ] ) ] := .T.
             ENDIF
-            IF hb_HGetDef( hTok, "generates", .F. ) .OR. lLinked .OR. ;
-               ( hTok[ "marker" ] >= 1 .AND. ;
-                 hb_HHasKey( hGenRef, PairKey( nApp, hTok[ "marker" ] ) ) )
+            IF ( hb_HGetDef( hTok, "generates", .F. ) .OR. lLinked .OR. ;
+                 ( hTok[ "marker" ] >= 1 .AND. ;
+                   hb_HHasKey( hGenRef, PairKey( nApp, hTok[ "marker" ] ) ) ) ) .AND. ;
+               ( hRestrict == NIL .OR. ( hTok[ "marker" ] >= 1 .AND. ;
+                 hb_HHasKey( hRestrict, PairKey( nApp, hTok[ "marker" ] ) ) ) )
                AddHit( aSites, hTok )
             ENDIF
          ELSEIF hTok[ "marker" ] >= 1 .AND. hb_HHasKey( hTok, "from" ) .AND. ;
@@ -10711,10 +11266,11 @@ STATIC FUNCTION OwnerWord( hOwnV, cOwn )
 // nome de marker. Devolve { método (grafia real), classe/co-derivação (grafia
 // real, "" quando não há), linha, coluna 1-based do nome escrito, vocábulo }
 // - o vocábulo é a cabeça (minúscula) da regra RAIZ que consumiu o nome:
-// "method" no hbclass, "handler" numa DSL de handlers, sem tabela nenhuma
-STATIC FUNCTION PpMarkerLift( hAst, hFunc, cUp )
+// "method" no hbclass, "handler" numa DSL de handlers, sem tabela nenhuma.
+// hRestrict (P3, opcional): repassado a MethodImplOf - ver comentário lá.
+STATIC FUNCTION PpMarkerLift( hAst, hFunc, cUp, hRestrict )
 
-   LOCAL aImpl := MethodImplOf( hAst, hFunc, "", cUp )
+   LOCAL aImpl := MethodImplOf( hAst, hFunc, "", cUp, hRestrict )
    LOCAL hApp, hTok, aHit := NIL, hRule, cVocab
 
    IF aImpl == NIL
@@ -10749,10 +11305,11 @@ STATIC FUNCTION PpMarkerLift( hAst, hFunc, cUp )
 
 // sites escritos do nome de marker que atravessam diretivas e que nenhum relator
 // clássico cobriu (declaração de método, uso em DSL de pp...) - resposta no
-// vocabulário do fonte; nomes gerados só com --show-expansion
-STATIC FUNCTION PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, nLen, lShowExp )
+// vocabulário do fonte; nomes gerados só com --show-expansion.
+// hRestrict (P3, opcional): repassado a PpMarkerSeeds - ver comentário lá.
+STATIC FUNCTION PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, nLen, lShowExp, hRestrict )
 
-   LOCAL hEnt := PpMarkerSeeds( hAst, cUp ), aArts, aHit, aL, lSeen
+   LOCAL hEnt := PpMarkerSeeds( hAst, cUp, hRestrict ), aArts, aHit, aL, lSeen
    LOCAL hRule, cWhat, cDeriv, aArt, nHits := 0
 
    IF Empty( hEnt[ "sites" ] )
@@ -10816,6 +11373,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
    LOCAL hOpt := { => }, lData := .F.
    LOCAL cKey, aKParts, nApp, nMarker, aAlts, cAltList   // P5: validação do restrict
+   LOCAL hArtIdx                                         // P6: guarda de órfão por FATO
 
    IF Len( aArgs ) < 4
       Usage()
@@ -11052,11 +11610,28 @@ STATIC FUNCTION RenameMethod( aArgs )
       ENDIF
    NEXT
    // o fonte soletra um nome gerado que vai mudar? renomear o gerador
-   // deixaria a grafia manual órfã - recusa nomeando o site
+   // deixaria a grafia manual órfã - recusa nomeando o site.
+   // P6: "grafia manual" NÃO é "token sem `from`". Um nome escrito à mão que
+   // apenas ATRAVESSA uma diretiva (`? fj_Lamina()` - o `?` é #command e CLONA
+   // o argumento) chega ao stream COM `from`, de op 'clone' - o teste antigo
+   // (`! hb_HHasKey(hTok,"from")`) o lia como "derivado, não é grafia manual" e
+   // ficava CEGO para todo site dentro de um comando. O fato que separa é o
+   // mesmo do ast-12: 'clone' = pass-through, a grafia é do USUÁRIO (orfanável);
+   // 'paste'/'stringify' = o texto foi FABRICADO pela expansão (é o artefato que
+   // o próprio rename re-deriva). Os artefatos DESTE rename já estão computados
+   // em hFacts["arts"] (PpMarkerArtifacts, por índice no stream): qualquer OUTRO
+   // token que soletre um nome gerado é grafia manual. Sem isto o furo só
+   // aparecia na recompilação - rollback TARDIO com "contagem de símbolos
+   // mudou" (opaco), e o `--dry-run` APROVAVA um rename que o apply desfazia
    FOR EACH cPath IN hProj[ "files" ]
+      hArtIdx := { => }
+      FOR EACH aArt IN hFacts[ cPath ][ "arts" ]
+         hArtIdx[ hb_ntos( aArt[ 1 ] ) ] := .T.
+      NEXT
       FOR EACH hTok IN hAsts[ cPath ][ "tokens" ]
          IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
-            hTok[ "col" ] != NIL .AND. ! hb_HHasKey( hTok, "from" ) .AND. ;
+            hTok[ "col" ] != NIL .AND. ;
+            ! hb_HHasKey( hArtIdx, hb_ntos( hTok:__enumIndex() - 1 ) ) .AND. ;
             hb_HHasKey( hMap, Upper( hTok[ "text" ] ) ) .AND. ;
             !( Upper( hTok[ "text" ] ) == cUpOld )
             RETURN Refuse( "o fonte soletra o nome gerado '" + hTok[ "text" ] + "' (" + ;
