@@ -132,6 +132,15 @@ escrever, o ponteiro avança.
    byte-idênticos — estava nos commits.)*
    Depois de editar, **republicar o artifact** (mesmo `file_path` → mesma URL).
 
+0.4c **INDICADORES: rodar `make site-check` (Diego, 2026-07-12).** Nenhum número
+   nas páginas é digitado — todos são elementos marcados (`data-metric`) que o
+   `bin/site-numbers.sh` MEDE. `make site-numbers` reescreve; `make site-check`
+   FALHA se algo defasou (no core: `make -C site numbers|check`). **Indicador que
+   não se consegue gerar NÃO entra na página** — vira o comando que o leitor roda.
+   *(A régua nasceu porque QUATRO números estavam errados ao mesmo tempo, e nenhum
+   tinha sido notado: `1085/1085`, `112/112`, `105 cases / 825 checks` e "thirteen
+   schema steps".)*
+
 0.5 **Régua anti-buraco (roda sempre, é barata):** confirmar que todo comando que
    o binário expõe hoje (`hbrefactor` sem args) aparece em alguma entrada do
    CHANGELOG. Um comando vivo sem UMA linha de changelog é o buraco que gerou a

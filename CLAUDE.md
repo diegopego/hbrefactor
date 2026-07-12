@@ -254,6 +254,20 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   (b) a FERRAMENTA jamais pode abandonar `#command`/`#translate`: ela refatora o
   código dos OUTROS, e o `std.ch`, o `hbclass.ch` e toda a herança Clipper são
   dBase. A política é sobre o que escrevemos, nunca sobre o que suportamos.
+- **NENHUM número digitado à mão nas páginas — indicador é MEDIDO (Diego,
+  2026-07-12)**: *"se realmente importa colocar estes indicadores, eles devem ser
+  atualizados de forma determinística"*. Cada indicador é um elemento marcado
+  (`<span data-metric="suite-checks">`), e o `bin/site-numbers.sh` o **recalcula**:
+  `make site-numbers` escreve, **`make site-check` FALHA** se algo estiver defasado
+  (no core: `make -C site numbers|check`). **Corolário duro: indicador que não se
+  consegue GERAR não entra na página** — a prova de impacto zero exige buildar DOIS
+  compiladores, não cabe num alvo de rotina, então a página traz o **comando** que o
+  mantenedor roda (`tests/pcode-identity.sh`), não um número. *(O estrago que gerou a
+  regra: a proposta afirmava `1085/1085` e `112/112` módulos com pcode idêntico, a
+  página do hbrefactor dizia `105 cases / 825 checks`, e o texto falava em "thirteen
+  schema steps". Os QUATRO estavam errados e ninguém tinha notado — número mantido à
+  mão envelhece calado, e na porta de entrada de um PR isso queima a credibilidade
+  inteira.)* Rodar o `site-check` ao mexer em página/manual (a `/update-manual` o faz).
 - **Genérico > específico**: comando dedicado só com razão forte (o
   `usages-dsl` foi absorvido pelo `usages`); ao consumir fatos de pp, operar
   sobre o genérico (cabeça/kind/marker), nunca por DSL/família conhecida.
