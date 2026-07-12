@@ -347,7 +347,7 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
       <a href="#start">Start here</a>
       <a href="#deeper">Going deeper</a>
       <a href="#hood">Under the hood</a>
-      <a class="out" href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">Extending Harbour ↗</a>
+      <a class="out" href="https://diegopego.github.io/harbour-core/">Extending Harbour ↗</a>
       <a href="#status">Status</a>
       <a href="#install">Install</a>
     </nav>
@@ -388,7 +388,7 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
           <span class="tag">0 bytes</span>
           <span class="t">We <b>extended the Harbour compiler</b> so it hands over the facts — and it
           changes <b>nothing</b> in your build. <b>1085 of 1085</b> modules, byte-identical.</span>
-          <a href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">The core proposal ↗</a>
+          <a href="https://diegopego.github.io/harbour-core/">The core proposal ↗</a>
         </div>
       </div>
 
@@ -486,7 +486,7 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
       has <b>its own page</b> — written for the Harbour maintainers: the case, the honest shape of the
       diff, the two bugs it fixes in <em>stock</em> Harbour, and what we still don't have good answers
       for. If you maintain Harbour, that page is for you.</p>
-      <a class="btn btn-primary" href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">Extending the compiler without breaking anything &rarr;</a>
+      <a class="btn btn-primary" href="https://diegopego.github.io/harbour-core/">Extending the compiler without breaking anything &rarr;</a>
     </div>
   </div>
 </section>
@@ -836,6 +836,7 @@ Eval( bPaga )
       <tr><td>ast-13</td><td><b>rule genealogy</b>: a rule created by another rule's expansion records which application created it — and derivation now survives token clones, so a generated rule's artifacts stay traceable through its uses</td></tr>
       <tr><td>ast-14</td><td>a marker a rule <em>matches but never uses</em> is no longer indistinguishable from a word of the rule itself — the preprocessor stopped throwing the binding away</td></tr>
       <tr><td>ast-15</td><td><b>which</b> word of the rule a token matched. <span class="mono">#command</span> accepts its keywords <b>abbreviated</b> (from 4 letters), so <span class="mono">GRAV</span> may be the rule's own keyword <em>or</em> <span class="mono">GRAVAR</span> cut short — only the preprocessor knows, and now it says so</td></tr>
+      <tr><td>ast-16</td><td>a directive has a <b>lifetime</b>: <span class="mono">#undef</span> / <span class="mono">#xuncommand</span> switch it off partway through a file. The preprocessor did that and told nobody — so renaming the directive left the switch-off behind, pointing at a name that no longer existed, and the directive silently <b>leaked</b> past the point where you turned it off. Also: the dump used to describe a <span class="mono">#ycommand</span> as if its keywords could be abbreviated, which they cannot</td></tr>
     </table>
     </div>
     <p>Along the way: a <b>20-year-old segfault fixed</b> (annotating a code-block parameter with <span class="mono">AS CLASS</span> used to crash the compiler — stock Harbour still does), and a false <span class="mono">W0019</span> "duplicate declaration" warning silenced when a re-declaration merely completes a missing type — it had blocked 18 methods in <span class="mono">hbhttpd</span>.</p>
@@ -849,7 +850,7 @@ Eval( bPaga )
       <p class="muted" style="margin-bottom:18px">The full case for the maintainers — the consolidated
       argument, the honest shape of the diff, the two bugs it fixes in <em>stock</em> Harbour, and the
       open questions we can't answer yet — lives on the branch's own page.</p>
-      <a class="btn btn-ghost" href="https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be">The core proposal, in full &rarr;</a>
+      <a class="btn btn-ghost" href="https://diegopego.github.io/harbour-core/">The core proposal, in full &rarr;</a>
     </div>
   </div>
 </section>
@@ -859,7 +860,7 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong>105 cases / 825 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong>112 cases / 913 checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
     <div class="grid-2">
       <div>
@@ -891,7 +892,7 @@ Eval( bPaga )
     <div class="callout help">
       <p class="sec-eyebrow" style="color:var(--purple)">An honest ask</p>
       <h3 style="font-size:1.4rem">Help wanted: review the Harbour branch</h3>
-      <p>I built the <span class="mono">harbour-core</span> branch that makes these compiler facts exist — the AST dump (thirteen schema steps), the <span class="mono">-kt</span> enforcement, the parentage channel, the segfault and warning fixes. But I'm a Harbour <strong>application</strong> developer, <strong>not a compiler/VM specialist</strong>. I would genuinely value people who know Harbour's core taking a look at that branch.</p>
+      <p>I built the <span class="mono">harbour-core</span> branch that makes these compiler facts exist — the AST dump (sixteen schema steps), the <span class="mono">-kt</span> enforcement, the parentage channel, the segfault and warning fixes. But I'm a Harbour <strong>application</strong> developer, <strong>not a compiler/VM specialist</strong>. I would genuinely value people who know Harbour's core taking a look at that branch.</p>
       <p>If you know the compiler, the VM, or the class system — issues, corrections, and second opinions are all welcome.</p>
       <p style="margin-top:18px">
         <a class="btn btn-primary" href="https://github.com/diegopego/harbour-core/tree/feature/compiler-ast-dump" target="_blank" rel="noopener">Review <span class="mono" style="font-weight:700">feature/compiler-ast-dump</span> →</a>
@@ -914,7 +915,7 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (105 cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (112 cases)</span></code></pre>
         </div>
       </li>
       <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.13.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>

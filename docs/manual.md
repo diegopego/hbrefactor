@@ -15,7 +15,7 @@
       and REFERENCES is safe — rolls back or re-derives, never silently wrong): that is a
       guarantee of the EXISTING rename, already covered in principle by "Same name,
       different owner", so no new body text — it lives in CHANGELOG 2026-07-11.
-  suite at baseline: 105 cases, 825 checks green
+  suite at baseline: 112 cases, 913 checks green
   updated: 2026-07-12
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -138,7 +138,7 @@ the patched compiler produces the **same bytes** as the one you use today. Measu
 asserted: **1085 of 1085** compiled modules byte-identical, and every `.prg` in Harbour's own
 `src/` identical to the pre-patch binary. That work lives on a branch of Harbour itself and has
 **its own page**, written for the Harbour maintainers:
-**[extending the compiler without breaking anything](https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be)**
+**[extending the compiler without breaking anything](https://diegopego.github.io/harbour-core/)**
 (source: `harbour-core/site/index.html`; user-facing log: `harbour-core/NEWS.md`).
 
 ---
@@ -633,7 +633,7 @@ binary.
 The core branch has **its own page**, written for the Harbour maintainers — the consolidated
 case, the honest shape of the diff, the two bugs it fixes in *stock* Harbour, and what we still
 don't have good answers for:
-**[the core proposal](https://claude.ai/code/artifact/5f998d03-3be4-4acb-bacd-d198d0fb70be)**
+**[the core proposal](https://diegopego.github.io/harbour-core/)**
 (source: `harbour-core/site/index.html`; the user-facing log is `harbour-core/NEWS.md`).
 
 The founding principle in action: when a fact doesn't exist, **extend the core so it
@@ -692,7 +692,7 @@ language); English is on the roadmap.
 <!-- prov: Diego's explicit ask (2026-07-10); branch inventory from git log. -->
 
 I built the `harbour-core` branch that makes these compiler facts exist — the AST dump
-(thirteen schema steps), the `-kt` enforcement, the parentage channel, the segfault and
+(sixteen schema steps), the `-kt` enforcement, the parentage channel, the segfault and
 warning fixes. But I'm a Harbour **application** developer, **not a compiler/VM
 specialist**. I would genuinely value people who know Harbour's core taking a look.
 
