@@ -65,9 +65,9 @@ PROCEDURE Main()
       // KIND vira consequência do fato sob o cursor, não do sufixo. As
       // funções-motor viram delegados internos do `rename`; redireciona
       // honesto (nomeando o comando velho), nunca adivinha
-      OutStd( "hbrefactor: '" + aArgs[ 1 ] + "' foi removido na fase U - " + ;
-              "use `rename <projeto> <arq:linha:col> <novo>` " + ;
-              "(o kind vem do fato sob o cursor)" + hb_eol() )
+      OutStd( "hbrefactor: '" + aArgs[ 1 ] + "' was removed - " + ;
+              "use `rename <project> <file:line:col> <new>` " + ;
+              "(the kind comes from the fact under the cursor)" + hb_eol() )
       nExit := EXIT_USAGE
    OTHERWISE
       Usage()
@@ -82,33 +82,33 @@ STATIC PROCEDURE Usage()
 
    OutStd( "hbrefactor " + APP_VERSION + " - Harbour refactoring (compiler AST)" + hb_eol() )
    OutStd( "Usage:" + hb_eol() )
-   OutStd( "  hbrefactor rename <projeto> <arq:linha:col> <novo> [--force] [--edit-rules] [--dry-run]" + hb_eol() )
-   OutStd( "                                     (renomeia o símbolo SOB O CURSOR; o KIND -" + hb_eol() )
-   OutStd( "                                      local/param/static/memvar/função/método/dsl/marker -" + hb_eol() )
-   OutStd( "                                      vem do FATO da árvore, não do comando)" + hb_eol() )
-   OutStd( "  hbrefactor reorder-params <projeto> <função> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor extract-function <projeto> <arq.prg> <ini>-<fim> <nome> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor inline-local <projeto> <arq.prg> <função> <nome> [--dry-run]" + hb_eol() )
-   OutStd( "  hbrefactor usages <projeto> <nome|Classe:Método|--at arq:linha:col> [--func <função>] [--json <out>] [--show-expansion]" + hb_eol() )
-   OutStd( "  hbrefactor resolve-at <projeto> <arq.prg> <linha> <coluna>   (posição -> 'query: <spec>')" + hb_eol() )
-   OutStd( "  hbrefactor unused-locals <projeto>" + hb_eol() )
-   OutStd( "  hbrefactor call-graph <projeto> [<função>]" + hb_eol() )
-   OutStd( "  hbrefactor find-dynamic-calls <projeto>" + hb_eol() )
-   OutStd( "  hbrefactor dump <projeto>          (gera os .ast.json e informa o diretório)" + hb_eol() )
-   OutStd( "  hbrefactor projects-of <arq.prg> <projeto1> [<projeto2> ...] [--json <out>]" + hb_eol() )
-   OutStd( "                                     (quais destes projetos têm o arquivo como fonte)" + hb_eol() )
-   OutStd( "  hbrefactor projects-of <arq.prg> [--root <dir>]... [--json <out>]" + hb_eol() )
-   OutStd( "                                     (sem candidatos: ACHA os projetos por fato -" + hb_eol() )
-   OutStd( "                                      corredor ancestral, mais próximo primeiro;" + hb_eol() )
+   OutStd( "  hbrefactor rename <project> <file:line:col> <new> [--force] [--edit-rules] [--dry-run]" + hb_eol() )
+   OutStd( "                                     (renames the symbol UNDER THE CURSOR; the KIND -" + hb_eol() )
+   OutStd( "                                      local/param/static/memvar/function/method/dsl/marker -" + hb_eol() )
+   OutStd( "                                      comes from the FACT in the tree, not from the command)" + hb_eol() )
+   OutStd( "  hbrefactor reorder-params <project> <function> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor extract-function <project> <file.prg> <first>-<last> <name> [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor inline-local <project> <file.prg> <function> <name> [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor usages <project> <name|Class:Method|--at file:line:col> [--func <function>] [--json <out>] [--show-expansion]" + hb_eol() )
+   OutStd( "  hbrefactor resolve-at <project> <file.prg> <line> <column>   (position -> 'query: <spec>')" + hb_eol() )
+   OutStd( "  hbrefactor unused-locals <project>" + hb_eol() )
+   OutStd( "  hbrefactor call-graph <project> [<function>]" + hb_eol() )
+   OutStd( "  hbrefactor find-dynamic-calls <project>" + hb_eol() )
+   OutStd( "  hbrefactor dump <project>           (writes the .ast.json files and reports the directory)" + hb_eol() )
+   OutStd( "  hbrefactor projects-of <file.prg> <project1> [<project2> ...] [--json <out>]" + hb_eol() )
+   OutStd( "                                     (which of these projects have the file as a source)" + hb_eol() )
+   OutStd( "  hbrefactor projects-of <file.prg> [--root <dir>]... [--json <out>]" + hb_eol() )
+   OutStd( "                                     (with no candidates: FINDS the projects by fact -" + hb_eol() )
+   OutStd( "                                      ancestor corridor, nearest first;" + hb_eol() )
    OutStd( "                                      JSON = { owners:[...], candidates:[...] })" + hb_eol() )
-   OutStd( "  hbrefactor annotate <projeto> [<arq[:função]>] [--json <out>] [--apply]" + hb_eol() )
-   OutStd( "                                     (escada de anotações; RELATÓRIO por padrão, --apply escreve" + hb_eol() )
-   OutStd( "                                      DECLAREs + AS CLASS com verificação padrão-ouro e rollback)" + hb_eol() )
-   OutStd( "  hbrefactor exec-registry <projeto> [--out <arq.astr.json>] [--stamp <c>] [--run <F1,F2>]" + hb_eol() )
-   OutStd( "                                     (EXECUTA funções de registro de classes em sandbox e grava o" + hb_eol() )
-   OutStd( "                                      retrato da tabela viva; o snapshot SUGERE, o -kt impõe)" + hb_eol() )
-   OutStd( "  <projeto> = qualquer alvo que o hbmk2 aceite (.hbp, .hbc com sources=," + hb_eol() )
-   OutStd( "              lista de .prg separada por vírgula ou espaço)" + hb_eol() )
+   OutStd( "  hbrefactor annotate <project> [<file[:function]>] [--json <out>] [--apply]" + hb_eol() )
+   OutStd( "                                     (annotation ladder; REPORT by default, --apply writes" + hb_eol() )
+   OutStd( "                                      DECLAREs + AS CLASS with gold-standard verification and rollback)" + hb_eol() )
+   OutStd( "  hbrefactor exec-registry <project> [--out <file.astr.json>] [--stamp <c>] [--run <F1,F2>]" + hb_eol() )
+   OutStd( "                                     (RUNS class-registration functions in a sandbox and records the" + hb_eol() )
+   OutStd( "                                      live table snapshot; the snapshot SUGGESTS, -kt enforces)" + hb_eol() )
+   OutStd( "  <project> = any target hbmk2 accepts (.hbp, .hbc with sources=," + hb_eol() )
+   OutStd( "              list of .prg separated by comma or space)" + hb_eol() )
 
    RETURN
 
@@ -145,7 +145,7 @@ STATIC FUNCTION LoadProject( cSpec )
       ENDIF
    NEXT
    IF Empty( aCmdLines )
-      OutErr( "hbrefactor: hbmk2 não produziu comando do compilador para '" + ;
+      OutErr( "hbrefactor: hbmk2 produced no compiler command for '" + ;
               cSpec + "'" + hb_eol() )
       RETURN NIL
    ENDIF
@@ -251,12 +251,12 @@ STATIC FUNCTION AstDumps( hProj, cTmp )
       OutErr( ErrLines( cOut + cErr ) )
       // a falha clássica sem HB_BIN é o hbmk2 do PATH (sem -x) reprovando
       // um projeto que compila - nomear a causa provável evita o
-      // diagnóstico enganoso "o projeto não compila"
+      // diagnóstico enganoso "the project does not compile"
       IF Empty( hb_GetEnv( "HB_BIN" ) )
-         OutErr( "hbrefactor: HB_BIN não definido - usei o hbmk2 do PATH, " + ;
-                 "que pode não ter o -x do fork; exporte " + ;
-                 "HB_BIN=<dir dos binários com -x> (ou configure " + ;
-                 "hbrefactor.hbBin na extensão)" + hb_eol() )
+         OutErr( "hbrefactor: HB_BIN not set - used the hbmk2 from PATH, " + ;
+                 "which may lack the fork's -x; export " + ;
+                 "HB_BIN=<dir of the binaries with -x> (or set " + ;
+                 "hbrefactor.hbBin in the extension)" + hb_eol() )
       ENDIF
       RETURN .F.
    ENDIF
@@ -398,7 +398,7 @@ STATIC FUNCTION Usages( aArgs )
       // últimos segmentos
       aAtParts := hb_ATokens( cAtSpec, ":" )
       IF Len( aAtParts ) < 3
-         RETURN Refuse( "forma do --at é arq:linha:col (1-based): '" + cAtSpec + "'" )
+         RETURN Refuse( "the --at form is file:line:col (1-based): '" + cAtSpec + "'" )
       ENDIF
       nAtCol0 := Val( ATail( aAtParts ) ) - 1
       nAtLine := Val( aAtParts[ Len( aAtParts ) - 1 ] )
@@ -407,18 +407,18 @@ STATIC FUNCTION Usages( aArgs )
          cAtFile += ":" + aAtParts[ nI ]
       NEXT
       IF nAtLine < 1 .OR. nAtCol0 < 0
-         RETURN Refuse( "posição inválida no --at: linha e coluna são 1-based" )
+         RETURN Refuse( "invalid position in --at: line and column are 1-based" )
       ENDIF
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
 
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
 
    // duas passadas: as tabelas DECLARE do dump são POR MÓDULO e a
@@ -426,8 +426,8 @@ STATIC FUNCTION Usages( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ast-1 ausente/inválido para '" + cPath + ;
-                        "' (harbour com -x do branch feature/compiler-ast-dump)" )
+         RETURN Refuse( "ast-1 dump missing/invalid for '" + cPath + ;
+                        "' (harbour with -x from branch feature/compiler-ast-dump)" )
       ENDIF
       hAsts[ cPath ] := hAst
    NEXT
@@ -438,14 +438,14 @@ STATIC FUNCTION Usages( aArgs )
          // P8: pode ser um ARQUIVO DE REGRA (.ch) - onde as DSLs reais moram
          hResAt := ResolveAtRuleFile( hProj, hAsts, cAtFile, nAtLine, nAtCol0 )
          IF hResAt == NIL
-            RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + ;
-                           "' nem arquivo de diretiva com regra nesta posição" )
+            RETURN Refuse( "'" + cAtFile + "' is not a source of project '" + cSpec + ;
+                           "' nor a directive file with a rule at this position" )
          ENDIF
       ELSE
          hResAt := ResolveAtQuery( hAsts[ cAtPath ], hAsts, nAtLine, nAtCol0 )
       ENDIF
       IF hResAt == NIL
-         RETURN Refuse( "nenhum identificador de compilação em " + cAtFile + ":" + ;
+         RETURN Refuse( "no compile-time identifier at " + cAtFile + ":" + ;
                         hb_ntos( nAtLine ) + ":" + hb_ntos( nAtCol0 + 1 ) )
       ENDIF
       OutStd( cAtFile + ":" + hb_ntos( nAtLine ) + ":" + hb_ntos( nAtCol0 + 1 ) + ;
@@ -489,7 +489,7 @@ STATIC FUNCTION Usages( aArgs )
       cClass   := Upper( Left( cName, nAt - 1 ) )
       cMethTok := SubStr( cName, nAt + 1 )
       IF Empty( cClass ) .OR. Empty( cMethTok ) .OR. ":" $ cMethTok
-         RETURN Refuse( "forma Classe:Método malformada: '" + cName + "'" )
+         RETURN Refuse( "malformed Class:Method form: '" + cName + "'" )
       ENDIF
    ELSE
       cMethTok := cName
@@ -801,11 +801,11 @@ STATIC FUNCTION DumpOnly( aArgs )
    ENDIF
    hProj := LoadProject( aArgs[ 2 ] )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + aArgs[ 2 ] + "'" )
+      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila" )
+      RETURN Refuse( "the project does not compile" )
    ENDIF
    OutStd( "dumps em: " + cTmp + hb_eol() )
 
@@ -968,7 +968,7 @@ STATIC FUNCTION ProjectsOfFilter( aCand, cAbs, cCwd, cJsonOut )
       hProj := LoadProject( cSpec )
       IF hProj == NIL
          OutErr( "hbrefactor: candidato '" + cSpec + ;
-                 "' não resolveu no hbmk2 - fora do picker" + hb_eol() )
+                 "' did not resolve in hbmk2 - out of the picker" + hb_eol() )
          LOOP
       ENDIF
       nResolved++
@@ -978,7 +978,7 @@ STATIC FUNCTION ProjectsOfFilter( aCand, cAbs, cCwd, cJsonOut )
    NEXT
 
    IF nResolved == 0
-      RETURN Refuse( "nenhum candidato resolveu no hbmk2 - a pergunta ficou sem resposta" )
+      RETURN Refuse( "no candidate resolved in hbmk2 - the question went unanswered" )
    ENDIF
 
    // P8: nenhum projeto tem o arquivo como FONTE, mas ele pode ser um INCLUDE
@@ -996,8 +996,8 @@ STATIC FUNCTION ProjectsOfFilter( aCand, cAbs, cCwd, cJsonOut )
          ENDIF
       NEXT
       IF Empty( aOwn )
-         OutErr( "hbrefactor: '" + hb_FNameNameExt( cAbs ) + "' é include, mas nenhum " + ;
-                 "projeto no diretório dele (ou acima) registra regra vinda dele" + hb_eol() )
+         OutErr( "hbrefactor: '" + hb_FNameNameExt( cAbs ) + "' is an include, but no " + ;
+                 "project in its directory (or above) registers a rule coming from it" + hb_eol() )
       ENDIF
    ENDIF
 
@@ -1029,8 +1029,8 @@ STATIC FUNCTION ProjectsOfDiscover( cAbs, aRoots, cCwd, cJsonOut )
    FOR EACH cSpec IN aCand
       hProj := LoadProject( cSpec )
       IF hProj == NIL
-         OutErr( "hbrefactor: projeto '" + cSpec + ;
-                 "' não resolveu no hbmk2 - fora do picker" + hb_eol() )
+         OutErr( "hbrefactor: project '" + cSpec + ;
+                 "' did not resolve in hbmk2 - out of the picker" + hb_eol() )
          LOOP
       ENDIF
       nResolved++
@@ -1046,8 +1046,8 @@ STATIC FUNCTION ProjectsOfDiscover( cAbs, aRoots, cCwd, cJsonOut )
       FOR EACH cSpec IN aWide
          IF ++nProbed > OWNER_BROADEN_CAP
             OutErr( "hbrefactor: busca ampla truncada em " + ;
-                    hb_ntos( OWNER_BROADEN_CAP ) + " projetos (o resto entra só na " + ;
-                    "lista para escolha manual)" + hb_eol() )
+                    hb_ntos( OWNER_BROADEN_CAP ) + " projects (the rest goes only into the " + ;
+                    "list for manual choice)" + hb_eol() )
             EXIT
          ENDIF
          hProj := LoadProject( cSpec )
@@ -1068,7 +1068,7 @@ STATIC FUNCTION ProjectsOfDiscover( cAbs, aRoots, cCwd, cJsonOut )
    // para o findFiles/erro do workspace); achou projetos mas o hbmk2 não
    // resolveu nenhum: a pergunta ficou sem resposta (exit != 0)
    IF ! Empty( aCand ) .AND. nResolved == 0
-      RETURN Refuse( "nenhum projeto próximo resolveu no hbmk2 - a pergunta ficou sem resposta" )
+      RETURN Refuse( "no nearby project resolved in hbmk2 - the question went unanswered" )
    ENDIF
 
    // P8: o arquivo não é FONTE de ninguém - mas um `.ch` (onde as DSLs moram)
@@ -1272,30 +1272,30 @@ STATIC FUNCTION ResolveAt( aArgs )
    nLine := Val( aArgs[ 4 ] )
    nCol0 := Val( aArgs[ 5 ] ) - 1
    IF nLine < 1 .OR. nCol0 < 0
-      RETURN Refuse( "posição inválida: linha e coluna são 1-based" )
+      RETURN Refuse( "invalid position: line and column are 1-based" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cSrcPath := ProjectMember( hProj, cFile )
    IF cSrcPath == ""
-      RETURN Refuse( "'" + cFile + "' não é fonte do projeto '" + cSpec + "'" )
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ( hAsts[ cPath ] := ReadAst( cTmp, cPath ) ) == NIL
-         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "ast dump missing/invalid for '" + cPath + "'" )
       ENDIF
    NEXT
 
    hRes := ResolveAtQuery( hAsts[ cSrcPath ], hAsts, nLine, nCol0 )
    IF hRes == NIL
-      RETURN Refuse( "nenhum identificador de compilação em " + cFile + ":" + ;
+      RETURN Refuse( "no compile-time identifier at " + cFile + ":" + ;
                      hb_ntos( nLine ) + ":" + hb_ntos( nCol0 + 1 ) )
    ENDIF
    aSrc := hb_ATokens( StrTran( hb_MemoRead( cSrcPath ), Chr( 13 ) , "" ), Chr( 10 ) )
@@ -1880,13 +1880,13 @@ STATIC FUNCTION Rename( aArgs )
    // arq:linha:col (o arquivo pode conter ':'; linha/col são os 2 últimos)
    aAtParts := hb_ATokens( cAtSpec, ":" )
    IF Len( aAtParts ) < 3
-      RETURN Refuse( "forma da posição é arq:linha:col (1-based): '" + cAtSpec + "'" )
+      RETURN Refuse( "the position form is file:line:col (1-based): '" + cAtSpec + "'" )
    ENDIF
    // linha/col têm de ser numéricas PURAS - Val() aceitaria prefixo ('5x'->5)
    // e resolveria em silêncio a posição errada; posição malformada recusa
    IF ! AllDigits( aAtParts[ Len( aAtParts ) - 1 ] ) .OR. ;
       ! AllDigits( ATail( aAtParts ) )
-      RETURN Refuse( "linha e coluna devem ser numéricas: '" + cAtSpec + "'" )
+      RETURN Refuse( "line and column must be numeric: '" + cAtSpec + "'" )
    ENDIF
    nCol0   := Val( ATail( aAtParts ) ) - 1
    nLine   := Val( aAtParts[ Len( aAtParts ) - 1 ] )
@@ -1895,21 +1895,21 @@ STATIC FUNCTION Rename( aArgs )
       cAtFile += ":" + aAtParts[ nI ]
    NEXT
    IF nLine < 1 .OR. nCol0 < 0
-      RETURN Refuse( "posição inválida: linha e coluna são 1-based" )
+      RETURN Refuse( "invalid position: line and column are 1-based" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cAtPath := ProjectMember( hProj, cAtFile )
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ( hAsts[ cPath ] := ReadAst( cTmp, cPath ) ) == NIL
-         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "ast dump missing/invalid for '" + cPath + "'" )
       ENDIF
    NEXT
 
@@ -1919,15 +1919,15 @@ STATIC FUNCTION Rename( aArgs )
       // posição. Só resolve se o arquivo REGISTRA regra do projeto (fato)
       hR := ResolveAtRuleFile( hProj, hAsts, cAtFile, nLine, nCol0 )
       IF hR == NIL
-         RETURN Refuse( "'" + cAtFile + "' não é fonte do projeto '" + cSpec + ;
-                        "' nem arquivo de diretiva com regra nesta posição" )
+         RETURN Refuse( "'" + cAtFile + "' is not a source of project '" + cSpec + ;
+                        "' nor a directive file with a rule at this position" )
       ENDIF
       hR := ResolveRenameKind( hR )
    ELSE
       hR := ResolveRenameAt( hAsts[ cAtPath ], hAsts, nLine, nCol0 )
    ENDIF
    IF hR == NIL
-      RETURN Refuse( "nenhum identificador de compilação em " + cAtFile + ":" + ;
+      RETURN Refuse( "no compile-time identifier at " + cAtFile + ":" + ;
                      hb_ntos( nLine ) + ":" + hb_ntos( nCol0 + 1 ) )
    ENDIF
    IF hb_HHasKey( hR, "refuse" )
@@ -1983,7 +1983,7 @@ STATIC FUNCTION Rename( aArgs )
    CASE hR[ "cmd" ] == "rename-dsl"
       aDel := { "rename-dsl", cSpec, hR[ "old" ], cNew }
    OTHERWISE
-      RETURN Refuse( "roteamento interno falhou para '" + hR[ "cmd" ] + "'" )
+      RETURN Refuse( "internal routing failed for '" + hR[ "cmd" ] + "'" )
    ENDCASE
    IF lDryRun
       AAdd( aDel, "--dry-run" )
@@ -2004,7 +2004,7 @@ STATIC FUNCTION Rename( aArgs )
       RETURN RenameDsl( aDel )
    ENDCASE
 
-   RETURN Refuse( "roteamento interno falhou para '" + hR[ "cmd" ] + "'" )
+   RETURN Refuse( "internal routing failed for '" + hR[ "cmd" ] + "'" )
 
 // ---------------------------------------------------------------------------
 // saída LSP Location[] (linhas/colunas 0-based)
@@ -2100,45 +2100,45 @@ STATIC FUNCTION RenameLocal( aArgs )
    cUpNew := Upper( cNew )
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    IF cUpOld == cUpNew
-      RETURN Refuse( "nomes velho e novo são idênticos" )
+      RETURN Refuse( "old and new names are identical" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cSrcPath := ProjectMember( hProj, cFile )
    IF cSrcPath == ""
-      RETURN Refuse( "'" + cFile + "' não é fonte do projeto '" + cSpec + "'" )
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! NameAccepted( hProj, cNew, .F. )
-      RETURN Refuse( "o compilador do projeto rejeita '" + cNew + "' como nome de variável" )
+      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a variable name" )
    ENDIF
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    hAst := ReadAst( cTmp, cSrcPath )
    IF hAst == NIL
-      RETURN Refuse( "dump ast-1 ausente/inválido para '" + cSrcPath + "'" )
+      RETURN Refuse( "ast-1 dump missing/invalid for '" + cSrcPath + "'" )
    ENDIF
    IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
-      RETURN Refuse( "novo nome '" + cNew + "' colide com regra de pré-processador (" + ;
+      RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule (" + ;
                      RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
    ENDIF
 
    hFunc := PickFunc( hAst, cFunc )
    IF hFunc == NIL
-      RETURN Refuse( "função '" + cFunc + "' não encontrada em '" + cFile + "'" )
+      RETURN Refuse( "function '" + cFunc + "' not found in '" + cFile + "'" )
    ENDIF
 
    // o alvo precisa ser LOCAL (ou parâmetro) declarado na função
    FOR EACH hItem IN hFunc[ "declarations" ]
       IF Upper( hItem[ "sym" ] ) == cUpNew
-         RETURN Refuse( "novo nome '" + cNew + "' já declarado na função (escopo " + hItem[ "scope" ] + ")" )
+         RETURN Refuse( "new name '" + cNew + "' already declared in the function (scope " + hItem[ "scope" ] + ")" )
       ENDIF
       IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "local"
          hDecl := hItem
@@ -2150,15 +2150,15 @@ STATIC FUNCTION RenameLocal( aArgs )
       IF Upper( hItem[ "sym" ] ) == cUpNew .AND. ;
          ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" .OR. ;
            hItem[ "scope" ] == "field" )
-         RETURN Refuse( "'" + cNew + "' já é " + hItem[ "scope" ] + " referenciada na função (linha " + ;
-                        hb_ntos( hItem[ "line" ] ) + ") - a LOCAL nova sombrearia esses usos" )
+         RETURN Refuse( "'" + cNew + "' is already " + hItem[ "scope" ] + " referenced in the function (line " + ;
+                        hb_ntos( hItem[ "line" ] ) + ") - the new LOCAL would shadow those uses" )
       ENDIF
    NEXT
    IF hDecl == NIL
-      RETURN Refuse( "'" + cOld + "' não é LOCAL declarada em " + hFunc[ "name" ] )
+      RETURN Refuse( "'" + cOld + "' is not a LOCAL declared in " + hFunc[ "name" ] )
    ENDIF
    IF lParamOnly .AND. ! hDecl[ "param" ]
-      RETURN Refuse( "'" + cOld + "' não é parâmetro de " + hFunc[ "name" ] )
+      RETURN Refuse( "'" + cOld + "' is not a parameter of " + hFunc[ "name" ] )
    ENDIF
 
    // sombras: parâmetro de codeblock homônimo (do velho: ambíguo demais;
@@ -2166,10 +2166,10 @@ STATIC FUNCTION RenameLocal( aArgs )
    FOR EACH hItem IN hFunc[ "occurrences" ]
       IF hItem[ "block" ] .AND. hItem[ "scope" ] == "local"
          IF Upper( hItem[ "sym" ] ) == cUpOld
-            RETURN Refuse( "parâmetro de codeblock homônimo sombreia (shadows) '" + cOld + "' - recusando" )
+            RETURN Refuse( "a codeblock parameter of the same name shadows '" + cOld + "' - refusing" )
          ENDIF
          IF Upper( hItem[ "sym" ] ) == cUpNew
-            RETURN Refuse( "'" + cNew + "' é parâmetro de codeblock na função - o rename seria sombreado" )
+            RETURN Refuse( "'" + cNew + "' is a codeblock parameter in the function - the rename would be shadowed" )
          ENDIF
       ENDIF
    NEXT
@@ -2196,8 +2196,8 @@ STATIC FUNCTION RenameLocal( aArgs )
          Upper( hTok[ "text" ] ) == cUpOld .AND. ;
          !( cPrevType == 58 .OR. cPrevType == 59 )
          IF hTok[ "col" ] == NIL
-            RETURN Refuse( "referência na linha " + hb_ntos( hTok[ "line" ] ) + ;
-                           " sem posição confiável no fonte (reescrita de pp) - recusando" )
+            RETURN Refuse( "reference on line " + hb_ntos( hTok[ "line" ] ) + ;
+                           " with no reliable source position (pp rewrite) - refusing" )
          ENDIF
          AAdd( aEdits, { hTok[ "line" ], hTok[ "col" ] + 1 } )
       ENDIF
@@ -2226,7 +2226,7 @@ STATIC FUNCTION RenameLocal( aArgs )
    // vira nAlfalfa). Um site = uma posição-fonte.
    DedupHits( aEdits )
    IF Empty( aEdits )
-      RETURN Refuse( "nenhum site editável encontrado" )
+      RETURN Refuse( "no editable site found" )
    ENDIF
 
    OutStd( aArgs[ 1 ] + ": " + cOld + " -> " + cNew + " in " + ;
@@ -2244,8 +2244,8 @@ STATIC FUNCTION RenameLocal( aArgs )
    FOR nI := 1 TO Len( aDisc )
       OutErr( "warning: " + hb_FNameNameExt( cSrcPath ) + ":" + ;
               hb_ntos( aDisc[ nI ][ 1 ] ) + ":" + hb_ntos( aDisc[ nI ][ 2 ] ) + ": '" + cOld + ;
-              "' é consumido e DESCARTADO pela diretiva (" + aDisc[ nI ][ 3 ] + ") - " + ;
-              "não chega ao compilador; NÃO renomeado" + hb_eol() )
+              "' is consumed and DISCARDED by the directive (" + aDisc[ nI ][ 3 ] + ") - " + ;
+              "never reaches the compiler; NOT renamed" + hb_eol() )
    NEXT
    IF lDryRun
       OutStd( "dry run - nada foi escrito" + hb_eol() )
@@ -2254,25 +2254,25 @@ STATIC FUNCTION RenameLocal( aArgs )
 
    // estado "antes" para a verificação byte-idêntica
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
 
    cText := hb_MemoRead( cSrcPath )
    hb_MemoWrit( cSrcPath, ApplyTokenEdits( cText, aEdits, cOld, cNew, @nLine ) )
    IF nLine > 0
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "texto na linha " + hb_ntos( nLine ) + " não confere com o esperado - rollback" )
+      RETURN Refuse( "text on line " + hb_ntos( nLine ) + " does not match what was expected - rollback" )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]           // reuso de cSpec como iterador
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verificação FALHOU: " + hb_FNameName( cSpec ) + ".hrb mudou - rollback" )
+         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback" )
       ENDIF
    NEXT
 
@@ -2741,33 +2741,33 @@ STATIC FUNCTION RenameStatic( aArgs )
    cUpNew := Upper( cNew )
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    IF cUpOld == cUpNew
-      RETURN Refuse( "nomes velho e novo são idênticos" )
+      RETURN Refuse( "old and new names are identical" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cSrcPath := ProjectMember( hProj, cFile )
    IF cSrcPath == ""
-      RETURN Refuse( "'" + cFile + "' não é fonte do projeto '" + cSpec + "'" )
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! NameAccepted( hProj, cNew, .F. )
-      RETURN Refuse( "o compilador do projeto rejeita '" + cNew + "' como nome de variável" )
+      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a variable name" )
    ENDIF
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    hAst := ReadAst( cTmp, cSrcPath )
    IF hAst == NIL
-      RETURN Refuse( "dump ast-1 ausente/inválido para '" + cSrcPath + "'" )
+      RETURN Refuse( "ast-1 dump missing/invalid for '" + cSrcPath + "'" )
    ENDIF
    IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
-      RETURN Refuse( "novo nome '" + cNew + "' colide com regra de pré-processador (" + ;
+      RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule (" + ;
                      RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
    ENDIF
 
@@ -2780,18 +2780,18 @@ STATIC FUNCTION RenameStatic( aArgs )
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "static"
             IF hOwner != NIL
-               RETURN Refuse( "STATIC '" + cOld + "' declarada em mais de um lugar - use --func" )
+               RETURN Refuse( "STATIC '" + cOld + "' declared in more than one place - use --func" )
             ENDIF
             hOwner := hFunc
             lFileWide := hFunc[ "fileDecl" ]
          ENDIF
          IF Upper( hItem[ "sym" ] ) == cUpNew
-            RETURN Refuse( "novo nome '" + cNew + "' já declarado em " + hFunc[ "name" ] )
+            RETURN Refuse( "new name '" + cNew + "' already declared in " + hFunc[ "name" ] )
          ENDIF
       NEXT
    NEXT
    IF hOwner == NIL
-      RETURN Refuse( "STATIC '" + cOld + "' não encontrada em '" + cFile + "'" )
+      RETURN Refuse( "STATIC '" + cOld + "' not found in '" + cFile + "'" )
    ENDIF
 
    // sombras: qualquer declaração homônima não-static no alcance torna a
@@ -2800,8 +2800,8 @@ STATIC FUNCTION RenameStatic( aArgs )
       IF lFileWide .OR. hFunc == hOwner
          FOR EACH hItem IN hFunc[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ! hItem[ "scope" ] == "static"
-               RETURN Refuse( "'" + cOld + "' também é " + hItem[ "scope" ] + " em " + ;
-                              hFunc[ "name" ] + " - sombra; recusando" )
+               RETURN Refuse( "'" + cOld + "' is also " + hItem[ "scope" ] + " em " + ;
+                              hFunc[ "name" ] + " - shadow; refusing" )
             ENDIF
          NEXT
       ENDIF
@@ -2816,8 +2816,8 @@ STATIC FUNCTION RenameStatic( aArgs )
          !( cPrevType == 58 .OR. cPrevType == 59 ) .AND. ;
          ( lFileWide .OR. InFuncSpan( hAst, hOwner, hTok[ "line" ] ) )
          IF hTok[ "col" ] == NIL
-            RETURN Refuse( "referência na linha " + hb_ntos( hTok[ "line" ] ) + ;
-                           " sem posição confiável (reescrita de pp) - recusando" )
+            RETURN Refuse( "reference on line " + hb_ntos( hTok[ "line" ] ) + ;
+                           " with no reliable position (pp rewrite) - refusing" )
          ENDIF
          AAdd( aEdits, { hTok[ "line" ], hTok[ "col" ] + 1 } )
       ENDIF
@@ -2828,7 +2828,7 @@ STATIC FUNCTION RenameStatic( aArgs )
    // RenameLocal) - um site = uma posição-fonte
    DedupHits( aEdits )
    IF Empty( aEdits )
-      RETURN Refuse( "nenhum site editável encontrado" )
+      RETURN Refuse( "no editable site found" )
    ENDIF
 
    OutStd( "rename-static: " + cOld + " -> " + cNew + ;
@@ -2844,23 +2844,23 @@ STATIC FUNCTION RenameStatic( aArgs )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    cText := hb_MemoRead( cSrcPath )
    hb_MemoWrit( cSrcPath, ApplyTokenEdits( cText, aEdits, cOld, cNew, @nLine ) )
    IF nLine > 0
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "texto na linha " + hb_ntos( nLine ) + " não confere - rollback" )
+      RETURN Refuse( "text on line " + hb_ntos( nLine ) + " does not match - rollback" )
    ENDIF
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verificação FALHOU: " + hb_FNameName( cSpec ) + ".hrb mudou - rollback" )
+         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback" )
       ENDIF
    NEXT
    OutStd( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + ;
@@ -2920,19 +2920,19 @@ STATIC FUNCTION RenameFunction( aArgs )
    cUpNew := Upper( cNew )
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    IF cUpOld == cUpNew
-      RETURN Refuse( "nomes velho e novo são idênticos" )
+      RETURN Refuse( "old and new names are identical" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! NameAccepted( hProj, cNew, .T. )
-      RETURN Refuse( "o compilador do projeto rejeita '" + cNew + "' como nome de função" )
+      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a function name" )
    ENDIF
    // função do core/runtime Harbour (harbour.hbx + hb_IsFunction): definir
    // no projeto uma função homônima sombreia a nativa em TODAS as chamadas
@@ -2941,14 +2941,14 @@ STATIC FUNCTION RenameFunction( aArgs )
             "sombreia (shadows) a nativa em todas as chamadas" )
    ENDIF
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
 
    // definições e colisões, projeto inteiro
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ast-1 ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "ast-1 dump missing/invalid for '" + cPath + "'" )
       ENDIF
       hAsts[ cPath ] := hAst
       FOR EACH hFunc IN hAst[ "functions" ]
@@ -2956,12 +2956,12 @@ STATIC FUNCTION RenameFunction( aArgs )
             LOOP
          ENDIF
          IF Upper( hFunc[ "name" ] ) == cUpNew
-            RETURN Refuse( "'" + cNew + "' já é função definida em " + hb_FNameNameExt( cPath ) )
+            RETURN Refuse( "'" + cNew + "' is already a function defined in " + hb_FNameNameExt( cPath ) )
          ENDIF
          // chamadas existentes ao nome novo passariam a cair na renomeada
          FOR EACH hItem IN hFunc[ "calls" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew
-               RETURN Refuse( "'" + cNew + "' já é chamada em " + hb_FNameNameExt( cPath ) + ;
+               RETURN Refuse( "'" + cNew + "' is already called in " + hb_FNameNameExt( cPath ) + ;
                               ":" + hb_ntos( hItem[ "line" ] ) + " - o rename sequestraria essas chamadas" )
             ENDIF
          NEXT
@@ -2971,7 +2971,7 @@ STATIC FUNCTION RenameFunction( aArgs )
                LOOP
             ENDIF
             IF ! Empty( cDefFile )
-               RETURN Refuse( "'" + cOld + "' definida em mais de um módulo - use --file" )
+               RETURN Refuse( "'" + cOld + "' is defined in more than one module - use --file" )
             ENDIF
             cDefFile := cPath
             lStatic := hFunc[ "static" ]
@@ -2979,7 +2979,7 @@ STATIC FUNCTION RenameFunction( aArgs )
       NEXT
    NEXT
    IF Empty( cDefFile )
-      RETURN Refuse( "função '" + cOld + "' não está definida no projeto" )
+      RETURN Refuse( "function '" + cOld + "' is not defined in the project" )
    ENDIF
 
    // B4g: o nome citado DENTRO de regras de pp (match[]/result[] do ast-5) -
@@ -3025,30 +3025,30 @@ STATIC FUNCTION RenameFunction( aArgs )
          OutErr( "rule site: " + cSiteDesc + hb_eol() )
       NEXT
       IF ! lEditRules
-         RETURN Refuse( "'" + cOld + "' é citado dentro de regra(s) de pp (sites acima) - " + ;
-                        "a regra reescreveria para o nome velho; repita com --edit-rules " + ;
-                        "para editar as diretivas junto" )
+         RETURN Refuse( "'" + cOld + "' is named inside pp rule(s) (sites above) - " + ;
+                        "the rule would rewrite back to the old name; repeat with --edit-rules " + ;
+                        "to edit the directives as well" )
       ENDIF
       cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
       FOR EACH aSite IN aRuleSites
          hRule := aSite[ 1 ]
          hTok  := aSite[ 2 ]
          IF hRule[ "file" ] == NIL
-            RETURN Refuse( "'" + cOld + "' citado em regra BUILTIN (" + RuleTag( hRule ) + ;
-                           ") - não há diretiva a editar" )
+            RETURN Refuse( "'" + cOld + "' named in a BUILTIN rule (" + RuleTag( hRule ) + ;
+                           ") - there is no directive to edit" )
          ENDIF
          IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
-            RETURN Refuse( "site de '" + cOld + "' na regra " + RuleTag( hRule ) + " (" + ;
-                           RuleWhere( hRule ) + ") sem posição no fonte (diretiva nascida " + ;
-                           "de expansão) - recuso editar" )
+            RETURN Refuse( "site of '" + cOld + "' in rule " + RuleTag( hRule ) + " (" + ;
+                           RuleWhere( hRule ) + ") with no source position (directive born " + ;
+                           "of an expansion) - refusing to edit" )
          ENDIF
          cChPath := ResolveInclude( hProj, hRule[ "file" ] )
          IF Empty( cChPath )
-            RETURN Refuse( "não achei o arquivo da diretiva '" + hRule[ "file" ] + "'" )
+            RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
          ENDIF
          IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
-            RETURN Refuse( "diretiva em '" + cChPath + "' fora do diretório do projeto - " + ;
-                           "recuso editar include de sistema/compartilhado" )
+            RETURN Refuse( "directive in '" + cChPath + "' outside the project directory - " + ;
+                           "refusing to edit a system/shared include" )
          ENDIF
          cChPath := hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) )
          // diretiva num fonte do PROJETO (regra no próprio .prg): a chave
@@ -3096,7 +3096,7 @@ STATIC FUNCTION RenameFunction( aArgs )
          FOR EACH hItem IN hFunc[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew .AND. ! Empty( aE )
                AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "declLine" ] ) + ;
-                     ": '" + cNew + "' é " + hItem[ "scope" ] + " em " + hFunc[ "name" ] + ;
+                     ": '" + cNew + "' is " + hItem[ "scope" ] + " em " + hFunc[ "name" ] + ;
                      " - chamadas ali seriam sombreadas" )
             ENDIF
          NEXT
@@ -3118,7 +3118,7 @@ STATIC FUNCTION RenameFunction( aArgs )
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
             Upper( hItem[ "text" ] ) == cUpOld
             AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string igual a '" + cOld + "' - possível chamada por nome (não será alterada)" )
+                  ": string igual a '" + cOld + "' - possible call by name (will NOT be changed)" )
          ENDIF
       NEXT
    NEXT
@@ -3137,18 +3137,18 @@ STATIC FUNCTION RenameFunction( aArgs )
    NEXT
 
    IF nTotal == 0
-      RETURN Refuse( "nenhum site editável encontrado para '" + cOld + "'" )
+      RETURN Refuse( "no editable site found for '" + cOld + "'" )
    ENDIF
 
    FOR nI := 1 TO Len( aWarn )
       OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "referências textuais encontradas (ver warnings) - repita com --force para prosseguir sem tocá-las" )
+      RETURN Refuse( "textual references found (see warnings) - repeat with --force to proceed without touching them" )
    ENDIF
 
    OutStd( "rename-function: " + cOld + " -> " + cNew + ;
-           iif( lStatic, " (static, só " + hb_FNameNameExt( cDefFile ) + ")", "" ) + hb_eol() )
+           iif( lStatic, " (static, only " + hb_FNameNameExt( cDefFile ) + ")", "" ) + hb_eol() )
    FOR EACH cPath IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cPath ]
          OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ;
@@ -3161,7 +3161,7 @@ STATIC FUNCTION RenameFunction( aArgs )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
       cText := hb_MemoRead( cPath )
@@ -3170,19 +3170,19 @@ STATIC FUNCTION RenameFunction( aArgs )
       IF nLine > 0
          RollbackAll( hOrig )
          RETURN Refuse( "texto em " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
-                        " não confere - rollback" )
+                        " does not match - rollback" )
       ENDIF
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                           hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                           cUpOld, cUpNew, @cSpec )              // reuso de cSpec p/ motivo
          RollbackAll( hOrig )
-         RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
       ENDIF
    NEXT
 
@@ -3346,52 +3346,52 @@ STATIC FUNCTION ExtractFunction( aArgs )
 
    nI := At( "-", cRange )
    IF nI == 0
-      RETURN Refuse( "intervalo deve ser <ini>-<fim> (números de linha do fonte)" )
+      RETURN Refuse( "the range must be <first>-<last> (source line numbers)" )
    ENDIF
    nFirst := Val( Left( cRange, nI - 1 ) )
    nLast  := Val( SubStr( cRange, nI + 1 ) )
    IF nFirst <= 0 .OR. nLast < nFirst
-      RETURN Refuse( "intervalo de linhas inválido" )
+      RETURN Refuse( "invalid line range" )
    ENDIF
 
    IF ! OneWord( cNewName )
-      RETURN Refuse( "novo nome '" + cNewName + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNewName + "' is not a single word" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cSrcPath := ProjectMember( hProj, cFile )
    IF cSrcPath == ""
-      RETURN Refuse( "'" + cFile + "' não é fonte do projeto '" + cSpec + "'" )
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! NameAccepted( hProj, cNewName, .T. )
-      RETURN Refuse( "o compilador do projeto rejeita '" + cNewName + "' como nome de função" )
+      RETURN Refuse( "the project compiler rejects '" + cNewName + "' as a function name" )
    ENDIF
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
 
    // o nome novo não pode existir nem ser referenciado em nenhum módulo
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ast-1 ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "ast-1 dump missing/invalid for '" + cPath + "'" )
       ENDIF
       hAsts[ cPath ] := hAst
       IF cPath == cSrcPath .AND. ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
-         RETURN Refuse( "novo nome '" + cNewName + "' colide com regra de pré-processador (" + ;
+         RETURN Refuse( "new name '" + cNewName + "' collides with a preprocessor rule (" + ;
                         RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
       ENDIF
       FOR EACH hFunc IN hAst[ "functions" ]
          IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUpNew
-            RETURN Refuse( "'" + cNewName + "' já é função definida em " + hb_FNameNameExt( cPath ) )
+            RETURN Refuse( "'" + cNewName + "' is already a function defined in " + hb_FNameNameExt( cPath ) )
          ENDIF
          FOR EACH hItem IN hFunc[ "calls" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew
-               RETURN Refuse( "'" + cNewName + "' já é referenciada em " + hb_FNameNameExt( cPath ) )
+               RETURN Refuse( "'" + cNewName + "' is already referenced in " + hb_FNameNameExt( cPath ) )
             ENDIF
          NEXT
       NEXT
@@ -3401,7 +3401,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    cText := hb_MemoRead( cSrcPath )
    aSrc := hb_ATokens( StrTran( cText, Chr( 13 ), "" ), Chr( 10 ) )
    IF nLast > Len( aSrc )
-      RETURN Refuse( "intervalo além do fim do arquivo" )
+      RETURN Refuse( "range past the end of the file" )
    ENDIF
 
    // função contêiner: a seleção tem que caber INTEIRA numa única função
@@ -3421,10 +3421,10 @@ STATIC FUNCTION ExtractFunction( aArgs )
       ENDIF
    NEXT
    IF hTarget == NIL
-      RETURN Refuse( "o intervalo não está inteiro dentro de uma única função" )
+      RETURN Refuse( "the range is not entirely inside a single function" )
    ENDIF
    IF hTarget[ "usesMacro" ]
-      OutStd( "warning: a função usa macros & - revise com cuidado" + hb_eol() )
+      OutStd( "warning: the function uses & macros - review carefully" + hb_eol() )
    ENDIF
 
    // P2a: o CONTÊINER é método? Nome composto pelo rastro (dona+mensagem);
@@ -3458,24 +3458,24 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH hOcc IN hTarget[ "occurrences" ]
       IF hOcc[ "sym" ] == "SELF" .AND. hOcc[ "line" ] >= nFirst .AND. hOcc[ "line" ] <= nLast
          IF hOcc[ "access" ] == "write"
-            RETURN Refuse( "a seleção reatribui Self (linha " + hb_ntos( hOcc[ "line" ] ) + ") - recusando" )
+            RETURN Refuse( "the selection reassigns Self (line " + hb_ntos( hOcc[ "line" ] ) + ") - refusing" )
          ENDIF
          IF hOcc[ "access" ] == "ref"
-            RETURN Refuse( "a seleção passa Self por referência (linha " + hb_ntos( hOcc[ "line" ] ) + ") - recusando" )
+            RETURN Refuse( "the selection passes Self by reference (line " + hb_ntos( hOcc[ "line" ] ) + ") - refusing" )
          ENDIF
          lUsesSelf := .T.
       ENDIF
    NEXT
    IF lUsesSelf .AND. ! lMethod
-      RETURN Refuse( "a seleção usa Self/:: mas " + hTarget[ "name" ] + ;
-                     " não é método de classe - extração recusada" )
+      RETURN Refuse( "the selection uses Self/:: but " + hTarget[ "name" ] + ;
+                     " is not a class method - extraction refused" )
    ENDIF
    IF lMethod
       // extração PARA MÉTODO da mesma classe: o corpo move verbatim (::/sends
       // continuam válidos; Super preserva o binding - mesma classe).
       aImplInfo := MethodImplOf( hAst, hTarget, "", cMsgPart )
       IF aImplInfo == NIL
-         RETURN Refuse( "não consegui decompor o nome gerado de " + hTarget[ "name" ] )
+         RETURN Refuse( "could not decompose the generated name of " + hTarget[ "name" ] )
       ENDIF
       cClassReal := aImplInfo[ 1 ]
       // símbolo previsto da função gerada: o composto com a faixa do MÉTODO
@@ -3496,15 +3496,15 @@ STATIC FUNCTION ExtractFunction( aArgs )
          ENDIF
       NEXT
       IF Empty( cGenNew )
-         RETURN Refuse( "não consegui prever o símbolo gerado do novo método" )
+         RETURN Refuse( "could not predict the generated symbol of the new method" )
       ENDIF
       cUpGenNew := Upper( cGenNew )
       // âncora do protótipo: aplicações com a identidade INTEIRA do método
       // (P1a) cujos tokens posicionados ficam ANTES da implementação
       nAnchor := MethodProtoAnchor( hAst, aGenParts, hTarget[ "line" ] )
       IF nAnchor == 0
-         RETURN Refuse( "não localizei o protótipo de " + cClassReal + ":" + cMsgPart + ;
-                        " no módulo (classe declarada em include?) - recusando" )
+         RETURN Refuse( "could not locate the prototype of " + cClassReal + ":" + cMsgPart + ;
+                        " in the module (class declared in an include?) - refusing" )
       ENDIF
       // colisões nos módulos: símbolo gerado já existente/referenciado e
       // mensagem já ENVIADA (send é despacho dinâmico - o método novo
@@ -3513,17 +3513,17 @@ STATIC FUNCTION ExtractFunction( aArgs )
          hAst2 := hAsts[ cPath ]
          FOR EACH hFn2 IN hAst2[ "functions" ]
             IF ! hFn2[ "fileDecl" ] .AND. Upper( hFn2[ "name" ] ) == cUpGenNew
-               RETURN Refuse( "o símbolo gerado " + cGenNew + " já é função em " + hb_FNameNameExt( cPath ) )
+               RETURN Refuse( "the generated symbol " + cGenNew + " is already a function in " + hb_FNameNameExt( cPath ) )
             ENDIF
             FOR EACH hIt2 IN hFn2[ "calls" ]
                IF Upper( hIt2[ "sym" ] ) == cUpGenNew
-                  RETURN Refuse( "o símbolo gerado " + cGenNew + " já é referenciado em " + hb_FNameNameExt( cPath ) )
+                  RETURN Refuse( "the generated symbol " + cGenNew + " is already referenced in " + hb_FNameNameExt( cPath ) )
                ENDIF
             NEXT
             FOR EACH hIt2 IN hFn2[ "sends" ]
                IF Upper( hIt2[ "sym" ] ) == cUpNew .OR. Upper( hIt2[ "sym" ] ) == "_" + cUpNew
-                  RETURN Refuse( "'" + cNewName + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
-                                 ":" + hb_ntos( hIt2[ "line" ] ) + " - o método novo mudaria o dispatch; recusando" )
+                  RETURN Refuse( "'" + cNewName + "' is already a message sent in " + hb_FNameNameExt( cPath ) + ;
+                                 ":" + hb_ntos( hIt2[ "line" ] ) + " - the new method would change the dispatch; refusing" )
                ENDIF
             NEXT
          NEXT
@@ -3543,7 +3543,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
          aCF := hClassMap[ cUpCur ]
          hMembers := ClassMembersOf( aCF[ 2 ], aCF[ 3 ] )
          IF hb_HHasKey( hMembers, cUpNew )
-            RETURN Refuse( "'" + cNewName + "' já é membro (VAR/DATA/METHOD) da classe " + cUpCur )
+            RETURN Refuse( "'" + cNewName + "' is already a member (VAR/DATA/METHOD) of class " + cUpCur )
          ENDIF
          aPP := ClassParentsOf( aCF[ 2 ], cUpCur, aCF[ 3 ], hClassMap )
          FOR EACH cPar IN aPP[ 1 ]
@@ -3558,7 +3558,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
       // strings soltas que soletram o nome novo: relato (nunca edição)
       FOR EACH hTok IN hAst[ "tokens" ]
          IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. Upper( hTok[ "text" ] ) == cUpNew
-            OutStd( "warning: string na linha " + hb_ntos( hTok[ "line" ] ) + ;
+            OutStd( "warning: string on line " + hb_ntos( hTok[ "line" ] ) + ;
                     " soletra '" + cNewName + "'" + hb_eol() )
          ENDIF
       NEXT
@@ -3568,7 +3568,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH hItem IN hTarget[ "statements" ]
       IF hItem[ "line" ] >= nFirst .AND. hItem[ "line" ] <= nLast .AND. ;
          ExprHasEt( hb_HGetDef( hItem, "expr", NIL ), "MACRO" )
-         RETURN Refuse( "a seleção usa macro (&) na linha " + hb_ntos( hItem[ "line" ] ) + " - recusando" )
+         RETURN Refuse( "the selection uses a macro (&) on line " + hb_ntos( hItem[ "line" ] ) + " - refusing" )
       ENDIF
    NEXT
 
@@ -3582,11 +3582,11 @@ STATIC FUNCTION ExtractFunction( aArgs )
       FOR EACH hItem IN hTarget[ "statements" ]
          IF hItem[ "line" ] >= nFirst .AND. hItem[ "line" ] <= nLast .AND. ;
             ExprHasEt( hb_HGetDef( hItem, "expr", NIL ), "SELF" )
-            RETURN Refuse( "a seleção usa QSelf()/Self (linha " + hb_ntos( hItem[ "line" ] ) + ;
-                           ") e o alvo é uma FUNÇÃO - o receptor não viajaria" + ;
-                           iif( Empty( cDslRule ), "", ": o contêiner nasce de regra de DSL própria ('" + ;
-                                cDslRule + "') e a síntese de método é a exceção do hbclass (não sei " + ;
-                                "sintetizar o construto desta DSL)" ) + "; recusando" )
+            RETURN Refuse( "the selection uses QSelf()/Self (line " + hb_ntos( hItem[ "line" ] ) + ;
+                           ") and the target is a FUNCTION - the receiver would not travel" + ;
+                           iif( Empty( cDslRule ), "", ": the container is born from a custom DSL rule ('" + ;
+                                cDslRule + "') and method synthesis is the hbclass exception (I do not know " + ;
+                                "sintetizar o construto desta DSL)" ) + "; refusing" )
          ENDIF
       NEXT
    ENDIF
@@ -3596,8 +3596,8 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH hItem IN hTarget[ "declarations" ]
       IF hItem[ "declLine" ] >= nFirst .AND. hItem[ "declLine" ] <= nLast .AND. ;
          !( hItem[ "scope" ] == "local" )
-         RETURN Refuse( "declaração " + Upper( hItem[ "scope" ] ) + " '" + hItem[ "sym" ] + ;
-                        "' dentro da seleção (linha " + hb_ntos( hItem[ "declLine" ] ) + ") - recusando" )
+         RETURN Refuse( "declaration " + Upper( hItem[ "scope" ] ) + " '" + hItem[ "sym" ] + ;
+                        "' inside the selection (line " + hb_ntos( hItem[ "declLine" ] ) + ") - refusing" )
       ENDIF
    NEXT
 
@@ -3607,12 +3607,12 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH hItem IN aPairs
       IF ( hItem[ 2 ] >= nFirst .AND. hItem[ 2 ] <= nLast ) .AND. ;
          !( hItem[ 3 ] >= nFirst .AND. hItem[ 3 ] <= nLast )
-         RETURN Refuse( "a seleção abre " + hItem[ 1 ] + " (linha " + hb_ntos( hItem[ 2 ] ) + ;
-                        ") que fecha fora dela" )
+         RETURN Refuse( "the selection opens " + hItem[ 1 ] + " (line " + hb_ntos( hItem[ 2 ] ) + ;
+                        ") that closes outside it" )
       ENDIF
       IF !( hItem[ 2 ] >= nFirst .AND. hItem[ 2 ] <= nLast ) .AND. ;
          ( hItem[ 3 ] >= nFirst .AND. hItem[ 3 ] <= nLast )
-         RETURN Refuse( "a seleção fecha " + hItem[ 1 ] + " aberto fora dela (linha " + ;
+         RETURN Refuse( "the selection closes " + hItem[ 1 ] + " opened outside it (line " + ;
                         hb_ntos( hItem[ 2 ] ) + ")" )
       ENDIF
    NEXT
@@ -3626,18 +3626,18 @@ STATIC FUNCTION ExtractFunction( aArgs )
          hTok[ "line" ] >= nFirst .AND. hTok[ "line" ] <= nLast
          DO CASE
          CASE Upper( hTok[ "text" ] ) == "RETURN"
-            RETURN Refuse( "RETURN dentro da seleção (linha " + hb_ntos( hTok[ "line" ] ) + ") - recusando" )
+            RETURN Refuse( "RETURN inside the selection (line " + hb_ntos( hTok[ "line" ] ) + ") - refusing" )
          CASE Upper( hTok[ "text" ] ) == "EXIT" .OR. Upper( hTok[ "text" ] ) == "LOOP"
             IF ! JumpCovered( aPairs, hTok[ "line" ], nFirst, nLast, { "for", "while" } )
-               RETURN Refuse( Upper( hTok[ "text" ] ) + " na linha " + hb_ntos( hTok[ "line" ] ) + ;
-                              " saltaria para fora da seleção" )
+               RETURN Refuse( Upper( hTok[ "text" ] ) + " on line " + hb_ntos( hTok[ "line" ] ) + ;
+                              " would jump outside the selection" )
             ENDIF
          CASE Upper( hTok[ "text" ] ) == "BREAK" .AND. ;
               !( hTok:__enumIndex() < Len( hAst[ "tokens" ] ) .AND. ;
                  hAst[ "tokens" ][ hTok:__enumIndex() + 1 ][ "type" ] == 50 )
             IF ! JumpCovered( aPairs, hTok[ "line" ], nFirst, nLast, { "sequence" } )
-               RETURN Refuse( "BREAK na linha " + hb_ntos( hTok[ "line" ] ) + ;
-                              " saltaria para fora da seleção" )
+               RETURN Refuse( "BREAK on line " + hb_ntos( hTok[ "line" ] ) + ;
+                              " would jump outside the selection" )
             ENDIF
          ENDCASE
       ENDIF
@@ -3683,15 +3683,15 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH hVar IN aVars
       IF hVar[ "declIn" ]
          IF hVar[ "after" ]
-            RETURN Refuse( "'" + hVar[ "sym" ] + "' é declarada dentro da seleção mas usada depois dela" )
+            RETURN Refuse( "'" + hVar[ "sym" ] + "' is declared inside the selection but used after it" )
          ENDIF
          LOOP                                    // move junto com o código
       ENDIF
       // codeblock na seleção capturando local viva fora: a captura passaria
       // a apontar para o parâmetro da função nova - recusa conservadora
       IF hVar[ "detachedIn" ] .AND. ( hVar[ "before" ] .OR. hVar[ "after" ] )
-         RETURN Refuse( "codeblock na seleção captura '" + hVar[ "sym" ] + ;
-                        "' usada fora dela - a captura mudaria de alvo; recusando" )
+         RETURN Refuse( "a codeblock in the selection captures '" + hVar[ "sym" ] + ;
+                        "' used outside it - the capture would change target; refusing" )
       ENDIF
       cWhy := TokenSpell( hAst, hTarget, nFuncEnd, hVar[ "sym" ] )   // grafia original
       IF ! hVar[ "param" ] .AND. ! hVar[ "before" ] .AND. ! hVar[ "after" ] .AND. ;
@@ -3704,8 +3704,8 @@ STATIC FUNCTION ExtractFunction( aArgs )
       ENDIF
       IF VarWrittenIn( hVar ) .AND. hVar[ "after" ]
          IF ! Empty( cOut )
-            RETURN Refuse( "mais de uma variável modificada e usada depois da seleção ('" + ;
-                           cOut + "' e '" + cWhy + "') - recusando" )
+            RETURN Refuse( "more than one variable modified and used after the selection ('" + ;
+                           cOut + "' e '" + cWhy + "') - refusing" )
          ENDIF
          cOut := cWhy
          lOutParam := !( hVar[ "firstIn" ] == "write" )
@@ -3730,7 +3730,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    FOR EACH nI IN hb_HKeys( hMovedLines )         // reuso: nI = linha
       hMovedLines[ nI ] := BuildDeclLine( hAst, hTarget, aSrc, nI, hMovedLines[ nI ] )
       IF hMovedLines[ nI ] == NIL
-         RETURN Refuse( "não consegui editar com segurança a declaração da linha " + hb_ntos( nI ) )
+         RETURN Refuse( "could not safely edit the declaration on line " + hb_ntos( nI ) )
       ENDIF
    NEXT
 
@@ -3775,23 +3775,23 @@ STATIC FUNCTION ExtractFunction( aArgs )
 
    OutStd( "extract-function: linhas " + hb_ntos( nFirst ) + "-" + hb_ntos( nLast ) + ;
            " de " + hTarget[ "name" ] + " -> " + ;
-           iif( lMethod, "novo método " + cClassReal + ":" + cNewName, cNewName ) + ;
+           iif( lMethod, "new method " + cClassReal + ":" + cNewName, cNewName ) + ;
            "( " + ArrJoin( aParams, ", " ) + " )" + ;
            iif( Empty( cOut ), "", " retornando " + cOut ) + hb_eol() )
    IF ! Empty( cDslRule )
-      OutStd( "  contêiner de DSL própria (regra '" + cDslRule + "'): a síntese de método é a " + ;
-              "exceção do hbclass - o alvo é FUNÇÃO verificada" + hb_eol() )
+      OutStd( "  custom DSL container (rule '" + cDslRule + "'): method synthesis is the " + ;
+              "hbclass exception - the target is a verified FUNCTION" + hb_eol() )
    ENDIF
    IF lMethod
-      OutStd( "  protótipo METHOD " + cNewName + " inserido após a linha " + hb_ntos( nAnchor ) + ;
-              " (junto ao protótipo do método de origem)" + hb_eol() )
+      OutStd( "  METHOD prototype " + cNewName + " inserted after line " + hb_ntos( nAnchor ) + ;
+              " (next to the prototype of the source method)" + hb_eol() )
       FOR EACH cPar IN aParentsUnk
-         OutStd( "  warning: pai " + cPar + " fora do projeto - membros herdados não verificáveis" + hb_eol() )
+         OutStd( "  warning: pai " + cPar + " outside the project - inherited members not verifiable" + hb_eol() )
       NEXT
    ENDIF
    FOR nI := 1 TO Len( aMoved )
-      OutStd( "  LOCAL " + aMoved[ nI ][ 3 ] + " (linha " + hb_ntos( aMoved[ nI ][ 1 ] ) + ;
-              ") só é usada na seleção - migra para " + cNewName + hb_eol() )
+      OutStd( "  LOCAL " + aMoved[ nI ][ 3 ] + " (line " + hb_ntos( aMoved[ nI ][ 1 ] ) + ;
+              ") is used only in the selection - moves to " + cNewName + hb_eol() )
    NEXT
    IF lDryRun
       OutStd( "dry run - nada foi escrito" + hb_eol() )
@@ -3799,7 +3799,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
 
    cTextNew := ReplaceLines( cText, nFirst, nLast, cCall, cEol ) + cNewFunc
@@ -3821,7 +3821,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "o projeto parou de compilar após a extração - rollback" )
+      RETURN Refuse( "the project stopped compiling after the extraction - rollback" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       cWhy := ""
@@ -3834,24 +3834,24 @@ STATIC FUNCTION ExtractFunction( aArgs )
                                         hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                                         cUpGenNew, cUpNew, Upper( cClassReal ), cNewName, @cWhy )
                hb_MemoWrit( cSrcPath, cText )
-               RETURN Refuse( "verificação FALHOU: " + cWhy + " - rollback" )
+               RETURN Refuse( "verification FAILED: " + cWhy + " - rollback" )
             ENDIF
          ELSEIF ! HrbExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                                    hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                                    cUpNew, @cWhy )
             hb_MemoWrit( cSrcPath, cText )
-            RETURN Refuse( "verificação FALHOU: " + cWhy + " - rollback" )
+            RETURN Refuse( "verification FAILED: " + cWhy + " - rollback" )
          ENDIF
       ELSEIF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
                 hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verificação FALHOU: módulo não-editado mudou - rollback" )
+         RETURN Refuse( "verification FAILED: an unedited module changed - rollback" )
       ENDIF
    NEXT
 
-   OutStd( "verified: símbolos preservados (+" + ;
+   OutStd( "verified: symbols preserved (+" + ;
            iif( lMethod, cGenNew + "), mensagem " + cNewName + " registrada", cNewName + ")" ) + ;
-           "; rode sua suíte para confirmar comportamento" + hb_eol() )
+           "; run your test suite to confirm behaviour" + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -4462,24 +4462,24 @@ STATIC FUNCTION InlineLocal( aArgs )
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cSrcPath := ProjectMember( hProj, cFile )
    IF cSrcPath == ""
-      RETURN Refuse( "'" + cFile + "' não é fonte do projeto '" + cSpec + "'" )
+      RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
 
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    hAst := ReadAst( cTmp, cSrcPath )
    IF hAst == NIL
-      RETURN Refuse( "dump ast-1 ausente/inválido para '" + cSrcPath + "'" )
+      RETURN Refuse( "ast-1 dump missing/invalid for '" + cSrcPath + "'" )
    ENDIF
    hFunc := PickFunc( hAst, cFunc )
    IF hFunc == NIL
-      RETURN Refuse( "função '" + cFunc + "' não encontrada em '" + cFile + "'" )
+      RETURN Refuse( "function '" + cFunc + "' not found in '" + cFile + "'" )
    ENDIF
 
    cText := hb_MemoRead( cSrcPath )
@@ -4493,10 +4493,10 @@ STATIC FUNCTION InlineLocal( aArgs )
       ENDIF
    NEXT
    IF hDecl == NIL
-      RETURN Refuse( "'" + cName + "' não é LOCAL declarada em " + hFunc[ "name" ] )
+      RETURN Refuse( "'" + cName + "' is not a LOCAL declared in " + hFunc[ "name" ] )
    ENDIF
    IF hDecl[ "param" ]
-      RETURN Refuse( "'" + cName + "' é parâmetro - sem expressão de init para inline" )
+      RETURN Refuse( "'" + cName + "' is a parameter - no init expression to inline" )
    ENDIF
    nDeclLine := hDecl[ "declLine" ]
    FOR EACH hItem IN hFunc[ "declarations" ]
@@ -4505,8 +4505,8 @@ STATIC FUNCTION InlineLocal( aArgs )
       ENDIF
    NEXT
    IF nDeclsOnLine != 1
-      RETURN Refuse( "a declaração de '" + cName + "' compartilha a linha " + ;
-                     hb_ntos( nDeclLine ) + " com outras - recusando" )
+      RETURN Refuse( "the declaration of '" + cName + "' shares line " + ;
+                     hb_ntos( nDeclLine ) + " with others - refusing" )
    ENDIF
 
    // usos: só leituras simples fora de codeblock; a única escrita é o init
@@ -4514,23 +4514,23 @@ STATIC FUNCTION InlineLocal( aArgs )
       IF Upper( hItem[ "sym" ] ) == cUp
          DO CASE
          CASE hItem[ "block" ]
-            RETURN Refuse( "'" + cName + "' é usada/capturada em codeblock (linha " + ;
+            RETURN Refuse( "'" + cName + "' is used/captured in a codeblock (line " + ;
                            hb_ntos( hItem[ "line" ] ) + ") - inline mudaria a captura" )
          CASE hItem[ "line" ] == nDeclLine .AND. hItem[ "access" ] == "write"
             lInit := .T.
          CASE hItem[ "access" ] == "read"
             nReads++
          OTHERWISE
-            RETURN Refuse( "'" + cName + "' é " + hItem[ "access" ] + " na linha " + ;
-                           hb_ntos( hItem[ "line" ] ) + " - só leituras permitem inline" )
+            RETURN Refuse( "'" + cName + "' is " + hItem[ "access" ] + " on line " + ;
+                           hb_ntos( hItem[ "line" ] ) + " - only reads allow inlining" )
          ENDCASE
       ENDIF
    NEXT
    IF ! lInit
-      RETURN Refuse( "'" + cName + "' não tem inicializador na declaração" )
+      RETURN Refuse( "'" + cName + "' has no initializer in its declaration" )
    ENDIF
    IF nReads == 0
-      RETURN Refuse( "'" + cName + "' não tem leituras - use unused-locals" )
+      RETURN Refuse( "'" + cName + "' has no reads - use unused-locals" )
    ENDIF
 
    // nome citado em string no módulo (stringify de pp/call-by-name): a
@@ -4538,10 +4538,10 @@ STATIC FUNCTION InlineLocal( aArgs )
    // linha: o token do stringify nasce sintetizado com line 0/prov 'n'
    FOR EACH hTok IN hAst[ "tokens" ]
       IF hTok[ "type" ] == 41 .AND. Upper( hTok[ "text" ] ) == cUp
-         RETURN Refuse( "string igual a '" + cName + "'" + ;
-                        iif( hTok[ "line" ] > 0, " na linha " + hb_ntos( hTok[ "line" ] ), ;
-                             " gerada por regra de pp" ) + ;
-                        " (stringify/chamada por nome) - recusando" )
+         RETURN Refuse( "string equal to '" + cName + "'" + ;
+                        iif( hTok[ "line" ] > 0, " on line " + hb_ntos( hTok[ "line" ] ), ;
+                             " generated by a pp rule" ) + ;
+                        " (stringify/call by name) - refusing" )
       ENDIF
    NEXT
 
@@ -4555,12 +4555,12 @@ STATIC FUNCTION InlineLocal( aArgs )
       ENDIF
    NEXT
    IF hInit == NIL
-      RETURN Refuse( "não encontrei o statement de init de '" + cName + "'" )
+      RETURN Refuse( "could not find the init statement of '" + cName + "'" )
    ENDIF
    hExpr := hInit[ "expr" ][ "right" ]
 
    IF ! ExprPure( hExpr, @cWhy )
-      RETURN Refuse( "expressão de init impura/não-duplicável (" + cWhy + ") - recusando" )
+      RETURN Refuse( "impure/non-duplicable init expression (" + cWhy + ") - refusing" )
    ENDIF
    // variáveis da expressão: nenhuma pode ser reescrita fora do próprio init
    aVarsExpr := {}
@@ -4571,9 +4571,9 @@ STATIC FUNCTION InlineLocal( aArgs )
             // a única escrita tolerada é o init da própria variável
             IF ! ( hItem[ "access" ] == "write" .AND. ! hItem[ "block" ] .AND. ;
                    hItem[ "line" ] == VarDeclLine( hFunc, cVar ) )
-               RETURN Refuse( "'" + cVar + "' (usada na expressão) é reescrita na linha " + ;
-                              hb_ntos( hItem[ "line" ] ) + " - o valor de '" + cName + ;
-                              "' não é estável" )
+               RETURN Refuse( "'" + cVar + "' (used in the expression) is rewritten on line " + ;
+                              hb_ntos( hItem[ "line" ] ) + " - the value of '" + cName + ;
+                              "' is not stable" )
             ENDIF
          ENDIF
       NEXT
@@ -4582,7 +4582,7 @@ STATIC FUNCTION InlineLocal( aArgs )
    // texto da expressão: fatia do stream depois de nome+':=' até o fim da
    // linha da declaração (declaração continuada por ';' recusa)
    IF Right( RTrim( aSrc[ nDeclLine ] ), 1 ) == ";"
-      RETURN Refuse( "declaração continuada por ';' - recusando" )
+      RETURN Refuse( "declaration continued by ';' - refusing" )
    ENDIF
    aToks := hAst[ "tokens" ]
    FOR nI := 1 TO Len( aToks )
@@ -4593,7 +4593,7 @@ STATIC FUNCTION InlineLocal( aArgs )
       ENDIF
    NEXT
    IF iName == 0 .OR. iName + 2 > Len( aToks ) .OR. ! aToks[ iName + 1 ][ "text" ] == ":="
-      RETURN Refuse( "init de '" + cName + "' com formato inesperado na linha " + hb_ntos( nDeclLine ) )
+      RETURN Refuse( "init de '" + cName + "' with an unexpected format on line " + hb_ntos( nDeclLine ) )
    ENDIF
    iA := iName + 2
    iB := iA
@@ -4602,14 +4602,14 @@ STATIC FUNCTION InlineLocal( aArgs )
    ENDDO
    aSpan := BuildArgSpan( hAst, iA, iB, @cWhy )
    IF aSpan == NIL
-      RETURN Refuse( cWhy + " - não consegui recortar a expressão (linha " + ;
-                     hb_ntos( nDeclLine ) + "; um #define no init não tem posição no fonte)" )
+      RETURN Refuse( cWhy + " - could not carve out the expression (line " + ;
+                     hb_ntos( nDeclLine ) + "; a #define in the init has no source position)" )
    ENDIF
    cExpr := aSpan[ 3 ]
    // nada (comentário) depois da expressão: a linha inteira vai cair
    IF ! Empty( RTrim( SubStr( aSrc[ nDeclLine ], aSpan[ 2 ] + Len( cExpr ) ) ) )
-      RETURN Refuse( "comentário/resto depois do init na linha " + hb_ntos( nDeclLine ) + ;
-                     " se perderia - recusando" )
+      RETURN Refuse( "comment/leftover after the init on line " + hb_ntos( nDeclLine ) + ;
+                     " would be lost - refusing" )
    ENDIF
    cRepl := iif( iB > iA, "( " + cExpr + " )", cExpr )
 
@@ -4630,16 +4630,16 @@ STATIC FUNCTION InlineLocal( aArgs )
          Upper( hTok[ "text" ] ) == cUp .AND. ;
          !( cPrevType == 58 .OR. cPrevType == 59 )
          IF hTok[ "col" ] == NIL
-            RETURN Refuse( "uso na linha " + hb_ntos( hTok[ "line" ] ) + ;
-                           " sem posição confiável (reescrita de pp) - recusando" )
+            RETURN Refuse( "use on line " + hb_ntos( hTok[ "line" ] ) + ;
+                           " with no reliable position (pp rewrite) - refusing" )
          ENDIF
          AAdd( aEdits, { hTok[ "line" ], hTok[ "col" ] + 1, hTok[ "text" ], cRepl } )
       ENDIF
       aPrev := hTok
    NEXT
    IF Len( aEdits ) != nReads
-      RETURN Refuse( "usos no fonte (" + hb_ntos( Len( aEdits ) ) + ") não casam com as " + ;
-                     "leituras do compilador (" + hb_ntos( nReads ) + ") - recusando" )
+      RETURN Refuse( "uses in the source (" + hb_ntos( Len( aEdits ) ) + ") do not match the " + ;
+                     "leituras do compilador (" + hb_ntos( nReads ) + ") - refusing" )
    ENDIF
 
    OutStd( "inline-local: " + cName + " := " + cExpr + " em " + hFunc[ "name" ] + ;
@@ -4648,18 +4648,18 @@ STATIC FUNCTION InlineLocal( aArgs )
       OutStd( "  " + hb_FNameNameExt( cSrcPath ) + ":" + hb_ntos( aEdits[ nI ][ 1 ] ) + ;
               ":" + hb_ntos( aEdits[ nI ][ 2 ] ) + hb_eol() )
    NEXT
-   OutStd( "  declaração da linha " + hb_ntos( nDeclLine ) + " removida" + hb_eol() )
+   OutStd( "  declaration on line " + hb_ntos( nDeclLine ) + " removida" + hb_eol() )
    IF lDryRun
       OutStd( "dry run - nada foi escrito" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    cSpec := ApplyRangeEdits( cText, aEdits, @nLine )          // reuso de cSpec
    IF nLine > 0
-      RETURN Refuse( "texto na linha " + hb_ntos( nLine ) + " não confere com o esperado" )
+      RETURN Refuse( "text on line " + hb_ntos( nLine ) + " does not match what was expected" )
    ENDIF
    cWhy := iif( Chr( 13 ) + Chr( 10 ) $ cText, Chr( 13 ) + Chr( 10 ), Chr( 10 ) )   // reuso: eol
    cSpec := EditLine( cSpec, nDeclLine, "", cWhy )
@@ -4672,23 +4672,23 @@ STATIC FUNCTION InlineLocal( aArgs )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "o projeto parou de compilar após o inline - rollback" )
+      RETURN Refuse( "the project stopped compiling after the inline - rollback" )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]                          // reuso
       IF cSpec == cSrcPath
          IF ! HrbSymbolsEqual( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ), ;
                                hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ), @cWhy )
             hb_MemoWrit( cSrcPath, cText )
-            RETURN Refuse( "verificação FALHOU: " + cWhy + " - rollback" )
+            RETURN Refuse( "verification FAILED: " + cWhy + " - rollback" )
          ENDIF
       ELSEIF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
                 hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verificação FALHOU: módulo não-editado mudou - rollback" )
+         RETURN Refuse( "verification FAILED: an unedited module changed - rollback" )
       ENDIF
    NEXT
-   OutStd( "verified: " + hb_ntos( nReads ) + " uso(s) substituídos; símbolos intactos; " + ;
-           "rode sua suíte para confirmar comportamento" + hb_eol() )
+   OutStd( "verified: " + hb_ntos( nReads ) + " use(s) replaced; symbols intact; " + ;
+           "run your test suite to confirm behaviour" + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -4782,7 +4782,7 @@ STATIC FUNCTION UnusedLocals( aArgs )
    ENDIF
    hProj := LoadProject( aArgs[ 2 ] )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + aArgs[ 2 ] + "'" )
+      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
    ENDIF
    // análise do próprio compilador (W0003/W0032); -w/-es do projeto saem
    // para o -w3 desta análise não virar erro de build
@@ -4794,8 +4794,8 @@ STATIC FUNCTION UnusedLocals( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       cOut := cErr := ""
       IF hb_processRun( HarbourBin() + " " + cPath + " -q0 -w3 -s" + cFlags,, @cOut, @cErr ) != 0
-         OutErr( "hbrefactor: " + cPath + " não compila:" + hb_eol() + ErrLines( cOut + cErr ) )
-         RETURN Refuse( "'" + cPath + "' não compila" )
+         OutErr( "hbrefactor: " + cPath + " does not compile:" + hb_eol() + ErrLines( cOut + cErr ) )
+         RETURN Refuse( "'" + cPath + "' does not compile" )
       ENDIF
       FOR EACH cLine IN hb_ATokens( StrTran( cOut + cErr, Chr( 13 ), "" ), Chr( 10 ) )
          IF "W0003" $ cLine .OR. "W0032" $ cLine
@@ -4821,14 +4821,14 @@ STATIC FUNCTION CallGraph( aArgs )
    ENDIF
    hProj := LoadProject( aArgs[ 2 ] )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + aArgs[ 2 ] + "'" )
+      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
    ENDIF
    IF Len( aArgs ) >= 3
       cFilter := Upper( aArgs[ 3 ] )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila" )
+      RETURN Refuse( "the project does not compile" )
    ENDIF
    // funções definidas + índice de MENSAGENS de construto gerado: o nome
    // composto decompõe pelo rastro (GenNameParts); a MENSAGEM é a parte
@@ -4840,7 +4840,7 @@ STATIC FUNCTION CallGraph( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ausente para '" + cPath + "'" )
+         RETURN Refuse( "dump missing for '" + cPath + "'" )
       ENDIF
       hAsts[ cPath ] := hAst
       FOR EACH hFunc IN hAst[ "functions" ]
@@ -4975,16 +4975,16 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
    ENDIF
    hProj := LoadProject( aArgs[ 2 ] )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + aArgs[ 2 ] + "'" )
+      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila" )
+      RETURN Refuse( "the project does not compile" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ausente para '" + cPath + "'" )
+         RETURN Refuse( "dump missing for '" + cPath + "'" )
       ENDIF
       FOR EACH hFunc IN hAst[ "functions" ]
          IF ! hFunc[ "fileDecl" ]
@@ -5064,11 +5064,11 @@ STATIC FUNCTION ReorderParams( aArgs )
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
 
    // definição e lista de parâmetros. PickFunc resolve nome puro, Classe:Metodo
@@ -5077,7 +5077,7 @@ STATIC FUNCTION ReorderParams( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "ast dump missing/invalid for '" + cPath + "'" )
       ENDIF
       hAst[ "__src" ] := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
       hAsts[ cPath ] := hAst
@@ -5090,14 +5090,14 @@ STATIC FUNCTION ReorderParams( aArgs )
       hFunc := PickFunc( hAsts[ cPath ], cFunc )
       IF hFunc != NIL .AND. ! hFunc[ "fileDecl" ]
          IF hDef != NIL
-            RETURN Refuse( "'" + cFunc + "' definida em mais de um módulo - use --file" )
+            RETURN Refuse( "'" + cFunc + "' is defined in more than one module - use --file" )
          ENDIF
          hDef := hFunc
          cDefFile := cPath
       ENDIF
    NEXT
    IF hDef == NIL
-      RETURN Refuse( "função '" + cFunc + "' não está definida no projeto" )
+      RETURN Refuse( "function '" + cFunc + "' is not defined in the project" )
    ENDIF
    cUpFunc := Upper( hDef[ "name" ] )         // nome REAL (gerado, p/ métodos)
    FOR EACH hItem IN hDef[ "declarations" ]
@@ -5106,7 +5106,7 @@ STATIC FUNCTION ReorderParams( aArgs )
       ENDIF
    NEXT
    IF Len( aParams ) < 2
-      RETURN Refuse( "'" + cFunc + "' tem menos de 2 parâmetros" )
+      RETURN Refuse( "'" + cFunc + "' has fewer than 2 parameters" )
    ENDIF
 
    // método? identidade (classe+método) do nome gerado; assinatura e política
@@ -5121,8 +5121,8 @@ STATIC FUNCTION ReorderParams( aArgs )
          // co-derivação) - a posição no composto é forma, não fato (Q1)
          cUpMsg := GenMsgPart( aIdent, ClassFuncMap( hAsts ) )
          IF Empty( cUpMsg )
-            RETURN Refuse( "não consegui identificar a mensagem no composto '" + ;
-                           hDef[ "name" ] + "' - use a forma Classe:Metodo" )
+            RETURN Refuse( "could not identify the message in the compound '" + ;
+                           hDef[ "name" ] + "' - use the Class:Method form" )
          ENDIF
       ENDIF
    ENDIF
@@ -5134,12 +5134,12 @@ STATIC FUNCTION ReorderParams( aArgs )
       aNew[ nI ] := AllTrim( aNew[ nI ] )
    NEXT
    IF Len( aNew ) != Len( aParams )
-      RETURN Refuse( "a nova ordem deve listar todos os " + hb_ntos( Len( aParams ) ) + " parâmetro(s)" )
+      RETURN Refuse( "the new order must list all " + hb_ntos( Len( aParams ) ) + " parameter(s)" )
    ENDIF
    FOR nI := 1 TO Len( aNew )
       nJ := hb_AScan( aParams, aNew[ nI ],,, .T. )
       IF nJ == 0 .OR. hb_AScan( aPerm, nJ ) > 0
-         RETURN Refuse( "a nova ordem deve ser permutação de: " + ArrJoin( aParams, ", " ) )
+         RETURN Refuse( "the new order must be a permutation of: " + ArrJoin( aParams, ", " ) )
       ENDIF
       AAdd( aPerm, nJ )
    NEXT
@@ -5174,9 +5174,9 @@ STATIC FUNCTION ReorderParams( aArgs )
          NEXT
       NEXT
       IF Len( aOwnerClasses ) > 1
-         RETURN Refuse( "'" + cFunc + "': a mensagem é membro de mais de uma classe (" + ;
-                        ArrJoin( aOwnerClasses, ", " ) + ") - send é despacho dinâmico, " + ;
-                        "reordenar os argumentos seria ambíguo; recuso" )
+         RETURN Refuse( "'" + cFunc + "': the message is a member of more than one class (" + ;
+                        ArrJoin( aOwnerClasses, ", " ) + ") - a send is dynamic dispatch, " + ;
+                        "reordering the arguments would be ambiguous; refusing" )
       ENDIF
    ENDIF
 
@@ -5197,8 +5197,8 @@ STATIC FUNCTION ReorderParams( aArgs )
                IF lIsMethod
                   aSigHits := SigParamHits( hAst, aIdent, aParams[ nI ] )
                   IF Empty( aSigHits )
-                     RETURN Refuse( "parâmetro '" + aParams[ nI ] + ;
-                                    "' não localizado na assinatura do método" )
+                     RETURN Refuse( "parameter '" + aParams[ nI ] + ;
+                                    "' not located in the method signature" )
                   ENDIF
                   FOR EACH hItem IN aSigHits          // hItem = { linha, col1based }
                      AAdd( aE, { hItem[ 1 ], hItem[ 2 ], ;
@@ -5208,7 +5208,7 @@ STATIC FUNCTION ReorderParams( aArgs )
                ELSE
                   aSigHits := LineTokens( hAst, hFunc, hFunc[ "line" ], aParams[ nI ] )
                   IF Len( aSigHits ) != 1
-                     RETURN Refuse( "parâmetro '" + aParams[ nI ] + "' não localizado com precisão na assinatura" )
+                     RETURN Refuse( "parameter '" + aParams[ nI ] + "' not located precisely in the signature" )
                   ENDIF
                   AAdd( aE, { aSigHits[ 1 ][ 1 ], aSigHits[ 1 ][ 2 ], ;
                               SpellAt( cPath, aSigHits[ 1 ], Len( aParams[ nI ] ) ), ;
@@ -5228,8 +5228,8 @@ STATIC FUNCTION ReorderParams( aArgs )
                IF Len( hItem ) < Len( aParams )
                   RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + ;
                                  hb_ntos( iif( Empty( hItem ), hFunc[ "line" ], hItem[ 1 ][ 1 ] ) ) + ;
-                                 ": chamada com " + hb_ntos( Len( hItem ) ) + " arg(s) < " + ;
-                                 hb_ntos( Len( aParams ) ) + " parâmetro(s) - implicit NIL would move" )
+                                 ": call with " + hb_ntos( Len( hItem ) ) + " arg(s) < " + ;
+                                 hb_ntos( Len( aParams ) ) + " parameter(s) - implicit NIL would move" )
                ENDIF
                FOR nI := 1 TO Len( aParams )
                   AAdd( aE, { hItem[ nI ][ 1 ], hItem[ nI ][ 2 ], ;
@@ -5250,8 +5250,8 @@ STATIC FUNCTION ReorderParams( aArgs )
             IF Len( hItem ) < Len( aParams )
                RETURN Refuse( hb_FNameNameExt( cPath ) + ":" + ;
                               hb_ntos( iif( Empty( hItem ), 0, hItem[ 1 ][ 1 ] ) ) + ;
-                              ": send com " + hb_ntos( Len( hItem ) ) + " arg(s) < " + ;
-                              hb_ntos( Len( aParams ) ) + " parâmetro(s) - implicit NIL would move" )
+                              ": send with " + hb_ntos( Len( hItem ) ) + " arg(s) < " + ;
+                              hb_ntos( Len( aParams ) ) + " parameter(s) - implicit NIL would move" )
             ENDIF
             FOR nI := 1 TO Len( aParams )
                AAdd( aE, { hItem[ nI ][ 1 ], hItem[ nI ][ 2 ], ;
@@ -5266,7 +5266,7 @@ STATIC FUNCTION ReorderParams( aArgs )
             Upper( hItem[ "text" ] ) == cCallName .AND. ;
             !( lIsMethod .AND. hb_HHasKey( hItem, "from" ) )
             AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string igual a '" + cFunc + "' - possível chamada por nome" )
+                  ": string igual a '" + cFunc + "' - possible call by name" )
          ENDIF
       NEXT
       IF ! Empty( aE )
@@ -5275,14 +5275,14 @@ STATIC FUNCTION ReorderParams( aArgs )
       ENDIF
    NEXT
    IF nTotal == 0
-      RETURN Refuse( "nenhum site encontrado" )
+      RETURN Refuse( "no site found" )
    ENDIF
 
    FOR nI := 1 TO Len( aWarn )
       OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "referências textuais encontradas - repita com --force" )
+      RETURN Refuse( "textual references found - repeat with --force" )
    ENDIF
 
    OutStd( "reorder-params: " + cFunc + "( " + ArrJoin( aParams, ", " ) + " ) -> ( " + ;
@@ -5300,7 +5300,7 @@ STATIC FUNCTION ReorderParams( aArgs )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
       cText := hb_MemoRead( cPath )
@@ -5309,21 +5309,21 @@ STATIC FUNCTION ReorderParams( aArgs )
       IF nI > 0
          RollbackAll( hOrig )
          RETURN Refuse( "texto em " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( nI ) + ;
-                        " não confere com o esperado - rollback" )
+                        " does not match what was expected - rollback" )
       ENDIF
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "o projeto parou de compilar após o reorder - rollback" )
+      RETURN Refuse( "the project stopped compiling after the reorder - rollback" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ! HrbSymbolsEqual( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), @cWhy )
          RollbackAll( hOrig )
-         RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
       ENDIF
    NEXT
-   OutStd( "verified: " + hb_ntos( nTotal ) + " site(s) reordenados; símbolos intactos; rode sua suíte para confirmar comportamento" + hb_eol() )
+   OutStd( "verified: " + hb_ntos( nTotal ) + " site(s) reordered; symbols intact; run your test suite to confirm behaviour" + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -5496,7 +5496,7 @@ STATIC FUNCTION BuildArgSpan( hAst, iA, iB, cWhy )
       aPos := MatchBack( aSrc, nL1, nC1, aToks[ nI ][ "text" ] )
       IF aPos == NIL
          cWhy := "'" + aToks[ nI ][ "text" ] + "' do argumento não conferiu no fonte" + ;
-                 " (linha " + hb_ntos( nL1 ) + ")"
+                 " (line " + hb_ntos( nL1 ) + ")"
          RETURN NIL
       ENDIF
       nL1 := aPos[ 1 ]
@@ -5507,7 +5507,7 @@ STATIC FUNCTION BuildArgSpan( hAst, iA, iB, cWhy )
       aPos := MatchFwd( aSrc, nL2, nC2, aToks[ nI ][ "text" ] )
       IF aPos == NIL
          cWhy := "'" + aToks[ nI ][ "text" ] + "' do argumento não conferiu no fonte" + ;
-                 " (linha " + hb_ntos( nL2 ) + ")"
+                 " (line " + hb_ntos( nL2 ) + ")"
          RETURN NIL
       ENDIF
       nL2 := aPos[ 1 ]
@@ -5789,7 +5789,7 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
             nHits++
             IF hRule[ "file" ] == NIL
                OutStd( "(builtin): directive (" + RuleTag( hRule ) + ", " + ;
-                  hb_ntos( hRule[ "markers" ] ) + " marker(s)) - regra do core/-D, sem arquivo" + hb_eol() )
+                  hb_ntos( hRule[ "markers" ] ) + " marker(s)) - core/-D rule, no file" + hb_eol() )
             ELSE
                OutStd( hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) + ;
                   ": directive (" + RuleTag( hRule ) + ", " + ;
@@ -5816,7 +5816,7 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
                   SrcLine( aSrc, hTok[ "line" ] ) + hb_eol() )
             ELSE
                OutStd( cModFile + ":" + hb_ntos( hApp[ "line" ] ) + ": " + cWhat + ;
-                  " - sem posição no fonte (expansão de outra regra/include)" + hb_eol() )
+                  " - no source position (expansion of another rule/include)" + hb_eol() )
             ENDIF
          ENDIF
       NEXT
@@ -5917,34 +5917,34 @@ STATIC FUNCTION RenameDsl( aArgs )
    cUpNew := Upper( cNew )
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    IF cUpOld == cUpNew
-      RETURN Refuse( "nomes velho e novo são idênticos" )
+      RETURN Refuse( "old and new names are identical" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
 
    // regras alvo (cabeça == velha) + colisões do nome novo, projeto inteiro
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "dump missing/invalid for '" + cPath + "'" )
       ENDIF
       IF ! PpReady( hAst )
-         RETURN Refuse( "dump sem ppRules/ppApplications (schema ast-2) - " + ;
-                        "recompile o harbour do branch feature/compiler-ast-dump" )
+         RETURN Refuse( "dump without ppRules/ppApplications (schema ast-2) - " + ;
+                        "rebuild harbour from branch feature/compiler-ast-dump" )
       ENDIF
       IF ! RuleToksReady( hAst )
-         RETURN Refuse( "dump sem match[]/result[] (schema anterior ao ast-5) - " + ;
-                        "recompile o harbour do branch feature/compiler-ast-dump" )
+         RETURN Refuse( "dump without match[]/result[] (schema older than ast-5) - " + ;
+                        "rebuild harbour from branch feature/compiler-ast-dump" )
       ENDIF
       hAsts[ cPath ] := hAst
 
@@ -5966,8 +5966,8 @@ STATIC FUNCTION RenameDsl( aArgs )
          ENDIF
          IF lTarget
             IF hRule[ "file" ] == NIL
-               RETURN Refuse( "'" + cOld + "' é palavra de regra builtin (std rules/-D, sem " + ;
-                              "arquivo de diretiva) - não há diretiva a editar" )
+               RETURN Refuse( "'" + cOld + "' is a builtin rule word (std rules/-D, with no " + ;
+                              "directive file) - there is no directive to edit" )
             ENDIF
             cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ]
             IF hb_AScan( aDefSeen, cKey,,, .T. ) == 0
@@ -5979,19 +5979,19 @@ STATIC FUNCTION RenameDsl( aArgs )
          IF hRule[ "head" ] != NIL .AND. ! Upper( hRule[ "head" ] ) == cUpOld .AND. ;
             ! IsRuleDel( hRule )
             IF Upper( hRule[ "head" ] ) == cUpNew
-               RETURN Refuse( "'" + cNew + "' já é cabeça de regra (" + RuleTag( hRule ) + ;
+               RETURN Refuse( "'" + cNew + "' is already a rule head (" + RuleTag( hRule ) + ;
                               ", " + RuleWhere( hRule ) + ")" )
             ENDIF
             // escrever o nome NOVO casaria com esta regra? (abreviação dBase
             // inclusive) - quem responde é o pp, não aritmética local
             IF PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew )
-               RETURN Refuse( "'" + cNew + "' colide por abreviação com a regra " + ;
+               RETURN Refuse( "'" + cNew + "' collides by abbreviation with rule " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
             ENDIF
             IF PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpOld )
-               RETURN Refuse( "'" + cOld + "' colide por abreviação com a regra " + ;
+               RETURN Refuse( "'" + cOld + "' collides by abbreviation with rule " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ") - " + ;
-                              "ambiguidade pré-existente, resolva antes do rename" )
+                              "pre-existing ambiguity, resolve it before the rename" )
             ENDIF
          ENDIF
          // o nome novo já é palavra do match de alguma regra: a renomeada o
@@ -6002,15 +6002,15 @@ STATIC FUNCTION RenameDsl( aArgs )
                Upper( hTok[ "text" ] ) == cUpNew .AND. ;
                ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
                  hTok[ "role" ] == "restrict" )
-               RETURN Refuse( "'" + cNew + "' já é palavra do match da regra " + ;
+               RETURN Refuse( "'" + cNew + "' is already a match word of rule " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
             ENDIF
          NEXT
       NEXT
    NEXT
    IF Empty( aTargets )
-      RETURN Refuse( "'" + cOld + "' não é palavra de match de regra de pp do projeto " + ;
-                     "(cabeça, keyword secundária ou restrição)" )
+      RETURN Refuse( "'" + cOld + "' is not a match word of any project pp rule " + ;
+                     "(head, secondary keyword or restriction)" )
    ENDIF
 
    // SEQUESTRO REVERSO: a cabeça RENOMEADA passa a casar grafias que hoje são
@@ -6035,10 +6035,10 @@ STATIC FUNCTION RenameDsl( aArgs )
             cWitness := HeadClashWitness( cUpNew, cUpOld, hTgt[ "kind" ], ;
                                           Upper( hRule[ "head" ] ), hRule[ "kind" ] )
             IF ! Empty( cWitness )
-               RETURN Refuse( "'" + cNew + "' colide por abreviação com a regra " + ;
+               RETURN Refuse( "'" + cNew + "' collides by abbreviation with rule " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" + ;
                               " - depois do rename, escrever '" + cWitness + ;
-                              "' casaria com as DUAS regras" )
+                              "' would match BOTH rules" )
             ENDIF
          NEXT
       NEXT
@@ -6051,17 +6051,17 @@ STATIC FUNCTION RenameDsl( aArgs )
       FOR EACH hTok IN hAst[ "tokens" ]
          IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
             Upper( hTok[ "text" ] ) == cUpNew
-            RETURN Refuse( "'" + cNew + "' já é identificador usado em " + ;
+            RETURN Refuse( "'" + cNew + "' is already an identifier used in " + ;
                            hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
-                           " - a regra renomeada o capturaria" )
+                           " - the renamed rule would capture it" )
          ENDIF
       NEXT
       FOR EACH hApp IN hAst[ "ppApplications" ]
          FOR EACH hTok IN hApp[ "tokens" ]
             IF hTok[ "marker" ] == 0 .AND. Upper( hTok[ "text" ] ) == cUpNew
-               RETURN Refuse( "'" + cNew + "' já é palavra da regra " + ;
+               RETURN Refuse( "'" + cNew + "' is already a word of rule " + ;
                               RuleTag( hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ] ) + ;
-                              " em aplicações (" + hb_FNameNameExt( cPath ) + ":" + ;
+                              " in applications (" + hb_FNameNameExt( cPath ) + ":" + ;
                               hb_ntos( hApp[ "line" ] ) + ")" )
             ENDIF
          NEXT
@@ -6115,17 +6115,17 @@ STATIC FUNCTION RenameDsl( aArgs )
             ENDIF
             IF Upper( hTok[ "text" ] ) == cUpOld
                IF !( hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL )
-                  RETURN Refuse( "aplicação de " + RuleTag( hRule ) + " em " + ;
+                  RETURN Refuse( "application of " + RuleTag( hRule ) + " em " + ;
                                  hb_FNameNameExt( cPath ) + ":" + hb_ntos( hApp[ "line" ] ) + ;
-                                 " sem posição no fonte (include ou expansão de outra regra) - recuso" )
+                                 " with no source position (include or expansion of another rule) - refusing" )
                ENDIF
                AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
             ELSE
                // é a MINHA palavra (fato), mas escrita ABREVIADA (dBase): o texto
                // do site não é a palavra inteira - edição cega deixaria site órfão
-               RETURN Refuse( "uso abreviado '" + hTok[ "text" ] + "' da regra em " + ;
+               RETURN Refuse( "abbreviated use '" + hTok[ "text" ] + "' of the rule in " + ;
                               hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
-                              " - normalize para '" + cOld + "' antes do rename" )
+                              " - normalize to '" + cOld + "' before the rename" )
             ENDIF
          NEXT
       NEXT
@@ -6145,11 +6145,11 @@ STATIC FUNCTION RenameDsl( aArgs )
    FOR EACH hRule IN aTargets
       cChPath := ResolveInclude( hProj, hRule[ "file" ] )
       IF Empty( cChPath )
-         RETURN Refuse( "não achei o arquivo da diretiva '" + hRule[ "file" ] + "'" )
+         RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
       ENDIF
       IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
-         RETURN Refuse( "diretiva em '" + cChPath + "' fora do diretório do projeto - " + ;
-                        "recuso editar include de sistema/compartilhado" )
+         RETURN Refuse( "directive in '" + cChPath + "' outside the project directory - " + ;
+                        "refusing to edit a system/shared include" )
       ENDIF
       aE := {}
       FOR EACH hTok IN hRule[ "match" ]
@@ -6157,15 +6157,15 @@ STATIC FUNCTION RenameDsl( aArgs )
             Upper( hTok[ "text" ] ) == cUpOld .AND. ;
             ( hTok[ "role" ] == "literal" .OR. hTok[ "role" ] == "restrict" )
             IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
-               RETURN Refuse( "palavra '" + cOld + "' na diretiva " + RuleTag( hRule ) + ;
-                              " (" + RuleWhere( hRule ) + ") sem posição no fonte " + ;
-                              "(diretiva nascida de expansão) - recuso editar" )
+               RETURN Refuse( "palavra '" + cOld + "' in directive " + RuleTag( hRule ) + ;
+                              " (" + RuleWhere( hRule ) + ") with no source position " + ;
+                              "(directive born of an expansion) - refusing to edit" )
             ENDIF
             AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
          ENDIF
       NEXT
       IF Empty( aE )
-         RETURN Refuse( "palavra '" + cOld + "' não encontrada no match da diretiva " + ;
+         RETURN Refuse( "palavra '" + cOld + "' not found in the match of directive " + ;
                         RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
       ENDIF
       nDirEdits += Len( aE )
@@ -6188,12 +6188,12 @@ STATIC FUNCTION RenameDsl( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       cPpo := PpoGen( hProj, cPath )
       IF cPpo == NIL
-         RETURN Refuse( "falha ao gerar .ppo de referência para '" + cPath + "'" )
+         RETURN Refuse( "failed to generate the reference .ppo for '" + cPath + "'" )
       ENDIF
       hPpoBefore[ cPath ] := cPpo
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
 
    FOR EACH cKey IN hb_HKeys( hEdits )
@@ -6203,7 +6203,7 @@ STATIC FUNCTION RenameDsl( aArgs )
       IF nLine > 0
          RollbackAll( hOrig )
          RETURN Refuse( "texto em " + hb_FNameNameExt( cKey ) + ":" + hb_ntos( nLine ) + ;
-                        " não confere - rollback" )
+                        " does not match - rollback" )
       ENDIF
    NEXT
 
@@ -6211,23 +6211,23 @@ STATIC FUNCTION RenameDsl( aArgs )
       cPpo := PpoGen( hProj, cPath )
       IF cPpo == NIL
          RollbackAll( hOrig )
-         RETURN Refuse( "o projeto parou de pré-processar após o rename - rollback" )
+         RETURN Refuse( "the project stopped preprocessing after the rename - rollback" )
       ENDIF
       IF !( cPpo == hPpoBefore[ cPath ] )
          RollbackAll( hOrig )
-         RETURN Refuse( "expansão (.ppo) de " + hb_FNameNameExt( cPath ) + ;
-                        " mudou - rename inconsistente - rollback" )
+         RETURN Refuse( "expansion (.ppo) of " + hb_FNameNameExt( cPath ) + ;
+                        " changed - inconsistent rename - rollback" )
       ENDIF
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
          RollbackAll( hOrig )
-         RETURN Refuse( "pcode (.hrb) de " + hb_FNameName( cPath ) + " mudou - rollback" )
+         RETURN Refuse( "pcode (.hrb) de " + hb_FNameName( cPath ) + " changed - rollback" )
       ENDIF
    NEXT
 
@@ -6272,7 +6272,7 @@ STATIC FUNCTION RuleMarkerUsages( hProj, hAsts, hResAt, cJsonOut )
       ENDIF
    NEXT
    IF hRule == NIL
-      RETURN Refuse( "não achei a regra do marker '" + cName + "' no dump" )
+      RETURN Refuse( "could not find the rule of marker '" + cName + "' no dump" )
    ENDIF
 
    cChPath := ResolveInclude( hProj, hRule[ "file" ] )
@@ -6294,7 +6294,7 @@ STATIC FUNCTION RuleMarkerUsages( hProj, hAsts, hResAt, cJsonOut )
    NEXT
 
    OutStd( hb_ntos( nHits ) + " result(s) for '" + cName + "' " + ;
-           "(marker local à diretiva " + RuleTag( hRule ) + ")" + hb_eol() )
+           "(marker local to directive " + RuleTag( hRule ) + ")" + hb_eol() )
    IF ! Empty( cJsonOut )
       hb_MemoWrit( cJsonOut, LocationsJson( aLoc ) )
    ENDIF
@@ -6397,19 +6397,19 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    LOCAL hPpoBefore := { => }, cPpo, cText, nLine := 0, cKey, nEdits
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ( hAsts[ cPath ] := ReadAst( cTmp, cPath ) ) == NIL
-         RETURN Refuse( "dump ast ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "ast dump missing/invalid for '" + cPath + "'" )
       ENDIF
    NEXT
 
@@ -6434,7 +6434,7 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
       ENDIF
    NEXT
    IF hRule == NIL
-      RETURN Refuse( "não achei a regra do marker '" + cOld + "' no dump" )
+      RETURN Refuse( "could not find the rule of marker '" + cOld + "' no dump" )
    ENDIF
 
    // colisão: o nome novo já é OUTRO marker da MESMA regra? o alpha-rename
@@ -6444,21 +6444,21 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
       FOR EACH hTok IN hRule[ cSide ]
          IF hTok[ "role" ] == "marker" .AND. hTok[ "marker" ] != nMk .AND. ;
             Upper( hb_HGetDef( hTok, "text", "" ) ) == cUpNew
-            RETURN Refuse( "'" + cNew + "' já é outro marker da mesma diretiva " + ;
+            RETURN Refuse( "'" + cNew + "' is already another marker of the same directive " + ;
                            RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ") - " + ;
-                           "o rename fundiria dois markers; recuso" )
+                           "the rename would merge two markers; refusing" )
          ENDIF
       NEXT
    NEXT
 
    cChPath := ResolveInclude( hProj, hRule[ "file" ] )
    IF Empty( cChPath )
-      RETURN Refuse( "não achei o arquivo da diretiva '" + hRule[ "file" ] + "'" )
+      RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
    ENDIF
    cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
    IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
-      RETURN Refuse( "diretiva em '" + cChPath + "' fora do diretório do projeto - " + ;
-                     "recuso editar include de sistema/compartilhado" )
+      RETURN Refuse( "directive in '" + cChPath + "' outside the project directory - " + ;
+                     "refusing to edit a system/shared include" )
    ENDIF
 
    // os sites: os DOIS lados da regra, por NÚMERO de marker (o fato)
@@ -6466,16 +6466,16 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
       FOR EACH hTok IN hRule[ cSide ]
          IF hTok[ "role" ] == "marker" .AND. hTok[ "marker" ] == nMk
             IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
-               RETURN Refuse( "marker '" + cOld + "' no " + cSide + " da diretiva " + ;
-                              RuleTag( hRule ) + " sem posição no fonte " + ;
-                              "(diretiva nascida de expansão) - recuso editar" )
+               RETURN Refuse( "marker '" + cOld + "' no " + cSide + " of directive " + ;
+                              RuleTag( hRule ) + " with no source position " + ;
+                              "(directive born of an expansion) - refusing to edit" )
             ENDIF
             AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
          ENDIF
       NEXT
    NEXT
    IF Empty( aE )
-      RETURN Refuse( "marker '" + cOld + "' não encontrado na diretiva " + RuleTag( hRule ) )
+      RETURN Refuse( "marker '" + cOld + "' not found in directive " + RuleTag( hRule ) )
    ENDIF
    DedupHits( aE )
    nEdits := Len( aE )
@@ -6498,12 +6498,12 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    // módulos têm de sair byte-idênticos. Qualquer diferença = rollback honesto
    FOR EACH cPath IN hProj[ "files" ]
       IF ( cPpo := PpoGen( hProj, cPath ) ) == NIL
-         RETURN Refuse( "falha ao gerar .ppo de referência para '" + cPath + "'" )
+         RETURN Refuse( "failed to generate the reference .ppo for '" + cPath + "'" )
       ENDIF
       hPpoBefore[ cPath ] := cPpo
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
 
    FOR EACH cKey IN hb_HKeys( hEdits )
@@ -6513,34 +6513,34 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
       IF nLine > 0
          RollbackAll( hOrig )
          RETURN Refuse( "texto em " + hb_FNameNameExt( cKey ) + ":" + hb_ntos( nLine ) + ;
-                        " não confere - rollback" )
+                        " does not match - rollback" )
       ENDIF
    NEXT
 
    FOR EACH cPath IN hProj[ "files" ]
       IF ( cPpo := PpoGen( hProj, cPath ) ) == NIL
          RollbackAll( hOrig )
-         RETURN Refuse( "o projeto parou de pré-processar após o rename - rollback" )
+         RETURN Refuse( "the project stopped preprocessing after the rename - rollback" )
       ENDIF
       IF !( cPpo == hPpoBefore[ cPath ] )
          RollbackAll( hOrig )
-         RETURN Refuse( "expansão (.ppo) de " + hb_FNameNameExt( cPath ) + ;
-                        " mudou - o rename do marker não é alpha-equivalente - rollback" )
+         RETURN Refuse( "expansion (.ppo) of " + hb_FNameNameExt( cPath ) + ;
+                        " changed - the marker rename is not alpha-equivalent - rollback" )
       ENDIF
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
          RollbackAll( hOrig )
-         RETURN Refuse( "pcode (.hrb) de " + hb_FNameName( cPath ) + " mudou - rollback" )
+         RETURN Refuse( "pcode (.hrb) de " + hb_FNameName( cPath ) + " changed - rollback" )
       ENDIF
    NEXT
 
-   OutStd( "verified: " + hb_ntos( nEdits ) + " marker occurrence(s) na diretiva; " + ;
+   OutStd( "verified: " + hb_ntos( nEdits ) + " marker occurrence(s) in the directive; " + ;
            ".ppo and .hrb byte-identical (alpha-rename)" + hb_eol() )
 
    RETURN EXIT_OK
@@ -6832,7 +6832,7 @@ STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
          aDef := hIdx[ "public" ][ cTgt ]
       ELSE
          IF ! CoreFunction( hProj, cTgt )
-            AAdd( aHoles, "função '" + cTgt + "' fora do projeto e do core Harbour" )
+            AAdd( aHoles, "function '" + cTgt + "' fora do projeto e do core Harbour" )
          ENDIF
          LOOP
       ENDIF
@@ -6898,16 +6898,16 @@ STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
             cLine += iif( Empty( cLine ), "", ", " ) + aI[ 2 ][ "name" ]
          ENDIF
       NEXT
-      OutStd( "    dynamic reach: " + iif( Empty( cLine ), "(nenhum callee no projeto)", cLine ) + hb_eol() )
+      OutStd( "    dynamic reach: " + iif( Empty( cLine ), "(no callee in the project)", cLine ) + hb_eol() )
       FOR EACH cLine IN hReach[ "holes" ]
          OutStd( "    hole in reach: " + cLine + hb_eol() )
       NEXT
    NEXT
    IF nPriv > 0 .AND. nPub > 0
-      OutStd( "  dynamic shadowing: PRIVATE sombreia o PUBLIC homônimo enquanto viver" + hb_eol() )
+      OutStd( "  dynamic shadowing: a PRIVATE shadows the PUBLIC of the same name while it lives" + hb_eol() )
    ENDIF
    IF nPriv + nPub > 1
-      OutStd( "  more than one creator: bindings dependem do caminho de execução" + hb_eol() )
+      OutStd( "  more than one creator: bindings depend on the execution path" + hb_eol() )
    ENDIF
 
    FOR EACH aC IN hF[ "decls" ]
@@ -6915,20 +6915,20 @@ STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
    NEXT
    FOR EACH aC IN hF[ "lexshadow" ]
       OutStd( "  lexical shadow: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 4 ] ) + ") declara " + ;
-              aC[ 3 ] + " homônima - usos ali NÃO são esta memvar" + hb_eol() )
+              aC[ 3 ] + " of the same name - uses there are NOT this memvar" + hb_eol() )
    NEXT
    FOR EACH aC IN hF[ "fields" ]
-      OutStd( "  FIELD homônimo: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ;
+      OutStd( "  FIELD of the same name: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ;
               ") - dado externo (workarea), nunca editado" + hb_eol() )
    NEXT
    FOR EACH aC IN hF[ "macrocreates" ]
       OutStd( "  macro creation: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ;
-              ") cria memvar via '&' - nome invisível ao compilador" + hb_eol() )
+              ") creates a memvar via '&' - the name is invisible to the compiler" + hb_eol() )
    NEXT
    FOR EACH aC IN hF[ "uses" ]
       IF aC[ 5 ]      // implícita (sem declaração) - vale destaque no mapa
          OutStd( "  implicit use: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ", " + ;
-                 aC[ 4 ] + ") - memvar não declarada" + hb_eol() )
+                 aC[ 4 ] + ") - memvar not declared" + hb_eol() )
       ENDIF
    NEXT
 
@@ -6974,31 +6974,31 @@ STATIC FUNCTION RenameMemvar( aArgs )
    cUpNew := Upper( cNew )
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    IF cUpOld == cUpNew
-      RETURN Refuse( "nomes velho e novo são idênticos" )
+      RETURN Refuse( "old and new names are identical" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! NameAccepted( hProj, cNew, .F. )
-      RETURN Refuse( "o compilador do projeto rejeita '" + cNew + "' como nome de variável" )
+      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a variable name" )
    ENDIF
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "dump missing/invalid for '" + cPath + "'" )
       ENDIF
       hAsts[ cPath ] := hAst
       IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
-         RETURN Refuse( "novo nome '" + cNew + "' colide com regra de pré-processador (" + ;
+         RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule (" + ;
                         RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
       ENDIF
    NEXT
@@ -7007,18 +7007,18 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    // o alvo existe como memvar?
    IF Empty( hF[ "creators" ] ) .AND. Empty( hF[ "uses" ] ) .AND. Empty( hF[ "decls" ] )
-      RETURN Refuse( "'" + cOld + "' não é memvar do projeto (nenhum criador, uso ou MEMVAR)" )
+      RETURN Refuse( "'" + cOld + "' is not a memvar of the project (no creator, use or MEMVAR)" )
    ENDIF
 
    // política de fecho: exatamente UM criador explícito
    IF Empty( hF[ "creators" ] )
       IF ! Empty( hF[ "uses" ] )
          aU := hF[ "uses" ][ 1 ]
-         RETURN Refuse( "'" + cOld + "' não tem criador PRIVATE/PUBLIC no projeto (uso " + ;
-                        iif( aU[ 5 ], "implícito", "declarado" ) + " em " + aU[ 1 ] + ":" + ;
-                        hb_ntos( aU[ 3 ] ) + ") - criada fora do projeto ou só em runtime; recuso" )
+         RETURN Refuse( "'" + cOld + "' has no PRIVATE/PUBLIC creator in the project (use " + ;
+                        iif( aU[ 5 ], "implicit", "declarado" ) + " em " + aU[ 1 ] + ":" + ;
+                        hb_ntos( aU[ 3 ] ) + ") - created outside the project or only at runtime; refusing" )
       ENDIF
-      RETURN Refuse( "'" + cOld + "' só existe como declaração MEMVAR (sem criador nem uso) - nada a renomear com segurança" )
+      RETURN Refuse( "'" + cOld + "' exists only as a MEMVAR declaration (no creator, no use) - nothing to rename safely" )
    ENDIF
    IF Len( hF[ "creators" ] ) > 1
       cWhy := ""
@@ -7026,7 +7026,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
          cWhy += iif( Empty( cWhy ), "", "; " ) + aC[ 4 ] + " em " + aC[ 2 ] + " (" + ;
                  aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ")"
       NEXT
-      RETURN Refuse( "'" + cOld + "' tem mais de um criador - bindings dependem do caminho de execução: " + cWhy )
+      RETURN Refuse( "'" + cOld + "' has more than one creator - bindings depend on the execution path: " + cWhy )
    ENDIF
    aC := hF[ "creators" ][ 1 ]
 
@@ -7034,11 +7034,11 @@ STATIC FUNCTION RenameMemvar( aArgs )
    hIdx := FuncIndex( hProj, hAsts )
    hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
    IF ! Empty( hReach[ "holes" ] )
-      OutErr( "hbrefactor: o alcance dinâmico de " + aC[ 2 ] + " tem furos:" + hb_eol() )
+      OutErr( "hbrefactor: the dynamic scope of " + aC[ 2 ] + " tem furos:" + hb_eol() )
       FOR EACH cWhy IN hReach[ "holes" ]
          OutErr( "  - " + cWhy + hb_eol() )
       NEXT
-      RETURN Refuse( "alcance com furos - código fora do grafo estático pode ver '" + cOld + "'; recuso" )
+      RETURN Refuse( "scope with holes - code outside the static graph may see '" + cOld + "'; refusing" )
    ENDIF
    hInReach := { => }
    FOR EACH aU IN hReach[ "funcs" ]
@@ -7048,16 +7048,16 @@ STATIC FUNCTION RenameMemvar( aArgs )
    // todos os usos do projeto dentro do alcance
    FOR EACH aU IN hF[ "uses" ]
       IF ! hb_HHasKey( hInReach, aU[ 7 ] + "!" + Upper( aU[ 2 ] ) )
-         RETURN Refuse( "uso de '" + cOld + "' fora do alcance do criador: " + aU[ 2 ] + ;
-                        " (" + aU[ 1 ] + ":" + hb_ntos( aU[ 3 ] ) + ") nunca roda com esse " + ;
-                        aC[ 4 ] + " vivo - outra memvar homônima; recuso" )
+         RETURN Refuse( "use of '" + cOld + "' outside the creator's scope: " + aU[ 2 ] + ;
+                        " (" + aU[ 1 ] + ":" + hb_ntos( aU[ 3 ] ) + ") never runs with that " + ;
+                        aC[ 4 ] + " alive - a different memvar of the same name; refusing" )
       ENDIF
    NEXT
    // criação via macro dentro do alcance = pode ser este nome
    FOR EACH aU IN hF[ "macrocreates" ]
       IF hb_HHasKey( hInReach, MvModPath( hProj, aU[ 1 ] ) + "!" + Upper( aU[ 2 ] ) )
-         RETURN Refuse( "criação de memvar via '&' no alcance (" + aU[ 2 ] + ", " + aU[ 1 ] + ":" + ;
-                        hb_ntos( aU[ 3 ] ) + ") - o nome criado é invisível ao compilador; recuso" )
+         RETURN Refuse( "memvar creation via '&' within the scope (" + aU[ 2 ] + ", " + aU[ 1 ] + ":" + ;
+                        hb_ntos( aU[ 3 ] ) + ") - the created name is invisible to the compiler; refusing" )
       ENDIF
       AAdd( aWarn, "criação via '&' fora do alcance em " + aU[ 2 ] + " (" + aU[ 1 ] + ":" + ;
             hb_ntos( aU[ 3 ] ) + ") - não roda com o " + aC[ 4 ] + " vivo, mas confira" )
@@ -7066,7 +7066,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    // nome novo: sem vida própria de memvar e sem sombra léxica onde o velho vive
    hFNew := MvFacts( hProj, hAsts, cUpNew )
    IF ! Empty( hFNew[ "creators" ] ) .OR. ! Empty( hFNew[ "uses" ] ) .OR. ! Empty( hFNew[ "decls" ] )
-      RETURN Refuse( "'" + cNew + "' já tem vida de memvar no projeto (criador/uso/MEMVAR) - o rename fundiria duas variáveis" )
+      RETURN Refuse( "'" + cNew + "' already lives as a memvar in the project (creator/use/MEMVAR) - the rename would merge two variables" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
@@ -7076,15 +7076,15 @@ STATIC FUNCTION RenameMemvar( aArgs )
          ENDIF
          FOR EACH hItem IN hFunc[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew
-               RETURN Refuse( "'" + cNew + "' é " + hItem[ "scope" ] + " em " + hFunc[ "name" ] + " (" + ;
+               RETURN Refuse( "'" + cNew + "' is " + hItem[ "scope" ] + " em " + hFunc[ "name" ] + " (" + ;
                               hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "declLine" ] ) + ;
-                              ") que usa '" + cOld + "' - os usos renomeados mudariam de binding em silêncio" )
+                              ") that uses '" + cOld + "' - the renamed uses would silently change binding" )
             ENDIF
          NEXT
          FOR EACH hItem IN hFunc[ "occurrences" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew .AND. hItem[ "block" ] .AND. hItem[ "scope" ] == "local"
-               RETURN Refuse( "'" + cNew + "' é parâmetro de codeblock em " + hFunc[ "name" ] + ;
-                              " que usa '" + cOld + "' - usos dentro do bloco seriam sombreados" )
+               RETURN Refuse( "'" + cNew + "' is a codeblock parameter in " + hFunc[ "name" ] + ;
+                              " that uses '" + cOld + "' - uses inside the block would be shadowed" )
             ENDIF
          NEXT
       NEXT
@@ -7092,7 +7092,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
       FOR EACH hItem IN hAst[ "tokens" ]
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. Upper( hItem[ "text" ] ) == cUpOld
             AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string igual a '" + cOld + "' - possível acesso por nome (não será alterada)" )
+                  ": string igual a '" + cOld + "' - possible access by name (will NOT be changed)" )
          ENDIF
       NEXT
    NEXT
@@ -7101,7 +7101,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
       OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "avisos acima - repita com --force para prosseguir sem tocá-los" )
+      RETURN Refuse( "warnings above - repeat with --force to proceed without touching them" )
    ENDIF
 
    // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos
@@ -7135,11 +7135,11 @@ STATIC FUNCTION RenameMemvar( aArgs )
       ENDIF
    NEXT
    IF nTotal == 0
-      RETURN Refuse( "nenhum site editável encontrado para '" + cOld + "'" )
+      RETURN Refuse( "no editable site found for '" + cOld + "'" )
    ENDIF
 
-   OutStd( "rename-memvar: " + cOld + " -> " + cNew + " (criador " + aC[ 4 ] + " em " + ;
-           aC[ 2 ] + ", alcance fechado e limpo)" + hb_eol() )
+   OutStd( "rename-memvar: " + cOld + " -> " + cNew + " (creator " + aC[ 4 ] + " em " + ;
+           aC[ 2 ] + ", scope closed and clean)" + hb_eol() )
    FOR EACH cPath IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cPath ]
          OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;
@@ -7152,7 +7152,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
       cText := hb_MemoRead( cPath )
@@ -7161,19 +7161,19 @@ STATIC FUNCTION RenameMemvar( aArgs )
       IF nLine > 0
          RollbackAll( hOrig )
          RETURN Refuse( "texto em " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
-                        " não confere - rollback" )
+                        " does not match - rollback" )
       ENDIF
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                           hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                           cUpOld, cUpNew, @cWhy )
          RollbackAll( hOrig )
-         RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
       ENDIF
    NEXT
 
@@ -7734,12 +7734,12 @@ STATIC FUNCTION Annotate( aArgs )
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    hLoad := AnnLoad( hProj, cTmp )
    IF ! HB_ISHASH( hLoad )
-      RETURN Refuse( "o projeto não compila / dumps ast ausentes (harbour com -x " + ;
+      RETURN Refuse( "the project does not compile / ast dumps missing (harbour with -x " + ;
                      "do branch feature/compiler-ast-dump) - corrija o build primeiro" )
    ENDIF
    hPlan := AnnPlan( hProj, hLoad, cFileFil, cFuncFil )
@@ -7972,63 +7972,63 @@ STATIC PROCEDURE AnnReport( hPlan, cJsonOut, lApplied )
    LOCAL hSum := hPlan[ "sum" ], hCand, hLn, hEntry, cTag
 
    IF ! lApplied
-      OutStd( "annotate (RELATÓRIO; nenhuma edição - use --apply para escrever)" + hb_eol() )
+      OutStd( "annotate (REPORT; no edits - use --apply to write)" + hb_eol() )
    ENDIF
    FOR EACH hCand IN aRep
       cTag := hCand[ "module" ] + " " + hCand[ "func" ] + " " + hCand[ "sym" ] + ": "
       DO CASE
       CASE hCand[ "level" ] == "n1"
-         OutStd( cTag + "nível 1 - AS CLASS " + hCand[ "cls" ] + ;
+         OutStd( cTag + "level 1 - AS CLASS " + hCand[ "cls" ] + ;
                  " (fato declarado puro)" + hb_eol() )
       CASE hCand[ "level" ] == "n2"
-         OutStd( cTag + "nível 2 - AS CLASS " + hCand[ "cls" ] + ", fecha com:" + hb_eol() )
+         OutStd( cTag + "level 2 - AS CLASS " + hCand[ "cls" ] + ", closes with:" + hb_eol() )
          FOR EACH hLn IN hCand[ "lines" ]
             OutStd( "    + " + hLn[ "text" ] + "   [" + hLn[ "module" ] + ;
                     ", " + hLn[ "pos" ] + "]" + hb_eol() )
          NEXT
       CASE hCand[ "level" ] == "n3"
-         OutStd( cTag + "nível 3 - " + ;
-                 iif( Empty( hCand[ "cls" ] ), "", "classe " + hCand[ "cls" ] + " " ) + ;
-                 "(só inferência: " + hCand[ "reason" ] + ") - NÃO edita" + hb_eol() )
+         OutStd( cTag + "level 3 - " + ;
+                 iif( Empty( hCand[ "cls" ] ), "", "class " + hCand[ "cls" ] + " " ) + ;
+                 "(inference only: " + hCand[ "reason" ] + ") - does NOT edit" + hb_eol() )
       CASE hCand[ "level" ] == "kind"
          OutStd( cTag + "kind " + hCand[ "kind" ] + ;
-                 " (valor, fora da fatia de classes)" + hb_eol() )
+                 " (value, outside the class slice)" + hb_eol() )
       ENDCASE
    NEXT
    IF ! Empty( aFR )
-      OutStd( "retornos de FUNÇÃO declaráveis (Rota B - DECLARE imposto sob -kt):" + hb_eol() )
+      OutStd( "declarable FUNCTION returns (Route B - DECLARE enforced under -kt):" + hb_eol() )
       FOR EACH hEntry IN aFR
          OutStd( "    + " + hEntry[ "text" ] + "   [" + hEntry[ "module" ] + ;
-                 ", antes da definição (linha " + hb_ntos( hEntry[ "line" ] ) + ")" + ;
-                 iif( hEntry[ "needreg" ], " + registro antes: " + ;
+                 ", before the definition (line " + hb_ntos( hEntry[ "line" ] ) + ")" + ;
+                 iif( hEntry[ "needreg" ], " + record before: " + ;
                       hEntry[ "regtext" ], "" ) + "]" + hb_eol() )
       NEXT
    ENDIF
    IF ! Empty( aMR )
-      OutStd( "retornos de MÉTODO declaráveis (topologia (g) - _HB_MEMBER completa tipo):" + hb_eol() )
+      OutStd( "declarable METHOD returns (topology (g) - _HB_MEMBER completes the type):" + hb_eol() )
       FOR EACH hEntry IN aMR
          OutStd( "    + " + hEntry[ "cls" ] + ": " + hEntry[ "text" ] + hb_eol() )
       NEXT
    ENDIF
    IF ! Empty( hPlan[ "bp" ] )
-      OutStd( "params de BLOCO anotáveis (fatia 3 - AS CLASS imposto por Eval sob -kt):" + hb_eol() )
+      OutStd( "annotatable BLOCK params (slice 3 - AS CLASS enforced by Eval under -kt):" + hb_eol() )
       FOR EACH hEntry IN hPlan[ "bp" ]
          OutStd( "    + " + hEntry[ "func" ] + " {| " + hEntry[ "sym" ] + ;
                  " AS CLASS " + hEntry[ "cls" ] + " |   [" + hEntry[ "module" ] + ;
                  ":" + hb_ntos( hEntry[ "nameLine" ] ) + ;
-                 iif( hEntry[ "needreg" ], " + registro antes: " + ;
+                 iif( hEntry[ "needreg" ], " + record before: " + ;
                       hEntry[ "regtext" ], "" ) + "]" + hb_eol() )
       NEXT
    ENDIF
    OutStd( "resumo: locais-varridas=" + hb_ntos( hPlan[ "scan" ] ) + ;
-           " nível1=" + hb_ntos( hSum[ "n1" ] ) + ;
-           " nível2=" + hb_ntos( hSum[ "n2" ] ) + ;
-           " nível3=" + hb_ntos( hSum[ "n3" ] ) + ;
-           " kind-fora=" + hb_ntos( hSum[ "kind" ] ) + ;
-           " sem-prova=" + hb_ntos( hSum[ "semprova" ] ) + ;
-           " retornos-fun-declaráveis=" + hb_ntos( Len( aFR ) ) + ;
-           " retornos-metodo-declaráveis=" + hb_ntos( Len( aMR ) ) + ;
-           " params-bloco-anotáveis=" + hb_ntos( Len( hPlan[ "bp" ] ) ) + hb_eol() )
+           " level1=" + hb_ntos( hSum[ "n1" ] ) + ;
+           " level2=" + hb_ntos( hSum[ "n2" ] ) + ;
+           " level3=" + hb_ntos( hSum[ "n3" ] ) + ;
+           " kind-outside=" + hb_ntos( hSum[ "kind" ] ) + ;
+           " no-proof=" + hb_ntos( hSum[ "semprova" ] ) + ;
+           " declarable-fun-returns=" + hb_ntos( Len( aFR ) ) + ;
+           " declarable-method-returns=" + hb_ntos( Len( aMR ) ) + ;
+           " annotatable-block-params=" + hb_ntos( Len( hPlan[ "bp" ] ) ) + hb_eol() )
    IF ! Empty( cJsonOut )
       hb_MemoWrit( cJsonOut, hb_jsonEncode( { "candidates" => aRep, ;
                    "funrets" => aFR, "methodrets" => aMR, ;
@@ -8458,7 +8458,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
 
    // 1. baseline .hrb (estado de referência, sem -kt)
    IF ! CompileHrbAll( hInert, cTmp, "annb4" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
 
    // 1b. o oráculo de execução só vale se o projeto RODA sob -kt ANTES de
@@ -8476,7 +8476,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
             AnnQueueIns( aIns, hModAst, hLn[ "module" ], hLn[ "anchor" ], ;
                          hLn[ "text" ], @cWhy )
             IF ! Empty( cWhy )
-               RETURN Refuse( "não posicionei '" + hLn[ "text" ] + "': " + cWhy )
+               RETURN Refuse( "could not position '" + hLn[ "text" ] + "': " + cWhy )
             ENDIF
          NEXT
       ENDIF
@@ -8490,14 +8490,14 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
       AnnQueueIns( aIns, hModAst, hEntry[ "module" ], ;
          { "kind" => "beforeFunc", "func" => hEntry[ "name" ] }, hEntry[ "text" ], @cWhy )
       IF ! Empty( cWhy )
-         RETURN Refuse( "não posicionei '" + hEntry[ "text" ] + "': " + cWhy )
+         RETURN Refuse( "could not position '" + hEntry[ "text" ] + "': " + cWhy )
       ENDIF
    NEXT
    FOR EACH hEntry IN hPlan[ "mr" ]
       AnnQueueIns( aIns, hModAst, hEntry[ "module" ], ;
          { "kind" => "afterClass", "cls" => hEntry[ "cls" ] }, hEntry[ "text" ], @cWhy )
       IF ! Empty( cWhy )
-         RETURN Refuse( "não posicionei '" + hEntry[ "text" ] + "': " + cWhy )
+         RETURN Refuse( "could not position '" + hEntry[ "text" ] + "': " + cWhy )
       ENDIF
    NEXT
    // fatia 3: registro _HB_CLASS que habilita a anotação de param de
@@ -8509,13 +8509,13 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
             { "kind" => "beforeFunc", "func" => hEntry[ "func" ] }, ;
             hEntry[ "regtext" ], @cWhy )
          IF ! Empty( cWhy )
-            RETURN Refuse( "não posicionei '" + hEntry[ "regtext" ] + "': " + cWhy )
+            RETURN Refuse( "could not position '" + hEntry[ "regtext" ] + "': " + cWhy )
          ENDIF
       ENDIF
    NEXT
 
    IF Empty( aIns ) .AND. AnnCountN1( hPlan ) == 0 .AND. Empty( hPlan[ "bp" ] )
-      OutStd( "annotate --apply: nada a materializar (nenhum nível 1/2 no escopo)" + hb_eol() )
+      OutStd( "annotate --apply: nothing to materialize (no level 1/2 in scope)" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -8523,11 +8523,11 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    IF ! Empty( aIns )
       IF ! AnnWriteInserts( aIns, hOrig, @cWhy )
          RollbackAll( hOrig )
-         RETURN Refuse( "falha ao inserir declarações: " + cWhy )
+         RETURN Refuse( "failed to insert declarations: " + cWhy )
       ENDIF
       IF ! AnnGoldCheck( hInert, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
          RollbackAll( hOrig )
-         RETURN Refuse( "padrão-ouro FALHOU após inserir declarações: " + cWhy )
+         RETURN Refuse( "gold standard FAILED after inserting declarations: " + cWhy )
       ENDIF
    ENDIF
 
@@ -8535,7 +8535,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    hLoad2 := AnnLoad( hProj, cTmp )
    IF ! HB_ISHASH( hLoad2 )
       RollbackAll( hOrig )
-      RETURN Refuse( "re-análise falhou após inserir declarações - rollback" )
+      RETURN Refuse( "re-analysis failed after inserting declarations - rollback" )
    ENDIF
    hPlan2 := AnnPlan( hProj, hLoad2, cFileFil, cFuncFil )
 
@@ -8576,21 +8576,21 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    IF ! Empty( aAnn )
       IF ! AnnWriteAnnots( aAnn, hOrig, @cWhy )
          RollbackAll( hOrig )
-         RETURN Refuse( "falha ao anotar locais: " + cWhy )
+         RETURN Refuse( "failed to annotate locals: " + cWhy )
       ENDIF
       IF ! AnnGoldCheck( hInert, hProj[ "spec" ], cTmp, lRunnable, @cWhy, @cKt )
          RollbackAll( hOrig )
-         RETURN Refuse( "padrão-ouro FALHOU após anotar locais: " + cWhy )
+         RETURN Refuse( "gold standard FAILED after annotating locals: " + cWhy )
       ENDIF
    ENDIF
 
    OutStd( "annotate --apply: " + hb_ntos( Len( aIns ) ) + ;
-           " declaração(ões) + " + hb_ntos( Len( aAnn ) ) + " anotação(ões) AS CLASS" + hb_eol() )
-   OutStd( "verificado: .hrb byte-idêntico sem -kt; compila limpo -w3 -es2; " + ;
-           iif( cKt == "ran", "roda sob -kt (cheques passam)", ;
+           " declaration(s) + " + hb_ntos( Len( aAnn ) ) + " AS CLASS annotation(s)" + hb_eol() )
+   OutStd( "verified: .hrb byte-identical without -kt; compiles clean under -w3 -es2; " + ;
+           iif( cKt == "ran", "runs under -kt (checks pass)", ;
            iif( Empty( cKtBase ), ;
-                "projeto não-executável - passo -kt pulado (declared, não imposto)", ;
-                "execução já falhava SEM edição - passo -kt pulado (declared, não imposto)" ) ) + hb_eol() )
+                "project not runnable - -kt step skipped (declared, not enforced)", ;
+                "execution already failed WITHOUT the edit - -kt step skipped (declared, not enforced)" ) ) + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -8962,12 +8962,12 @@ STATIC FUNCTION ExecRegistry( aArgs )
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    hLoad := AnnLoad( hProj, cTmp )
    IF ! HB_ISHASH( hLoad )
-      RETURN Refuse( "o projeto não compila / dumps ast ausentes (harbour com -x " + ;
+      RETURN Refuse( "the project does not compile / ast dumps missing (harbour with -x " + ;
                      "do branch feature/compiler-ast-dump) - corrija o build primeiro" )
    ENDIF
 
@@ -9199,28 +9199,28 @@ STATIC FUNCTION RegSnapWrite( hDrv, hSel, cSpec, cStamp, cOut )
                 "failed" => hDrv[ "failed" ], "skipped" => hSel[ "skip" ], ;
                 "aborted" => hb_HGetDef( hDrv, "aborted", "" ) } ) )
 
-   OutStd( "exec-registry (retrato da tabela viva; o snapshot SUGERE, o -kt impõe)" + hb_eol() )
+   OutStd( "exec-registry (live table snapshot; the snapshot SUGGESTS, -kt enforces)" + hb_eol() )
    FOR EACH hCls IN aCls
-      OutStd( "  classe " + hCls[ "name" ] + "  [" + ;
+      OutStd( "  class " + hCls[ "name" ] + "  [" + ;
               iif( hCls[ "from" ] == "startup", "startup (INIT)", ;
-                   "execução de " + hCls[ "from" ] + "()" ) + ;
+                   "execution of " + hCls[ "from" ] + "()" ) + ;
               ", seletores=" + hb_ntos( Len( hCls[ "sels" ] ) ) + ;
               iif( Empty( hCls[ "parents" ] ), "", ;
                    ", pais: " + ArrJoin( hCls[ "parents" ], "," ) ) + "]" + hb_eol() )
    NEXT
    FOR EACH hSkip IN hSel[ "skip" ]
-      OutStd( "  fora: " + hSkip[ "name" ] + " - " + hSkip[ "why" ] + hb_eol() )
+      OutStd( "  outside: " + hSkip[ "name" ] + " - " + hSkip[ "why" ] + hb_eol() )
    NEXT
    IF ! Empty( hb_HGetDef( hDrv, "aborted", "" ) )
       OutStd( "  ABORTOU a colheita: " + hDrv[ "aborted" ] + ;
-              " encerrou o processo (QUIT/exit) - retrato PARCIAL até ele" + hb_eol() )
+              " terminated the process (QUIT/exit) - PARTIAL snapshot up to it" + hb_eol() )
    ENDIF
    OutStd( "resumo: executadas=" + hb_ntos( Len( hDrv[ "ran" ] ) ) + ;
            " falharam=" + hb_ntos( Len( hDrv[ "failed" ] ) ) + ;
            " classes-reveladas=" + hb_ntos( nRev ) + ;
            " startup=" + hb_ntos( Len( hDrv[ "startup" ] ) - Len( aVm ) ) + ;
            " vm=" + hb_ntos( Len( aVm ) ) + ;
-           " fora=" + hb_ntos( Len( hSel[ "skip" ] ) ) + ;
+           " outside=" + hb_ntos( Len( hSel[ "skip" ] ) ) + ;
            " snapshot=" + cOut + hb_eol() )
 
    RETURN EXIT_OK
@@ -11504,32 +11504,32 @@ STATIC FUNCTION RenameMethod( aArgs )
    cUpNew   := Upper( cNew )
 
    IF ! OneWord( cNew )
-      RETURN Refuse( "novo nome '" + cNew + "' não é uma palavra única" )
+      RETURN Refuse( "new name '" + cNew + "' is not a single word" )
    ENDIF
    IF cUpOld == cUpNew
-      RETURN Refuse( "nomes velho e novo são idênticos" )
+      RETURN Refuse( "old and new names are identical" )
    ENDIF
 
    hProj := LoadProject( cSpec )
    IF hProj == NIL
-      RETURN Refuse( "não consegui resolver o projeto '" + cSpec + "'" )
+      RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
    IF ! AstDumps( hProj, cTmp )
-      RETURN Refuse( "o projeto não compila - corrija os erros de build primeiro" )
+      RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
-         RETURN Refuse( "dump ausente/inválido para '" + cPath + "'" )
+         RETURN Refuse( "dump missing/invalid for '" + cPath + "'" )
       ENDIF
       IF ! FromReady( hAst )
-         RETURN Refuse( "dump sem rastro de derivação (schema ast-3) - " + ;
+         RETURN Refuse( "dump without derivation trail (schema ast-3) - " + ;
                         "recompile harbour E hbmk2 do branch feature/compiler-ast-dump" )
       ENDIF
       hAsts[ cPath ] := hAst
       IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
-         RETURN Refuse( "novo nome '" + cNew + "' colide com regra de pré-processador (" + ;
+         RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule (" + ;
                         RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
       ENDIF
    NEXT
@@ -11550,7 +11550,7 @@ STATIC FUNCTION RenameMethod( aArgs )
       hOwn  := PpMarkerOwners( hAst, aArts, aSpans, cUpNew )
       IF ! Empty( hOwn )
          cOwn := hb_HKeys( hOwn )[ 1 ]
-         RETURN Refuse( "'" + cNew + "' já é membro/mensagem registrada da classe " + cOwn + ;
+         RETURN Refuse( "'" + cNew + "' is already a registered member/message of class " + cOwn + ;
                         " (" + hb_FNameNameExt( cPath ) + ") - o rename fundiria mensagens" )
       ENDIF
    NEXT
@@ -11574,9 +11574,9 @@ STATIC FUNCTION RenameMethod( aArgs )
             FOR EACH cPred IN aAlts
                cAltList += iif( Empty( cAltList ), "", ", " ) + cPred
             NEXT
-            RETURN Refuse( "'" + cNew + "' não é uma das alternativas do marker RESTRITO da regra (" + ;
-                           cAltList + ") em " + hb_FNameNameExt( cPath ) + " - a regra deixaria de " + ;
-                           "casar; recuso" )
+            RETURN Refuse( "'" + cNew + "' is not one of the alternatives of the rule's RESTRICTED marker (" + ;
+                           cAltList + ") em " + hb_FNameNameExt( cPath ) + " - the rule would stop " + ;
+                           "matching; refusing" )
          ENDIF
       NEXT
    NEXT
@@ -11601,14 +11601,14 @@ STATIC FUNCTION RenameMethod( aArgs )
       // nome de marker sem dona: ou não existe, ou é nome de marker de DSL pura
       // (HANDLER, EVENTO...) - sem mensagem não há política de send
       IF ! Empty( cUpClass )
-         RETURN Refuse( "método '" + cMethod + "' não encontrado na classe '" + cClass + "' no projeto" )
+         RETURN Refuse( "method '" + cMethod + "' not found in class '" + cClass + "' in the project" )
       ENDIF
       lOurs := .F.
       FOR EACH cPath IN hProj[ "files" ]
          lOurs := lOurs .OR. ! Empty( hFacts[ cPath ][ "sites" ] )
       NEXT
       IF ! lOurs
-         RETURN Refuse( "método '" + cMethod + "' não encontrado no projeto" )
+         RETURN Refuse( "method '" + cMethod + "' not found in the project" )
       ENDIF
       // mensagem enviada sem dona identificável = não dá para prever o
       // efeito do rename nos sends - recusa fato-based
@@ -11616,16 +11616,16 @@ STATIC FUNCTION RenameMethod( aArgs )
          FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
             FOR EACH hItem IN hFunc[ "sends" ]
                IF Upper( hItem[ "sym" ] ) == cUpOld
-                  RETURN Refuse( "'" + cMethod + "' é mensagem enviada (" + ;
+                  RETURN Refuse( "'" + cMethod + "' is a message sent (" + ;
                                  hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                                 ") sem classe dona identificável - recuso" )
+                                 ") with no identifiable owner class - refusing" )
                ENDIF
             NEXT
          NEXT
       NEXT
    ELSE
       IF Empty( cClassPath )
-         RETURN Refuse( "método '" + cMethod + "' não encontrado na classe '" + cClass + "' no projeto" )
+         RETURN Refuse( "method '" + cMethod + "' not found in class '" + cClass + "' in the project" )
       ENDIF
       // unicidade da mensagem: sends não têm classe - só renomeamos quando
       // o nome pertence a UMA classe do projeto
@@ -11636,8 +11636,8 @@ STATIC FUNCTION RenameMethod( aArgs )
          ENDIF
       NEXT
       IF ! Empty( cWhy )
-         RETURN Refuse( "'" + cMethod + "' também é membro de: " + cWhy + ;
-                        " - send é despacho dinâmico, rename ambíguo; recuso" )
+         RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
+                        " - a send is dynamic dispatch, the rename is ambiguous; refusing" )
       ENDIF
       // membro de DADOS (VAR/DATA): a atribuição vira o send '_NOME' (o
       // setter). O getter (:NOME) e o setter (:_NOME) são o MESMO token
@@ -11651,8 +11651,8 @@ STATIC FUNCTION RenameMethod( aArgs )
                   lData := .T.
                ENDIF
                IF Upper( hItem[ "sym" ] ) == cUpNew .OR. Upper( hItem[ "sym" ] ) == "_" + cUpNew
-                  RETURN Refuse( "'" + cNew + "' já é mensagem enviada em " + hb_FNameNameExt( cPath ) + ;
-                                 ":" + hb_ntos( hItem[ "line" ] ) + " - o rename passaria a respondê-la" )
+                  RETURN Refuse( "'" + cNew + "' is already a message sent in " + hb_FNameNameExt( cPath ) + ;
+                                 ":" + hb_ntos( hItem[ "line" ] ) + " - the rename would start answering it" )
                ENDIF
             NEXT
          NEXT
@@ -11701,13 +11701,13 @@ STATIC FUNCTION RenameMethod( aArgs )
       cPred := hMap[ cOwn ]
       IF !( cOwn == cUpOld )
          IF ! NameAccepted( hProj, cPred, .T. )
-            RETURN Refuse( "o compilador do projeto rejeita '" + cPred + ;
-                           "' (nome da função gerada) - escolha outro nome" )
+            RETURN Refuse( "the project compiler rejects '" + cPred + ;
+                           "' (name of the generated function) - choose another name" )
          ENDIF
          FOR EACH cPath IN hProj[ "files" ]
             IF FuncByName( hAsts[ cPath ], cPred ) != NIL
-               RETURN Refuse( "'" + cPred + "' (previsto para o artefato " + cOwn + ;
-                              ") já existe como função em " + hb_FNameNameExt( cPath ) + " - recuso" )
+               RETURN Refuse( "'" + cPred + "' (predicted for artifact " + cOwn + ;
+                              ") already exists as a function in " + hb_FNameNameExt( cPath ) + " - refusing" )
             ENDIF
          NEXT
       ENDIF
@@ -11737,9 +11737,9 @@ STATIC FUNCTION RenameMethod( aArgs )
             ! hb_HHasKey( hArtIdx, hb_ntos( hTok:__enumIndex() - 1 ) ) .AND. ;
             hb_HHasKey( hMap, Upper( hTok[ "text" ] ) ) .AND. ;
             !( Upper( hTok[ "text" ] ) == cUpOld )
-            RETURN Refuse( "o fonte soletra o nome gerado '" + hTok[ "text" ] + "' (" + ;
+            RETURN Refuse( "the source spells out the generated name '" + hTok[ "text" ] + "' (" + ;
                            hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
-                           ") - renomear '" + cMethod + "' o deixaria órfão; recuso" )
+                           ") - renomear '" + cMethod + "' would orphan it; refusing" )
          ENDIF
       NEXT
    NEXT
@@ -11778,7 +11778,7 @@ STATIC FUNCTION RenameMethod( aArgs )
          IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
             Upper( hItem[ "text" ] ) == cUpOld .AND. ! hb_HHasKey( hItem, "from" )
             AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string igual a '" + cMethod + "' - possível acesso por nome (não será alterada)" )
+                  ": string igual a '" + cMethod + "' - possible access by name (will NOT be changed)" )
          ENDIF
       NEXT
    NEXT
@@ -11787,7 +11787,7 @@ STATIC FUNCTION RenameMethod( aArgs )
       OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "referências textuais encontradas (ver warnings) - repita com --force" )
+      RETURN Refuse( "textual references found (see warnings) - repeat with --force" )
    ENDIF
 
    // AddHit já normalizou tudo para pares { linha, coluna 1-based }
@@ -11824,7 +11824,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "falha ao compilar o estado de referência" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
       cText := hb_MemoRead( cPath )
@@ -11833,14 +11833,14 @@ STATIC FUNCTION RenameMethod( aArgs )
       IF nLine > 0
          RollbackAll( hOrig )
          RETURN Refuse( "texto em " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( nLine ) + ;
-                        " não confere - rollback" )
+                        " does not match - rollback" )
       ENDIF
    NEXT
    // "after" também regrava os dumps (-x): é neles que as strings
    // previstas são conferidas fato a fato
    IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       RollbackAll( hOrig )
-      RETURN Refuse( "o projeto parou de compilar após o rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
    ENDIF
    // módulos com artefato derivado: o pcode muda DE VERDADE (strings de
    // registro e nome da função gerada) - símbolos conferidos com o mapa
@@ -11851,12 +11851,12 @@ STATIC FUNCTION RenameMethod( aArgs )
       IF ! Empty( hFacts[ cPath ][ "arts" ] )
          IF ! HrbSymbolsRenamed( cText, cWhy, hMap, hOpt, @cSpec )
             RollbackAll( hOrig )
-            RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
          ENDIF
       ELSE
          IF ! HrbEquivalent( cText, cWhy, cUpOld, cUpNew, @cSpec )
             RollbackAll( hOrig )
-            RETURN Refuse( "verificação FALHOU em " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
          ENDIF
       ENDIF
    NEXT
@@ -11866,7 +11866,7 @@ STATIC FUNCTION RenameMethod( aArgs )
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL .OR. ! FromReady( hAst )
          RollbackAll( hOrig )
-         RETURN Refuse( "dump pós-edição ausente para " + hb_FNameNameExt( cPath ) + " - rollback" )
+         RETURN Refuse( "post-edit dump missing for " + hb_FNameNameExt( cPath ) + " - rollback" )
       ENDIF
       hF    := PpMarkerSeeds( hAst, cUpNew )
       aArts := PpMarkerArtifacts( hAst, hF[ "pairs" ], cUpNew )
@@ -11880,7 +11880,7 @@ STATIC FUNCTION RenameMethod( aArgs )
          NEXT
          IF ! lOurs
             RollbackAll( hOrig )
-            RETURN Refuse( "string prevista " + '"' + aHit[ 2 ] + '"' + " não confirmada no dump de " + ;
+            RETURN Refuse( "string prevista " + '"' + aHit[ 2 ] + '"' + " not confirmed in the dump of " + ;
                            hb_FNameNameExt( cPath ) + " - rollback" )
          ENDIF
       NEXT
