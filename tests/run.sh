@@ -3426,7 +3426,10 @@ grep -q "linha e coluna devem ser numéricas" "$D/mal.log"
 check "REFUSA malformada nomeando o motivo (não resolve '5x'->5)" $?
 # SOMBRA de homônimo: 'Dobra' é LOCAL em Main, FUNCTION em sh2 e FIELD em Calc
 D=$(freshshadow case107f)
-"$HB_BIN/harbour" "$D/sh1.prg" -n -q0 -w3 -es2 > /dev/null 2>&1
+# -s (só sintaxe): sem ele o compilador GERA o .c no CWD - que aqui é a RAIZ do
+# repo -, deixando um sh1.c de lixo a cada `make test`. As demais checagens de
+# "a fixture compila limpa" já usavam -s; esta tinha escapado.
+"$HB_BIN/harbour" "$D/sh1.prg" -n -q0 -w3 -es2 -s > /dev/null 2>&1
 check "fixture fixshadow clean under -w3 -es2" $?
 ( cd "$D" && "$BIN" rename fixshadow.hbp sh1.prg:11:13 Triplica --dry-run > c.log 2>&1 )
 grep -q "^rename-function: Dobra -> Triplica" "$D/c.log"
