@@ -405,6 +405,13 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   esperar conclusão, conferir `ps -p <pid>` do task; morto = cancelar
   (`codex-companion.mjs cancel <id>`) e re-executar com modelo
   explícito (`--model gpt-5.5`).
+- **GitHub é pelo `gh` (Diego, 2026-07-13)**: autenticação e operações de GitHub usam o
+  **`gh` CLI** (logado como `diegopego`, protocolo ssh), nunca o credential-manager do
+  Windows. O `credential.helper` global apontava para
+  `/mnt/c/.../git-credential-manager-core.exe` — caminho do Windows que **não existe
+  dentro do WSL**, e cada `push` cuspia um erro do helper (inofensivo, mas ruído que
+  esconde erro de verdade). Conserto feito: `gh auth setup-git` + remoção do helper
+  genérico quebrado. Se voltar a aparecer, é o helper global de novo.
 - Commits só com autorização explícita do Diego **para AQUELE commit**;
   concluir/aprovar o trabalho não autoriza o commit. Um pedido por commit —
   não encadear. Sem push salvo pedido.

@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@86e03bc -->
+<!-- changelog-baseline: hbrefactor@1d407df -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 86e03bc..HEAD   (see § Maintaining this file, at the end).
+     To resume:  git log 1d407df..HEAD   (see § Maintaining this file, at the end).
 
 # Changelog
 
@@ -19,6 +19,20 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-07-13 — the tool and the compiler must now be in step, and it says so
+
+**If you update the tool, rebuild the compiler branch too.** The tool now requires the
+*exact* dump version the compiler branch emits today. If the `harbour` on your `HB_BIN`
+is from an older build of the branch, every command refuses, and it tells you exactly
+that — which version your compiler speaks, which one the tool speaks, and to rebuild.
+
+Before, a mismatch had two bad endings, both of which we hit: it either refused with
+*"dump missing"* while the dump was sitting right there, or — worse — it **quietly
+downgraded its own answer**, reporting a `possible` where it had a `confirmed`, because
+an older dump lacked a fact. A build problem was being reported to you as a limit of
+what can be known about your code. That is exactly backwards, so it is gone: the tool
+never lowers a verdict because of a stale toolchain. It stops and says so.
 
 ## 2026-07-13 — every command got faster on a real project
 
