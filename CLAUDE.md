@@ -121,6 +121,21 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   escreve. *(É o mesmo pecado da REGRA DO FATO, do lado de fora: afirmar sem medir é
   a heurística vestida de manchete. E veio no MESMO dia em que a P9 flagrou que eu
   chamara um custo de "barato" olhando uma fixture.)*
+  **(d) O projeto do benchmark tem de PASSAR — conferir o exit E que ele leu/analisou
+  (2026-07-13, o MESMO erro na 3ª rodada).** Ao re-medir "de verdade", publiquei uma
+  tabela de 3 projetos e um deles (`work/gtwvg`, contrib **Windows-only**) **não
+  compila**: a ferramenta RECUSA, e o número media um **comando abortado**. Só apareceu
+  ao instrumentar a ferramenta por dentro (`ler+parsear = 0 ms`) — por FORA, emulando o
+  que eu *achava* que ela fazia, o tempo parecia legítimo. **Cronometrar processo não é
+  medir trabalho: comando que morre também gasta segundos.**
+  **(e) NÃO PUBLIQUE TABELA DE BENCHMARK (Diego, 2026-07-13, à pergunta *"pra que serve
+  esta tabela publicada?"*)**: ela não serve ao leitor (não é a máquina dele, nem o
+  projeto dele, e ele não reproduz) — serve ao AUTOR, como defesa (*"olha, desta vez eu
+  medi"*). É medidor, a mesma coisa que saiu das páginas, escondida no CHANGELOG/NEWS.
+  E cobra caro: **para sustentar a defesa eu precisei de volume, e enfiei o projeto que
+  não compila** — a mentira voltou pela porta que abri para me redimir. No anúncio vai a
+  **afirmação** + o **comando** para o leitor medir no projeto dele; o número medido vive
+  em `roadmap.md`/spec, como registro datado.
 - **NÃO declare IMPOSSÍVEL/RECUSA sem VARRER a superfície do core (2026-07-12)**:
   toda recusa ("o pp não consegue X") é uma afirmação sobre o CORE e exige
   varredura ANTES, com o que foi varrido REGISTRADO na spec: (a) `harbour`/`hbmk2`

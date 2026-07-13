@@ -551,13 +551,28 @@ suíte (responde ao critério de matar do adr-003).
   anterior. Suíte **961/0**, lexdiff 0. O que sobra é linear e dominado por escrever
   o JSON (64k linhas = 107 MB) — se doer, o alvo é o TAMANHO do dump, não mais a
   busca do fato. [spec-p § P9](spec-p-pp-refatoracao.md).
-  **⚠️ CORREÇÃO no MESMO dia (o Diego pegou):** o 330× é do **stress sintético** (uma
-  aplicação de pp por linha); eu ANUNCIEI que "16k linhas expandidas é tamanho de
-  aplicação real" **sem medir** — invenção, o mesmo pecado que a P9 flagrou. Medido
-  ponta a ponta (comando completo, projetos reais): gtwvg 12,28→**7,49 s**, xhb
-  12,35→**8,36 s** — **~1,4–1,6× (um terço da espera)**, que é ganho de verdade e é a
-  manchete honesta. Os quatro anúncios (CHANGELOG, NEWS, as duas páginas) foram
-  reescritos. **Lição: medir o STRESS não é medir o PRODUTO.**
+  **⚠️ DUAS CORREÇÕES no MESMO dia, ambas pegas pelo Diego. Registro completo porque é
+  o mesmo erro, cometido três vezes seguidas: MEDIR O QUE EU ACHO, não o que roda.**
+  **(1)** O 330× é do **stress sintético** (uma aplicação de pp por linha); ANUNCIEI que
+  "16k linhas expandidas é tamanho de aplicação real" **sem medir** — invenção.
+  **(2)** Ao re-medir "de verdade", montei uma tabela com TRÊS projetos — e **um deles,
+  o `gtwvg`, NÃO COMPILA** (contrib Windows-only: `!win`, erro do compilador C). A
+  ferramenta **RECUSA** o projeto; os 7,49 s que publiquei mediam um **comando
+  abortado** (gera dumps, morre, não lê nada). Descoberto na fatia V-1, ao instrumentar
+  a ferramenta: `ler+parsear = 0 ms`. **Por que eu fiz isso é o que importa:** depois do
+  vexame do 330×, a tabela era a minha DEFESA (*"olha, desta vez eu medi"*) — e para
+  sustentar a defesa eu precisava de volume, então enfiei um projeto sem conferir se ele
+  passava. **A mentira voltou pela porta que abri para me redimir.**
+  **A medição válida** (comando completo, projeto que compila, lê e analisa):
+  **xhb, 43 módulos: 12,35 → 8,36 s** (~1,5×, um terço da espera); hbhttpd (3 módulos):
+  1,16 → 1,07 s. A manchete "um terço" **sobrevive** — só a evidência podre saiu.
+  **E a TABELA saiu dos anúncios (decisão do Diego, 2026-07-13, à pergunta *"pra que
+  serve esta tabela publicada?"*):** ela não servia ao leitor (não é a máquina dele, nem
+  o projeto dele, e ele não reproduz), servia **a mim**. É medidor — a mesma coisa que
+  saiu das páginas, escondida numa superfície onde eu achei que passaria. Nos anúncios
+  fica a AFIRMAÇÃO (linear; ~1/3 em código real; o catastrófico é patológico) + o
+  **comando** para o leitor medir no projeto DELE. Número medido vive aqui e na spec —
+  registro datado da entrega, não promessa viva ao leitor.
 - **P10 ✅ ENTREGUE (2026-07-13): síntese — e a completude achou um BUG que teria
   matado a ferramenta.** (a) **O `adr-003` está FECHADO**: as 5 perguntas que ele
   abriu têm veredito, respondidas *pelo critério que ele mesmo fixou* — granularidade
@@ -860,42 +875,60 @@ módulos homônimos. Spec dedicada a criar: `docs/spec-p-pp-refatoracao.md`
 (molde da [spec-u](spec-u-verbos-unificados.md)). Plano detalhado salvo em
 `~/.claude/plans/crie-um-plano-para-enchanted-flask.md`.
 
-### V — Velocidade da refatoração em PROJETO GRANDE — **ATIVA (ordem do Diego, 2026-07-13)**
+### V — Velocidade da refatoração em PROJETO GRANDE — **ATIVA; FATIA 1 ENTREGUE (2026-07-13)**
 
 A P9 consertou o dump **por módulo**. O que sobrou é **estrutural, e é o que o usuário
 sente**: todo comando re-dumpa o **projeto INTEIRO** — `AstDumps` passa `-rebuild`
 ([hbrefactor.prg:249](../src/hbrefactor.prg)), de propósito (*"dump sempre fresco"*: a
-ferramenta jamais pode agir sobre fato velho). Consequência medida: xhb (42 módulos)
-**8,36 s**, gtwvg (28) **7,49 s** — dezenas de segundos, e **a espera é a mesma para
-renomear 1 variável ou 20**. Num projeto de aplicação de verdade isso deixa de ser
-incômodo e vira o motivo de não usar a ferramenta. *(A extensão VSCode é o consumidor
-diário do Diego — é lá que a espera dói mais.)*
+ferramenta jamais pode agir sobre fato velho). **A espera é a mesma para renomear 1
+variável ou 20.** *(A extensão VSCode é o consumidor diário do Diego — é lá que dói.)*
 
-**Fatia 1 — MEDIR ONDE O TEMPO VAI (obrigatória, e vem PRIMEIRO).** É a lição da P9
-aplicada antes do erro, não depois: repartir os ~8 s do xhb entre (a) o hbmk2 +
-compilador GERANDO os dumps, (b) a ferramenta LENDO/parseando o JSON, (c) a análise.
-Otimizar sem isso é chute — e se o tempo estiver em (b)/(c), **cache de dump não
-resolve nada**. *Pronto:* número por etapa, registrado.
+**FATIA 1 ✅ ENTREGUE — onde o tempo VAI (e ela DERRUBOU o desenho das outras duas).**
+Medida com a ferramenta **instrumentada por dentro** — e isso não é detalhe: por FORA,
+emulando o `hbmk2` que eu *achava* que ela dispara, os números não fechavam (uma etapa
+dava mais que o total) e um projeto quebrado passava por bom. **Cronometrar processo não
+é medir trabalho.** Projeto: `work/xhb` (43 módulos, compila, lê e analisa):
 
-**Fatia 2 — o canal CORRETO para "o que mudou" (REGRA DO FATO).** É PROIBIDO inventar
-staleness na ferramenta (comparar mtime é heurística e o include transitivo a quebra).
-Quem decide o que precisa recompilar é o **`hbmk2 -inc`** — sondado em 2026-07-13:
-tocando 1 de 3 módulos, **só o dump dele é regravado**; e quem dá o fecho transitivo de
-include é o **`harbour -gd`** (já usado na P8, com caminho resolvido). O desenho sai
-desses dois, nunca de esperteza nossa.
+| comando | total | gerar dumps | ler+parsear JSON | analisar |
+|---|---:|---:|---:|---:|
+| `call-graph` | 8,4 s | **4,9 s (58%)** | 0,9 s (11%) | 2,6 s (31%) |
+| `usages` | 12–15 s | 4,9 s (~35%) | ~1 s (10%) | **4,7–8,2 s (~50%)** |
 
-**Fatia 3 — cache de dumps por projeto.** Hoje o diretório de dump é um tmp por
-invocação, então **nada é reaproveitável por construção**. O portão é a garantia que
-hoje justifica o `-rebuild`: o resultado com cache tem de ser **byte-idêntico** ao
-resultado sem cache — a mesma régua de equivalência que provou a P9 (suíte inteira
-verde nos dois modos).
+**Os três vereditos:**
+1. **NÃO existe gargalo único.** Geração é metade no `call-graph` e só um terço no
+   `usages` — o verbo mais usado, onde a **ANÁLISE pesa mais que a geração**.
+2. **Cache de dump ataca no máximo METADE.** Com um cache perfeito, o `usages` no xhb
+   ainda levaria ~7–9 s. **O desenho original desta fase (fatia 3 = "cache de dumps")
+   estava ERRADO** — e só se soube medindo.
+3. **As TRÊS etapas são proporcionais ao PROJETO**, inclusive a análise, que re-deriva os
+   fatos do projeto inteiro a cada comando. O objetivo da fase (*custo proporcional ao
+   que você TOCOU*) **não se alcança sem tornar incremental o FATO ANALISADO**, não só o
+   dump.
+4. **Achado lateral:** `unused-locals` **não usa a AST** — dispara o compilador **43 vezes
+   em série** (`harbour -w3 -s`, lendo W0003/W0032). Mesma dor, outra porta.
 
-**Riscos honestos:** (i) cache é a classe de bug mais cara que existe, e "agiu sobre
-fato velho" é **exatamente** o que esta ferramenta promete nunca fazer — fail-closed em
-qualquer dúvida; (ii) o ganho pode estar noutro lugar (ver fatia 1).
+**FATIA 2 (RE-DESENHADA pela fatia 1) — o FATO ANALISADO por módulo, incremental.** O que
+tem de ser reaproveitado quando um módulo não muda é o **resultado da análise daquele
+módulo** (o que ele define, chama, declara) — o dump vem junto, de graça, pelo mesmo
+critério. **REGRA DO FATO:** é PROIBIDO inventar staleness na ferramenta (mtime é
+heurística; include transitivo a quebra). Quem decide o que recompilar é o
+**`hbmk2 -inc`** (sondado 2026-07-13: tocando 1 de 3 módulos, **só o dump dele é
+regravado**); o fecho transitivo de include vem do **`harbour -gd`** (P8).
 
-**PRONTO da fase:** num projeto de dezenas de módulos, um comando que toca 1 módulo
-custa proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o modo
+**FATIA 3 — paralelizar o `unused-locals`** (43 invocações seriais do compilador). Barata,
+independente do resto, e não precisa de cache nenhum.
+
+**PORTÃO (vale para 2 e 3):** resultado **byte-idêntico** ao modo de hoje — a mesma régua
+de equivalência que provou a P9 (suíte inteira verde nos dois modos).
+
+**Riscos honestos:** (i) cache é a classe de bug mais cara que existe, e *"agiu sobre fato
+velho"* é **exatamente** o que esta ferramenta promete nunca fazer — fail-closed em
+qualquer dúvida; (ii) a análise pode ter um piso irredutível (o veredito de um send depende
+do PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, não a
+esconder.
+
+**PRONTO da fase:** num projeto de dezenas de módulos, um comando que toca 1 módulo custa
+proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o modo
 `-rebuild` de hoje.
 
 ### B-infra — suíte paralela ✅ ENTREGUE (Etapas 1 e 2) — narrativa no [arquivo](roadmap-fases-entregues.md)

@@ -42,16 +42,16 @@ than proportionally** to a module's size: the more your code leans on `#command`
 `#define`, the worse it got, because the compiler was re-answering a question it had
 already answered, once per word. It is **linear** now.
 
-**What it bought, measured on real Harbour projects** (the whole command, end to end —
-`contrib/gtwvg`, 28 modules; `xhb`, 42 modules): about **a third off the wait**. Not a
-different tool; a tool that stopped wasting your time. Nothing you *see* changed —
-the facts, the refusals, the edits and the verification are byte for byte what they
-were.
+**What it bought:** running a whole command end to end against real Harbour code, about
+**a third off the wait**. Not a different tool; a tool that stopped wasting your time.
+Nothing you *see* changed — the facts, the refusals, the edits and the verification are
+byte for byte what they were.
 
 **The honest size of the news.** You may read elsewhere that this was a 300× fix. It
 was — on a module *dense* in expansions, which is a shape real Harbour code does not
-usually have. On your code it is a third, unless your code is unusual. Time it and
-see.
+usually have. On your code, expect the third. And don't take our word for it: time a
+command against your own project, before and after. That is a number you can trust,
+because it is yours; ours would be about our machine and our code.
 
 **Where it still bites, honestly.** Every command re-dumps your **whole project**, from
 scratch, every time — the tool asks for a fresh dump on purpose, so it can never act on
