@@ -298,6 +298,40 @@ ERRADO** sobre o branch do core (é o ato 2 de §3.4). É a REGRA DO FATO um ní
 
 ---
 
+### 3.7 A ÁRVORE DE BUILD SUJA — dois bugs INVENTADOS no mesmo dia (2026-07-13)
+
+**Duas vezes, na mesma sessão, eu anunciei um bug que não existe.** Mesma causa das duas
+vezes: **medi num diretório de build podre** — dezenas de rebuilds incrementais meus — e
+tratei o sintoma como fato.
+
+1. **"O `-rebuild` não desce para sub-projetos de um container"** — escrito no roadmap, com
+   mecanismo e tudo. Re-sondado no limpo: **não reproduz**.
+2. **"O branch tem uma REGRESSÃO que quebra o macro-compilador"** — codeblock macro-compilado
+   perdendo todo parâmetro além do primeiro (`{|a,b| b}` → *variable does not exist*), com
+   tabela branch × Harbour de fábrica, e o veredito de que isso **mataria o PR**. Rodei um
+   `git bisect` de 42 commits para achar o culpado. **O bisect não achou nada porque não havia
+   nada:** todo commit testado passou. Ele apontou o meu último commit **só porque eu declarei
+   o "bad" a partir do binário do repositório real** — e nunca testei aquele commit num build
+   limpo. Testado numa worktree isolada: **passa**. `make clean && make` no repo real: **exit 0,
+   contribs inclusive**, e o macro funciona.
+
+**E a segunda me levou a quase estragar o branch.** O Diego, diante do "make falha no hbwin",
+mandou **inibir o hbwin no build deste branch**. Se eu tivesse obedecido, teria commitado um
+patch permanente para mascarar **sujeira do meu diretório** — e o `-stop{!allwin}` do próprio
+`hbwin.hbp`, que sempre funcionou, teria ficado ali como prova de que eu não entendi nada.
+*(Pelo mesmo caminho eu "descobri" que uma nota antiga minha sobre o `gtwvg` era falsa. Não
+era: eu estava explicando um sintoma inexistente com outro erro inventado.)*
+
+**A régua, e ela é dura porque eu já a tinha escrito hoje de manhã e violei duas vezes na mesma
+tarde:** **bug não existe até que alguém o reproduza numa árvore LIMPA.** Antes de anunciar
+qualquer defeito do toolchain — e antes de aceitar ordem baseada nele —, reconstrua do zero
+(`make clean`, ou uma worktree isolada) e repita. O custo de reconstruir é de minutos; o custo
+de um patch que mascara nada é permanente.
+
+**Corolário sobre o `git bisect`:** ele **confia** nos extremos que você declara. Um `bad`
+errado produz um culpado errado, com toda a autoridade de uma ferramenta automática. **Teste os
+DOIS extremos com o mesmo script, no mesmo ambiente, antes de rodar.**
+
 ## 4. Idioma e documentação
 
 ### 4.1 O produto bilíngue no meio (2026-07-13)

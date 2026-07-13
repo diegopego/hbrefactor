@@ -12,27 +12,34 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-## 0. ⚠️ HÁ TRABALHO NÃO-COMMITADO NOS DOIS REPOS (2026-07-13)
+## 0. O ESTADO EXATO (2026-07-13, fim da sessão)
 
-**Suíte 990/0.** Nada foi commitado — commit é autorização por-commit do Diego, nos dois
-repositórios.
+**Suíte 990/0.** O código está COMMITADO nos dois repos; sobram duas coisas, ambas do Diego.
 
-**No `harbour-core` (`utils/hbmk2/hbmk2.prg`): comando NOVO `hbmk2 --hbproject[=nested]`.**
-Devolve, em JSON, **de que um projeto é feito** — `sources` (`.prg` e `.hbx`), `incpaths`,
-`prgflags` — tudo já resolvido pelo builder (`.hbp`/`.hbc`/`.hbm`, `-i`, `${macros}`,
-filtros), **um bloco por alvo**, e **sem buildar nada**. O `--hbinfo` ficou **byte-idêntico**
-(ordem do Diego: *"se mudar a saída de algum comando, crie um comando novo"*).
+**Entregue e commitado:**
+- **`harbour-core@f8b2c9ab31`** — comando NOVO `hbmk2 --hbproject[=nested]`: devolve em JSON
+  **de que um projeto é feito** (`sources` com `.prg` e `.hbx`, `incpaths`, `prgflags`), tudo
+  já resolvido pelo builder (`.hbp`/`.hbc`/`.hbm`, `-i`, `${macros}`, filtros), **um bloco por
+  alvo**, e **sem buildar nada**. O `--hbinfo` ficou **byte-idêntico** (ordem do Diego: *"se
+  mudar a saída de algum comando, crie um comando novo"*).
+- **`hbrefactor@ef6f1e3`** — o `LoadProject` **pergunta** ao hbmk2 em vez de raspar o
+  `-traceonly`; o **`CmdTokens` morreu**; o **caso 124** trava a recusa de projeto com fontes
+  de **basename homônimo**. Zero drift.
 
-**No `hbrefactor` (`src/hbrefactor.prg`, `tests/run.sh`):** o `LoadProject` consome esse
-canal; o **`CmdTokens` morreu**; e o **caso 124** trava a recusa de projeto com fontes de
-**basename homônimo**.
+**FALTA (as duas precisam DELE):**
+1. **Commit de dois arquivos de doc** — `docs/handoff.md` e `docs/cicatrizes.md` (a § 3.7,
+   escrita depois do commit do código). Estão na árvore, sem commit.
+2. **O delta do `docs/manual.md`** — proposto e **NÃO aplicado** (invariante da
+   `/update-manual`: aprovação site a site). Detalhe abaixo.
 
-**Escrito e pronto:** entrada no `CHANGELOG.md` (a recusa nova) e no `NEWS.md` do core (o
-`--hbproject`). Ponteiro do CHANGELOG avançado para `hbrefactor@304cfa8`; **ao commitar,
-avance os dois ponteiros de novo** para os SHAs novos.
+**Ponteiros de baseline:** o do `CHANGELOG.md` está em `hbrefactor@304cfa8` e o do `NEWS.md`
+em `harbour-core@8092e33a0b` — **os dois precisam avançar** para `ef6f1e3` e `f8b2c9ab31`
+(padrão do repo: um commit próprio de docs, como o `176083dbb8` do core).
 
-**PENDENTE DE OK DO DIEGO — o delta do `docs/manual.md`** (a skill `/update-manual` exige
-aprovação site a site; foi proposto e NÃO aplicado). Dois sítios:
+**As entradas de changelog JÁ ESTÃO ESCRITAS e commitadas** (a recusa nova no `CHANGELOG.md`;
+o `--hbproject` no `NEWS.md`) — não duplicar.
+
+**O delta do manual, PENDENTE DE OK.** Dois sítios:
 (1) *"the tool uses the already-resolved command"* → passa a *"asks hbmk2 (`--hbproject`) and
 reads the answer as data"*; (2) o limite *"two modules with the same filename … can get
 confused"*, hoje em **Still rough**, é **falso** — vira recusa deliberada e **permanente** em
@@ -174,10 +181,14 @@ imediato**.
   *(Cuidado com um efeito colateral bobo: ele é PreToolUse e casa a string `git commit` no SEU
   comando — um `echo "... git commit ..."` dispara o hook ANTES do seu `git add` rodar, e você
   vai depurar um índice velho achando que é bug do hook.)*
-- **`make` do harbour-core FALHA no contrib `hbwin`** (`windows.h`, `olectl.h` — Windows-only).
-  É **pré-existente e alheio**; o `harbour` e o `hbmk2` são regravados normalmente. Não tente
-  "consertar". *(Mesma família do `gtwvg`, que não compila neste Linux — e que já me fez
-  publicar um benchmark de um comando abortado.)*
+- **O `make` do harbour-core PASSA (exit 0), contribs inclusive — se falhar, a árvore de build
+  é que está velha.** Eu afirmei aqui, horas atrás, que ele "falha no contrib `hbwin`
+  (Windows-only), pré-existente e alheio". **MENTIRA, e ela quase virou um patch permanente no
+  branch.** O `hbwin.hbp` tem `-stop{!allwin}` e se auto-pula sozinho; ele só era compilado
+  porque o motor de filtros do hbmk2 (que compila as expressões por **macro em runtime**) estava
+  quebrado — num binário construído a partir de objetos velhos meus. **`make clean && make`
+  resolve.** Depois de reconstruir do zero: 0 erros de filtro, 0 erros de header Windows,
+  `make` exit 0.
 - **Ao mexer no hbmk2, rebuildar apagando o binário** (`rm -f bin/linux/gcc/hbmk2 && make`) — o
   `make` mente "up to date". E o hbmk2 **embute o compilador**: mudou o compilador, rebuilde os
   dois.
@@ -197,7 +208,20 @@ imediato**.
 - **Antes de escrever entrada de CHANGELOG, CONFIRA se a sessão da entrega já escreveu uma.**
   Eu dupliquei a entrada da P-AUDIT por não olhar primeiro; a regra da skill é *conferir e
   completar*, não duplicar.
-- **Repetir o experimento no LIMPO antes de anunciar bug.** Nesta sessão eu escrevi no roadmap
-  um "bug do container" que **não reproduz** — o que eu vira acontecera num diretório sujo de
-  builds que haviam falhado na minha própria sonda. A retratação está lá. **Bug não existe até
-  que alguém o reproduza.**
+- **A ÁRVORE DE BUILD SUJA — leia a [cicatriz § 3.7](cicatrizes.md) ANTES de anunciar qualquer
+  defeito do toolchain.** Nesta sessão eu inventei **DOIS bugs**, pela mesma causa: medi num
+  diretório podre de rebuilds incrementais meus. O primeiro ("o `-rebuild` não desce para
+  sub-projetos") está retratado no roadmap. O segundo foi pior: anunciei ao Diego uma
+  **regressão do branch que quebraria o macro-compilador** (`{|a,b| b}` perdendo o 2º
+  parâmetro), com tabela comparativa e o veredito de que **mataria o PR** — e rodei um `git
+  bisect` de 42 commits atrás de um culpado que não existe. **`make clean && make` no core:
+  exit 0, contribs inclusive, macro perfeito.**
+  - **Bug não existe até que alguém o reproduza numa árvore LIMPA** (`make clean`, ou uma
+    worktree isolada). Isso vale também para **aceitar uma ordem baseada nele**: o Diego mandou
+    inibir o `hbwin` no build, e obedecer teria posto no branch um patch permanente para
+    mascarar sujeira minha. O `hbwin.hbp` tem `-stop{!allwin}` e sempre se auto-pulou.
+  - **O `git bisect` CONFIA nos extremos que você declara.** Um `bad` errado produz um culpado
+    errado com toda a autoridade de uma ferramenta automática — ele apontou o meu próprio
+    commit. **Teste os DOIS extremos com o mesmo script, no mesmo ambiente, antes de rodar.**
+  - **Nunca `git clean -xdf` no repo real** (destrói não-rastreados, irreversível). Para
+    experimentar com a árvore, `git worktree add` num scratchpad.
