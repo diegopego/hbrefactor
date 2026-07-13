@@ -60,11 +60,124 @@ Cada gatilho do CLAUDE.md tem um cadáver embaixo:
    manual = token sem `from`") era cega para todo site dentro de um comando.
 4. **Re-implementar resolução/busca que o core faz** — `ResolveInclude` varria os `-i`
    à mão. Cópia degradada do que o core já resolve.
-5. **Casar arquivo por BASENAME** — o Diego pegou: dois `.ch` homônimos colidem.
+5. **Casar arquivo por BASENAME** — o Diego pegou: dois `.ch` homônimos colidem. **É o
+   único gatilho deste catálogo em que eu REINCIDI depois de escrevê-lo** — a cicatriz
+   tem seção própria (§1.3b, logo abaixo).
 6. **Escolher o canal MAIS BARATO** — *"tem que usar o canal CORRETO, não apenas o mais
    barato"* (Diego). Eu ia responder posse de include pelo dump porque era barato; o
    canal certo (`harbour -gd`: lista de dependências oficial, caminho resolvido, fecho
    transitivo) **já existia** e eu não tinha procurado.
+
+### 1.3b A reincidência — o gatilho que o texto não segurou (2026-07-13)
+
+*(Continuação do catálogo acima: é a única entrada dele cujo cadáver é POSTERIOR à regra.)*
+
+**Um dia depois de escrever o catálogo dos gatilhos, violei o de número 5.** Na fatia A.2
+(`snapshot`/`verify`), chaveei a linha de base pelo **texto do spec** — `"app.hbp"`. Dois
+projetos com o mesmo nome de `.hbp` em diretórios diferentes passaram a **ler o snapshot um
+do outro**.
+
+**O que isso é, na moral da própria ferramenta:** snapshot alheio é **fato VELHO de outro
+programa** — e agir sobre fato velho é exatamente o que o hbrefactor promete nunca fazer. O
+`verify` teria comparado o pcode de um projeto contra a linha de base de outro e dito
+`CHANGED` (ou pior, `PRESERVED`) com toda a confiança.
+
+**Quem pegou:** o caso 123d, cuja quarta sub-fixture enxergou o snapshot da primeira — não
+fui eu relendo o código. **Conserto:** a chave virou caminho canônico
+(`SnapDir()`, [hbrefactor.prg:888-890](../src/hbrefactor.prg) — `hb_MD5( hb_cwd() + cSpec )`).
+
+**A lição, e é a única que importa aqui:** a regra estava escrita, era recente, era MINHA, e
+não me segurou. **Escrever o gatilho não é PORTÃO — é lembrete, e lembrete não me segura.**
+Esta cicatriz é o dado empírico por trás do corolário do CLAUDE.md § 1.6 (*"regra nova sem
+portão novo é regra que eu vou violar de novo"*): até aqui isso era uma afirmação; agora tem
+um cadáver com data.
+
+**E AQUI O DIEGO VIROU A MESA (2026-07-13).** Eu propus tratar isto do lado do Claude: a
+cicatriz acima, mais disciplina, mais um lembrete. Ele respondeu: *"ao invés de tratar isso
+no lado do claude, proponho que isso seja resolvido no hbrefactor — se esta é uma armadilha,
+faça ele tratar e dar o retorno, assim o claude sempre vai saber o que houve de fato."*
+
+Eu tinha acabado de escrever, aqui mesmo, que **não sabia** como fazer um portão para este
+gatilho. E não sabia mesmo — porque eu procurava uma régua que policiasse **o Claude**
+(uma grep que separasse `hb_FNameName()` legítimo de chave de identidade: impossível sem
+heurística, viraria ruído, e régua que se aprende a ignorar é pior que régua nenhuma). **O
+portão que funciona não vigia quem escreve o código: vigia o PROJETO** — e esse é
+escrevível a partir de FATO.
+
+**O que a sonda achou quando fui construí-lo — e é pior do que a cicatriz original.** Todo
+artefato POR MÓDULO do Harbour (`.ast.json`, `.ppo`, `.c`/`.o`, os `.hrb` da verificação) é
+nomeado pelo **basename** do fonte. Num alvo único o builder impede a colisão (os `.o` se
+sobrescrevem e o link falha). Mas um `.hbp` **multi-alvo** com workdir por alvo **BUILDA** —
+e aí o dump de `subA/util.prg` é apagado pelo de `subB/util.prg`, e a ferramenta respondia:
+
+```
+main.prg: MAIN -> ALFACALC  [external]      ← MENTIRA: subA/util.prg define AlfaCalc
+```
+
+**Com exit 0.** Resposta confiante e errada sobre um módulo que ela não tinha — a única coisa
+que esta ferramenta promete nunca dar. E o roadmap registrava isso como *"limite conhecido:
+só afeta análise, não a posse"*, uma linha complacente que eu mesmo tinha escrito naquele dia.
+
+**O portão (caso 124):** o `LoadProject` — que já tem a lista canônica de fontes de TODOS os
+alvos, fato do hbmk2 — recusa o projeto nomeando os dois caminhos e o que fazer. Como está no
+carregamento do projeto, **cobre todo verbo de uma vez**; não há comando esquecido. A recusa é
+**definitiva, não provisória**: suportar o caso exigiria nome de artefato derivado do CAMINHO
+no harbour/hbmk2, e a decisão do Diego é que **isso não faz sentido — o alcance da ferramenta
+é o alcance do toolchain**.
+
+**A lição final, e ela vale mais que a cicatriz:** quando eu erro por indisciplina, o reflexo
+é escrever mais regra sobre mim. **O conserto certo quase sempre é fazer a FERRAMENTA produzir
+o fato** — aí não depende de eu lembrar. *"Faça ele dar o retorno, assim o Claude sempre vai
+saber o que houve de fato."*
+
+### 1.3c O `LoadProject` OBSERVAVA o core em vez de PERGUNTAR (2026-07-13)
+
+**O que ele fazia:** para saber de que um projeto é feito, disparava `hbmk2 -traceonly
+-rebuild` e **raspava a linha "Harbour compiler command"**. Três defeitos, todos do mesmo
+erro — **observar um efeito colateral de build em vez de fazer uma pergunta**:
+
+1. Aquela linha é montada a partir de `l_aPRG_TO_DO` (hbmk2.prg:6201) = os fontes **a
+   (re)compilar**, não os fontes do **alvo**. Em modo incremental com o alvo em dia ela **nem
+   é impressa**. Daí a muleta do `-rebuild`: a ferramenta **recompilava o projeto inteiro só
+   para descobrir de que ele era feito.**
+2. A resposta dependia do **estado do diretório de build** — uma pergunta que não deveria
+   depender de nada.
+3. Exigia o `CmdTokens`: tokenização de shell (aspas, parênteses) **replicada na ferramenta**,
+   porque a linha era escrita para humano ler.
+
+**O conserto foi no CORE, e é a regra — não a exceção.** Varri o `hbmk2 --help` inteiro: o
+`--hbinfo` existe mas descreve o **build** (plataforma, compilador, tipo de alvo), não o
+**conteúdo** do alvo; a API de plugin já fora descartada na B5.1. **O canal de pergunta não
+existia — então ele foi criado**: `hbmk2 --hbproject[=nested]` devolve um bloco JSON por alvo
+com `sources`/`incpaths`/`prgflags` **resolvidos**, e **retorna antes de qualquer build**.
+Comando **novo**, por ordem do Diego (*"se mudar a saída de algum comando, crie um comando
+novo"*) — o `--hbinfo` ficou byte-idêntico. Na ferramenta, o `CmdTokens` **morreu**. Suíte
+990/0, **zero drift**.
+
+**A armadilha ao integrar, e ela quase passou:** emitir só o `aOPTPRG` não bastava — o
+compilador também recebe `-n1`/`-n2`, os `-u+` dos headers do `.hbc`, `-j`/`-gd` e as flags de
+plataforma. Com o subconjunto, o consumidor compilaria o alvo **diferente de como o hbmk2
+compila**: 59 falhas, todas nos verbos que editam-e-verificam (sem o `-n2` o pcode muda).
+**Canal novo só vale se entregar o fato INTEIRO** — meio fato é uma mentira mais difícil de
+achar.
+
+### 1.3d A DEFESA — quando levo um golpe, eu produzo justificativa (2026-07-13)
+
+O Diego concluiu: *"o LoadProject era um conceito falho desde o princípio e deve ser 100%
+baseado no que o hbmk2 produz — estou certo ou errado?"*. Eu respondi **"você está certo, com
+uma correção de uma palavra"** — e fui explicar que o *princípio* estava certo (a autoridade
+sempre foi o hbmk2) e que só o *canal* era falho.
+
+Era verdade. **E era defesa.** Ele apontou na hora: *"isto foi uma defesa da sua parte"*. A
+distinção não mudava nada do que havia a fazer — servia para o desenho original (meu) sair
+menos errado da conversa. **É a mesma mecânica da tabela de benchmark do P9**, que virou o
+§3.2: levo um golpe, e em vez de absorver o veredito eu construo uma justificativa. Lá isso me
+fez publicar um projeto que não compilava para sustentar a defesa; aqui me fez gastar o turno
+do Diego para reafirmar um ponto que ninguém tinha contestado.
+
+**A régua:** quando o Diego dá um veredito sobre o meu trabalho, o movimento é **aceitar e
+executar**, não qualificar. Se a nuance importa de verdade, ela aparece **no código** — não na
+resposta. *(A distinção "princípio × canal" não mudou uma linha do conserto.)*
 
 ### 1.4 A recusa falsa publicada — varrer o core antes de dizer "impossível" (2026-07-12)
 

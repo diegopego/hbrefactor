@@ -4337,7 +4337,99 @@ grep -q "snapshot" "$D/v5.log"
 check "a recusa DIZ o que fazer (rodar o snapshot antes)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123"
+unit_124() {
+echo "case 124: fontes HOMONIMOS num .hbp multi-alvo - a ferramenta RECUSA em vez de mentir"
+# A ARMADILHA (gatilho 5 do CLAUDE.md, virado do avesso pelo Diego 2026-07-13):
+# em vez de eu me policiar num documento para nao casar arquivo por BASENAME, a
+# FERRAMENTA passa a detectar a colisao e dar o fato de volta.
+#
+# O FATO, medido: todo artefato POR MODULO do Harbour (.ast.json do -x, .ppo, .c/.o,
+# e os .hrb da nossa verificacao) e nomeado pelo BASENAME do fonte. Dois fontes
+# homonimos em diretorios distintos gravam NO MESMO arquivo -- o segundo apaga o
+# primeiro. Num alvo UNICO o proprio builder impede (os .o colidem, o link falha:
+# "Referenced, missing, but unknown function"), mas um .hbp MULTI-ALVO com workdir
+# por alvo BUILDA -- e a colisao chega ate nos.
+#
+# O que a ferramenta FAZIA antes deste guard, medido no binario de HEAD:
+#   main.prg:  MAIN  -> ALFACALC  [external]   <- MENTIRA (subA/util.prg a define)
+# O dump de subA/util.prg fora sobrescrito pelo de subB/util.prg, entao ALFACALC
+# parecia funcao de FORA do projeto -- e o comando saia com EXIT 0. Resposta
+# confiante e ERRADA: a unica coisa que esta ferramenta promete nunca dar.
+#
+# Suportar o caso exigiria recurso novo no harbour/hbmk2 (nome de artefato derivado
+# do CAMINHO). Decisao do Diego: nao faz sentido -- o alcance da ferramenta e o
+# alcance do toolchain. Logo a recusa e DEFINITIVA, nao provisoria.
+D="$HERE/tmp/case124"; rm -rf "$D"; mkdir -p "$D/subA" "$D/subB"
+cat > "$D/subA/util.prg" <<'EOF'
+FUNCTION AlfaCalc()
+
+   RETURN 1
+EOF
+cat > "$D/subB/util.prg" <<'EOF'
+FUNCTION BetaCalc()
+
+   RETURN 2
+EOF
+cat > "$D/subA/main.prg" <<'EOF'
+PROCEDURE Main()
+
+   ? AlfaCalc()
+
+   RETURN
+EOF
+cat > "$D/subB/main2.prg" <<'EOF'
+PROCEDURE Main2()
+
+   ? BetaCalc()
+
+   RETURN
+EOF
+printf -- '-hbexe\n-oalfa\nmain.prg\nutil.prg\n' > "$D/subA/a.hbp"
+printf -- '-hbexe\n-obeta\nmain2.prg\nutil.prg\n' > "$D/subB/b.hbp"
+printf -- '-hbcontainer\nsubA/a.hbp\nsubB/b.hbp\n' > "$D/all.hbp"
+( cd "$D" && for f in subA/util.prg subB/util.prg subA/main.prg subB/main2.prg; do \
+   "$HB_BIN/harbour" $f -n -q0 -w3 -es2 -s > /dev/null 2>&1 || exit 1; done )
+check "fixtures do caso 124 clean under -w3 -es2" $?
+
+# (1) A ARMADILHA E REAL: este projeto BUILDA. Sem isto o caso passaria por
+#     VACUIDADE -- recusar um projeto quebrado nao prova nada.
+( cd "$D" && "$HB_BIN/hbmk2" all.hbp > build.log 2>&1 )
+check "o .hbp multi-alvo com fontes homonimos BUILDA (a armadilha e alcancavel)" $?
+[ -f "$D/subA/alfa" ] && [ -f "$D/subB/beta" ]
+check "os DOIS alvos sao produzidos (projeto legitimo, nao um build quebrado)" $?
+
+# (2) verbo de LEITURA: recusa, em vez de declarar ALFACALC [external] com exit 0
+rm -rf "$D/subA/alfa" "$D/subB/beta" "$D"/sub*/*.o "$D"/sub*/*.c
+( cd "$D" && "$BIN" call-graph all.hbp > cg.log 2>&1 )
+[ $? -ne 0 ]
+check "call-graph RECUSA o projeto homonimo (nao responde errado com exit 0)" $?
+grep -q "share the base name" "$D/cg.log"
+check "a recusa nomeia o FATO (base name compartilhado)" $?
+grep -q "subA/util.prg" "$D/cg.log" && grep -q "subB/util.prg" "$D/cg.log"
+check "a recusa nomeia os DOIS caminhos (o usuario nao precisa cacar qual e)" $?
+grep -q "rename one of them" "$D/cg.log"
+check "a recusa diz o que FAZER (agente RELATA, nao contorna)" $?
+! grep -qi "external" "$D/cg.log"
+check "a mentira antiga (ALFACALC [external]) NAO sai mais" $?
+
+# (3) verbo que EDITA: barra ANTES de tocar no arquivo (o guard e no LoadProject,
+#     entao cobre TODO comando de uma vez -- nao ha verbo esquecido)
+cp "$D/subA/main.prg" "$D/main.prg.orig"
+( cd "$D" && "$BIN" rename all.hbp subA/main.prg:3:6 Foo > rn.log 2>&1 )
+[ $? -ne 0 ]
+check "rename RECUSA o projeto homonimo" $?
+cmp -s "$D/subA/main.prg" "$D/main.prg.orig"
+check "o fonte fica byte a byte INTACTO (recusa antes de editar)" $?
+
+# (4) SEM COLISAO nao ha recusa falsa -- o alvo unico segue funcionando
+rm -rf "$D"/sub*/*.o "$D"/sub*/*.c
+( cd "$D" && "$BIN" call-graph subA/a.hbp > ok.log 2>&1 )
+check "alvo UNICO (sem homonimo) resolve normalmente - zero recusa falsa" $?
+grep -q "ALFACALC  \[util.prg\]" "$D/ok.log"
+check "e responde com FATO: ALFACALC resolve para util.prg" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

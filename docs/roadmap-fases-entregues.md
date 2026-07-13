@@ -1,7 +1,11 @@
-> **ARQUIVO HISTÓRICO (congelado em 2026-07-07)** — snapshot integral do
-> roadmap v3 no dia da limpeza. A intenção VIVA (fases ativas, backlog,
-> ordem de revisão) mora em [roadmap.md](roadmap.md); este arquivo
-> preserva o registro completo das fases entregues e não é mais editado.
+> **ARQUIVO HISTÓRICO — registro, não intenção.** A intenção VIVA (fases ativas,
+> pendências, backlog) mora em [roadmap.md](roadmap.md); aqui fica o registro
+> completo das fases ENTREGUES. É **append-only**: cada limpeza do roadmap
+> acrescenta as narrativas migradas ao FIM, verbatim, sem reescrever as anteriores.
+> Começou como snapshot integral do roadmap v3 (2026-07-07); as migrações seguintes
+> estão datadas nas seções de arquivamento.
+> **Não se lê este arquivo para saber o que fazer** — só para saber o que já foi
+> feito, e por quê.
 > ATENÇÃO (ordem do Diego, 2026-07-07): partes desta narrativa foram
 > escritas com enquadramento hbclass-cêntrico — ler com
 > [revisao-generalidade.md](revisao-generalidade.md) ao lado.
@@ -1802,3 +1806,1160 @@ e o site coberto sai `guaranteed` DIRETO — invariante no mesmo passo.
 Suíte 699/0 byte-idêntica paralelo × JOBS=1; lexdiff limpo. Resíduo
 que segue aberto: anotação de PARÂMETRO (rendimento auto-escrevível
 baixo — quase sempre nível 3) e candidato (f) como coluna-delta.
+
+---
+
+# ARQUIVAMENTO 2026-07-13 — narrativas migradas do roadmap.md
+
+Fases ENTREGUES (ou mortas) cuja narrativa integral saiu do `roadmap.md` para
+cumprir a regra de manutenção dele: **o roadmap carrega estado atual + o que
+está por fazer; o registro completo mora aqui.** Nada foi reescrito — os blocos
+abaixo são o texto VERBATIM do roadmap no dia do arquivamento. As pendências
+VIVAS que estavam enterradas nestas narrativas (portão D-P5, fila da P-AUDIT,
+P12, P-DOC, resíduos da B9, dívida da SITE-EX) foram EXTRAÍDAS e continuam no
+roadmap, na seção "Pendências vivas".
+
+---
+
+## [arquivada] Fase RE — re-escopo pós-revisão externa (RE.1-RE.6 fechados)
+
+### RE — Re-escopo pós-revisão externa — **PRIORIDADE 1 (portão aberto pelo Diego, 2026-07-09)**
+
+A revisão externa independente (Codex, 3 rodadas em 2026-07-09 —
+instrumento
+[revisao-codex-zero-inferencia.md](revisao-codex-zero-inferencia.md))
+convergiu com o julgamento interno de 2026-07-08: **manter** dump
+`-x`/rastreamento PP/refatorações verificadas; **`-kt` é R1-legítimo
+mas o consumo overclaima** (`guaranteed` para sites que o cheque não
+cobre); **B7/B7b são inferência** → rebaixar a sugeridora/
+materializadora. Plano vinculante com achados A1-A6, itens RE.1-RE.6,
+guarda de fase e critérios executáveis (**RE.1-RE.4 FECHADOS em
+2026-07-09** — RE.1: A1/A2/A5 confirmados com probes, extras gap de
+`@ref` e A6, segfault upstream com `AS CLASS` em param de codeblock;
+RE.2: marca `kt` restrita a site coberto, caso 88; RE.3, portão
+aberto na forma "a" + possible sem nomes de inferência: máquina
+B7/B7b/dispatch-por-grafo DORMENTE, usages só-fato, M-cov 3 com
+confirmed 1.715→545 100% canal declarado, casos 39/61/63/66-69/72/75/
+84-86 re-baselinados — o furo dos homônimos degradou nos sends;
+RE.4: `pPosTbl` limpo no reset, 460/460 byte-idêntico, harbour-core
+`ef0abe3688`. Suíte 622/0 byte-idêntica. **RE.5 EXECUTADO
+(2026-07-10, portão aberto pelo Diego na mesma sessão da spec):
+[spec-re5-cobertura-kt.md](spec-re5-cobertura-kt.md)** — K1 (A6 morto:
+classe de param de bloco EXISTE e chega ao dump), K2 (prólogo de bloco
+impõe por Eval), K3 (pós-store de detached em bloco), K4 (fato `chk`
+no dump, **ast-8**; `B7KtCovered` virou LEITOR — a matriz replicada
+morreu; portões de capacidade convertidos a `AstAtLeast`, lição do
+bump); K5 MEDIDO (zero receptores-objeto em @ref no corpus → FORA
+com registro), K6 FORA. Caso 88 re-baselinado como matriz por FATO
+(escrita em bloco e param de bloco AS CLASS RECONQUISTADOS →
+`guaranteed`; site 5 era INESCREVÍVEL antes do A6). Zero impacto
+1085/1085 (+3 = o próprio A6 no compilador base); suíte **700/0**
+byte-idêntica paralelo × `JOBS=1`; lexdiff limpo. Commits do core sob
+autorização. **RE.6 — F6.1+F6.2+F6.3 ENTREGUES (2026-07-10, D1-D6 como
+recomendados): o FURO DOS HOMÔNIMOS (caso 66, o caso original do Diego)
+FECHADO por FATO.**
+[spec-re6-parentesco-declarado.md](spec-re6-parentesco-declarado.md)
+§ Executado — F6.1: canal `_HB_SUPER` no core (léxico+gramática
+0-conflitos+hbclass.ch, pai posicionado prov `s`; `.hrb` 356/0
+byte-idêntico; lição hbmk2 = 2º binário que embute o compilador,
+commit `c2c26e5aa3`). F6.2: schema `ast-10` (`b07fef4060`) + consumidor
+(`ClassSuperFacts`/`ResolveDispatchSuper`/`KinshipExcludes`, exclusão de
+send por parentesco de FATO com degrade honesto sob is-a). F6.3:
+re-baseline dos 16 asserts da Rota C + generalidade adversarial (caso
+104, DSL inventada declara herança só via `_HB_SUPER`) + CHANGELOG;
+suíte **757/0**, lexdiff 0. Commit consumidor+re-baseline `6df5c50`;
+generalidade+CHANGELOG sob portão. Parentesco DECLARADO reconquistou a
+exclusão de SEND sobre arestas de FATO:
+**[spec-re-reescopo-pos-revisao.md](spec-re-reescopo-pos-revisao.md)**
+— retomada de sessão COMEÇA por lá. Registro narrativo da sessão
+2026-07-09 (rodadas, commits `c1927dfcac`/`6584aa8`/`590a4a5`) no
+[arquivo](roadmap-fases-entregues.md).
+
+---
+
+## [arquivada] Fase R + stub da B4g
+
+### R — Revisão de generalidade ✅ CONCLUÍDA (2026-07-07) — narrativa no [arquivo](roadmap-fases-entregues.md)
+
+V1-V7 tratados, Q1-Q8 fechadas com prova executável (casos 75-81 +
+atualizações 64/72-74); checklist e achados:
+[revisao-generalidade.md](revisao-generalidade.md). Pendência viva que
+sobrou: os 7 asserts de herança flipados para possible nomeado (Q4)
+foram **mudança de contrato que aguardava portão do Diego** — absorvida
+pela fase RE (o rebaixamento de B7/B7b decide o contrato final).
+
+### B4g ✅ ENTREGUE (2026-07-07) — registro no [arquivo](roadmap-fases-entregues.md)
+
+Portão + decisões: [adr-001-b4g-diretiva-fonte.md](adr-001-b4g-diretiva-fonte.md);
+spec (fatos 1-13): [spec-b4g-diretiva-fonte.md](spec-b4g-diretiva-fonte.md).
+Todos os critérios mecânicos fechados (zero impacto 224/224; byte-exato
+campo a campo no caso 82; caso 74 acionável com round-trip; suíte 555/0 +
+lexdiff limpo; extensão 0.7.0).
+
+---
+
+## [arquivada] Fase B5 — extensão VSCode (fatias 0.6.0 → 0.13.0) e B5.1
+
+### B5 — Extensão VSCode (restante)
+
+Fatias entregues no arquivo; **consulta por POSIÇÃO entregue (Q5,
+extensão 0.6.0)**; **B4g entregue (0.7.0)**: confirm-then-force de
+`--edit-rules` no rename-function + conserto do confirm de `--force`
+(regex testava mensagem em inglês, CLI fala português — estava morto).
+**`--show-expansion` entregue (0.7.1, 2026-07-08 — decisão do Diego:
+SEMPRE-ligado no usages da extensão, sem comando/setting novos)**: o
+flag é só-rótulo do canal (` -> CAIXA_SOMA`, ` -> derives ...`) e o
+`--json` do peek é byte-idêntico com/sem ele (provado em fixmth e
+fixppm), então suprimir custaria caro — cada invocação recompila o
+projeto (`hbmk2 -rebuild`) e re-perguntar pagaria outra compilação;
+divergência com o default do CLI documentada no README da extensão;
+guarda executável no harness do caso 71.
+**HB_BIN definitivo (0.7.2, 2026-07-08)**: a validação do Diego morreu
+com "o projeto não compila" porque o host de desenvolvimento não tinha
+`hbrefactor.hbBin` configurado — sem `HB_BIN` o CLI cai no hbmk2 do
+PATH (sem `-x`), sintoma já catalogado no CLAUDE.md. Conserto em três
+camadas: default do setting = layout do repo
+(`~/devel/harbour-core/harbour/bin/linux/gcc`, o mesmo do Makefile);
+dica honesta no `AstDumps` do CLI nomeando a causa quando o build falha
+com `HB_BIN` vazio; 2 guardas novas no harness do caso 71 (13 pass).
+**Picker ciente do arquivo entregue (0.8.0, 2026-07-08)**: subcomando
+`projects-of <arq> <candidatos...> [--json]` no CLI — pertencer = o
+hbmk2 resolve o arquivo como fonte na linha de comando do compilador
+(`LoadProject`/`-traceonly`, medido ~3 ms por candidato ⇒ sem cache),
+identidade por caminho canônico COMPLETO (nome+ext daria falso positivo
+entre projetos com `main.prg` distintos — provado no caso 83); órfão =
+resposta vazia com exit 0, nenhum candidato resolvido = exit != 0 (a
+pergunta falhou, não é órfão). Na extensão a decisão é pura
+(`pickerChoices`): dono único entra SEM pergunta, fonte compartilhada
+pergunta só entre os donos, órfão/falha degrada para a lista completa;
+`projCtx` (relatórios de projeto inteiro) inalterado. Provas: caso 83
+novo (10 checks, inclui a armadilha do basename e a forma absoluta da
+extensão) + 9 guardas novas no harness do caso 71 (22 pass); suíte
+**565/0**.
+**Descoberta por proximidade entregue (0.11.0, 2026-07-10)**: o Diego
+relatou que no dia a dia o picker mostrava vários `.hbp` (às vezes o
+mesmo repetido) e o `.hbp` do próprio diretório do arquivo SUMIA.
+Diagnóstico (três raízes, todas na extensão): (1) `findFiles` com teto
+de **32** truncava a lista em ordem indefinida ANTES da lógica de dono
+rodar — neste workspace há 158 `.hbp`/`.hbc`, então o do diretório caía
+fora; (2) zero ordenação (a `fsPath` crua na ordem de varredura); (3)
+zero dedup. Conserto **no CLI** (fiel à extensão fina — o walk-up e a
+ordenação são inteligência, não podem morar na extensão): o
+`projects-of` ganha um **modo DESCOBERTA** — `projects-of <arq> [--root
+<dir>]... [--json]` sem candidatos. A ferramenta ACHA o projeto por
+FATO: caminha os diretórios ANCESTRAIS (dir do arquivo → raiz que o
+contém) listando `.hbp/.hbc` (só nome por extensão — nunca parse de
+`.hbp`), sonda o hbmk2 do mais PRÓXIMO ao mais distante (`FileOwnedBy`
+fatorado de `ProjectsOf`) e, só se nenhum ancestral for dono, amplia
+varrendo a(s) raiz(es) (adaptativo; teto `OWNER_BROADEN_CAP` avisa se
+truncar). Devolve `{ owners, candidates }` JÁ ordenados por proximidade
+(`RankByProximity`, matemática de caminho pura). **A proximidade é só
+APRESENTAÇÃO; o veredito de posse continua sendo fato do hbmk2** — o
+auto-select ainda exige dono ÚNICO de fato, nunca "o mais próximo". Na
+extensão: `ownerOf` passa o arquivo + as raízes do workspace e renderiza
+(rótulos legíveis: nome do `.hbp` + diretório); `findFiles` perde o teto
+e deduplica (só usado no caminho SEM arquivo/degradado); `pickerChoices`
+intacto. Modo FILTRO legado (candidatos explícitos, array JSON, ordem
+dos candidatos) preservado byte-a-byte → caso 83 inalterado. Provas:
+caso 102 novo (6 checks: dono único, fonte compartilhada nearest-first,
+decoy mais perto que NÃO é dono, órfão, objeto JSON) + 6 guardas novas
+no harness do caso 71 (32 pass).
+Restante, por fricção do uso diário:
+
+- ~~preview `--dry-run --json` se a fricção pedir.~~ **ABSORVIDO pela fase A**
+  (2026-07-13): não era fricção de uso diário, era a falta de um CONTRATO DE
+  MÁQUINA — o mesmo buraco que faz a extensão casar prosa. Ver a fase A.1.
+
+**Critério**: Diego usa no dia a dia; sem regressão.
+
+#### B5.1 — `.hbp` multi-alvo reconhecido por inteiro ✅ ENTREGUE (2026-07-10)
+
+Sintoma do Diego: `.hbp` com estrutura/flags mais complexa "não era
+reconhecido". Raiz: um `.hbp` pode resolver para **vários alvos de build**
+— `-hbcontainer` referenciando sub-`.hbp`, referência direta a outro
+`.hbp`, ou `-target=` — e o `hbmk2 -traceonly` imprime **uma linha
+"Harbour compiler command" por alvo**. O `LoadProject` lia só a PRIMEIRA;
+as fontes dos demais alvos ficavam invisíveis e o `.hbp` deixava de ser
+reconhecido como dono delas (owners vazio no `projects-of`). Fix:
+`LoadProject` captura TODAS as linhas de comando e **une** fontes/includes/
+flags/hbx com dedup (`AddUniq`). Fiel à REGRA DO FATO — `.hbm` (coleção de
+opções), `.hbc` (pacote), `-i`, `${macros}` e filtros `{...}` já vêm
+**resolvidos DENTRO de cada comando** pelo hbmk2; a ferramenta nunca
+parseia `.hbp`, só lê o comando do compilador que o builder oficial
+emitiu. Prova: caso 103 novo (4 checks: fixtures limpas, dono do 1º alvo,
+dono do 2º alvo — a regressão —, descoberta do container). A API de plugin
+do hbmk2 foi avaliada como canal alternativo e DESCARTADA: expõe
+`hbmk_AddInput_*` (escrita) e vars como `cTARGETNAME`, mas **não** a lista
+de fontes resolvida (leitura) — o comando do `-traceonly` continua sendo o
+canal de fato mais completo.
+Limite conhecido (não do escopo deste fix): se dois alvos compilam módulos
+de MESMO nome-base em diretórios distintos, o dump `.ast.json` é chaveado
+só pelo nome-base (`ReadAst`) e colidiria — só afeta análise, não a posse.
+
+---
+
+## [arquivada] Fase U — verbos unificados (fatias 1 e 2 entregues)
+
+### U — Verbos de refatoração unificados (`rename`/`extract`/`reorder`) — **FATIA 1 ENTREGUE (2026-07-11; portão aberto pelo Diego, D-U1 descontinuar+remover, D-U2 os 8 de uma vez)**
+
+**Fatia 1 EXECUTADA:** `rename <projeto> <arq:linha:col> <novo>` — o KIND vem
+do FATO sob o cursor (papel estrutural do site + escopo declarado da função
+dona), despacha ao `rename-*` específico por dentro com saída **byte-idêntica
+por construção**. Peças: `ResolveAtQuery` ganha chaves aditivas `role`/`owner`
+(zero mudança nos consumidores antigos); `ResolveRenameAt`/`FuncAtLine`/
+`IsProjectFunction` classificam a posição nos oito alvos; `Rename` reconstrói
+a argv exata e delega. Recusa nomeando a exceção em posição ambígua/sem fato
+(D-U3, degrade honesto). Os oito `rename-*` ficam **descontinuados** no
+`--help` mas funcionais nesta fatia (são o motor da delegação E o oráculo do
+teste). Extensão 0.12.0: comando único "Rename Symbol" (estilo F2). Prova:
+**caso 107** (29 checks). **Endurecido por DUAS rodadas de revisão externa
+comparada (Codex gpt-5.5 + Claude) na mesma sessão.** A rodada 2 destravou um
+FATO NOVO DO CORE: distinguir "nome que a diretiva vira CÓDIGO" de "símbolo
+ligado num comando" é `'p'aste/'s'tringify × 'c'lone` — fato POR-MARKER que o
+pp já tem. **Decisão do Diego: expor como canal do core (`ast-12`)** —
+`hb_compAstMarkerGenerates` carimba `"generates": true` no recheio de marker
+que gera (reverse-scan do `from`, puro no dump); o `ResolveRenameAt` lê o fato
+e decide marker×binding. Fecha o cluster: mirror `REGISTRO Salva` (marker que
+gera + LOCAL homônimo que a expansão fabrica → pp-marker, não local), Codex #2
+(marker×local), #4 (dsl-word×local → dsl), #3 (chamada continuada por coluna),
+#1 (duas statics homônimas → `--file`). Param de método (clone, em função de
+nome gerado) segue `rename-param` — um flag "declaração gerada" o quebraria.
+Suíte **797/0** byte-idêntica paralelo; **lexdiff 0 divergências reais** (o
+canal ast-12 não muda pcode); rebuild harbour + hbmk2 (compast.c). § Revisão
+da spec tem o placar das duas rodadas. Specs:
+**[spec-u-verbos-unificados.md](spec-u-verbos-unificados.md)** +
+**[adr-002-rename-unificado.md](adr-002-rename-unificado.md)**;
+`generates`/ast-12 em [ast-schema.md](ast-schema.md). **O achado da operação
+de derivação do pp (clone × paste/stringify) como FATO de resolução —
+possivelmente arquitetural, com limites e perguntas em aberto honestos — tem
+ADR próprio: [adr-003-derivacao-pp-como-fato.md](adr-003-derivacao-pp-como-fato.md).**
+**Fatia 2 — ENTREGUE (2026-07-11, decisão do Diego "remover + dropar os
+~13"):** a superfície pública dos oito `rename-*` foi REMOVIDA do `Main`/
+`Usage` (as funções `Rename*` viram delegados internos do `Rename()`);
+`rename-*` digitado à mão recebe redirecionamento honesto ("removido na fase
+U; use `rename <arq:linha:col>`"). Harness migrado por FATO: **98 invocações
+`rename-*`** → 76 viraram `rename <pos>` (a saída do delegado é idêntica, os
+asserts ficaram), 9 oráculos do caso 107 viraram asserção **golden**, 1 (VAR
+membro) migrada; **13 testes da INTERFACE removida DROPADOS** (cases 6/49
+inteiros; parciais em 13/29/38/40/46/77 — ambiguidade de nome-cru que a
+posição resolve, seletor, "não existe" sem posição). A migração destravou e
+consertou um BUG do canal ast-12: um marker que só STRINGIFICA por
+`#xtranslate` DENTRO de um comando (`? EVENTO x`) tinha o `from` do token
+sobrevivente re-clonado pelo comando externo — o reverse-scan agora varre
+também os tokens CONSUMIDOS das aplicações (que guardam a op original).
+Extensão 0.13.0 (os 5 comandos por-kind removidos, só "Rename Symbol").
+Suíte **782/0** (103 casos), lexdiff 0; rebuild harbour+hbmk2 (compast.c).
+Registro completo da motivação abaixo (preservado).
+
+**A pergunta, firme**: por que a CLI expõe OITO comandos de rename
+(`rename-local`, `rename-static`, `rename-memvar`, `rename-param`,
+`rename-function`, `rename-method`, `rename-dsl`, `rename-pp-marker`) mais
+`extract-function`, `inline-local`, `reorder-params`? Para renomear, o
+usuário precisa CLASSIFICAR de antemão o alvo — é local ou static? memvar
+ou param? método ou função ou palavra de DSL ou marcador de pp? Isso é
+justo o trabalho que **o compilador já fez** e que a ferramenta consome em
+`usages --at` / `resolve-at` / `ResolveAtQuery` (Q5): dado um ponto, o
+FATO diz o que o nome é. Fazer o usuário repetir essa taxonomia no sufixo
+do comando é uma **réplica sintática na superfície da CLI** — o mesmo
+anti-padrão que O NORTE proíbe no motor (sem ajuste por-caso; a fonte da
+verdade é o compilador, não uma tabela de tipos remontada à mão, aqui na
+UX).
+
+**Proposta a avaliar**: colapsar para os verbos que descrevem a AÇÃO, não a
+espécie do alvo — `rename <arq:linha:col> <novo>`, `extract`, `reorder` —
+despachando pelo fato da árvore no ponto (a máquina do `resolve-at` já
+existe e já é o caminho da extensão). O KIND deixa de ser escolha do
+usuário e vira consequência do que está sob o cursor.
+
+**Contra-argumentos honestos (para o portão, não varrer)**:
+- Os sufixos explícitos são também um CONTRATO/salvaguarda: `rename` cego
+  num ponto ambíguo poderia renomear a coisa errada em silêncio. Resposta
+  proposta: degradar honesto — desambiguar/recusar nomeando a exceção
+  (idioma já usado no SELF/dispatch), NUNCA adivinhar. Isso pode custar uma
+  pergunta interativa que hoje o sufixo dispensa.
+- Alguns comandos carregam semântica/flags próprias que o verbo único
+  precisa PRESERVAR, não perder: `rename-function --edit-rules` (caso 74),
+  `rename-pp-marker` genérico, `rename-dsl` de qualquer palavra do match
+  (B4g). Unificar sem regressão dessas capacidades é o custo real.
+- Scripts/harness (os ~565 casos) e a extensão chamam os nomes antigos —
+  aliases retrocompatíveis ou migração registrada, decisão do Diego.
+- Peso fraco a favor de manter separado: o sufixo é auto-documentado no
+  `--help` e no shell-completion; um `rename` único esconde o alcance.
+
+**Critério de pronto (executável, se o portão abrir)**: `rename
+<arq:linha:col> <novo>` resolve o KIND pelo fato e produz saída
+BYTE-IDÊNTICA ao `rename-*` específico correspondente, provado em casos
+cobrindo os oito alvos (local/static/memvar/param/function/method/dsl/
+pp-marker); ponto ambíguo ou sem fato degrada honesto (recusa nomeada, sem
+adivinhação); capacidades por-flag preservadas sob o verbo; nomes antigos
+viram aliases OU a remoção fica registrada em ADR; `extract`/`reorder`
+recebem o mesmo tratamento se o fato os cobrir. Zero regressão na suíte.
+
+---
+
+## [arquivada] Fase P — investigação exaustiva do pp (ENCERRADA 2026-07-13)
+
+### P — Investigação exaustiva do pp para refatoração — **EM CURSO (portão aberto pelo Diego, 2026-07-11; D-P0 U-2 antes, D-P1 dois eixos, D-P2 investigação+capacidade)**
+
+**P1 — ENTREGUE (2026-07-11): veredito do genOp + o primeiro pedaço do GRAFO
+(ast-13, genealogia de regra) com consumidores.** Spec:
+**[spec-p-pp-refatoracao.md](spec-p-pp-refatoracao.md)**; a tese arquitetural
+(grafo de transformação do pp, recomendações do Diego, oráculo `.ppo`/`.ppt`):
+**[adr-004](adr-004-grafo-transformacao-pp.md)**. (1) Granularidade
+paste×stringify (adr-003:82-86): `genOp` isolado recusado — a resolução usa o
+booleano `generates` (casos 51/52/107), a predição já lê a distinção do rastro
+`from`, stringify não exige `--force`. (2) Prova adversarial revelou a colisão
+de homônimo (`? Vendas()` colhido por nome lexical); DUAS hipóteses minhas
+caíram por execução (filtro `generates` quebra método — clone multi-passe;
+"conserto por binding" era desnecessário) e **a visão do Diego venceu: o
+conserto era completar o GRAFO**. (3) **ast-13 entregue**: genealogia de regra
+(`from` nos tokens de match/result de regra GERADA — liga a regra à aplicação
+criadora; `ppcore.c`/`hbpp.h`/`compast.c`) + derivação sobrevivendo ao clone
+(`hb_pp_tokenClone`); consumidores: coleta de sementes v2 (gate de
+pertencimento por fato), `genrule` na resolução (nome que VIRA regra =
+pp-marker mesmo sem `generates`), verificação com renome opcional do nome cru
+(`hOpt`). O homônimo deixou de ser degrade e virou rename CORRETO; o marker
+que gera regra (`DEFREGRA <n> => #xcommand USA <n> => ...`) ficou renomeável
+nas duas posições. Prova: **caso 108** (14 checks, fixture `fixgen`
+não-espelho) + regras METHOD do hbclass real; suíte **796/0**, lexdiff 0,
+zero drift nos 782 pré-existentes. Também fecha o miolo de **P6
+"regra-em-expansão"** por antecipação. **Commits (core + ferramenta) pendentes
+de autorização por-commit do Diego.**
+
+**P2 — ENTREGUE (2026-07-11): "marker que gera E passa adiante" (adr-003:87-90)
+FECHADO como o P1 — veredito + prova, sem canal novo.** A pergunta: um marker
+`<n>` usado como GERADOR (paste `s_<n>` / stringify `<"n">`) E como PASS-THROUGH
+(clone `<n>`) na MESMA regra — `generates` vence → `rename-pp-marker`; erra? A
+investigação (método-oráculo `.ppo`/`.ppt`, portão em 2 rodadas, a 2ª a pedido do
+Diego com os artefatos) provou que **não há corrupção silenciosa**: a segurança é
+ESTRUTURAL — a rede dupla (recompilação `-es2` + símbolos/identidade do `.hrb`)
+confere o ARTEFATO COMPILADO FINAL, indiferente à multiplicidade (o pp não põe
+teto no nº de usos no destino — provado com paste×3 e paste×2+stringify×2) e ao
+aninhamento (diretiva que gera `#xtranslate` nem registra; só `#[x]command`
+gerado entra no grafo — o alcance do ast-13/108). Todo caso é rollback honesto OU
+re-derivação verificada. Decisão do Diego: opção A (fechar como P1, sem `genOp`).
+Entrega: fixture `tests/fixp2` (DSL inventada LOG/WRAP/SNAP) + **caso 109** (17
+checks: re-target verificado, dois rollbacks, multiplicidade completa); suíte
+**813/0** byte-idêntica, sem tocar o core/motor (lexdiff não requerido). O
+REGISTRO é a entrega tanto quanto a prova (ordem do Diego): mecânica do pp e o
+princípio estrutural em [spec-p § P2](spec-p-pp-refatoracao.md),
+[adr-004](adr-004-grafo-transformacao-pp.md) e
+[limites-e-alavancas.md](limites-e-alavancas.md).
+
+A rodada 2 da fase U destravou a operação de derivação do pp
+(`clone`/`paste`/`stringify`) como fato de resolução (ast-12, `generates`);
+o [adr-003](adr-003-derivacao-pp-como-fato.md) registrou que o achado ABRE
+perguntas — não fecha portão — e nomeou 6 eixos em aberto + o critério de
+matar ("fato sem consumidor = fato local, não arquitetura"). Diego pediu
+(2026-07-11) **investigar AO EXTREMO as possibilidades e limitações do pp
+para refatoração**, aproveitando esses achados; a fase é **EXAURIDA antes de
+avançar outras frentes ativas**. É o esgotamento sistemático: cada pergunta
+aberta e cada fato que o `ppcore` sabe-e-não-exporta vira veredito provado —
+capacidade, fato novo (`ast-N`) ou recusa honesta documentada.
+
+**Decisões do portão (Diego, 2026-07-11):** **D-P0** — a fase U **fatia 2**
+(corte da superfície pública dos 8 `rename-*` + migração do harness) fecha
+ANTES, como pré-requisito. **D-P1** — DOIS eixos: pp como **FONTE DE FATO** (o
+que o `ppcore` sabe e não exporta) E pp como **INSTRUMENTO** de reescrita (o
+próprio pp do core como motor/oráculo; pode terminar em recusa, mas decidida
+por prova). **D-P2** — **investigação + capacidade**: todo fato que sobreviver
+à prova adversarial aterrissa como consumo mínimo na ferramenta + caso na
+suíte (responde ao critério de matar do adr-003).
+
+**Fatias** (ordem: U-2 → Eixo A P1–P6 → Eixo B P7 → Eixo C P8 → P9 → P10;
+**P1 ✅ + P2 ✅ ENTREGUES (2026-07-11); P4 ✅ + P5 ✅ + P3 ✅ ENTREGUES
+(2026-07-12)**):
+- **Eixo A (fonte de fato):** P1 ✅ granularidade `paste`×`stringify`
+  (adr-003:82-86, `genOp` recusado; `ast-13` foi para a genealogia);
+  P2 ✅ marker que gera E passa adiante (adr-003:87-90, veredito estrutural,
+  caso 109); **P4 ✅ + P5 ✅ os 15 mkinds EXAURIDOS (2026-07-12, caso 111,
+  fixture fixmk)**: sintaxe de cada um tirada do PARSER; 13 com consumo provado,
+  2 com recusa documentada (`strdump` só em stream `#pragma __text`; `dynval`
+  interno do pp); `<@>` (reference) desvendado — é o GUARDA ANTI-RECURSÃO de
+  regras circulares (ChangeLog do core 2010; uso real hbfoxpro.ch:63) e a
+  ferramenta o preserva por construção. TRÊS consumos: `restrict` VALIDADO
+  (recusa antes de editar, nomeando as alternativas — re-baseline do caso 82),
+  `wild`/marker-não-usado separado de palavra-de-regra **POR FATO** (canal novo
+  **`ast-14`** no core: todo marker de match é numerado, gated, `lexdiff` 0 —
+  matou uma heurística de texto minha que o Diego pegou), `logical`/`nul`
+  RELATADOS (valor descartado: não edita, avisa). Suíte 835/0;
+  [spec-p § P4+P5](spec-p-pp-refatoracao.md); commit do core sob autorização.
+  **P3 ✅ `generates` para `usages`/find-references ENTREGUE (2026-07-12,
+  caso 112, fixture `fixgen/hom.*` reaproveitada do caso 108)**: achado
+  adversarial provou que `usages --at` misturava um marker de pp com um
+  símbolo homônimo do programa (`LABEL Vendas`, stringify, `generates:
+  true`, sem dono × `FUNCTION Vendas()` real) — o mesmo blob de 4 hits em
+  qualquer um dos quatro sites, porque `--at` calculava `role`/`generates`/
+  `genrule` via `ResolveAtQuery` e os descartava (`src/hbrefactor.prg:425`),
+  caindo no pipeline global por-nome de `usages <nome>` sem `--at`. Diego
+  decidiu ESTREITAR (portão): `Usages()` agora consome esses três campos —
+  `lAtPp` (site é mecânica de pp: `dsl`/`ppdiscard`/`ppmarker`+`generates`
+  ou `genrule`) desliga as categorias que só casam por texto contra um
+  símbolo DECLARADO; `lAtSym` (identificador comum OU `ppmarker` CLONE sem
+  `generates`/`genrule` — o próprio símbolo atravessando um `#command`,
+  ex. `? Vendas()`) desliga as categorias que só existem para achar
+  mecânica de pp; `role == "method"` fica fora dos dois, intocado (já tinha
+  filtro por `cClass`/`cOwnerQ`). `hAtPairs` (o fecho de derivação do site
+  ESPECÍFICO clicado, exposto por `ResolveAtQuery` como novo campo
+  `"pairs"`) restringe `PpMarkerHits`/`PpMarkerLift`/`PpMarkerSeeds`/
+  `MethodImplOf` via parâmetro OPCIONAL (default NIL — zero impacto nos
+  chamadores do `rename`) para não misturar OUTRA aplicação independente
+  que colou o mesmo texto alhures (`MAKE Vendas`, regra diferente). Zero
+  canal novo de core — tudo já existia no dump, só passou a ser consumido.
+  `usages <nome>` sem `--at` fica byte-idêntico ao de sempre. Suíte
+  **844/0** (835 + 9 checks), zero regressão nos casos 50/107-111.
+  **Resíduo → ABSORVIDO pela fase A (2026-07-13):** artefatos derivados
+  (paste/stringify) como `Location` estruturada no `--json` (item 2 do escopo
+  original) — hoje só texto colado sob `--show-expansion`. Não era "quando
+  doer": é o mesmo buraco do contrato de máquina (fase A.1).
+  [spec-p § P3](spec-p-pp-refatoracao.md#eixo-a--p3-generates-para-usagesfind-references--entregue-2026-07-12).
+  **P6 ✅ ESTRUTURA da regra ENTREGUE (2026-07-12, caso 113, fixture
+  `fixp6` não-espelho)**: o miolo "regra-em-expansão" já caíra na P1
+  (ast-13); os três restantes têm veredito. (a) **Regra sem cabeça**
+  (`head: null`, match começa com marker — `ppcore.c:1161`): funciona
+  **por CONSTRUÇÃO**, zero código novo — a ferramenta nunca chaveou no
+  `head`, só em `marker == 0` e nas posições de `match[]`/`result[]`;
+  resolve, lista e RENOMEIA (uso + regra no `.ch`, round-trip byte-exato).
+  **Fecha o item 3 do backlog** com algo melhor que o "relato" que ele
+  pedia. *(Corpus: zero regras sem cabeça em `include/`+`contrib/` do
+  core — forma legal, ninguém usa.)* (b) **Opcionais reordenados**: o pp
+  casa os grupos `[ ]` em QUALQUER ordem (e ausentes); a partir da linha
+  INVERTIDA a keyword pega as duas ordens + a regra, o LOCAL que só
+  atravessa resolve `rename-local`, o marker gerador prevê paste E
+  stringify — nenhuma posição se perde (elas vêm do que o pp CONSUMIU,
+  não da ordem declarada). (c) **Multi-passe**: o fecho de derivação
+  atravessa as passadas (regra reaplicada sobre o resultado de outra);
+  **limite honesto registrado** — palavra de DSL EMITIDA no result de
+  outra regra não tem posição no fonte, e a ferramenta **recusa nomeando
+  o motivo** em vez de editar só o visível. (d) **A guarda de órfão
+  estava CEGA e foi consertada POR FATO** (achado ao sondar (b), mas
+  geral): ela testava "grafia manual = token SEM `from`" e não via a
+  grafia manual dentro de um comando — `? vk_Escudo()` passa pelo `?`
+  (que é `#command` e CLONA), então o token chega COM `from`. Medido: o
+  `--dry-run` **APROVAVA** um rename que o apply desfazia tarde com
+  *"contagem de símbolos mudou"* (dry-run e apply DISCORDAVAM). O fato
+  que separa já existia (ast-12: `clone` = grafia do usuário, orfanável;
+  `paste`/`stringify` = texto FABRICADO = o artefato que o rename
+  re-deriva) — a guarda passou a excluir por índice de ARTEFATO. Agora
+  recusa antes de tocar no arquivo, nomeando o site, e dry-run == apply
+  (mesmo padrão do `restrict`/P5). Suíte **866/0** (+22), zero core, zero
+  regressão.
+  [spec-p § P6](spec-p-pp-refatoracao.md#eixo-a--p6-estrutura-da-regra--entregue-2026-07-12).
+- **Eixo B (instrumento):** **P7 ✅ VEREDITO PARTIDO (2026-07-12), decidido por
+  execução — [spec-p § P7](spec-p-pp-refatoracao.md#eixo-b--p7-o-pp-do-core-como-instrumento--veredito-partido-2026-07-12)**.
+  (a) **pp como ESCRITOR de fonte: RECUSA PROVADA.** Existe o instrumento que
+  parecia salvar a ideia — **`-u`** (sem o command def set padrão) ISOLA de
+  verdade: o pp aplica só as regras de migração e deixa o resto da linguagem em
+  paz (`? "oi"` NÃO vira `QOut`). Mas o `.ppo` é **irreversivelmente
+  destrutivo**: medido, 4 comentários → **0**, `#include` destruído, formatação
+  normalizada. Guarda o código e SÓ o código. Colide com o contrato executável
+  (caso 107 exige *"comentário com o nome velho INTACTO"*) e com a regra
+  fundadora (**nunca editar o não-verificável**). Um canal que apaga comentário
+  não pode gravar arquivo. (b) **pp como ORÁCULO: VIÁVEL — e uma perna JÁ ESTAVA
+  EM PRODUÇÃO, só não nomeada**: o padrão-ouro do `rename-dsl` (*expansão
+  idêntica → `.ppo` e `.hrb` byte-idênticos; diferença = rollback*,
+  [hbrefactor.prg:5715](../src/hbrefactor.prg)). O pp é ótimo **calculador do
+  QUE**, péssimo **escritor do ONDE**. (c) **Migração de DSL — desenho pronto,
+  NÃO construída:** o pp computa o texto novo (`-u` + regra), a FERRAMENTA
+  escreve por posição de byte (sites já posicionados em `ppApplications[]`),
+  preservando comentário/formatação. Barrada por DUAS regras do projeto, não por
+  dificuldade: é **verbo novo → portão D-P5 do Diego**, e o **critério de matar
+  do adr-003** (*"fato sem consumidor = fato local, não arquitetura"*) — o
+  isolamento por `-u` é fato novo mas **hoje sem cliente**.
+- **Eixo C (editar a regra):** **P8 ✅ ENTREGUE (2026-07-12, caso 114)** — rename
+  do nome de MARKER da regra. O `<n>` é **variável local da diretiva** (não vira
+  símbolo; o `<n>` de outra regra é OUTRA variável), então: identidade =
+  **(regra, NÚMERO do marker)**, nunca o texto — o conjunto de edição sai do
+  `ast-5` (todo token com `role: "marker"` e o mesmo `marker: N`, dos DOIS
+  lados), o que mantém match e result coerentes por construção (o `<"n">`
+  stringify é o MESMO marker 1 do match). É um **ALPHA-RENAME**, e isso dá a
+  verificação mais forte da ferramenta **de graça**: `.ppo` e `.hrb` byte-
+  idênticos obrigatórios (nada pode mudar), usos intactos, round-trip byte-exato,
+  colisão (fundir dois markers) recusada antes de editar. **O `.ch` deixou de ser
+  inalcançável** — e aqui o Diego corrigiu um desvio meu: eu ia responder "de quem
+  é este include" pelo DUMP (mais barato); a regra é **usar o canal correto, e
+  estender o core se ele não der a informação**. O canal correto já existia:
+  **`harbour -gd`** (dependencies list, `-sm` = mínimo), que dá o **caminho
+  resolvido** (`inc/far.ch`, não o `far.ch` cru — resolução do CORE, a ferramenta
+  não re-implementa busca de include) e o **fecho transitivo**. Armadilha achada:
+  o harbour grava o `.d` **no CWD**, não ao lado do fonte — adivinhar deixava
+  **lixo no projeto**; conserto `-o<tmp>`. `projects-of` num `.ch` agora responde
+  o dono por fato, e a **extensão VSCode passa a funcionar com o include em foco
+  sem código novo**. Suíte **882/0**, zero core.
+  [spec-p § P8](spec-p-pp-refatoracao.md).
+- **P9 ✅ ENTREGUE (2026-07-13): o custo do reverse-scan era QUADRÁTICO — medido,
+  consertado no core, equivalência provada.** O adr-003:96-98 registrara o custo do
+  `generates` como *"barato no dump de um módulo; um ponto a vigiar"*. A medição (a
+  entrega desta fatia) desmentiu: `hb_compAstMarkerGenerates` respondia **por token
+  consultado**, e cada resposta varria o fluxo de tokens inteiro E todas as
+  aplicações → **O(markers × módulo)**. Módulo de **16k linhas expandidas: 69,30 s**
+  de dump (contra fração de segundo para compilar); dobrar N quadruplicava o tempo.
+  Conserto (`compast.c`): a resposta é propriedade do par **(aplicação, marker)** →
+  o conjunto é construído **uma vez por módulo**, numa passada linear sobre as MESMAS
+  duas fontes, e o token responde por lookup. **16k → 0,21 s (330×)**, e o
+  crescimento virou **linear** (64k = 0,94 s). Sem canal novo, sem campo novo, sem
+  mudança de semântica — e a prova disso é o ponto: os **847 dumps** do corpus (toda
+  fixture + 6 módulos reais do core) saem **byte a byte idênticos** ao binário
+  anterior. Suíte **961/0**, lexdiff 0. O que sobra é linear e dominado por escrever
+  o JSON (64k linhas = 107 MB) — se doer, o alvo é o TAMANHO do dump, não mais a
+  busca do fato. [spec-p § P9](spec-p-pp-refatoracao.md).
+  **⚠️ DUAS CORREÇÕES no MESMO dia, ambas pegas pelo Diego. Registro completo porque é
+  o mesmo erro, cometido três vezes seguidas: MEDIR O QUE EU ACHO, não o que roda.**
+  **(1)** O 330× é do **stress sintético** (uma aplicação de pp por linha); ANUNCIEI que
+  "16k linhas expandidas é tamanho de aplicação real" **sem medir** — invenção.
+  **(2)** Ao re-medir "de verdade", montei uma tabela com TRÊS projetos — e **um deles,
+  o `gtwvg`, NÃO COMPILA** (contrib Windows-only: `!win`, erro do compilador C). A
+  ferramenta **RECUSA** o projeto; os 7,49 s que publiquei mediam um **comando
+  abortado** (gera dumps, morre, não lê nada). Descoberto na fatia V-1, ao instrumentar
+  a ferramenta: `ler+parsear = 0 ms`. **Por que eu fiz isso é o que importa:** depois do
+  vexame do 330×, a tabela era a minha DEFESA (*"olha, desta vez eu medi"*) — e para
+  sustentar a defesa eu precisava de volume, então enfiei um projeto sem conferir se ele
+  passava. **A mentira voltou pela porta que abri para me redimir.**
+  **A medição válida** (comando completo, projeto que compila, lê e analisa):
+  **xhb, 43 módulos: 12,35 → 8,36 s** (~1,5×, um terço da espera); hbhttpd (3 módulos):
+  1,16 → 1,07 s. A manchete "um terço" **sobrevive** — só a evidência podre saiu.
+  **E a TABELA saiu dos anúncios (decisão do Diego, 2026-07-13, à pergunta *"pra que
+  serve esta tabela publicada?"*):** ela não servia ao leitor (não é a máquina dele, nem
+  o projeto dele, e ele não reproduz), servia **a mim**. É medidor — a mesma coisa que
+  saiu das páginas, escondida numa superfície onde eu achei que passaria. Nos anúncios
+  fica a AFIRMAÇÃO (linear; ~1/3 em código real; o catastrófico é patológico) + o
+  **comando** para o leitor medir no projeto DELE. Número medido vive aqui e na spec —
+  registro datado da entrega, não promessa viva ao leitor.
+- **P10 ✅ ENTREGUE (2026-07-13): síntese — e a completude achou um BUG que teria
+  matado a ferramenta.** (a) **O `adr-003` está FECHADO**: as 5 perguntas que ele
+  abriu têm veredito, respondidas *pelo critério que ele mesmo fixou* — granularidade
+  (booleano certo, `genOp` recusado, P1); marker que gera E passa (segurança
+  ESTRUTURAL, P2); custo (era quadrático, P9); "descoberta ruim" (**passou no
+  critério, e por pouco**: o 2º consumidor apareceu por BUG, não por elegância — o
+  `usages --at` estava errado sem o fato, P3); e o **acoplamento**, cuja resposta
+  inverte a pergunta — o medo era perder independência do pp, e a fase provou que
+  **independência do core é o que PRODUZ réplica degradada** (cada desacoplamento que
+  restava virou bug: `ast-15`, `ast-14`, a aritmética de colisão do P11, a busca de
+  include do P8). (b) **`ast-schema.md` alcança o core** (título dizia `ast-14`).
+  (c) **O BUG que a completude achou:** o canal `ast-16` entrou no core **sem
+  versionar o `HB_AST_SCHEMA`** — o dump entregava os campos novos declarando-se
+  `ast-15`, e o `NEWS`/página mandam o consumidor *conferir esse campo*: contrato
+  mentindo. Ao consertar o número, a ferramenta **recusou o projeto inteiro** — o
+  `ReadAst` tinha **lista ENUMERADA** de versões aceitas, que morre em silêncio a cada
+  bump (e ainda mentia no diagnóstico: *"dump missing"*, com o dump no lugar). **Um
+  esquecimento escondia o outro.** O `ast-schema.md` já registrara essa lição no bump
+  `ast-8` ("portão usa VERSÃO MÍNIMA, NUNCA lista") e **abria exceção para o
+  `ReadAst`** — a exceção era o bug. Conserto: core versiona (`ast-16`), leitor vira
+  **PISO** (`AstAtLeast`), dump velho é dito com o nome certo. **Caso 122** guarda a
+  régua (lista enumerada não volta). Suíte **965/0**, ppcorpus 42/0, lexdiff 0.
+  **Commit do core pendente de autorização por-commit do Diego.**
+
+**FASE P ENCERRADA (2026-07-13).** Saldo: 4 canais novos no core (`ast-13`..`ast-16`),
+zero heurística nova na ferramenta, e três erros meus registrados com nome.
+- **P11 — ENTREGUE (2026-07-12): o pp VIVO como oráculo; morre a última gramática
+  replicada, e com ela um SEQUESTRO DE REGRA silencioso.** A API está mapeada e a
+  **equivalência com o pp do build foi PROVADA** (mesma regra, mesmo site, mesmo
+  texto — `make ppcorpus`). O limite honesto: **o pp destrói o que você ALIMENTA**,
+  não "o arquivo" — a linha inteira entra e o comentário dela não volta; logo o
+  escritor alimenta o **span da statement** (posições que o dump já tem) e grava só
+  o span. Isso **confirma o Diego e derruba a minha recusa do P7** de vez.
+  **Consumo (caso 116):** o `AbbrevClash` — que replicava a aritmética dBase do
+  `ppcore.c` — foi substituído por uma **regra-sonda** perguntada ao pp. A réplica
+  era degradada em 3 frentes (ignorava o TIPO do token; passava `"?"` como tipo da
+  regra renomeada, desligando meia checagem; só via "uma cabeça é prefixo da
+  outra") e escondia um furo **provado, não deduzido**: renomear uma cabeça para um
+  nome que começa com 4+ letras da cabeça de outra regra **sequestrava** essa outra
+  regra — e como ela podia não ter **nenhum site**, o `.ppo`/`.hrb` saía
+  byte-idêntico e a ferramenta imprimia *"verified"*. Ambiguidade **latente**,
+  silenciosa. Agora recusa-se **só o que o rename CRIA** (a ambiguidade
+  pré-existente é do usuário — `MENUITEM`/`MENUBOX` já disputam `MENU` hoje) e a
+  recusa exibe a **grafia-testemunha**. Completude sem constante mágica: varre-se
+  **todo** prefixo do nome novo e o **pp** diz quais casam. Suíte **904/0**,
+  `ppcorpus` **42/0**, **zero core** (o canal certo já existia — era só parar de
+  replicá-lo). → [pp-corpus/pp-as-instrument.md](pp-corpus/pp-as-instrument.md) ·
+  [pp-corpus/abbreviation.md](pp-corpus/abbreviation.md). **Pendente: o portão
+  D-P5** (migração de DSL como verbo) — agora com o instrumento CERTO na mão.
+  A fonte que derrubou a recusa do P7 foi apontada pelo Diego:
+  [`tests/hbpp/hbpptest.prg`](../../harbour-core/harbour/tests/hbpp/hbpptest.prg)
+  do core — o `hb_compileFromBuf` (fichado na [spec-b8](spec-b8-macros.md)) NÃO foi
+  preciso: a fatia pedia o **pp**, não o compilador inteiro em buffer.
+- **P12 — o pp como ENGENHO DE BUSCA (ideia do Diego, 2026-07-12)**: usar o
+  casador do pp para **ACHAR**, não para transformar — busca estrutural, lint com
+  regras do usuário, codemod. O trunfo não é técnico e sim de adoção: a linguagem
+  de consulta seria a do `#xcommand`, que **todo programador Harbour já sabe
+  escrever** — e quem casa é o casador do CORE, não uma réplica. Hipótese central a
+  sondar: o canal de fato **já existe** (`ppApplications` + ast-13/14/15 dão site,
+  posições e o que casou em cada marker); o que falta é **injetar a regra de
+  consulta** — e uma regra **no-op** com o `<@>` (o guarda anti-recursão, já fichado
+  no corpus) pode registrar a aplicação **sem alterar o código**. Se confirmar,
+  a 1ª versão sai **sem mudança no core**. Plano de sondagem, usos candidatos e
+  limites honestos: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-search.md)**.
+  **NADA PROVADO AINDA** — o arquivo é plano, não registro.
+  **CONSUMIDOR NOMEADO pela fase A (2026-07-13)**: a primeira coisa que um agente faz
+  antes de editar é **PROCURAR** — e hoje ele grepa. Busca estrutural cujo casador é
+  **o do core** é capacidade de agente por excelência. A fase A não executa a P12; ela
+  responde a pergunta que a P12 deixava no ar (*"quem consome isto?"*).
+- **P13 — 1º achado ENTREGUE: `ast-16` (2026-07-12, caso 117)**. A diretiva tem
+  **tempo de vida léxico**, e o dump agora o exporta: a diretiva de **remoção** entra
+  em `ppRules` como registro próprio (com `match[]` POSICIONADO, logo editável por
+  posição), com **`undoes`** = id da regra que removeu (`null` = **órfão**, não
+  removeu nada) e **`removed`** na regra que morreu. Caiu junto um **bug de schema
+  pré-existente**: o modo de comparação era um BOOLEANO (`é x?`), então a família
+  **`y`** (exata e case-sensitive) saía rotulada `"command"` — o dump **afirmava que
+  uma regra exata casa abreviado**, e a sonda do P11 acreditaria nele. Agora o `kind`
+  carrega a família como o pp a vê (`command`/`xcommand`/`ycommand` × `un…`).
+  **O conserto do vazamento custou ZERO linha de lógica na ferramenta** — com o fato,
+  a remoção virou "mais uma regra com aquela cabeça" e a maquinaria de rename por
+  posição que já existia passou a editá-la sozinha. É a demonstração mais limpa da
+  REGRA DO FATO na fase inteira. Core: `ppcore.c`, `hbpp.h` (os `HB_PP_CMP_*` viram
+  públicos — a API de rastreio agora reporta o modo), `compast.c`. **`lexdiff` 0**,
+  suíte **913/0**, `ppcorpus` 42/0. **Commit do core sob autorização.**
+  → [pp-corpus/directive-scope.md](pp-corpus/directive-scope.md)
+  **Resíduos (a explorar):** o escopo como MECANISMO (injetar regra → casar →
+  remover) alimenta o **P12**; e o `#un…` órfão é fato SEM consumidor (diagnóstico de
+  código morto).
+- **P13 (registro do achado original)**: a sondagem rendeu DOIS achados provados
+  antes de a fatia começar: **(a) BUG no hbrefactor** — o `rename` de cabeça de DSL ignora o
+  `#un*`, deixa-o **órfão**, e a regra **VAZA** para além do ponto de desligamento
+  (provado por `.ppo`: um uso depois do `#xuncommand` que era código CRU passa a
+  EXPANDIR); a rede `.ppo`/`.hrb` **não pega**, o mesmo ponto cego do sequestro do
+  P11. **(b) LACUNA DO CORE (`ast-16`)** — o dump **não exporta** o `#un*`: o
+  `ppRules` traz só a regra criada, e a diretiva de remoção é **invisível**. O pp
+  SABE (ele executou a remoção); o dump descarta — **a mesma omissão do `ast-14` e
+  do `ast-15`, pela terceira vez**. Pela regra do Diego ("lacuna pausa e
+  experimenta"), o conserto do bug **espera o `ast-16`**: procurar `#xuncommand` por
+  TEXTO seria réplica de gramática (cega para as 6 grafias, para a abreviação
+  `#UNCOMM` e para o `.ch` incluído). Usos que o escopo promove (a explorar): é o
+  mecanismo de **injeção/remoção da regra de consulta** que faltava ao **P12**, e
+  habilita codemod com escopo. → [pp-corpus/directive-scope.md](pp-corpus/directive-scope.md)
+- **P-AUDIT — 1º achado ENTREGUE: `ast-15` (2026-07-12, caso 115)**. A varredura
+  achou de cara **réplica de gramática + RECUSA FALSA**, o mesmo formato do bug do
+  P5. `AbbrevClash` reescreve à mão a abreviação dBase do pp (regra real:
+  `ppcore.c:2533`), e o `RenameDsl` a usava para **adivinhar por prefixo** se um
+  literal consumido era "a minha palavra abreviada" — porque o dump só dizia
+  `marker: 0` ("é literal"), nunca QUAL literal. Furo provado em 6 linhas: numa
+  regra cuja keyword SECUNDÁRIA é prefixo de 4+ letras da CABEÇA, a secundária
+  **escrita por extenso** era lida como abreviação da cabeça, e o rename da cabeça
+  **recusava falsamente** (*"normalize para X"* num site já normalizado) — a cabeça
+  daquela DSL ficava **irrenomeável**. Conserto onde o fato nasce: o pp PAREIA
+  token-fonte com token do padrão ao casar e **descartava** o par do literal (a
+  mesma omissão do `ast-14`, do outro lado); agora cada token consumido carrega
+  **`ruletok`** = índice do literal no `match[]` da regra. Core: `ppcore.c` (gated
+  por `fTrackPos`), `hbpp.h`, `compast.c` (**ast-14 → ast-15**). **`lexdiff` 0**,
+  suíte **892/0**, `ppcorpus` 27/0. **Commit do core sob autorização.** Resíduo: o
+  `AbbrevClash` segue vivo para a pergunta DIFERENTE ("o nome NOVO colidiria com
+  outra cabeça sob abreviação?") — predição de casamento FUTURO, que o dump não
+  responde; canal certo = perguntar ao pp (**P11**).
+- **P-AUDIT (continua) — varredura anti-heurística (ordem do Diego, 2026-07-12)**: revisar o
+  `src/hbrefactor.prg` inteiro atrás de código que (a) voltou a se apoiar em
+  **heurística/inferência**, ou (b) pegou o **caminho mais barato** em vez de
+  extrair a informação correta do core (estendendo-o quando preciso). O gatilho
+  foi flagrante e é a régua: no P8 eu ia responder posse de include pelo dump
+  porque era mais barato, quando o canal certo (`harbour -gd`) já existia — e no
+  P5 o Diego já tinha pego uma classificação por COMPARAÇÃO DE TEXTO que virou o
+  `ast-14`. Alvos conhecidos a auditar: `ResolveInclude` (re-implementa a busca
+  de include do compilador — hoje inofensivo porque o dump já traz o caminho
+  resolvido, mas é cópia degradada por design); qualquer casamento por texto onde
+  exista número/id no dump; qualquer "se não é X, então é Y" sem fato que separe.
+  Saída: lista site a site (arquivo:linha) com veredito — fato disponível, fato a
+  criar no core, ou recusa honesta.
+  **Fila NOMEADA (do catálogo de erros de 2026-07-12, CLAUDE.md § GATILHOS):**
+  (i) `ResolveInclude` — re-implementa a busca de include do compilador (gatilho
+  4); hoje inofensivo porque o dump já traz o caminho RESOLVIDO, mas é cópia
+  degradada por design: ou morre, ou passa a consumir `harbour -gd`.
+  (ii) ~~Resíduo do `AbbrevClash`~~ — **MORTO (P11, `c391408`)**. Ele reescrevia a
+  aritmética de abreviação do `ppcore.c:2533` para prever casamento FUTURO ("o nome
+  NOVO colidiria com outra cabeça?"). O `HeadClashWitness` agora sobe um **pp vivo**
+  (`__pp_init`/`__pp_process`) e deixa o próprio preprocessador responder. Zero
+  ocorrências de `AbbrevClash` no fonte — conferido, não lembrado.
+  **Mas o `HeadClashWitness` ENTRA na fila no lugar dele:** ele varre os prefixos do
+  nome novo apoiado numa propriedade que EU li do core ("toda grafia que casa uma
+  cabeça é prefixo dela"). Quem julga cada candidato é o pp — mas a **completude do
+  conjunto de candidatos** é raciocínio meu sobre o core, e isso é auditável.
+  (iii) varrer os "se não é X, então é Y" (gatilho 3) e as comparações de texto
+  onde o dump já tem número/id (gatilho 1).
+  (iv) o **`#un…` órfão** (`undoes: null`, `ast-16`): fato disponível, **sem
+  consumidor** — é código morto silencioso que a ferramenta poderia diagnosticar.
+  (v) toda chave OPCIONAL do dump lida SEM `hb_HGetDef` (`marker`, `ruletok`, `from`,
+  `col`, `undoes`) — acesso direto é `BASE/1132` em produção e a suíte não pega.
+
+  > **A P-AUDIT é para uma SESSÃO DEDICADA E LIMPA** — o prompt está pronto em
+  > [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristica.md). Não a rode
+  > como apêndice de uma entrega: quem acabou de escrever o código é o pior juiz dele.
+
+- **P-AUDIT — VARREDURA EXECUTADA (sessão dedicada, 2026-07-12)**: três achados
+  **provados por fixture executável**, um passe explícito, uma hipótese registrada.
+  **Nenhum precisa de extensão do core** — os três são fato JÁ disponível (dois deles
+  já implementados no próprio arquivo) e apenas não consultado. Portão do Diego aberto
+  para consertar (2026-07-12: *"coloque no roadmap para resolver e comece já"*).
+  Ordem de conserto = risco:
+
+  - **A1 ✅ ENTREGUE (2026-07-12, caso 119; suíte 942/0)** — **a fronteira do projeto era o
+    CWD do processo** (`hbrefactor.prg` 3049 `RenameFunction --edit-rules`, 6157 `RenameDsl`,
+    6466 `RenameRuleMarker`).
+    O guard que promete "recuso editar include de sistema/compartilhado" pergunta só
+    *"o caminho começa com `hb_cwd()`?"* — e erra nas DUAS direções, provado:
+    (a) **recusa falsa** — o mesmo projeto, a mesma regra, invocado de outro diretório:
+    `directive in '<proj>/menu.ch' outside the project directory`; (b) **autorização
+    falsa, a que morde** — com `cwd = ~`, o `hbclass.ch` do CORE entra no plano de
+    edição (`hbclass.ch:250:11`), e sem `--dry-run` o `hb_MemoWrit` grava. **A rede não
+    salva**: ela confere `.ppo`/`.hrb` byte-idênticos DOS MÓDULOS DO PROJETO, e um
+    rename consistente não muda expansão nenhuma → passa sem rollback → mutação
+    silenciosa de um include compartilhado que quebra todo outro projeto da máquina.
+    *Gatilho 6 (canal barato) + 3.* **Fato já disponível, e o predicado certo já existe
+    no arquivo**: `DirAtOrAbove( cSpec, cAbs )` ancora no diretório do `.hbp` (é o que o
+    `projects-of` usa) e `IncludeOwnedBy`/`ModuleDeps` respondem posse pelo `harbour -gd`
+    (caminho resolvido, fecho transitivo). Ancorar no SPEC preserva o comportamento de
+    hoje no caso normal (cwd = dir do projeto).
+    **Como ficou:** `ProjectOwnsFile( hProj, cPath )` — o corredor é o diretório do(s)
+    `.hbp` (união, quando o spec resolve para vários), sobre o `DirAtOrAbove` que já
+    existia. Fixture `fixout/` (include **compartilhado fora** do diretório do projeto,
+    mas **dentro** do cwd) + o rename-dsl do `fixdsl` invocado **de outro cwd** — as duas
+    direções na suíte. Medido no binário de HEAD antes do conserto: ele editava o
+    `shared/lib.ch` e dizia **`verified`**.
+
+  - **A2 ✅ ENTREGUE (2026-07-12, caso 120)** — **o `removed` do ast-16 era fato SEM
+    CONSUMIDOR → recusa falsa** (`RuleHeadCollision`, 2607; consumido por 5 verbos). Regra já morta por
+    `#xuncommand` continua sendo tratada como viva: renomear um LOCAL para `PINTA`
+    recusa (`collides with a preprocessor rule (#xcommand PINTA, y.ch:1)`) — e a
+    mão-livre compila limpo sob `-w3 -es2`, porque a regra morta não captura nada.
+    É a recusa falsa da classe do caso 115 (nome irrenomeável por uma regra que não
+    existe mais). *Gatilho 3.* **Fato já no dump** (`removed: true`; o registro da
+    remoção traz `file`/`line`; `undoes` liga os dois). A leitura honesta NÃO é "pule
+    regra `removed`" — uma regra removida na linha 100 ainda captura na linha 50 —, é
+    *"a regra está VIVA neste sítio?"*: decidível pela linha quando remoção e sítio
+    estão no mesmo arquivo; onde a ordem não decide, a recusa conservadora FICA.
+    **Como ficou:** `RuleDeadInModule( hAst, hRule )` — a regra é pulada **só** quando
+    (a) traz `removed`, (b) o registro da remoção (o que carrega `undoes` com o id dela)
+    mora **no arquivo do próprio módulo**, e (c) **nenhum token de fonte do módulo
+    precede** a linha do desligamento (então a regra não viveu sobre código nenhum aqui).
+    Fora disso — remoção em outro arquivo, ou código antes dela —, o fato não decide e a
+    recusa fica. Fixture `fixlife/` prova os dois lados (módulo `dead` libera, módulo
+    `alive` recusa).
+
+  - **A3 ✅ ENTREGUE (2026-07-12, caso 120)** — **`RenameFunction` era o único verbo sem o
+    guard de cabeça de regra** (2891; os outros cinco chamam `RuleHeadCollision`: 2128
+    local, 2769 static, 3384 extract, 7007 memvar, 11538 method). Provado: `#xcommand
+    PINTA <x>` + `rename Foo → PINTA` não recusava, o call site virava `PINTA( 2 )` e era
+    CAPTURADO pela regra; a rede pegava (`the number of symbols/functions changed -
+    rollback`) e restaurava. Dano: nenhum; custo: o usuário levava um erro de verificação
+    em vez do FATO. *Omissão, não heurística.* Agora recusa nomeando a regra.
+
+  - **A4 ✅ ENTREGUE (2026-07-12, caso 121, fixture `fixa4` não-espelho; suíte 961/0,
+    ppcorpus 42/0, zero core)** — e o plano escrito estava **ERRADO**, o que só o probe
+    mostrou. O plano dizia: as colisões do próprio `rename-dsl` tratam regra MORTA como
+    viva, basta consultar o `RuleDeadInModule`. **Falso.** Três probes executáveis
+    provaram que o `#un…` **remove por PADRÃO, não por cabeça, e ignora o `result`** — logo
+    "a regra está desligada" **não licencia** renomear outra cabeça para o nome dela: se o
+    padrão da regra renomeada casar o do `#un…`, a diretiva recém-renomeada **morre junto**
+    e o site passa a expandir pela OUTRA regra. **Compila limpo — troca SILENCIOSA de
+    semântica** (`aq_(1,1)` → `aq_(1,2)`). Consultar só a morte teria trocado a recusa
+    falsa por um **aceite-que-desfaz** (a rede `.ppo`/`.hrb` só pega no apply), quebrando o
+    `dry-run == apply` que o A2/P5/P6 conquistaram.
+    **O fato que separa os dois casos é do CORE, e já existia**: `ast-16` (`undoes` = id da
+    regra que a remoção tirou da mesa). `DelKillsRule` monta um módulo com as **duas
+    diretivas REAIS** — a regra já com o nome novo + a remoção como está no fonte — compila
+    e **pergunta ao dump quem morreu**. Não se compara padrão a padrão na ferramenta (seria
+    réplica da busca de regra do pp), não se sintetiza grafia de teste (réplica da
+    gramática), e **não se modela a ordem de registro do pp** — a pergunta é local, de duas
+    linhas. *(Armadilha achada e evitada: sondar com **sentinela no result** MUDA a
+    identidade da regra para efeito de remoção — o marker de match não usado no result é
+    numerado diferente (`ast-14`) — e teria dado a resposta ERRADA.)*
+    Fecha também o `HeadClashWitness` (sequestro reverso do P11) e o check de "match word",
+    que também não liam o tempo de vida — e o **`#un…` órfão** (`undoes: null`) ganha
+    consumidor: o `usages` da palavra o marca como `ORPHAN: removes no rule (dead
+    directive)` — **relato, nunca edição** (o Harbour aceita o órfão em silêncio, e o
+    programador acha que desligou a regra que segue VIVA).
+    *(Achado de tabela: as 10 mensagens de `--dry-run` da CLI ainda estavam em PORTUGUÊS,
+    apesar do commit que declarou o produto inglês — traduzidas.)*
+
+  **Passa (registrado, não é achado):** `HeadClashWitness` — a completude do conjunto de
+  candidatos é raciocínio sobre o core, e é VERDADEIRA (`hb_pp_tokenValueCmp`,
+  ppcore.c:2704: só casa por prefixo no modo dBase, por igualdade nos demais; um witness
+  casa as duas cabeças, logo é prefixo de ambas). Quem julga cada candidato é o pp vivo.
+  **Hipóteses registradas (não consegui quebrar):** `ResolveInclude` — o dump já traz o
+  caminho resolvido (`hb_pp_FileNew` reescreve `szFileName` para o caminho ONDE ABRIU,
+  ppcore.c:2945-3060), então o fallback dos `-i` é código dormente; ou morre, ou consome
+  `ModuleDeps`. Família `y` (case-sensitive, `HB_PP_CMP_CASE` = memcmp): a ferramenta
+  uniformiza toda palavra de regra com `Upper()` e funde duas regras `y` que o core vê
+  como distintas — erro fail-closed, sem quebra demonstrada.
+  **Descartado COM PROVA:** `ProjectMember` por basename — o hbmk2 colapsa dois fontes
+  homônimos no MESMO `.o` (link falha), então projeto com fontes homônimos não existe:
+  o basename é único por FATO do builder, não por sorte.
+
+**P-DOC — corpus exploratório/explicativo do PP (ESSENCIAL, ordem do Diego,
+2026-07-11):** uma bateria de testes que casa diretivas REAIS do Harbour
+(examples/, contribs/, os `.ch` do core — std.ch, hbclass.ch, box.ch, inkey.ch,
+set.ch…) com seus `.ppo` (saída expandida) E `.ppt` (traço passo a passo), no
+MESMO formato explicativo que a investigação P2 usou para explicar ao Diego:
+texto técnico quando preciso, mas SEMPRE explicando também para o público-alvo
+programador Harbour. **Objetivo:** entender A FUNDO o potencial do pp usando as
+diretivas que já existem no ecossistema — o que cada diretiva real gera, como o
+pp a transforma passo a passo, e o que a ferramenta consegue (ou não) refatorar
+nela. Vira **fonte essencial de conhecimento do PP** (para o Diego, para o
+usuário final e para as próprias fatias P). **Formato:** fixture por família de
+diretiva + o par `.ppo`/`.ppt` anotado + a explicação bilíngue (técnica +
+programador). Encaixa na fase P (alimenta Eixo A/fonte-de-fato e Eixo
+B/instrumento) e no mapa do alcançável. **Spec + método:
+[spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
+[pp-corpus/README.md](pp-corpus/README.md).** Método = os QUATRO oráculos (`.ppo` + `.ppt` +
+ast dump + fixture COMPILÁVEL); suíte SEPARADA do contrato (`make ppcorpus`, não
+`make test`) porque é exploratória E o core será estendido para gerar mais
+informação durante a fase (permissão do Diego). **Organização (ordem do Diego):**
+diretório `docs/pp-corpus/` — índice + UM ARQUIVO POR FAMÍLIA (o Claude do futuro
+carrega só o que precisa; monolito estoura contexto). **Regra dura (Diego):** cada
+LACUNA real (info que os oráculos NÃO dão) PAUSA a exploração e vira experimento
+de core imediato; consumo-futuro (fato derivável) NÃO pausa. **Famílias 1-4
+ENTREGUES (2026-07-11):** SET EXACT (restrict+smart-quote), @…SAY (grupos
+opcionais), STORE (grupo que repete), hbclass (OO é pp: paste + genealogia ast-13
++ `Self AS CLASS`); `make ppcorpus` 16/16, contrato 813/0 intocado. **LACUNA
+encontrada → experimentada → RESOLVIDA no mesmo dia (regra do Diego "lacuna pausa
+e experimenta"):** o `rename` de DATA/VAR member de classe recusava; virou a
+capacidade **rename-DATA** entregue (fatia 1, completude do rename-method, zero
+core — ver backlog + [spec-rename-data.md](spec-rename-data.md); suíte 825/0).
+Exploração do corpus RETOMÁVEL: próxima família na ordem = um contrib (medição).
+
+**Portões pontuais a submeter durante a execução:** D-P3 (fato provado vira
+`ast-N` OU fica computado do `from`?), D-P4 (restrict-validation e
+rename-de-literal-da-regra são capacidades desejadas OU fato sem comando?),
+D-P5 (se o Eixo B for viável, migração de DSL ganha verbo próprio?).
+
+**Critério de pronto ("exaurida"):** cada uma das 6 perguntas do adr-003 com
+veredito registrado; cada match-mkind e result-mkind com fixture provando
+consumo OU recusa documentada no ast-schema; Eixo B com veredito provado; todo
+fato sobrevivente com consumidor + caso na suíte (nenhum `ast-N` sem cliente);
+passe de completude sem conceito de pp não exercitado; suíte verde
+byte-idêntica + `lexdiff 0` por bump; régua do caso 64 em cada fixture nova.
+Toda prova em **DSL inventada NÃO-espelho** ([revisao-generalidade.md:57-64](revisao-generalidade.md)).
+**Fora do escopo:** nome de classe, macros (B8), herança (RE.6), colisão de
+módulos homônimos. Spec dedicada a criar: `docs/spec-p-pp-refatoracao.md`
+(molde da [spec-u](spec-u-verbos-unificados.md)). Plano detalhado salvo em
+`~/.claude/plans/crie-um-plano-para-enchanted-flask.md`.
+
+---
+
+## [arquivada] Fase L — locais mortos (MORTA no dia em que nasceu)
+
+### L — Locais mortos ~~por FATO (`ast-17` + verbo que remove)~~ — **MORTA NO DIA EM QUE NASCEU (Diego, 2026-07-13): o COMANDO SAIU**
+
+Registro completo porque a fase inteira foi um **erro de julgamento meu, corrigido por
+uma pergunta de duas linhas do Diego** — e o valor está em como ele chegou lá.
+
+**O caminho.** (1) Fui propor **paralelizar** o `unused-locals` (fatia 3 da fase V): ele
+dispara o compilador 43× em série. (2) O Diego perguntou ***"pra que serve o
+unused-locals?"*** — e não servia: ele **raspa `stderr`** (`"W0003" $ cLine`) e só
+**relata** o que o `-w3` já relata. (3) Eu então propus **fase L**: canal `ast-17` no core
+(o compilador tem o fato num enum — `HB_VU_NOT_USED`/`HB_VU_INITIALIZED`/`HB_VU_USED`,
+`hbcomp.h:112-114` — e o joga fora numa string) + um verbo que **REMOVE** o local morto.
+(4) O Diego: ***"muito trabalho pra algo que o compilador já avisa"***. **Fase morta, e
+o comando REMOVIDO** (CLI + extensão VSCode + manual + página).
+
+**Por que ele está certo, e eu errado três vezes seguidas.** Meu instinto foi sempre
+*salvar* o verbo — primeiro otimizando, depois "promovendo" a refatoração de verdade com
+canal novo no core. Mas o valor do produto nunca esteve ali: o compilador **já avisa**, de
+graça, em todo build com `-w3`, continuamente. Um canal de core + um verbo + um oráculo
+próprio (o `.hrb` byte-idêntico **não serve**: remover código muda o pcode legitimamente)
+é caro, e compraria... um aviso que o usuário já tem. **A pergunta certa não era "como
+faço isto melhor?", era "isto tem de existir?"** — e ela veio dele, não de mim.
+
+**E havia um footgun no fim do caminho:** `LOCAL lOk := SaveEverything()` — a variável é
+morta, o *save* não é. Apagar a linha deixa código que **compila limpo, passa em tudo, e
+parou de salvar**. Preservar o efeito (`SaveEverything()` como statement) era possível,
+mas é exatamente o tipo de risco que não se assume por um ganho que é zero.
+
+**O que FICA da fase, e vale ouro:** *(a)* a sonda do `-ge<mode>` (**dois** modos —
+`0=Clipper`, `1=IDE`; **JSON de erro não existe**; o `--hbinfo` do hbmk2 é JSON de *build*)
+— então **raspar texto de diagnóstico não tem alternativa boa: o canal certo seria o dump,
+e o comando certo era nenhum**; *(b)* a régua: **superfície de produto que duplica o core é
+peso, não capacidade** — a mesma família do "não existe compatibilidade" de hoje cedo.
+*(c)* O `unused-locals` era o **único verbo que não tocava na AST**. Sintoma, não detalhe.
+
+> **A sonda (a) virou item de fase (2026-07-13).** "JSON de erro não existe" é uma LACUNA DO
+> CORE, e o `-ge<mode>` já ter dois modos torna o conserto uma EXTENSÃO de opção existente, não
+> uma flag nova. Vive na **fase A.4** — com o veredito honesto de que **o hbrefactor é o
+> consumidor mais fraco dele** (a ferramenta usa o compilador como oráculo binário e tira os
+> fatos do dump). Quem o sustenta é o painel Problems, o agente do usuário, e o fato de ser um
+> PR pequeno e não-controverso.
+
+---
+
+## [arquivada] B-infra, B9, RD, RD-c
+
+### B-infra — suíte paralela ✅ ENTREGUE (Etapas 1 e 2) — narrativa no [arquivo](roadmap-fases-entregues.md)
+
+Racional: [testes-paralelos.md](testes-paralelos.md). Etapa 1
+(2026-07-07): pool bash por-caso, 109 s → 11-14 s (~8×). Etapa 2
+(2026-07-08): runner em Harbour (`tests/parrun.prg` +
+`tests/tcheck.prg`), python fora do `make test`, paridade
+byte-idêntica nos dois modos.
+### B9 — Tipos declarados impostos (`-kt`) + materializador `annotate` — ✅ ENTREGUE (fatias 1 e 2, 2026-07-08→10) — narrativa no [arquivo](roadmap-fases-entregues.md)
+
+A fase-modelo da REGRA DO FATO: fato ausente → **estender o core** —
+a anotação `AS <tipo>`/`AS CLASS` virou INVARIANTE imposta (fail-fast
+sob `-kt`, cheque por NOME no objeto VIVO: cobre classes de runtime
+que a estática nunca alcança) e o `annotate` fechou o ciclo virtuoso:
+a máquina B7/B7b (dormente, RE.3) SUGERE → o comando ESCREVE
+declarações da linguagem pela ESCADA (nível 1 fato puro; nível 2
+one-liner `DECLARE`/`_HB_MEMBER`/`_HB_CLASS`; nível 3 SÓ relata) com
+padrão-ouro por edição (inerte byte-idêntico sem `-kt` + compila limpo
++ roda sob `-kt`) e rollback → o `-kt` IMPÕE → o site decide por fato
+(`confirmed declared` → `guaranteed`). Specs:
+[spec-b9-anotacoes-impostas.md](spec-b9-anotacoes-impostas.md) (fatia
+1) e [spec-b9-fatia2-materializacao.md](spec-b9-fatia2-materializacao.md)
+(fatia 2); plano executado F2.0-F2.5:
+[plano-b9-fatia2-escada.md](plano-b9-fatia2-escada.md); candidato (g)
+de core ADOTADO (`b758cf376a`). Casos 87-96 (execução real; round-trip
+por semente [FATIA-2]; ROLLBACK PROVOCADO com recusa nomeando o
+BASE/3012); [testes-suspensos-re3.md](testes-suspensos-re3.md) Rotas
+A/B **RECONQUISTADAS**; extensão VSCode 0.9.0; corpus hbhttpd: 31
+declarações + 7 anotações verificadas, re-relatório DRENA (M-annotate
+no [limites-e-alavancas.md](limites-e-alavancas.md)). Suíte **692/0**
+byte-idêntica paralelo × `JOBS=1`; lexdiff limpo.
+
+**Projeto já-`-kt` ENTREGUE (2026-07-10, escopo aberto pelo Diego)**:
+o teste inerte compila baseline/pós-edição SEM a flag (`AnnNoKt`) — a
+anotação sob `-kt` muda pcode por DESIGN (emite os cheques); caso 97:
+quem já adotou `-kt` anota e o site coberto sai `guaranteed` direto.
+Suíte **699/0** byte-idêntica paralelo × `JOBS=1`.
+
+**Fatia 3 — materializador de param de bloco (2ª perna da Rota D) —
+✅ EXECUTADA (2026-07-10, mesma sessão do portão; decisões do Diego:
+D1 contrato espelho da Rota B, D2 fato de posição para TODAS as
+declarações, D3 ambas as fontes)**:
+**[spec-b9-fatia3-param-bloco.md](spec-b9-fatia3-param-bloco.md)** §
+Executado — F3.1: âncora de escrita como FATO do dump (**ast-9**:
+`nameLine`/`nameCol` = posição do token ESCRITO do nome; param de
+bloco captura no parse via `HB_CBVAR`, padrão K1; ausente = param de
+diretiva, inescrevível — honesto), zero impacto 230/230, adversarial
+`LOCAL conta AS CLASS Conta` provado; F3.2/F3.3: balde `bp` do
+`annotate` (sugestão pelo caminho de bloco da máquina dormente:
+receptor-inline + união de Evals convergente) + escrita na âncora do
+fato com registro `_HB_CLASS` quando a classe de runtime não é
+conhecida do módulo; `AnnNameCol` (régua de unicidade) rebaixado a
+degrade de dump antigo; F3.4: casos 98-100 fecham a Rota D nos itens
+escrevíveis (detached, params q1 inclusive CONTINUADO, DSL
+não-espelho JUNTO), venenos assertados, 89/97 re-baselinados só nas
+contagens. Suíte **729/0** byte-idêntica paralelo × `JOBS=1`; lexdiff
+limpo. q1:13/14 seguem suspensos com rota futura registrada
+(anotação na regra da DSL / hbclass.ch no core). Commits do core sob
+autorização.
+
+### RD — Rota da diretiva (q1:13/14): tipo do receptor INLINE por FATO — ✅ **ENTREGUE (2026-07-10, mecanismo M-B; suíte 762/0)**
+
+O furo que sobrou da B9 fatia 3 (fato 8): o `Self` gerado pela diretiva
+`INLINE`/`OPERATOR`/`ACCESS`/`ASSIGN` do hbclass.ch NÃO tem token de
+fonte, então os sends `::Msg()` dentro do bloco degradavam para
+`possible` (q1:13/14 suspenso, caso 99). Alvo: o tipo do receptor
+INLINE vira FATO de compilação, **nascendo genérico** (regra da DSL do
+usuário; hbclass.ch = instância core). Experimento E0-E2 (2026-07-10):
+**(E0)** gap = 2 params `SELF` (declLine 13/14) com `class:None`;
+**(E2, empírico)** a ferramenta JÁ consome `type:'S'+class` num param de
+bloco → `confirmed send (receiver declared AS CLASS MOEDA, codeblock)`,
+ZERO mudança no consumidor (caminho vivo K2 do RE.5, TypeOf/DeclType);
+**inércia** provada byte-idêntica sem `-kt`; **custo -kt** confirmado
+(`__HB_CHKTYPE(Self,"S:MOEDA","MOEDA:SELF")` por Eval). O problema
+colapsa em: preencher `type:'S'+class` no dump SEM o cheque `-kt`.
+**Mecanismo M-B (canal dedicado, sem AS CLASS — escolha do Diego sobre
+M-A/M-C)**: `bType` sentinela `HB_VARTYPE_INLINE_SELF` para "classe
+fact-only" — flui `VarType→CBVAR→HVAR→pDecl` sozinho; `hb_compChkTypeGenCall`
+(único emissor do cheque) pula o sentinela → cobre bloco simples E
+estendido; `hb_compAstWriteType` mapeia sentinela→`'S'` só na escrita do
+dump (E2 de graça); keyword `_HB_INLINESELF` no léxico (molde `_HB_SUPER`)
+que hbclass.ch emite no `Self`, no-op sob `HB_CLS_NO_DECLARATIONS`.
+Bônus: sem resolução de classe (linha hbmain.c:471 pulada) → sem W0025,
+funciona até p/ classe de runtime não-registrada (DSL não-espelho).
+**EXECUTADO (2026-07-10)**: 6 edições no core — sentinela
+`HB_VARTYPE_INLINE_SELF` (hbcomp.h), keyword `_HB_INLINESELF` (complex.c),
+`%token`+2 produções `BlockVarList` (harbour.y, bison regen 0-conflitos),
+skip no `hb_compChkTypeGenCall` (hbmain.c), mapa sentinela→`'S'` no
+`hb_compAstWriteType` (compast.c), os 4 blocos `INLINE`/`OPERATOR` +
+no-op sob `HB_CLS_NO_DECLARATIONS` (hbclass.ch). Provas: **E1** dump
+com `type:'S'+class` e `.c` `-kt` **byte-idêntico** ao original (zero
+cheque); **E2** q1:13/14 = `confirmed` sem mudar a ferramenta (mesmo sob
+`-kt`: confirmed, nunca guaranteed — fact-only); **E3** caso 105 novo
+(DSL não-espelho fixself: FORGE/BELLOW/STOKE, receptor `oIt` gerado por
+diretiva tipado só pelo canal — régua do caso 64); **zero-impacto** 43
+módulos `-kt` M-B×original byte-idênticos; suíte **762/0**, lexdiff limpo.
+Casos 86/99 re-baselinados (q1:13/14 `possible`→`confirmed`, portão do
+Diego). Consumidor NÃO muda (canal declarado vivo, TypeOf/DeclType/K2).
+Commits do core sob autorização por-commit. Rebuild: harbour E hbmk2
+(libhbcplr). Fallback M-C (`AS CLASS` impõe) ficou desnecessário.
+
+**Resíduos em aberto (fatias futuras da B9, portão de ESCOPO do
+Diego)**: (1) anotação de PARÂMETRO de assinatura (colapsa em
+`tokens[]`, pede o idioma `SigParamHits`; rendimento auto-escrevível
+baixo hoje — param quase sempre é nível 3; o fato de posição da
+fatia 3/D2 destrava a âncora se emitido para assinaturas); (2)
+candidato (f) de core ADIADO (New implícito — protótipo como
+coluna-delta quando reabrir); (3) execução controlada como 2ª FONTE
+da sugeridora — **fatia 4 FECHADA (2026-07-10): F4.1+F4.2 entregues;
+F4.3 (escrita) MORTA POR MEDIÇÃO (decisão do Diego sobre o M1b —
+critério de matar acionado; spec na gaveta, padrão B8)**:
+**[spec-b9-fatia4-execucao-controlada.md](spec-b9-fatia4-execucao-controlada.md)**
+§ Executado — `exec-registry` entrega o retrato da tabela viva
+(driver `-hbexe`+`-main=`, seleção 100% fato, proveniência por
+chamada, flush por `EXIT PROCEDURE` contra QUIT do código executado,
+schema `rtr-1` determinístico, zero edição no core; fixture fixreg +
+caso 101; suíte **740/0** byte-idêntica). M1+M1b no
+[mapa](limites-e-alavancas.md) (régua recalibrada: corpus = código do
+CORE, regra no CLAUDE.md): casting raro no core bem escrito (rtl ~0%,
+gtwvg ~1%, xhb ~0%; 38% do cls\*cast é tortura); classe invisível à
+estática existe (escalares de startup do xhb) mas é nicho; registrador
+paramétrico fica fora do alcance honesto — continuar/matar a escrita
+(F4.3) é decisão do Diego sobre estes números.
+
+### RD-c — Completude M-B: acessadores de DATA do hbclass + params no nó (ast-11) — ✅ **ENTREGUE (2026-07-11; suíte 768/0)**
+
+A RD carimbou o `Self` gerado dos blocos `INLINE`/`OPERATOR`/`MESSAGE`,
+mas deixou de fora os **acessadores de DATA** do dialeto Class(y)
+(`VAR ... IN`/`IS`/`IS ... IN`/`IS ... TO`, hbclass.ch ~484-502): cada um
+gera um getter `{|Self| Self:<msg>...}` E um `"_"`setter
+`{|Self,param| Self:<msg> := param}`. Emitir o marcador `_HB_INLINESELF`
+neles (8 blocos) foi **necessário mas não suficiente**: os dois blocos
+caem na MESMA linha de fonte, e o consumidor degradava para `possible`
+pela régua "dois blocos numa linha ⇒ a declaração do param é inatribuível
+a um bloco só" (`B7BlockParam`, casamento por `declLine`). **Escolha do
+Diego (portão, sobre relaxar-o-consumidor × aceitar-o-limite): numerar os
+blocos no core** — que refinei para o mais direto: o nó `CODEBLOCK` passa
+a carregar seus **próprios params tipados** no dump (`"params":[{sym,type,
+class}]`, schema **ast-11**, compast.c dump-only lendo de
+`asCodeblock.pLocals`). O consumidor tipa o receptor de um send pelo bloco
+**EXATO** em que ele está (`hBlk["params"]`), sem casar por linha — a
+ambiguidade some e resolve até o caso adversarial de dois blocos com
+receptores de classes diferentes. Provas: **E1** dump com `"params"` +
+`type:'S'`/class no `Self` (param sem tipo NÃO vaza classe); **E2** getter
+E setter de `VAR nEcho IS nRaw` (2 blocos na linha 15) AMBOS `confirmed`,
+mais a delegação via membro (`IS nCount TO oPart`, `Self:oPart` confirmed)
+e o `oG:nRaw` de fonte; **custo-zero** `.c -kt` byte-idêntico (marcador ×
+sem-marcador, mesmo nome de saída) — fact-only estendido aos acessadores;
+**zero drift** (762 asserções antigas intactas — o caminho params-first
+devolve o MESMO tipo que o antigo para bloco-único-por-linha); suíte
+**768/0**, lexdiff 0 divergências. Fixture `fixdel` + caso 106 (formas do
+CORE hbclass; a generalidade da rota já é do caso 105 com DSL inventada).
+Consumidor lê `"params"` de QUALQUER nó de bloco — nada keyed a hbclass.
+Rebuild: harbour E hbmk2 (compast.c → libhbcplr; sem regen de parser, não
+toquei harbour.y). Commits do core sob autorização por-commit do Diego.
+
+---
+
+## [arquivada] Fase SITE-EX — suíte dos exemplos da página + CLI em inglês
+
+### SITE-EX — suíte dos exemplos da página + CLI em inglês — ✅ **ENTREGUE (2026-07-12; suíte 923/0)**
+
+**Escopo.** A landing page publicava transcripts **inventados** (`vendas.hbp`,
+`billing.hbp`, classes `Payment`/`Logger` — projetos inexistentes) e uma saída de
+terminal com números que nenhuma execução produziu. Entrega em três pernas:
+
+1. **CLI em inglês** (decisão do Diego, 2026-07-12): ~380 literais de saída
+   traduzidos, 48 asserções da suíte reescritas, extensão VSCode + o harness dela +
+   `docs/manual.md` reacoplados (a extensão casava `/nenhum identificador/` e teria
+   quebrado calada). Pré-requisito para a página poder exibir saída **verbatim**.
+2. **Suíte dos exemplos** (`tests/site/`, `tools/site-examples.sh`): 10 exemplos,
+   quatro portas cada (antes compila / exit esperado / depois compila / recusa e
+   relatório deixam o fonte byte a byte intacto). `make site-examples` regrava os
+   blocos por EXECUÇÃO; **`make site-check` FALHA** se a página divergir. Portão
+   provado vivo (adulterar uma linha de transcript quebra o build). Contrato,
+   cicatriz e como adicionar: `tests/site/README.md`; regra durável no CLAUDE.md.
+3. **Conserto achado pela suíte**: `extract-function` dava **recusa falsa** em
+   qualquer trecho com `SWITCH` — a guarda de salto só aceitava `for`/`while` como
+   estrutura que cobre um `EXIT`, e o `EXIT` do `CASE` é do `SWITCH`. O fato já vinha
+   do compilador (`blocks[]` exporta o kind `switch`); a ferramenta o ignorava. `LOOP`
+   **não** entrou na lista (ele continua o laço externo e o salto é real). Caso 118 +
+   fixture `tests/fixsw` travam os dois lados.
+
+**Critério de pronto (atingido).** `make test` 923/0; `make site-check` verde nos
+dois portões (indicadores medidos + exemplos executados); zero projeto inexistente
+citado nos blocos gerados da página.
+
+**Dívida aberta.** As seções profundas da página (rename de DATA, genealogia de
+regra, tempo de vida de diretiva, sequestro por abreviação) ainda têm transcript
+**colado à mão** — corretos hoje (rodados um a um), mas FORA do portão, e portanto
+sujeitos ao mesmo apodrecimento. Migrá-los para `tests/site/` é o próximo passo.
+
+---
+
+## [arquivada] Fase A.2 — `snapshot`/`verify`, o oráculo exposto (2026-07-13)
+
+*A fase A segue ATIVA no roadmap (A.1/A.3/A.4 em portão fechado); só a narrativa da
+fatia ENTREGUE migrou para cá. O LIMITE do `CHANGED` e o "fica de fora" continuam no
+roadmap — governam o resto da fase.*
+
+#### A.2 — `verify`: o ORÁCULO EXPOSTO — ✅ **ENTREGUE (2026-07-13, portão aberto pelo Diego; caso 123, suíte 978/0)**
+
+Duas chamadas, e a máquina que **já existia** passa a servir edições que a ferramenta **não
+fez**: `snapshot <project>` grava a linha de base (pcode + cópia dos fontes); o agente edita à
+vontade; `verify <project> [--rollback]` responde com **três vereditos** — `PRESERVED` (prova),
+`CHANGED` (**ausência** de prova, com o DELTA) e `BROKEN` (erro objetivo, `--rollback` restaura
+byte a byte). **O agente ganha liberdade sem ganhar impunidade.** Nada no core faz isso.
+
+> **LIMITE, e é o CORAÇÃO do desenho:** identidade de pcode é oráculo **DE UM LADO SÓ**.
+> **`PRESERVED` é PROVA; `CHANGED` NÃO é prova de quebra** — um `extract-function` legítimo muda
+> o pcode. Ler "mudou" como "está errado" seria **chutar a intenção do autor** = heurística. Por
+> isso o `CHANGED` **sai com exit 0** e **nenhuma palavra de reprovação** — e o caso 123 trava
+> isso com uma régua textual (`! grep -qiE "wrong|incorrect|broke|invalid|failed"`).
+
+**O `CHANGED` é a saída MAIS valiosa, não a pior.** Ele traz o **delta que o COMPILADOR viu**
+(`pcode of MAIN changed`; `new function CALCULA`; `new symbol CALCULA`), lido do `.hrb` pelo
+`HrbParse` que já existia. **Um diff de texto mostra linhas; isto mostra o que o compilador
+entendeu que mudou** — o que nenhum LLM finge e nenhum grep dá.
+
+**SONDA que derriscou a fatia ANTES de codar** (spec § 3.4): o pcode carrega número de linha
+(`HB_P_LINE`), o que faria `PRESERVED` nunca disparar. **Não dispara porque a ferramenta já
+compila com `-gh -l`** — e o `-l` suprime a informação de linha. **Já estava lá**: o oráculo é
+insensível a formatação e sensível a semântica, por decisão anterior, não por sorte.
+
+**CICATRIZ (o gatilho de basename, e eu caí nele).** Chaveei o snapshot pelo **texto do spec**
+(`"app.hbp"`) — dois projetos homônimos em diretórios diferentes **liam a linha de base um do
+outro**. É o **gatilho nº 5 do CLAUDE.md**, escrito e ignorado. Pego pelo caso 123d, cuja quarta
+sub-fixture enxergou o snapshot da primeira. Chave agora é **caminho canônico** (`hb_cwd()` +
+spec). *(Snapshot alheio é fato VELHO de outro programa — e agir sobre fato velho é o que esta
+ferramenta promete nunca fazer.)*
+
+**Fica de fora, honesto:** a relação de equivalência do `verify` é a **mais estrita** (identidade
+byte a byte do `.hrb`). Os degraus mais frouxos que os verbos usam por dentro (`HrbEquivalent`
+para rename; `HrbExtractCheck` para extract) **dependem de saber o que se esperava mudar** — e
+numa edição que a ferramenta não fez **não existe expectativa**. Usá-los seria inventar intenção.
+
+---
+
+## [arquivado] Itens de backlog FECHADOS (limpeza de 2026-07-13)
+
+Saíram do backlog do roadmap porque já têm veredito. Registro:
+
+- **Rename de DATA/VAR member — ✅ ENTREGUE (fatia 1, 2026-07-11; lacuna achada
+  pelo P-DOC e fechada no MESMO dia pela regra "lacuna pausa e experimenta").**
+  O `rename` sobre `VAR nSaldo`/`::nSaldo` agora edita declaração + getter +
+  setter, mapeia `NOME→novo` E `_NOME→_novo`, e recusa homônimo entre classes
+  (unicidade). Completude do rename-method para DATA (sem comando novo), zero
+  mudança de core. Spec: [spec-rename-data.md](spec-rename-data.md); provas: caso
+  48 re-baselinado + caso 110 (fixdata); suíte 825/0. **Fatia 2 (backlog):**
+  `ACCESS`/`ASSIGN` (getter/setter explícitos), DATA herdada de superclasse, e o
+  `resolve-at` de `::membro` escopando a classe (rename a partir do site de USO).
+0c. ~~**Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
+   verificação proporcional à edição quando o uso real doer.~~ **PROMOVIDO a FASE V
+   (Diego, 2026-07-13)** — deixou de ser "quando doer": está medido que dói (xhb,
+   42 módulos: 8,36 s por comando, edite-se 1 linha ou 20). Ver a fase acima.
+1. **Análise de programa inteiro (tipos interprocedurais)** — **PROMOVIDA
+   para a fase B7 (2026-07-08)**, spec no portão:
+   [spec-b7-tipos-interprocedurais.md](spec-b7-tipos-interprocedurais.md).
+   Ponto fixo sobre os dumps com conjuntos finitos de classes — alavanca
+   B do [mapa](limites-e-alavancas.md); nota de probe: RETURN vira `push`
+   no dump mas SEM rótulo (D2 da spec propõe o gancho ast-6).
+   **Fricção relatada (Diego, 2026-07-08, fixext)**: usages de `Deposita`
+   mistura os sends de `oC` (Conta) e `oV` (ContaVip) — os 4 sends saem
+   `possible (receiver unknown)` nas DUAS consultas e o peek junta tudo.
+   A separação por homônimo nas definições/declarações JÁ funciona
+   (caso 81: excluded com fato nos dois sentidos); o que falta é tipar o
+   RECEPTOR dos sends. Alvo executável: com `oC := Conta():New()` /
+   `oV := ContaVip():New()` no MAIN, a consulta `CONTAVIP:Deposita` deve
+   excluir os sends de `oC` e confirmar o de `oV`, cada um com seu fato;
+   receptor sem fato (parâmetro de fora, macro, `Self := oOutra` do
+   próprio fixture) permanece possible — o contrato de 3 camadas fica.
+2. **Evidência de execução — PROMOVIDA a fase D no portão
+   (2026-07-08)**: spec própria com fatos re-auditados
+   ([spec-d-evidencia-execucao.md](spec-d-evidencia-execucao.md));
+   ver a seção da fase acima.
+3. ~~**Regra sem cabeça** (`head null`, hbcompat legado): dump já registra;
+   candidata a fixture de RELATO se um projeto real trouxer o caso.~~
+   ✅ **FECHADO pela P6 (2026-07-12, caso 113)** — e com algo melhor que o
+   relato que este item pedia: a ferramenta **resolve, lista e RENOMEIA** a
+   regra sem cabeça **por construção** (nunca chaveou no `head`; opera em
+   `marker == 0` e nas posições de `match[]`/`result[]`), com round-trip
+   byte-exato. Zero código novo. *(Corpus: zero ocorrências em
+   `include/`+`contrib/` do core — forma legal que ninguém usa, daí nunca
+   ter aparecido.)*

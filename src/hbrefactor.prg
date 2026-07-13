@@ -131,63 +131,100 @@ STATIC PROCEDURE Usage()
 
 STATIC FUNCTION LoadProject( cSpec )
 
-   LOCAL cOut := "", cErr := "", cCmdLine, cTok, cDir, aLines, nI
-   LOCAL hProj, lNext := .F., aCmdLines := {}
+   LOCAL cOut := "", cErr := "", cTok, cDir, cLine
+   LOCAL hProj, hTgt
+   LOCAL hSeen := { => }, cBase
 
-   // -rebuild: sem ele, projeto com -inc e alvo em dia não mostra comando
+   // O CANAL É DE CONSULTA, NUNCA DE OBSERVAÇÃO. Para projeto (fontes, includes,
+   // flags) a fonte de verdade é o hbmk2 - e a pergunta se FAZ a ele:
+   // `--hbproject=nested` devolve UM BLOCO JSON POR ALVO com o conteúdo já
+   // RESOLVIDO (.hbp/.hbc/.hbm, -i, ${macros} e filtros {...} expandidos pelo
+   // builder), e retorna ANTES de qualquer build.
+   //
+   // O que havia aqui antes era o canal ERRADO, e o erro não era estético: a
+   // ferramenta raspava a linha "Harbour compiler command" do -traceonly, que é
+   // EFEITO COLATERAL DE BUILD. Aquela linha traz os fontes A COMPILAR, não os
+   // fontes do ALVO (em modo incremental com o alvo em dia ela nem sai) - daí a
+   // muleta do -rebuild, que forçava recompilar o projeto INTEIRO só para
+   // descobrir de que ele é feito. E ainda exigia re-tokenizar aspas/parênteses
+   // de uma linha escrita para humano ler (o CmdTokens, morto com esta mudança).
+   //
+   // A regra que isto encarna (Diego, 2026-07-13): necessidade identificada ->
+   // o CORE passa a responder. O `--hbproject` foi criado no hbmk2 para esta
+   // pergunta. É o caminho PADRÃO, não a exceção.
    IF hb_processRun( HbMk2Bin() + " " + StrTran( cSpec, ",", " " ) + ;
-                     " -traceonly -rebuild",, @cOut, @cErr ) != 0
+                     " --hbproject=nested",, @cOut, @cErr ) != 0
       OutErr( ErrLines( cOut + cErr ) )
-      RETURN NIL
-   ENDIF
-
-   // um .hbp pode resolver para VÁRIOS alvos (sub-projetos via -hbcontainer/
-   // referência a outro .hbp, ou -target=): o hbmk2 imprime uma linha
-   // "Harbour compiler command" POR alvo. Capturar TODAS e unir as fontes -
-   // pegar só a primeira torna invisíveis os .prg dos demais alvos e o .hbp
-   // deixa de ser reconhecido como dono deles. (.hbm/.hbc/-i/macros/filtros
-   // já vêm resolvidos DENTRO de cada comando - fato do hbmk2, sem parse nosso)
-   aLines := hb_ATokens( StrTran( cOut, Chr( 13 ), "" ), Chr( 10 ) )
-   FOR nI := 1 TO Len( aLines )
-      IF lNext
-         AAdd( aCmdLines, aLines[ nI ] )
-         lNext := .F.
-      ELSEIF "Harbour compiler command" $ aLines[ nI ]
-         lNext := .T.
-      ENDIF
-   NEXT
-   IF Empty( aCmdLines )
-      OutErr( "hbrefactor: hbmk2 produced no compiler command for '" + ;
-              cSpec + "'" + hb_eol() )
       RETURN NIL
    ENDIF
 
    hProj := { "spec" => cSpec, "files" => {}, "hbx" => {}, "inc" => {}, "flags" => {} }
 
-   FOR EACH cCmdLine IN aCmdLines
-      FOR EACH cTok IN CmdTokens( cCmdLine )
+   // um bloco por alvo (um .hbp resolve para VÁRIOS via -hbcontainer/-target=):
+   // unir tudo - pegar só o primeiro torna invisíveis os fontes dos demais
+   FOR EACH cLine IN hb_ATokens( StrTran( cOut, Chr( 13 ), "" ), Chr( 10 ) )
+      IF Len( AllTrim( cLine ) ) == 0
+         LOOP
+      ENDIF
+      hTgt := hb_jsonDecode( cLine )
+      IF ! HB_ISHASH( hTgt ) .OR. ! hb_HHasKey( hTgt, "sources" )
+         OutErr( "hbrefactor: hbmk2 --hbproject returned no project content for '" + ;
+                 cSpec + "' - the hbmk2 on HB_BIN is out of step with this tool" + hb_eol() )
+         RETURN NIL
+      ENDIF
+      // .prg e .hbx chegam na MESMA lista (o hbmk2 os põe no mesmo array de
+      // entradas do compilador, hbmk2.prg:3748) - separa-se por extensão
+      FOR EACH cTok IN hTgt[ "sources" ]
          DO CASE
-         CASE cTok:__enumIndex() == 1           // o binário harbour (por alvo)
-         CASE ! Left( cTok, 1 ) == "-"
-            DO CASE
-            CASE Lower( hb_FNameExt( cTok ) ) == ".prg"
-               AddUniq( hProj[ "files" ], cTok )
-            CASE Lower( hb_FNameExt( cTok ) ) == ".hbx"
-               AddUniq( hProj[ "hbx" ], cTok )
-            ENDCASE
-         CASE Left( cTok, 2 ) == "-o" .OR. Left( cTok, 2 ) == "-q"
-         CASE Left( cTok, 2 ) == "-i"
-            AddUniq( hProj[ "inc" ], SubStr( cTok, 3 ) )
-            AddUniq( hProj[ "flags" ], cTok )
-         OTHERWISE
-            AddUniq( hProj[ "flags" ], cTok )
+         CASE Lower( hb_FNameExt( cTok ) ) == ".prg"
+            AddUniq( hProj[ "files" ], cTok )
+         CASE Lower( hb_FNameExt( cTok ) ) == ".hbx"
+            AddUniq( hProj[ "hbx" ], cTok )
          ENDCASE
+      NEXT
+      FOR EACH cTok IN hTgt[ "incpaths" ]
+         AddUniq( hProj[ "inc" ], cTok )
+         AddUniq( hProj[ "flags" ], "-i" + cTok )
+      NEXT
+      // as flags vêm PRONTAS para consumo: o hbmk2 já deixa de fora o -o/-q (o
+      // destino e a verbosidade que ELE escolheu para o build - plumbing dele,
+      // não fato do projeto). A ferramenta não classifica string de opção.
+      FOR EACH cTok IN hTgt[ "prgflags" ]
+         AddUniq( hProj[ "flags" ], cTok )
       NEXT
    NEXT
 
    IF Empty( hProj[ "files" ] )
+      OutErr( "hbrefactor: the project '" + cSpec + "' has no Harbour sources" + hb_eol() )
       RETURN NIL
    ENDIF
+
+   // FRONTEIRA DO TOOLCHAIN: todo artefato POR MÓDULO do Harbour (.ast.json do
+   // -x, .ppo, .c/.o, e os .hrb da nossa verificação) é nomeado pelo BASENAME do
+   // fonte. Dois fontes homônimos em diretórios distintos escrevem NO MESMO
+   // arquivo - o segundo apaga o primeiro -, e a ferramenta passa a analisar um
+   // módulo que não existe: o call-graph declarava a função do módulo perdido
+   // como [external], com exit 0. Resposta confiante e ERRADA, que é a única
+   // coisa que esta ferramenta promete nunca dar.
+   //
+   // Num alvo ÚNICO o próprio builder impede a situação (os .o colidem e o link
+   // falha: "Referenced, missing, but unknown function"). Mas um .hbp
+   // multi-alvo com -workdir por alvo BUILDA - e é por essa porta que a colisão
+   // chega até nós. Como o alcance da ferramenta é o alcance do toolchain, aqui
+   // se RECUSA (Diego, 2026-07-13: suportar isso exigiria recurso novo no
+   // harbour/hbmk2, e isso não faz sentido) - o fato é dito, e quem lê decide.
+   FOR EACH cTok IN hProj[ "files" ]
+      cBase := Lower( hb_FNameNameExt( cTok ) )
+      IF hb_HHasKey( hSeen, cBase )
+         OutErr( "hbrefactor: two sources of this project share the base name '" + ;
+                 hb_FNameNameExt( cTok ) + "': " + hSeen[ cBase ] + " and " + cTok + ;
+                 " - the Harbour toolchain names every per-module artifact after " + ;
+                 "the base name, so these two cannot be told apart; rename one of " + ;
+                 "them, or run hbrefactor on one target at a time" + hb_eol() )
+         RETURN NIL
+      ENDIF
+      hSeen[ cBase ] := cTok
+   NEXT
 
    FOR EACH cTok IN hProj[ "files" ]
       cDir := hb_FNameDir( cTok )
@@ -212,35 +249,12 @@ STATIC PROCEDURE AddUniq( aList, cValue )
 
    RETURN
 
-// hbmk2 cita tokens com '...' no unix e o argv[0] vem entre parênteses
-STATIC FUNCTION CmdTokens( cLine )
-
-   LOCAL aTok := {}, cCur := "", lQ := .F., nI, cCh
-
-   FOR nI := 1 TO Len( cLine )
-      cCh := SubStr( cLine, nI, 1 )
-      DO CASE
-      CASE cCh == "'"
-         lQ := ! lQ
-      CASE cCh == " " .AND. ! lQ
-         IF ! Empty( cCur )
-            AAdd( aTok, cCur )
-         ENDIF
-         cCur := ""
-      OTHERWISE
-         cCur += cCh
-      ENDCASE
-   NEXT
-   IF ! Empty( cCur )
-      AAdd( aTok, cCur )
-   ENDIF
-   FOR EACH cCur IN aTok
-      IF Left( cCur, 1 ) == "(" .AND. Right( cCur, 1 ) == ")"
-         cCur := SubStr( cCur, 2, Len( cCur ) - 2 )
-      ENDIF
-   NEXT
-
-   RETURN aTok
+// (CmdTokens MORREU aqui, 2026-07-13.) Ele desembrulhava aspas e parênteses da
+// linha de comando que o hbmk2 imprime para HUMANO ler - uma tokenização de
+// shell replicada na ferramenta, que só existia porque o canal era observação
+// de build em vez de consulta. Com o `--hbproject` do hbmk2 devolvendo JSON, a
+// réplica não tem o que fazer. Não reintroduzir: se faltar um dado do projeto,
+// o caminho é o hbmk2 responder, não nós parsearmos.
 
 STATIC FUNCTION HbMk2Bin()
 

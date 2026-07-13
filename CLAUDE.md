@@ -79,11 +79,24 @@ conta?". *(Catálogo de erros, 2026-07-12 — cada gatilho tem um cadáver embai
 5. **Casar arquivo por BASENAME** em vez de caminho canônico.
 6. **Escolher o canal MAIS BARATO**: *"tem que usar o canal CORRETO, não apenas o mais
    barato"* (Diego). Barato ≠ correto.
+7. **OBSERVAR o core em vez de PERGUNTAR a ele** — raspar log, saída de trace, efeito
+   colateral de build. O que se observa é o que a ferramenta do core **estava fazendo**;
+   o que se pergunta é o **fato**. Se não há canal de pergunta, **crie-o no core**.
+   *(Custou o `LoadProject` inteiro: [cic §1.3c])*
 
 **Falta de informação → VÁ AO CORE, IMEDIATAMENTE.** A missão é fazer o core gerar o
 MÁXIMO de informação necessária. **"Zero mudança no core" NÃO é virtude — é sinal de
 alerta**: se um conserto precisou de esperteza na ferramenta, quase sempre o fato faltava
 no core e a esperteza é o sintoma. *(Diego, 2026-07-12. [cic §1.2])*
+
+**ESTENDER O CORE É O CAMINHO PADRÃO, NÃO A EXCEÇÃO** *(Diego, 2026-07-13)*: identificada
+uma necessidade, a pergunta certa é *"como o core passa a responder isto?"* — e não *"como
+eu me viro com o que ele já dá?"*. **É isto que temos que fazer ao máximo possível.**
+- **Para PROJETO, o hbmk2 é SEMPRE a fonte de verdade** — build, quais arquivos compõem o
+  projeto, includes, flags. Ele é core. Nada de parse nosso, nada de inferência.
+- **Ao estender: NUNCA mude a saída de um comando existente — crie um comando NOVO**
+  *(Diego, 2026-07-13)*. Quebrar quem já consome o core é inaceitável, e o PR morre.
+  *(Foi assim que nasceu o `hbmk2 --hbproject`: o `--hbinfo` ficou byte-idêntico.)*
 
 ### 1.3 Nunca declare IMPOSSÍVEL sem VARRER a superfície do core
 

@@ -97,9 +97,39 @@ cosmética: é o que decide se o agente **relata** ou **contorna**.
 | **ambiente quebrado** — não é recusa, é o toolchain | `refused` | 1 | **Não é sobre a refatoração.** Conserte o projeto. | `project-does-not-compile`, `project-unresolved`, `dump-missing`, `schema-mismatch` |
 | **resposta vazia legítima** — não é recusa nenhuma | **`ok`** | **0** | Siga: a resposta é "não há". | — |
 
-**Drift em teste PRÉ-EXISTENTE → vai ao Diego, site a site, ANTES de eu escolher lado.** Dois
-sítios já identificados: **(a)** `usages` com zero hits deixa de sair `1`; **(b)** `--json
-<arquivo>` some. Ambos quebram casos da suíte **e** a extensão.
+### 2.4 LEVANTAMENTO DO DRIFT (2026-07-13) — feito ANTES de codar, e ele é assimétrico
+
+Eu tinha apresentado ao Diego "duas decisões de drift" como se fossem simétricas. **Não são.**
+
+**(a) `usages` com zero hits deixa de sair `1` — quase NÃO há drift.** Varridos os 100 sítios de
+`usages` na suíte: **nenhum teste depende do exit `1` em "zero resultados"**. O único que exige
+exit ≠ 0 é `run.sh:2356`, e ele é uma **recusa de verdade** (posição sem identificador de
+compile-time) — na taxonomia nova continua recusando, com `no-fact-at-position`. Sítios no fonte:
+`hbrefactor.prg` `RETURN iif( nHits > 0, EXIT_OK, EXIT_REFUSED )` em **dois** lugares (o `usages`
+normal e o de marker de regra). **O comportamento errado nunca foi contratado por ninguém — ele
+só existe.**
+
+**(b) A morte do `--json <arquivo>` — é AQUI que está o trabalho.** Não é difícil; é volume:
+
+| onde | o quê |
+|---|---|
+| fonte | 4 comandos com escrita em arquivo (`usages`, `projects-of`, `annotate`; + `--out` do `exec-registry`) |
+| suíte | **17** sítios usando `--json <arquivo>` |
+| extensão | **2 fluxos** que escrevem num temp e leem de volta (`ownerOf`, `cmdUsages` — `tmpJson()`/`readFileSync`/`unlinkSync`) |
+
+**(c) O alvo real do A.1, contado: os regexes de PROSA da extensão são QUATRO.**
+
+```
+extension.js:235  /no compile-time identifier/
+extension.js:280  /--edit-rules/
+extension.js:290  /--force/
+extension.js:368  /BROKEN/          <- escrito por mim na A.2, em 2026-07-13
+```
+
+**A entrega do `verify` AUMENTOU a dívida em um.** Para oferecer o rollback no `BROKEN`, o
+primeiro consumidor do comando novo já casa texto em inglês para decidir fluxo — e vai quebrar
+calado no dia em que alguém reescrever a mensagem. **Não é argumento retórico sobre o futuro: é
+uma linha de código.** O critério de pronto do A.1 mata as quatro.
 
 ---
 

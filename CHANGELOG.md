@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@1141943 -->
+<!-- changelog-baseline: hbrefactor@304cfa8 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 1141943..HEAD   (see § Maintaining this file, at the end).
+     To resume:  git log 304cfa8..HEAD   (see § Maintaining this file, at the end).
 
 # Changelog
 
@@ -19,6 +19,45 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-07-13 — it now refuses a project it cannot read correctly, instead of answering wrongly
+
+If two source files of your project have the **same file name** in different directories —
+`subA/util.prg` and `subB/util.prg` — hbrefactor used to give you an answer. A wrong one,
+with a clean exit code:
+
+```
+subA/main.prg: MAIN -> ALFACALC  [external]
+```
+
+`ALFACALC` is *not* external. It is defined in `subA/util.prg`, right there in your project.
+The reason for the lie: the Harbour toolchain names everything it produces per module after
+the **file name** — so the two `util.prg` overwrite each other's output, and the tool ended up
+reading only one of them. The other module simply vanished, and every function in it looked
+like it came from outside the project.
+
+A single-target project cannot get into this state (the linker catches it first, with
+`Referenced, missing, but unknown function`). A **multi-target** `.hbp` — a container with a
+separate work directory per target — builds perfectly well, and that is the door this came
+through.
+
+Now:
+
+```
+$ hbrefactor call-graph all.hbp
+hbrefactor: two sources of this project share the base name 'util.prg':
+subA/util.prg and subB/util.prg - the Harbour toolchain names every per-module
+artifact after the base name, so these two cannot be told apart; rename one of
+them, or run hbrefactor on one target at a time
+```
+
+It names both files and it tells you what to do. It refuses **before touching anything** —
+run a rename against such a project and your sources come back byte for byte unchanged.
+
+**The honest limit, and it is permanent.** This is not a "not yet". Supporting it would mean
+teaching Harbour and hbmk2 to name their per-module output after the *path* instead of the
+file name, and that is not a change worth making. **What hbrefactor can reach is what the
+toolchain can reach** — so it stops, and says so, rather than guessing.
 
 ## 2026-07-13 — `verify`: prove that an edit did not change behaviour — **including an edit you did not make**
 
