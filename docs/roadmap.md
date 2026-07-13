@@ -722,11 +722,33 @@ suíte (responde ao critério de matar do adr-003).
     rollback`) e restaurava. Dano: nenhum; custo: o usuário levava um erro de verificação
     em vez do FATO. *Omissão, não heurística.* Agora recusa nomeando a regra.
 
-  - **A4 — RESÍDUO ABERTO (mesma família do A2)**: as colisões do **próprio `rename-dsl`**
-    (`"'X' is already a rule head"` e as de abreviação, ~5988-6003) ainda tratam regra
-    MORTA como viva — o `RuleDeadInModule` existe e ali não é consultado. E o **`#un…`
-    órfão** (`undoes: null`) segue **sem consumidor**: é código morto silencioso que a
-    ferramenta poderia diagnosticar (o `usages` da palavra é o lugar natural).
+  - **A4 ✅ ENTREGUE (2026-07-12, caso 121, fixture `fixa4` não-espelho; suíte 961/0,
+    ppcorpus 42/0, zero core)** — e o plano escrito estava **ERRADO**, o que só o probe
+    mostrou. O plano dizia: as colisões do próprio `rename-dsl` tratam regra MORTA como
+    viva, basta consultar o `RuleDeadInModule`. **Falso.** Três probes executáveis
+    provaram que o `#un…` **remove por PADRÃO, não por cabeça, e ignora o `result`** — logo
+    "a regra está desligada" **não licencia** renomear outra cabeça para o nome dela: se o
+    padrão da regra renomeada casar o do `#un…`, a diretiva recém-renomeada **morre junto**
+    e o site passa a expandir pela OUTRA regra. **Compila limpo — troca SILENCIOSA de
+    semântica** (`aq_(1,1)` → `aq_(1,2)`). Consultar só a morte teria trocado a recusa
+    falsa por um **aceite-que-desfaz** (a rede `.ppo`/`.hrb` só pega no apply), quebrando o
+    `dry-run == apply` que o A2/P5/P6 conquistaram.
+    **O fato que separa os dois casos é do CORE, e já existia**: `ast-16` (`undoes` = id da
+    regra que a remoção tirou da mesa). `DelKillsRule` monta um módulo com as **duas
+    diretivas REAIS** — a regra já com o nome novo + a remoção como está no fonte — compila
+    e **pergunta ao dump quem morreu**. Não se compara padrão a padrão na ferramenta (seria
+    réplica da busca de regra do pp), não se sintetiza grafia de teste (réplica da
+    gramática), e **não se modela a ordem de registro do pp** — a pergunta é local, de duas
+    linhas. *(Armadilha achada e evitada: sondar com **sentinela no result** MUDA a
+    identidade da regra para efeito de remoção — o marker de match não usado no result é
+    numerado diferente (`ast-14`) — e teria dado a resposta ERRADA.)*
+    Fecha também o `HeadClashWitness` (sequestro reverso do P11) e o check de "match word",
+    que também não liam o tempo de vida — e o **`#un…` órfão** (`undoes: null`) ganha
+    consumidor: o `usages` da palavra o marca como `ORPHAN: removes no rule (dead
+    directive)` — **relato, nunca edição** (o Harbour aceita o órfão em silêncio, e o
+    programador acha que desligou a regra que segue VIVA).
+    *(Achado de tabela: as 10 mensagens de `--dry-run` da CLI ainda estavam em PORTUGUÊS,
+    apesar do commit que declarou o produto inglês — traduzidas.)*
 
   **Passa (registrado, não é achado):** `HeadClashWitness` — a completude do conjunto de
   candidatos é raciocínio sobre o core, e é VERDADEIRA (`hb_pp_tokenValueCmp`,

@@ -20,7 +20,7 @@
       measured by hand, once, with no script. Re-measured 2026-07-12 with
       tools/pcode-identity.sh: 889/889 identical, ZERO divergences. The claim holds; the
       count was fantasy. The body now points at the measurement, not at a number.
-  suite at baseline: 115 cases, 942 checks green
+  suite at baseline: 116 cases, 961 checks green
   updated: 2026-07-12
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -516,6 +516,54 @@ of code in that module**. If there is code above it, the rule was alive over tha
 and the refusal stays — a rule switched off on line 100 still captures on line 50, and
 the tool will not pretend to know where your name will land.
 
+That freed name is available to a **command**, too — and here the lifetime hides a trap
+that costs a subtle bug. **A `#uncommand` removes by pattern, not by head.** So switching
+`VERIFY` off does not simply "free the word": if the rule you now rename to `VERIFY` has
+the *same shape* as the one you switched off, that same `#uncommand` removes **the rule
+you just renamed**, and your call sites quietly start expanding through the *other* rule.
+It compiles clean. Nothing warns you.
+
+The tool does not reason about this — it **asks the preprocessor**, before touching a
+byte. Different shapes, so the switch-off cannot bite: the rename goes through.
+
+```
+$ hbrefactor rename app.hbp lib.ch:1:11 VERIFY
+rename-dsl: ASSERT -> VERIFY
+  app.prg:8:4
+  lib.ch:1:11
+verified: 1 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical
+```
+
+Same shape, and it refuses — naming the directive that would do the damage:
+
+```
+$ hbrefactor rename app.hbp lib.ch:2:11 VERIFY
+hbrefactor: 'VERIFY' would be turned off by the #xuncommand VERIFY at app.prg:4 -
+after the rename that directive removes the renamed rule (it matches by pattern),
+and the sites would expand through #xcommand VERIFY (lib.ch:1)
+```
+
+### A switch-off that switches nothing off
+
+<!-- prov: phase P-AUDIT/A4, case 121 (fixture tests/fixa4); live-run 2026-07-12
+     (scratchpad, output below verbatim). -->
+
+A `#uncommand` whose pattern matches no rule **removes nothing**. Harbour accepts it in
+silence: no warning, no error. You read the file, see the switch-off, and believe the
+command is off — while it is still live, still capturing.
+
+`usages` names it:
+
+```
+$ hbrefactor usages app.hbp ASSERT
+lib.ch:1: directive (#xcommand ASSERT, 1 marker(s))
+app.prg:4: directive (#xuncommand ASSERT, 2 marker(s)) - ORPHAN: removes no rule (dead directive)
+app.prg:8:4: application (#xcommand ASSERT, lib.ch:1)  | ASSERT .T.
+```
+
+A **report, never an edit.** The tool will not rewrite a directive whose intent it cannot
+verify — it can prove the switch-off is dead, but not what you meant it to say.
+
 ### "Would this new name collide?" — it asks the preprocessor instead of guessing
 
 <!-- prov: phase P/P11, hbrefactor c391408 (the live pp as an oracle: __pp_init +
@@ -761,8 +809,8 @@ does** — never build a guess inside the tool.
      library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.13.0`; they version independently). The behavior contract is a suite of **115 cases /
-942 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.13.0`; they version independently). The behavior contract is a suite of **116 cases /
+961 checks**, all green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
@@ -782,11 +830,10 @@ stock compiler.
   `guaranteed`, even under `-kt`.
 - Two modules with the same filename under a multi-target `.hbp` can get confused in
   fine analysis (ownership works).
-- Renaming a **DSL word** does not yet read a directive's lifetime when checking its
-  *own* collisions — there, a rule that has already been switched off can still produce
-  a false refusal. (Variables, functions and methods do read it.)
-- An **orphan** switch-off — a `#uncommand` that ends a rule which does not exist — is
-  dead code the tool cannot point at yet.
+- A switch-off only frees a name when it sits **in the module's own file**. If the
+  `#uncommand` arrives from an included header, the tool does not decide — it cannot see
+  from the compiler in what order your headers reached that module — and the refusal
+  stays. Fail-closed, on purpose.
 - The per-call `-kt` check has a cost in very hot loops (so it's opt-in), and it doesn't
   cover pass-by-reference (`@x`) or legacy `PARAMETERS x AS ...` — those sites are never
   labeled `guaranteed`.
@@ -832,7 +879,7 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (115 cases)
+   make test         # optional: the behavior suite (116 cases)
    ```
 3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.

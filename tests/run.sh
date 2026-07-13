@@ -4050,6 +4050,90 @@ freshun() { # freshun <case-name> -> diretiva com TEMPO DE VIDA (#xuncommand) - 
    echo "$d"
 }
 
+fresha4() { # fresha4 <case-name> -> colisao contra regra DESLIGADA (P-AUDIT/A4)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixa4/*.prg "$HERE"/fixa4/*.ch "$HERE"/fixa4/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_121() {
+echo "case 121: P-AUDIT/A4 - colisao contra regra DESLIGADA: quem decide e o #un..., e quem responde e o CORE"
+# O FURO (recusa falsa, classe do caso 115): o rename de cabeca de DSL recusava
+# renomear para o nome de uma regra ja DESLIGADA por #un... no modulo - regra que
+# nao captura mais nada ali. Cinco verbos ja liam o tempo de vida (ast-16); as
+# colisoes do PROPRIO rename, nao.
+# A ARMADILHA que o conserto ingenuo criaria: "esta morta" NAO licencia o rename.
+# O #un... remove por PADRAO (nao por cabeca) e ignora o result - se o padrao da
+# regra renomeada casar o do #un..., ele mata a regra RECEM-RENOMEADA e o site
+# passa a expandir pela OUTRA regra. Compila LIMPO: troca silenciosa de semantica.
+# Quem separa os dois casos e o CORE (ast-16: `undoes` = id da regra removida),
+# nunca comparacao de padrao na ferramenta (seria replica da busca de regra do pp).
+for f in safe risk; do
+   "$HB_BIN/harbour" "$HERE/fixa4/$f.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixa4" > /dev/null 2>&1
+   check "fixa4/$f.prg clean under -w3 -es2" $?
+done
+
+# (1) SEGURO: a regra desligada tem padrao DIFERENTE (<x>,<y> vs <x>) - o #un...
+#     nao morde a renomeada. Antes: recusa falsa ("is already a rule head").
+D=$(fresha4 case121a)
+( cd "$D" && "$BIN" rename safe.hbp safe.ch:2:11 VELACHO > r.log 2>&1 )
+check "rename para o nome de regra DESLIGADA (padrao diferente): exit 0" $?
+grep -q "^rename-dsl: FUNDEIA -> VELACHO" "$D/r.log"
+check "a recusa falsa morreu: o rename acontece" $?
+grep -q "\.ppo and \.hrb byte-identical" "$D/r.log"
+check "verificado pela rede: .ppo e .hrb byte-identicos" $?
+grep -q "^#xcommand VELACHO <x>      => aq_( <x>, 1 )" "$D/safe.ch"
+check "a diretiva foi reescrita com o nome novo" $?
+( cd "$D" && "$HB_BIN/harbour" safe.prg -n -q0 -p -I. > /dev/null 2>&1 )
+grep -q "aq_( 1, 1 )" "$D/safe.ppo"
+check "o site expande pela regra RENOMEADA (aq_ ..., 1), nao pela outra" $?
+( cd "$D" && "$HB_BIN/harbour" safe.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "modulo segue limpo apos o rename" $?
+
+# (2) PERIGOSO: mesmo padrao <x> - o #un... da regra morta mataria a RENOMEADA.
+#     Recusa ANTES de editar (dry-run == apply), nomeando a diretiva culpada.
+D=$(fresha4 case121b)
+cp "$D/risk.ch" "$D/risk.ch.orig"; cp "$D/risk.prg" "$D/risk.prg.orig"
+( cd "$D" && "$BIN" rename risk.hbp risk.ch:3:11 VELACHO > r.log 2>&1 )
+[ $? -ne 0 ]
+check "rename que o #un... mataria: RECUSADO" $?
+grep -q "would be turned off by the #xuncommand VELACHO at risk.prg:4" "$D/r.log"
+check "a recusa NOMEIA a diretiva de desligamento culpada" $?
+grep -q "it matches by pattern" "$D/r.log"
+check "a recusa diz POR QUE (o #un... casa por padrao, nao por cabeca)" $?
+cmp -s "$D/risk.ch" "$D/risk.ch.orig" && cmp -s "$D/risk.prg" "$D/risk.prg.orig"
+check "recusa NAO tocou num byte (dry-run == apply)" $?
+
+# (3) o probe do core NAO deixa lixo no projeto. O harbour grava o .c no CWD (nao
+# ao lado do fonte): sem -o<dir> a sonda cospe um ruleprobe.c dentro do projeto do
+# usuario - foi o pre-commit que pegou, porque esta assercao era cega ao .c.
+[ -z "$(ls "$D"/ruleprobe.* 2>/dev/null)" ] && [ -z "$(ls "$D"/*.c 2>/dev/null)" ]
+check "o modulo-sonda do core nao vazou NENHUM artefato para o projeto (.prg/.c/.ast.json)" $?
+
+# (4) A4 perna (b): o #un... ORFAO (undoes: null) era fato SEM CONSUMIDOR.
+# Uma remocao que nao removeu regra nenhuma e CODIGO MORTO - o Harbour aceita
+# calado, e o programador acha que desligou a regra (ela segue VIVA). Relato,
+# nunca edicao: a ferramenta nao mexe no que nao pode verificar.
+"$HB_BIN/harbour" "$HERE/fixa4/orph.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixa4" > /dev/null 2>&1
+check "fixa4/orph.prg clean under -w3 -es2 (o Harbour aceita o orfao em SILENCIO)" $?
+D=$(fresha4 case121c)
+( cd "$D" && "$BIN" usages orph.hbp FUNDEIA > u.log 2>&1 )
+check "usages da palavra: exit 0" $?
+grep -q "orph.prg:5: directive (#xuncommand FUNDEIA, 2 marker(s)) - ORPHAN: removes no rule (dead directive)" "$D/u.log"
+check "o #un... ORFAO e RELATADO (removeu regra nenhuma)" $?
+grep -q "orph.ch:1: directive (#xcommand FUNDEIA, 1 marker(s))$" "$D/u.log"
+check "a diretiva que CRIA a regra nao leva o rotulo de orfao" $?
+D=$(freshun case121d)
+( cd "$D" && "$BIN" usages un.hbp LACRA > u.log 2>&1 )
+! grep -q "ORPHAN" "$D/u.log"
+check "um #un... que REALMENTE desliga a regra nao e rotulado orfao (fixun)" $?
+
+# regua do caso 64
+! grep -qiwE "fundeia|velacho|aq_" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixa4 (régua do caso 64)" $?
+}
+
 unit_117() {
 echo "case 117: P13/ast-16 - a diretiva tem TEMPO DE VIDA; o rename acompanha o #xuncommand"
 # O FURO: o dump nao exportava a diretiva de REMOCAO. O rename da cabeca trocava
@@ -4153,7 +4237,7 @@ check "projects-of num .ch acha o dono (posse de include = fato do compilador, -
 check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

@@ -20,6 +20,55 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
+## 2026-07-12 — a rule you switched off no longer blocks your rename (and dead switch-offs get named)
+
+Two limits this file declared open are now closed.
+
+**1. A switched-off rule stops reserving its name.** A pp command lives from the
+`#xcommand` to the `#xuncommand`. If you turned `VERIFY` off in a module, its word is
+ordinary code there — yet renaming another command to `VERIFY` was refused anyway
+(*"'VERIFY' is already a rule head"*). Now it goes through:
+
+```
+rename-dsl: ASSERT -> VERIFY
+  app.prg:8:4
+  lib.ch:1:11
+verified: 1 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical
+```
+
+**But "switched off" is not a free pass — and this is the part worth knowing.** A
+`#uncommand` removes by **pattern**, not by head. So if the rule you switched off has
+the *same shape* as the one you are renaming, that very `#uncommand` will now switch off
+**the rule you just renamed** — and your call sites silently start expanding through the
+*other* rule. It compiles clean. You would find out in production.
+
+The tool asks the preprocessor before touching a byte, and refuses:
+
+```
+hbrefactor: 'VERIFY' would be turned off by the #xuncommand VERIFY at app.prg:4 -
+after the rename that directive removes the renamed rule (it matches by pattern),
+and the sites would expand through #xcommand VERIFY (lib.ch:1)
+```
+
+**2. An orphan switch-off is now named.** A `#uncommand` whose pattern matches no rule
+removes nothing — Harbour accepts it in silence, and you walk away believing the command
+is off when it is still live. `usages` points at it:
+
+```
+lib.ch:1: directive (#xcommand ASSERT, 1 marker(s))
+app.prg:4: directive (#xuncommand ASSERT, 2 marker(s)) - ORPHAN: removes no rule (dead directive)
+app.prg:8:4: application (#xcommand ASSERT, lib.ch:1)  | ASSERT .T.
+```
+
+It is a **report, never an edit** — the tool does not rewrite a directive whose intent it
+cannot verify.
+
+**The honest limit (unchanged):** the name is only freed when the switch-off comes
+**before any line of code in the module**. With code above it, the rule was alive over
+that code, and the refusal stays.
+
+*Internal details: [docs/roadmap.md](docs/roadmap.md) § P-AUDIT/A4.*
+
 ## 2026-07-12 — rename stops touching an include that isn't yours (and stops refusing the ones that are)
 
 Three fixes that came out of an audit of the tool's own code. The first two change what
@@ -93,11 +142,9 @@ outside the project's folder**, run a `git status` in your other projects and in
 Harbour tree: there may be a `.ch` edited that you never asked for. Renaming a variable,
 a function or a method never touched an include at all.
 
-**Honest limit, still open:** renaming a **DSL word** does not yet read the switch-off
-in *its own* collisions — there, an already-dead rule can still produce a false refusal
-(item 2 applies to variable/function/method names, not to the DSL word). And an
-**orphan** `#uncommand` — one that ends a rule which does not exist — still gets no
-diagnosis: it is dead code the tool cannot point at yet.
+*(Both "still open" limits this entry used to list — the DSL word not reading the
+switch-off in its own collisions, and the un-diagnosed orphan `#uncommand` — are closed;
+see the entry at the top of this file.)*
 
 *Internal details and the rest of the audit: [docs/roadmap.md](docs/roadmap.md) § P.*
 
@@ -122,6 +169,10 @@ success, anything else is a refusal or an error — so a script that only looks 
 exit code is unaffected. If you match text, now is the time to switch to the exit code.
 
 The VSCode extension speaks English too; there is nothing for you to do there.
+
+**Correction (2026-07-12):** one line escaped the sweep — the `--dry-run` footer still
+printed `dry run - nada foi escrito`. It now reads `dry run - nothing was written`. Same
+advice as above: match the exit code, not the text.
 
 ## 2026-07-12 — fixed: extracting a block containing a `SWITCH` was refused for no reason
 

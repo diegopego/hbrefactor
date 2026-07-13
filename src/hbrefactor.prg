@@ -2274,7 +2274,7 @@ STATIC FUNCTION RenameLocal( aArgs )
               "never reaches the compiler; NOT renamed" + hb_eol() )
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -2668,6 +2668,114 @@ STATIC FUNCTION RuleDeadInModule( hAst, hRule )
 
    RETURN .T.
 
+// o registro de REMOÇÃO que tirou esta regra da mesa (ast-16: `undoes` = id da
+// regra removida). NIL quando a remoção não mora neste dump.
+STATIC FUNCTION DelOfRule( hAst, hRule )
+
+   LOCAL hDel
+
+   FOR EACH hDel IN hAst[ "ppRules" ]
+      IF hb_HHasKey( hDel, "undoes" ) .AND. ValType( hDel[ "undoes" ] ) == "N" .AND. ;
+         hDel[ "undoes" ] == hRule[ "id" ]
+         RETURN hDel
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+// o texto REAL da diretiva, do fonte (continuações por ';' inclusive - a regra
+// não cabe numa linha só), opcionalmente com a CABEÇA trocada pelo nome novo.
+// Lê-se o fonte, não se remonta a diretiva a partir do match[]/result[]:
+// remontar seria replicar a gramática, e o texto é o que o pp vai ler.
+STATIC FUNCTION RuleText( hProj, hRule, cNewHead )
+
+   LOCAL cFile, aSrc, nI, cLine, aOut := {}, hTok, cHead := NIL
+
+   IF hRule[ "file" ] == NIL
+      RETURN ""                          // builtin: não há diretiva no fonte
+   ENDIF
+   cFile := ResolveInclude( hProj, hRule[ "file" ] )
+   IF cFile == NIL .OR. ! hb_vfExists( cFile )
+      RETURN ""
+   ENDIF
+   aSrc := hb_ATokens( StrTran( hb_MemoRead( cFile ), Chr( 13 ), "" ), Chr( 10 ) )
+   IF cNewHead != NIL
+      FOR EACH hTok IN hRule[ "match" ]   // o token ESCRITO da cabeça (posição real)
+         IF hb_HGetDef( hTok, "role", "" ) == "literal" .AND. ;
+            Upper( hb_HGetDef( hTok, "text", "" ) ) == Upper( hRule[ "head" ] )
+            cHead := hTok
+            EXIT
+         ENDIF
+      NEXT
+      IF cHead == NIL
+         RETURN ""                       // sem posição da cabeça: não se adivinha
+      ENDIF
+   ENDIF
+   FOR nI := hRule[ "line" ] TO Len( aSrc )
+      cLine := aSrc[ nI ]
+      IF cHead != NIL .AND. nI == cHead[ "line" ]
+         cLine := Left( cLine, cHead[ "col" ] ) + cNewHead + ;
+                  SubStr( cLine, cHead[ "col" ] + cHead[ "len" ] + 1 )
+      ENDIF
+      AAdd( aOut, cLine )
+      IF ! Right( RTrim( cLine ), 1 ) == ";"
+         EXIT
+      ENDIF
+   NEXT
+
+   RETURN ArrJoin( aOut, hb_eol() )
+
+// a REMOÇÃO hDel mataria a regra hTgt depois de ela ser renomeada para cNew?
+// Pergunta feita ao CORE, não deduzida: escreve-se um módulo com as duas
+// diretivas REAIS e lê-se o `undoes` do dump (ast-16). Não se compara padrão a
+// padrão na ferramenta (seria réplica da busca de regra do pp) nem se sintetiza
+// grafia de teste (seria réplica da gramática); e não se troca o result por
+// sentinela - isso MUDA a identidade da regra para efeito de remoção (o marker
+// de match não usado no result é numerado diferente, ast-14) e falsearia a
+// resposta. Qualquer falha do probe = .T. (recusa conservadora).
+STATIC FUNCTION DelKillsRule( hProj, hTgt, cNew, hDel, cTmp )
+
+   LOCAL cDir := hb_DirSepAdd( cTmp ) + "ruleprobe"
+   LOCAL cPrg := hb_DirSepAdd( cDir ) + "ruleprobe.prg"
+   LOCAL cRule := RuleText( hProj, hTgt, cNew )
+   LOCAL cDelTxt := RuleText( hProj, hDel, NIL )
+   LOCAL cOut := "", cErr := "", hAst, hRule, nId := -1
+
+   IF Empty( cRule ) .OR. Empty( cDelTxt )
+      RETURN .T.
+   ENDIF
+   hb_DirBuild( cDir )
+   hb_MemoWrit( cPrg, cRule + hb_eol() + cDelTxt + hb_eol() + ;
+                "PROCEDURE Main()" + hb_eol() + "   RETURN" + hb_eol() )
+   // -o<dir>: o harbour grava o .c no CWD, não ao lado do fonte - sem mandar o
+   // destino, a sonda deixa LIXO no projeto do usuário (a armadilha do -gd, de
+   // novo). E não se usa -s: ele suprime o dump junto com o .c.
+   IF hb_processRun( HarbourBin() + " " + cPrg + " -n -q0 -o" + hb_DirSepAdd( cDir ) + ;
+                     " -x" + hb_DirSepAdd( cDir ),, @cOut, @cErr ) != 0
+      RETURN .T.
+   ENDIF
+   hAst := hb_jsonDecode( hb_MemoRead( hb_DirSepAdd( cDir ) + "ruleprobe.ast.json" ) )
+   IF ! HB_ISHASH( hAst ) .OR. ! hb_HHasKey( hAst, "ppRules" )
+      RETURN .T.
+   ENDIF
+   FOR EACH hRule IN hAst[ "ppRules" ]   // a regra renomeada é a que abre o módulo
+      IF ! hb_HHasKey( hRule, "undoes" ) .AND. hRule[ "line" ] == 1
+         nId := hRule[ "id" ]
+         EXIT
+      ENDIF
+   NEXT
+   IF nId == -1
+      RETURN .T.
+   ENDIF
+   FOR EACH hRule IN hAst[ "ppRules" ]
+      IF hb_HHasKey( hRule, "undoes" ) .AND. ValType( hRule[ "undoes" ] ) == "N" .AND. ;
+         hRule[ "undoes" ] == nId
+         RETURN .T.                      // a remoção matou a regra renomeada
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
 STATIC FUNCTION RuleHeadCollision( hAst, cUpNew )
 
    LOCAL hRule
@@ -2904,7 +3012,7 @@ STATIC FUNCTION RenameStatic( aArgs )
               ":" + hb_ntos( aEdits[ nI ][ 2 ] ) + hb_eol() )
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -3230,7 +3338,7 @@ STATIC FUNCTION RenameFunction( aArgs )
       NEXT
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -3875,7 +3983,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
               ") is used only in the selection - moves to " + cNewName + hb_eol() )
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -4731,7 +4839,7 @@ STATIC FUNCTION InlineLocal( aArgs )
    NEXT
    OutStd( "  declaration on line " + hb_ntos( nDeclLine ) + " removed" + hb_eol() )
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -5376,7 +5484,7 @@ STATIC FUNCTION ReorderParams( aArgs )
       NEXT
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -5872,9 +5980,15 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
                OutStd( "(builtin): directive (" + RuleTag( hRule ) + ", " + ;
                   hb_ntos( hRule[ "markers" ] ) + " marker(s)) - core/-D rule, no file" + hb_eol() )
             ELSE
+               // A4: uma REMOÇÃO que não removeu regra nenhuma é código MORTO, e
+               // o Harbour a aceita calado. O fato é do ast-16 (`undoes` NIL num
+               // registro de remoção = órfão) e não tinha consumidor: aqui ele
+               // vira RELATO - a ferramenta não edita o que não pode verificar.
                OutStd( hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) + ;
                   ": directive (" + RuleTag( hRule ) + ", " + ;
-                  hb_ntos( hRule[ "markers" ] ) + " marker(s))" + hb_eol() )
+                  hb_ntos( hRule[ "markers" ] ) + " marker(s))" + ;
+                  iif( IsRuleDel( hRule ) .AND. hRule[ "undoes" ] == NIL, ;
+                       " - ORPHAN: removes no rule (dead directive)", "" ) + hb_eol() )
             ENDIF
          ENDIF
       ENDIF
@@ -5981,6 +6095,7 @@ STATIC FUNCTION RenameDsl( aArgs )
    LOCAL lTarget, hTargetKeys := { => }, aMk
    LOCAL nRTok, lOurs                    // ast-15: QUAL literal da regra o site casou
    LOCAL hTgt, cWitness                  // P11: ambiguidade julgada pelo pp VIVO
+   LOCAL aDeadSkip := {}, aDead, hDel    // A4: colisão contra regra DESLIGADA (ast-16)
 
    IF Len( aArgs ) < 4
       Usage()
@@ -6058,6 +6173,20 @@ STATIC FUNCTION RenameDsl( aArgs )
             ENDIF
          ENDIF
          IF hRule[ "head" ] != NIL .AND. ! Upper( hRule[ "head" ] ) == cUpOld .AND. ;
+            ! IsRuleDel( hRule ) .AND. RuleDeadInModule( hAst, hRule )
+            // A4: a regra está DESLIGADA neste módulo (fato do ast-16) - ela não
+            // captura nada aqui, logo a colisão de cabeça/abreviação é APARENTE e
+            // recusar por ela é a recusa falsa da classe do caso 115. Mas desligada
+            // não é inofensiva: a REMOÇÃO que a matou remove por PADRÃO (não por
+            // cabeça) e ignora o result, então ela pode matar TAMBÉM a regra
+            // renomeada. Guarda-se o par para perguntar ao core depois - só lá os
+            // alvos são conhecidos, e é o alvo que dá o padrão da pergunta.
+            IF Upper( hRule[ "head" ] ) == cUpNew .OR. ;
+               PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew ) .OR. ;
+               PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpOld )
+               AAdd( aDeadSkip, { cPath, hRule } )
+            ENDIF
+         ELSEIF hRule[ "head" ] != NIL .AND. ! Upper( hRule[ "head" ] ) == cUpOld .AND. ;
             ! IsRuleDel( hRule )
             IF Upper( hRule[ "head" ] ) == cUpNew
                RETURN Refuse( "'" + cNew + "' is already a rule head (" + RuleTag( hRule ) + ;
@@ -6077,22 +6206,53 @@ STATIC FUNCTION RenameDsl( aArgs )
          ENDIF
          // o nome novo já é palavra do match de alguma regra: a renomeada o
          // capturaria (ou vice-versa) - visível mesmo em regra nunca
-         // aplicada, pelo ast-5
-         FOR EACH hTok IN hRule[ "match" ]
-            IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
-               Upper( hTok[ "text" ] ) == cUpNew .AND. ;
-               ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
-                 hTok[ "role" ] == "restrict" )
-               RETURN Refuse( "'" + cNew + "' is already a match word of rule " + ;
-                              RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
-            ENDIF
-         NEXT
+         // aplicada, pelo ast-5. Regra DESLIGADA no módulo não captura nada
+         // aqui (ast-16): a palavra dela é código cru, não colide (A4). E uma
+         // REMOÇÃO não é regra que se aplique: nada casa nela (a palavra na
+         // match[] dela é o alvo do desligamento, não uma captura) - quem
+         // responde se aquele #un... morde a regra renomeada é o DelKillsRule.
+         IF ! IsRuleDel( hRule ) .AND. ! RuleDeadInModule( hAst, hRule )
+            FOR EACH hTok IN hRule[ "match" ]
+               IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+                  Upper( hTok[ "text" ] ) == cUpNew .AND. ;
+                  ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
+                    hTok[ "role" ] == "restrict" )
+                  RETURN Refuse( "'" + cNew + "' is already a match word of rule " + ;
+                                 RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
+               ENDIF
+            NEXT
+         ENDIF
       NEXT
    NEXT
    IF Empty( aTargets )
       RETURN Refuse( "'" + cOld + "' is not a match word of any project pp rule " + ;
                      "(head, secondary keyword or restriction)" )
    ENDIF
+
+   // A4: as colisões contra regra DESLIGADA foram poupadas acima - mas só são
+   // inofensivas se a REMOÇÃO que a desligou não desligar TAMBÉM a regra
+   // renomeada. O `#un...` remove por PADRÃO, não por cabeça, e IGNORA o result
+   // (provado por probe): dois padrões iguais e a diretiva recém-renomeada morre
+   // junto, deixando o site expandir pela OUTRA regra - troca SILENCIOSA de
+   // semântica, que COMPILA LIMPO. Não se modela a ordem de registro do pp (é
+   // interno dele): monta-se um módulo com as DUAS diretivas REAIS - a regra já
+   // com o nome novo e a remoção como está no fonte - e pergunta-se ao CORE quem
+   // morreu (ast-16: `undoes` = id da regra que a remoção tirou da mesa).
+   FOR EACH aDead IN aDeadSkip
+      FOR EACH hTgt IN aTargets
+         IF hTgt[ "head" ] == NIL .OR. ! Upper( hTgt[ "head" ] ) == cUpOld
+            LOOP                         // alvo não é cabeça: não cria regra nova
+         ENDIF
+         hDel := DelOfRule( hAsts[ aDead[ 1 ] ], aDead[ 2 ] )
+         IF hDel != NIL .AND. DelKillsRule( hProj, hTgt, cNew, hDel, cTmp )
+            RETURN Refuse( "'" + cNew + "' would be turned off by the " + ;
+                           RuleTag( hDel ) + " at " + RuleWhere( hDel ) + " - after " + ;
+                           "the rename that directive removes the renamed rule (it " + ;
+                           "matches by pattern), and the sites would expand through " + ;
+                           RuleTag( aDead[ 2 ] ) + " (" + RuleWhere( aDead[ 2 ] ) + ")" )
+         ENDIF
+      NEXT
+   NEXT
 
    // SEQUESTRO REVERSO: a cabeça RENOMEADA passa a casar grafias que hoje são
    // de OUTRA regra. Só dá para perguntar isto aqui: a resposta depende do TIPO
@@ -6109,8 +6269,12 @@ STATIC FUNCTION RenameDsl( aArgs )
       ENDIF
       FOR EACH cPath IN hProj[ "files" ]
          FOR EACH hRule IN hAsts[ cPath ][ "ppRules" ]
+            // regra DESLIGADA no módulo não disputa grafia nenhuma ali (ast-16):
+            // a testemunha só existiria se as duas regras vivessem no mesmo
+            // ponto. Que a REMOÇÃO dela não morda a regra renomeada, já foi
+            // perguntado ao core acima (DelKillsRule) - A4.
             IF hRule[ "head" ] == NIL .OR. Upper( hRule[ "head" ] ) == cUpOld .OR. ;
-               IsRuleDel( hRule )
+               IsRuleDel( hRule ) .OR. RuleDeadInModule( hAsts[ cPath ], hRule )
                LOOP
             ENDIF
             cWitness := HeadClashWitness( cUpNew, cUpOld, hTgt[ "kind" ], ;
@@ -6260,7 +6424,7 @@ STATIC FUNCTION RenameDsl( aArgs )
       NEXT
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -6569,7 +6733,7 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
       NEXT
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -7226,7 +7390,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
       NEXT
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 
@@ -11898,7 +12062,7 @@ STATIC FUNCTION RenameMethod( aArgs )
       NEXT
    NEXT
    IF lDryRun
-      OutStd( "dry run - nada foi escrito" + hb_eol() )
+      OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
 

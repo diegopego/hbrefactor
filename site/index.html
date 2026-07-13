@@ -1250,6 +1250,24 @@ rename-dsl: LACRA -&gt; SELA
     <p>Three sites, two files: the call, the <span class="mono">#xcommand</span> that creates the rule, and the <span class="mono">#xuncommand</span> that retires it. The rule still ends exactly where you said it ends.</p>
     <p>And it reads that lifetime in the <strong>other direction</strong> too. Once a rule is switched off, its word is an ordinary word again — so a name that word had made <em>un-renameable</em> becomes free. Renaming a local to <span class="mono">TRAVA</span>, below the line where <span class="mono">TRAVA</span> was switched off, used to be refused forever; now it simply works, because nothing there captures it. <strong>The honest limit:</strong> it only frees the name when the switch-off comes <em>before any line of code in that module</em> — a rule switched off on line 100 still captures on line 50, and the tool won't pretend to know where your name will land.</p>
     <p> This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#xuncommand</span> in your source — blind to the abbreviated spellings, to the several forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
+    <p>That freed name is available to a <strong>command</strong> too — and there the lifetime hides a trap. <b class="emph">A <span class="mono">#uncommand</span> removes by pattern, not by head.</b> Switching <span class="mono">VERIFY</span> off does not simply free the word: if the rule you now rename to <span class="mono">VERIFY</span> has the <em>same shape</em> as the one you switched off, that same <span class="mono">#uncommand</span> removes <strong>the rule you just renamed</strong>, and your call sites quietly start expanding through the <em>other</em> rule. It compiles clean. Nothing warns you.</p>
+    <p>The tool doesn't reason about this — it <strong>asks the preprocessor</strong>, before touching a byte. Different shapes, so the switch-off can't bite, and the rename goes through. Same shape, and it refuses, naming the directive that would do the damage:</p>
+    <div class="code-card">
+      <div class="code-top">terminal</div>
+<pre><code>$ hbrefactor rename app.hbp lib.ch:2:11 VERIFY
+<span class="bad">hbrefactor: 'VERIFY' would be turned off by the #xuncommand VERIFY at app.prg:4 -
+after the rename that directive removes the renamed rule (it matches by pattern),
+and the sites would expand through #xcommand VERIFY (lib.ch:1)</span></code></pre>
+    </div>
+    <p>And the mirror image: a <span class="mono">#uncommand</span> whose pattern matches <em>no</em> rule removes nothing. Harbour accepts it in silence — you read the file, see the switch-off, and believe the command is off while it is still live. <span class="mono">usages</span> names it:</p>
+    <div class="code-card">
+      <div class="code-top">terminal</div>
+<pre><code>$ hbrefactor usages app.hbp ASSERT
+lib.ch:1: directive (#xcommand ASSERT, 1 marker(s))
+app.prg:4: directive (#xuncommand ASSERT, 2 marker(s)) - <span class="bad">ORPHAN: removes no rule (dead directive)</span>
+app.prg:8:4: application (#xcommand ASSERT, lib.ch:1)  | ASSERT .T.</code></pre>
+    </div>
+    <p>A <strong>report, never an edit</strong>. The tool won't rewrite a directive whose intent it can't verify: it can prove the switch-off is dead, but not what you meant it to say.</p>
   </div>
 </section>
 
@@ -1458,7 +1476,7 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong><span data-metric="suite-cases">115</span> cases / <span data-metric="suite-checks">942</span> checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong><span data-metric="suite-cases">116</span> cases / <span data-metric="suite-checks">961</span> checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler.</p>
     <div class="grid-2">
       <div>
@@ -1469,8 +1487,7 @@ Eval( bPaga )
           <li>Some "maybe" is <b>irreducible</b>: a receiver whose class depends on runtime input honestly stays <em>possible</em> — the nature of the problem, not a bug. Library code keeps more <em>possible</em> than a closed program.</li>
           <li>In a chained call (<span class="mono">oM:Soma(1):Soma(2)</span>) the label stays <em>confirmed</em>, not <em>guaranteed</em>, even under <span class="mono">-kt</span>.</li>
           <li>Two modules with the <b>same filename</b> under a multi-target <span class="mono">.hbp</span> can get confused in fine analysis (ownership works).</li>
-          <li>Renaming a <b>DSL word</b> doesn't yet read a directive's lifetime when checking its <em>own</em> collisions — there, a rule that has already been switched off can still produce a false refusal. (Variables, functions and methods do read it.)</li>
-          <li>An <b>orphan</b> switch-off — a <span class="mono">#uncommand</span> that ends a rule which doesn't exist — is dead code the tool can't point at yet.</li>
+          <li>A switch-off only frees a name when it sits <b>in the module's own file</b>. If the <span class="mono">#uncommand</span> arrives from an included header, the tool doesn't decide — it can't see from the compiler in what order your headers reached that module — and the refusal stays. Fail-closed, on purpose.</li>
           <li>The per-call <span class="mono">-kt</span> check has a cost in very hot loops (so it's opt-in), and it doesn't cover pass-by-reference (<span class="mono">@x</span>) or legacy <span class="mono">PARAMETERS x AS ...</span> — those sites are never labeled <em>guaranteed</em>.</li>
         </ul>
       </div>
@@ -1515,7 +1532,7 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (<span data-metric="suite-cases">115</span> cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (<span data-metric="suite-cases">116</span> cases)</span></code></pre>
         </div>
       </li>
       <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.13.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>

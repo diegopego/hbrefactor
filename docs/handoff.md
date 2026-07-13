@@ -17,8 +17,9 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 **A P-AUDIT foi EXECUTADA** (sessão dedicada). Três achados provados por fixture e
 consertados — o pior deles: o `rename` media a fronteira do projeto pelo **CWD do
 processo**, então editava um `.ch` de OUTRO projeto (no limite, o `hbclass.ch` da
-instalação) e imprimia `verified`. Detalhe no roadmap § P. **Ela deixou o resíduo A4**,
-que é a próxima sessão.
+instalação) e imprimia `verified`. Detalhe no roadmap § P. **O resíduo A4 que ela deixou
+também já foi fechado** (2026-07-12, caso 121) — e a forma como ele *mudou de forma* está
+no § 2, porque é a lição, não o conserto.
 
 **A página parou de mentir, e virou portão.** Havia transcript INVENTADO nela (projetos
 que não existem). Agora existe `tests/site/` + `make site-examples`: todo exemplo da
@@ -38,32 +39,29 @@ CLI, manual, página, CHANGELOG e toda string da extensão VSCode. Português fi
 
 ---
 
-## 2. A próxima sessão: **A4** (o resíduo da P-AUDIT)
+## 2. O A4 foi ENTREGUE (2026-07-12) — e o plano que estava aqui era ERRADO
 
-É a de melhor relação valor/custo que existe agora — **a peça já está pronta e não é
-consultada**. Duas pernas, mesma família:
+Fica registrado porque a lição vale mais que a entrega. **Este documento mandava**:
+"as colisões do próprio `rename-dsl` tratam regra MORTA como viva; é só consultar o
+`RuleDeadInModule`, o fato já existe". **Estava errado, e o probe provou em 20 minutos.**
 
-**(a) `rename-dsl` trata regra MORTA como viva nas colisões DELE PRÓPRIO.** O A2
-construiu o `RuleDeadInModule` (lê o tempo de vida da diretiva: só libera quando a
-remoção mora no arquivo do módulo E nenhum token de fonte a precede). Cinco verbos o
-consultam. As colisões do próprio `rename-dsl` — `"'X' is already a rule head"` e as de
-abreviação (~5988-6003 no `src/hbrefactor.prg`) — **não**. Resultado: recusa falsa
-remanescente, da mesma classe do caso 115. Não é fato faltando; é fato não lido.
+O `#un…` **remove por PADRÃO, não por cabeça, e ignora o `result`**. Logo "a regra está
+desligada" **não licencia** renomear outra cabeça para o nome dela: se os padrões casarem,
+o `#un…` mata a regra **recém-renomeada**, e o site passa a expandir pela OUTRA regra —
+**compilando limpo**. Seguir o plano teria trocado uma recusa falsa por um
+**aceite-que-desfaz** (a rede só pega no apply), quebrando o `dry-run == apply`.
 
-**(b) O `#un…` ÓRFÃO (`undoes: null`) segue SEM CONSUMIDOR.** Uma diretiva que desliga
-uma regra que não existe é **código morto silencioso** — o Harbour aceita calado. O dump
-já traz o fato. O lugar natural de mostrá-lo é o `usages` da palavra. *(Cuidado: o
-critério do `adr-003` diz "fato sem consumidor = fato local, não arquitetura" — aqui o
-consumidor é um RELATO, não um verbo novo. Verbo novo é portão do Diego.)*
+Detalhe do conserto e a armadilha da sentinela: `roadmap.md` § P-AUDIT/A4, caso 121.
 
-**Método:** fixture primeiro, sempre — provar a recusa falsa ANTES de consertar (foi
-assim que A1/A2/A3 foram feitos, e é o que separa conserto de palpite). O CHANGELOG e o
-manual já **declaram os dois limites como abertos**; quando fecharem, os dois artefatos
-precisam ser corrigidos (a skill `/update-manual` cobre).
+> **A lição, que é o motivo de isto ficar escrito:** um plano de handoff é **hipótese**,
+> não fato — inclusive quando quem o escreveu fui eu, na sessão anterior, com o contexto
+> fresco. **Probe antes de codar, mesmo quando o plano parece óbvio e barato.** O sinal de
+> alerta aqui era o "é só consultar": quando o conserto parece trivial demais para exigir
+> prova, é exatamente aí que ele não foi provado.
 
 ---
 
-## 3. Depois do A4, nesta ordem
+## 3. A PRÓXIMA sessão, nesta ordem
 
 **3.1 — Migrar os quatro transcripts colados à mão da página para `tests/site/`.**
 As seções profundas (rename de `DATA`, genealogia de regra, tempo de vida de diretiva,
