@@ -875,6 +875,50 @@ módulos homônimos. Spec dedicada a criar: `docs/spec-p-pp-refatoracao.md`
 (molde da [spec-u](spec-u-verbos-unificados.md)). Plano detalhado salvo em
 `~/.claude/plans/crie-um-plano-para-enchanted-flask.md`.
 
+### L — Locais mortos por FATO: `ast-17` + o verbo que REMOVE — **ATIVA, ANTES da V-2 (portão do Diego, 2026-07-13)**
+
+**O que está errado hoje.** O `unused-locals` **raspa `stderr`**: roda `harbour -w3 -s`
+por módulo e casa `"W0003" $ cLine` / `"W0032"`. Texto de diagnóstico **não é canal** —
+é mensagem para humano (o Harbour pode reescrevê-la, traduzi-la ou renumerá-la, e a
+ferramenta quebra **em silêncio**). É o gatilho *"canal mais barato ≠ canal correto"*, e
+é o **único verbo que não toca na AST**. Ainda por cima ele não é refatoração: só
+**relata** o que o `-w3` já relata — superfície de produto duplicando o compilador.
+*(Sonda: `harbour -ge<mode>` tem só DOIS modos — `0=Clipper`, `1=IDE`; **JSON de erro não
+existe**. O `--hbinfo` do hbmk2 é JSON de build, não de diagnóstico. Trocar para `-ge1`
+só trocaria um texto por outro.)*
+
+**O core JÁ TEM o fato, e ele é EXATO (exploração feita 2026-07-13, ANTES de desenhar).**
+Não é uma mensagem — é um enum por variável: `include/hbcomp.h:112-114`,
+**`HB_VU_NOT_USED`** (0, declarada e nunca tocada) / **`HB_VU_INITIALIZED`** (1,
+**atribuída e nunca lida** — a base do `W0032`) / **`HB_VU_USED`** (2). O compilador LÊ
+esse enum em `hbmain.c:1887` (`hb_compWarnUnusedVar`) e em `:3935` (param de codeblock)
+e o **transforma em frase**. O fato nasce estruturado e morre como texto.
+
+**Fatia 1 — `ast-17` no core: o compilador publica o veredito que ele já computa.** Campo
+de USO por declaração (o `declarations[]` já carrega nome, escopo e a âncora de escrita
+do `ast-9`), cobrindo LOCAL, param de função e **param de codeblock**. Gated pelo `fAst`
+(build default byte-a-byte intocado), `lexdiff` 0. *Pronto:* o dump responde "este local
+nunca é lido" **sem `-w3`, sem `stderr`, sem substring**.
+
+**Fatia 2 — o verbo que EDITA (e o `unused-locals` SAI, CLI + extensão).** Refatoração de
+verdade: remove a declaração morta, com verificação e rollback.
+**A armadilha, que é onde o verbo ganha o pão:** `LOCAL x := Foo()` — o `x` é morto, mas
+**o `Foo()` tem de continuar rodando**. O dump **já** carrega a árvore da expressão do
+inicializador, então o fato existe: (a) inicializador literal/constante → remove tudo;
+(b) inicializador com **chamada, macro ou `@ref`** → **NÃO se apaga**: ou preserva a
+expressão como statement, ou recusa nomeando o motivo (a decisão do Diego decide qual —
+`fail-closed` é o default). *Nunca* apagar o que tem efeito.
+**Oráculo (e este é DIFERENTE do resto da ferramenta):** remover código **muda o pcode
+legitimamente**, então a régua `.hrb` byte-idêntico **não serve** aqui. O oráculo é:
+recompila limpo com as flags do projeto + `-w3`; o veredito daquela variável **sumiu** do
+dump novo; **nenhum aviso novo** apareceu; nenhuma outra declaração/uso mudou. Qualquer
+falha → **rollback**.
+
+**PRONTO da fase:** um projeto do corpus com local morto real tem a declaração removida e
+recompila limpo; o `LOCAL x := Foo()` é tratado sem perder o efeito; o `unused-locals`
+(raspador de `stderr`) não existe mais; caso na suíte com fixture que exercita os dois
+ramos (puro × com efeito).
+
 ### V — Velocidade da refatoração em PROJETO GRANDE — **ATIVA; FATIA 1 ENTREGUE (2026-07-13)**
 
 A P9 consertou o dump **por módulo**. O que sobrou é **estrutural, e é o que o usuário
@@ -915,10 +959,13 @@ heurística; include transitivo a quebra). Quem decide o que recompilar é o
 **`hbmk2 -inc`** (sondado 2026-07-13: tocando 1 de 3 módulos, **só o dump dele é
 regravado**); o fecho transitivo de include vem do **`harbour -gd`** (P8).
 
-**FATIA 3 — paralelizar o `unused-locals`** (43 invocações seriais do compilador). Barata,
-independente do resto, e não precisa de cache nenhum.
+**FATIA 3 — ~~paralelizar o `unused-locals`~~ CANCELADA (Diego, 2026-07-13).** Eu ia
+otimizar as 43 invocações seriais do compilador — e o Diego perguntou *"pra que serve o
+unused-locals?"*. Não serve: **raspa `stderr`** do compilador e só relata o que o `-w3` já
+relata. **Não se otimiza um comando que não devia existir**: ele SAI, e o fato passa a vir
+por canal (`ast-17`) num verbo que EDITA — **fase L**, acima.
 
-**PORTÃO (vale para 2 e 3):** resultado **byte-idêntico** ao modo de hoje — a mesma régua
+**PORTÃO:** resultado **byte-idêntico** ao modo de hoje — a mesma régua
 de equivalência que provou a P9 (suíte inteira verde nos dois modos).
 
 **Riscos honestos:** (i) cache é a classe de bug mais cara que existe, e *"agiu sobre fato
