@@ -953,6 +953,38 @@ afirmava `1085/1085` e `112/112`, irreproduzíveis). Medido em 2026-07-12: **889
 módulos com pcode byte-idêntico, ZERO divergências** (switches desligados,
 remendado vs `master`). A afirmação se sustenta; a contagem é que era fantasia.
 
+### SITE-EX — suíte dos exemplos da página + CLI em inglês — ✅ **ENTREGUE (2026-07-12; suíte 923/0)**
+
+**Escopo.** A landing page publicava transcripts **inventados** (`vendas.hbp`,
+`billing.hbp`, classes `Payment`/`Logger` — projetos inexistentes) e uma saída de
+terminal com números que nenhuma execução produziu. Entrega em três pernas:
+
+1. **CLI em inglês** (decisão do Diego, 2026-07-12): ~380 literais de saída
+   traduzidos, 48 asserções da suíte reescritas, extensão VSCode + o harness dela +
+   `docs/manual.md` reacoplados (a extensão casava `/nenhum identificador/` e teria
+   quebrado calada). Pré-requisito para a página poder exibir saída **verbatim**.
+2. **Suíte dos exemplos** (`tests/site/`, `tools/site-examples.sh`): 10 exemplos,
+   quatro portas cada (antes compila / exit esperado / depois compila / recusa e
+   relatório deixam o fonte byte a byte intacto). `make site-examples` regrava os
+   blocos por EXECUÇÃO; **`make site-check` FALHA** se a página divergir. Portão
+   provado vivo (adulterar uma linha de transcript quebra o build). Contrato,
+   cicatriz e como adicionar: `tests/site/README.md`; regra durável no CLAUDE.md.
+3. **Conserto achado pela suíte**: `extract-function` dava **recusa falsa** em
+   qualquer trecho com `SWITCH` — a guarda de salto só aceitava `for`/`while` como
+   estrutura que cobre um `EXIT`, e o `EXIT` do `CASE` é do `SWITCH`. O fato já vinha
+   do compilador (`blocks[]` exporta o kind `switch`); a ferramenta o ignorava. `LOOP`
+   **não** entrou na lista (ele continua o laço externo e o salto é real). Caso 118 +
+   fixture `tests/fixsw` travam os dois lados.
+
+**Critério de pronto (atingido).** `make test` 923/0; `make site-check` verde nos
+dois portões (indicadores medidos + exemplos executados); zero projeto inexistente
+citado nos blocos gerados da página.
+
+**Dívida aberta.** As seções profundas da página (rename de DATA, genealogia de
+regra, tempo de vida de diretiva, sequestro por abreviação) ainda têm transcript
+**colado à mão** — corretos hoje (rodados um a um), mas FORA do portão, e portanto
+sujeitos ao mesmo apodrecimento. Migrá-los para `tests/site/` é o próximo passo.
+
 ## Backlog (por valor)
 
 - **Rename de DATA/VAR member — ✅ ENTREGUE (fatia 1, 2026-07-11; lacuna achada

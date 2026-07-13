@@ -20,7 +20,7 @@
       measured by hand, once, with no script. Re-measured 2026-07-12 with
       tools/pcode-identity.sh: 889/889 identical, ZERO divergences. The claim holds; the
       count was fantasy. The body now points at the measurement, not at a number.
-  suite at baseline: 112 cases, 913 checks green
+  suite at baseline: 113 cases, 923 checks green
   updated: 2026-07-12
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -375,7 +375,7 @@ which class you meant. So it refuses, and names the other class:
 
 ```
 $ hbrefactor rename app.hbp c1.prg:15:8 nX
-hbrefactor: 'nSaldo' também é membro de: POUPANCA (c2.prg) - send é despacho dinâmico, rename ambíguo; recuso
+hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing
 ```
 
 That's the same rule that has always governed homonymous *methods* — data members simply
@@ -513,7 +513,7 @@ The tool refuses, and names the rule you would have collided with:
 
 ```
 $ hbrefactor rename app.hbp app.prg:4:4 LIST
-hbrefactor: 'LIST' colide por abreviação com a regra #command LISTAR (c.ch:2)
+hbrefactor: 'LIST' collides by abbreviation with rule #command LISTAR (c.ch:2)
 ```
 
 What matters is **who decided that**. hbrefactor does not reimplement Harbour's matching

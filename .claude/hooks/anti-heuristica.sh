@@ -53,8 +53,13 @@ relata "gatilho 1 - comparação de TEXTO para decidir PAPEL/IDENTIDADE (o dump 
    'Upper\([^)]*\) *== *Upper\(|== *Left\(|\bLeft\([^)]*\) *==|\$ *(cUp|cNome|cName)'
 relata "gatilho 2 - CONSTANTE MÁGICA de gramática (réplica de regra do compilador)" \
    '(Len|hb_BLen)\([^)]*\) *(>=|>|<=|<) *[0-9]+'
+# O gatilho 5 é CASAR arquivo por basename (dois .ch homônimos colidem), não
+# EXIBIR o basename. `Refuse( "text in " + hb_FNameNameExt( cPath ) + ... )` lê
+# e escreve pelo caminho CANÔNICO e só encurta o nome na mensagem - acusá-lo era
+# falso positivo (6 sites, 2026-07-12). Acusa quando o basename é COMPARADO
+# (==, $) ou vira CHAVE de hash/índice - aí sim ele decide identidade.
 relata "gatilho 4/5 - re-implementar RESOLUÇÃO do core / casar por BASENAME" \
-   'hb_FNameName|hb_vfExists.*\+.*cFile|FOR EACH .* IN .*\[ *"inc" *\]'
+   'hb_FNameName[^)]*\) *(==|\$)|(==|\$) *hb_FNameName|hb_HHasKey\([^,]*, *hb_FNameName|\[ *hb_FNameName|hb_vfExists.*\+.*cFile|FOR EACH .* IN .*\[ *"inc" *\]'
 
 if [ -n "$SAIDA" ]; then
    cat >&2 <<EOF

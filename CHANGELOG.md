@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@7021c89 -->
+<!-- changelog-baseline: hbrefactor@bed227e -->
 <!-- Ponteiro de delta. Tudo DEPOIS deste commit ainda NÃO está descrito aqui.
-     Para retomar:  git log 7021c89..HEAD   (ver § Manutenção, no fim).
+     Para retomar:  git log bed227e..HEAD   (ver § Manutenção, no fim).
 
 # Changelog
 
@@ -18,6 +18,58 @@ O compilador que sustenta tudo isto tem o seu próprio: **[harbour-core/NEWS.md]
 (../harbour-core/harbour/NEWS.md)** (branch `feature/compiler-ast-dump`). Lá o nome
 é `NEWS` por convenção GNU — o Harbour já tem um `ChangeLog.txt`, que é o log do
 *desenvolvedor*; `NEWS` é o do *usuário*.
+
+## 2026-07-12 — a ferramenta agora fala INGLÊS
+
+**Isto muda o que você lê no terminal.** Todas as mensagens do `hbrefactor` —
+avisos, recusas, o `verified:` do fim — passaram do português para o inglês.
+
+```
+antes:  hbrefactor: 'nSaldo' também é membro de: POUPANCA (c2.prg) - recuso
+agora:  hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg) - refusing
+```
+
+O motivo é simples: a ferramenta existe para ser usada por programador Harbour de
+qualquer lugar, e o Harbour é um projeto internacional. Uma mensagem que metade do
+mundo não lê não é uma mensagem.
+
+**Onde isto te morde:** se você tem script, `Makefile` ou editor que **procura
+texto** na saída do `hbrefactor` para decidir alguma coisa (um `grep "recuso"`, um
+`if` em cima de "não compila"), **ele para de funcionar**. O *exit code* não mudou —
+`0` é sucesso, diferente de `0` é recusa ou erro —, então script que olha só o exit
+code continua igual. Se você casa texto, é hora de trocar para o exit code.
+
+A extensão VSCode já vem ajustada; não há nada a fazer do seu lado.
+
+## 2026-07-12 — corrigido: extrair um bloco com `SWITCH` era recusado sem motivo
+
+`extract-function` **recusava** qualquer trecho que contivesse um `SWITCH`, com uma
+explicação que parecia razoável e estava errada:
+
+```
+$ hbrefactor extract-function app.hbp core.prg 1382-1420 MimeTypeOf
+hbrefactor: EXIT on line 1384 would jump outside the selection
+```
+
+O `EXIT` que ela viu era o `EXIT` do `CASE` — o fim de um ramo do `SWITCH`, que
+começava e terminava **dentro** do próprio trecho. A ferramenta o confundiu com o
+`EXIT` que abandona um laço e, achando que ele saltaria para fora da seleção,
+recusou. Era **recusa falsa**: a extração era perfeitamente segura.
+
+Isso derrubava justamente o caso mais comum de extrair função em código Harbour de
+verdade — aquele `SWITCH` de trinta ramos, enfiado no meio de uma função grande, que
+todo mundo queria tirar dali. Agora sai:
+
+```
+extract-function: lines 1382-1420 of UPROCFILES -> MimeTypeOf( cFileName ) returning cI
+  LOCAL nI (line 1356) is used only in the selection - moves to MimeTypeOf
+verified: symbols preserved (+MimeTypeOf); run your test suite to confirm behaviour
+```
+
+**O que continua sendo recusado, e com razão:** `LOOP` dentro de um `SWITCH`. Ele
+não pertence ao `SWITCH` — ele volta para o laço de fora. Se o laço ficou fora da
+sua seleção, o salto realmente atravessa a borda, e a extração mudaria o
+comportamento do programa. Nesse caso a ferramenta continua parando.
 
 ## 2026-07-12 — `dump`: os fatos do compilador, para você olhar com os próprios olhos
 

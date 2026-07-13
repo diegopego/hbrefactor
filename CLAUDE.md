@@ -272,6 +272,25 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   resultado foi **acusar o UPSTREAM de poluir o branch**, achado falso e publicado.
   O Diego cortou: *"prefiro que não publique estes números, isto está complicando o
   projeto"*. **Automatizar um número frágil é pior que não tê-lo.**
+- **EXEMPLO NA PÁGINA: só o que se EXECUTA sozinho — a suíte do site (Diego,
+  2026-07-12: *"esta técnica de suíte de testes que vai para o site é o caminho
+  correto"*)**. É a regra do número medido, um nível acima e valendo para CÓDIGO:
+  nenhum bloco de fonte e nenhuma saída de terminal da `site/index.html` se
+  escreve à mão. Os exemplos vivem em `tests/site/` (contrato, cicatriz e como
+  adicionar: `tests/site/README.md`), `make site-examples` os RE-EXECUTA e regrava
+  os blocos, e **`make site-check` FALHA** se a página divergir da execução.
+  Quatro portas por exemplo: o fonte ANTES compila limpo, o comando sai com o exit
+  esperado, o fonte DEPOIS compila limpo, e recusa/relatório deixam o fonte **byte
+  a byte intacto**. *(A cicatriz: a página nasceu com `vendas.hbp`, `billing.hbp` e
+  classes `Payment`/`Logger` — projetos que NÃO EXISTEM — e uma saída de terminal
+  com números que nenhuma execução produziu, tudo dentro de uma caixa de terminal
+  com botão Copy. Quando a CLI foi traduzida, um desses blocos passou a exibir uma
+  mensagem em português que o programa não emite mais: apodreceu calado, igual a
+  número mantido à mão. Para uma ferramenta cuja tese é "eu não chuto, eu provo",
+  publicar exemplo não-provado é a contradição mais cara que existe.)*
+  **Dívida aberta:** as seções profundas da página (rename de DATA, genealogia de
+  regra, tempo de vida de diretiva, sequestro por abreviação) ainda têm transcript
+  colado à mão — corretos hoje, mas FORA do portão; migrá-los para `tests/site/`.
 - **VERIFICAR A BASE antes de concluir dela (2026-07-12)**: `git diff master...HEAD`
   com um `master` local desatualizado produziu um veredito ERRADO sobre o branch (ver
   acima). Antes de comparar contra qualquer ref, **`git fetch` e conferir a que

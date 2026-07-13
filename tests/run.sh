@@ -398,7 +398,7 @@ printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
 RC=$?
 check "exit != 0 without --force"  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "string igual a 'Dupla' - possível chamada por nome" "$D/out.log"
+grep -q "string equal to 'Dupla' - possible call by name" "$D/out.log"
 check "warning classifies exact-name string" $?
 ( cd "$D" && "$BIN" usages fix01.hbp Dupla > usages.log 2>&1 )
 grep -q "possible reference in string" "$D/usages.log"
@@ -501,7 +501,7 @@ D=$(fresh case17)
 ( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-10 Metade2 > out.log 2>&1 )
 RC=$?
 check "cut FOR refused"            $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "fecha fora dela" "$D/out.log"
+grep -q "that closes outside it" "$D/out.log"
 check "reason mentions open structure" $?
 ( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 13-16 Fim2 > out2.log 2>&1 )
 RC=$?
@@ -654,7 +654,7 @@ printf 'exports.hbx\n' >> "$D/fix01.hbp"
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
 RC=$?
 check "refused without --force"    $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "DYNAMIC DUPLA em export (.hbx)" "$D/out.log"
+grep -q "DYNAMIC DUPLA in the export (.hbx)" "$D/out.log"
 check "hbx warning listed"         $?
 
 }
@@ -717,7 +717,7 @@ check "3 modules verified"           $?
 ( cd "$D" && "$BIN" rename case29.hbp b.prg:5:10 Dobrar > hbx.log 2>&1 )
 RC=$?
 check "hbx via \${hb_name} refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "DYNAMIC DUPLA em export (.hbx)" "$D/hbx.log"
+grep -q "DYNAMIC DUPLA in the export (.hbx)" "$D/hbx.log"
 check "hbx warning proves macro expansion" $?
 
 }
@@ -729,7 +729,7 @@ printf '\nFUNCTION Quebrada()\n\n   RETURN NaoFecha(\n' >> "$D/b.prg"
 ( cd "$D" && "$BIN" unused-locals fix01.hbp > out.log 2>&1 )
 RC=$?
 check "unused-locals exit != 0"    $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "não compila" "$D/out.log"
+grep -q "does not compile" "$D/out.log"
 check "refusal names the failure"  $?
 grep -q " Error E" "$D/out.log"
 check "compiler error line shown"  $?
@@ -877,7 +877,7 @@ grep -q "RETURN ( nV + nV )" "$D/b.prg"
 check "read replaced by parenthesized expression" $?
 ! grep -q "LOCAL nR" "$D/b.prg"
 check "declaration removed"        $?
-grep -q "símbolos intactos" "$D/out.log"
+grep -q "symbols intact" "$D/out.log"
 check "structural verification"    $?
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
@@ -902,7 +902,7 @@ EOF
 ( cd "$D" && "$BIN" inline-local fix01.hbp b.prg ComImpura nDobro > imp.log 2>&1 )
 RC=$?
 check "function call in init refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "impura" "$D/imp.log"
+grep -q "impure" "$D/imp.log"
 check "reason mentions purity"     $?
 ( cd "$D" && "$BIN" inline-local fix01.hbp b.prg ComImpura nMuda > mut.log 2>&1 )
 RC=$?
@@ -932,7 +932,7 @@ D=$(fresh case37)
 ( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 while > out.log 2>&1 )
 RC=$?
 check "compiler-rejected name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "compilador do projeto rejeita" "$D/out.log"
+grep -q "project compiler rejects" "$D/out.log"
 check "refusal cites the compiler"  $?
 # LOOP is ACCEPTED by the compiler as a local name (the occ-era list wrongly
 # refused it - grammar truth restored); byte-identical verification still rules
@@ -947,12 +947,12 @@ check "byte-identical verification" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 Len > rtl.log 2>&1 )
 RC=$?
 check "compiler-protected RTL name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "compilador do projeto rejeita" "$D/rtl.log"
+grep -q "project compiler rejects" "$D/rtl.log"
 check "probe relays the compiler refusal" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_ntos > rtl2.log 2>&1 )
 RC=$?
 check "runtime function name refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "função do runtime Harbour" "$D/rtl2.log"
+grep -q "Harbour runtime function" "$D/rtl2.log"
 check "warning explains the shadowing" $?
 # hb_MilliSeconds is NOT linked into the tool itself: only the canonical
 # core list (include/harbour.hbx, found via the project's -i paths) knows
@@ -960,7 +960,7 @@ check "warning explains the shadowing" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_MilliSeconds > rtl3.log 2>&1 )
 RC=$?
 check "core function unknown to the tool's runtime still refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "função do runtime Harbour" "$D/rtl3.log"
+grep -q "Harbour runtime function" "$D/rtl3.log"
 check "harbour.hbx caught it" $?
 # renaming to a name the project already CALLS (even an external one, like
 # QOut) would hijack those calls
@@ -1014,16 +1014,16 @@ check "#define round-trip byte-exact"  $?
 ( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_X --dry-run > dry.log 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "dry run writes nothing"        $?
-# recusas: sequestro de identificador, abreviação dBase, palavra inexistente
+# recusas: sequestro de identificador, abbreviation dBase, palavra inexistente
 ( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MenuAdd > hij.log 2>&1 )
 RC=$?
 check "new word already an identifier refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "capturaria" "$D/hij.log"
+grep -q "would capture it" "$D/hij.log"
 check "refusal explains the capture"  $?
 ( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU > abr.log 2>&1 )
 RC=$?
 check "dBase 4-letter abbreviation clash refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "abreviação" "$D/abr.log"
+grep -q "abbreviation" "$D/abr.log"
 check "refusal cites the abbreviation rule" $?
 
 }
@@ -1063,7 +1063,7 @@ RC=$?
 check "usages of builtin rule word exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "a.prg:23:11: keyword (#command @, builtin)" "$D/say.log"
 check "builtin @..SAY application with exact column" $?
-grep -q "sem posição no fonte" "$D/say.log"
+grep -q "no source position" "$D/say.log"
 check "multi-pass reapplication visible (no source position)" $?
 
 }
@@ -1110,7 +1110,7 @@ D=$(freshdsl case43)
 ( cd "$D" && "$BIN" extract-function fixdsl.hbp a.prg 19-20 Pedaco > ext.log 2>&1 )
 RC=$?
 check "selection cutting REPEAT without UNTIL refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "abre while (linha 19) que fecha fora dela" "$D/ext.log"
+grep -q "opens while (line 19) that closes outside it" "$D/ext.log"
 check "refusal is structural (block facts), line exact" $?
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg"
 check "a.prg untouched"               $?
@@ -1132,7 +1132,7 @@ grep -q "creator: PUBLIC in MAIN (a.prg:7)" "$D/map.log"
 check "PUBLIC creator with exact line" $?
 grep -q "creator: PRIVATE in COMSOMBRAPRIVADA (a.prg:23)" "$D/map.log"
 check "PRIVATE creator (dynamic shadow) found" $?
-grep -q "dynamic shadowing: PRIVATE sombreia o PUBLIC" "$D/map.log"
+grep -q "dynamic shadowing: a PRIVATE shadows the PUBLIC" "$D/map.log"
 check "dynamic-axis shadowing reported" $?
 grep -q "dynamic reach: DEPOSITA$" "$D/map.log"
 check "reach of the PRIVATE is its dynamic extension only" $?
@@ -1183,28 +1183,28 @@ D=$(freshmv case46)
 ( cd "$D" && "$BIN" rename fixmv.hbp a.prg:7:11 xGrana > r1.log 2>&1 )
 RC=$?
 check "more than one creator refused"  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "mais de um criador" "$D/r1.log" && grep -q "PUBLIC em MAIN" "$D/r1.log"
+grep -q "more than one creator" "$D/r1.log" && grep -q "PUBLIC in MAIN" "$D/r1.log"
 check "refusal lists the creators"     $?
 ( cd "$D" && "$BIN" rename fixmv.hbp b.prg:39:4 xImposto > r2.log 2>&1 )
 RC=$?
 check "implicit memvar (no creator) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "não tem criador" "$D/r2.log"
+grep -q "has no PRIVATE/PUBLIC creator" "$D/r2.log"
 check "refusal explains missing creator" $?
 ( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 nAux > r4.log 2>&1 )
 RC=$?
 check "new name is LOCAL in a using function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "mudariam de binding em silêncio" "$D/r4.log"
+grep -q "would silently change binding" "$D/r4.log"
 check "refusal names the silent binding change" $?
 ( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xSaldo > r5.log 2>&1 )
 RC=$?
 check "new name already a living memvar refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "fundiria duas variáveis" "$D/r5.log"
+grep -q "would merge two variables" "$D/r5.log"
 check "refusal explains the merge"     $?
 # o inverso da recusa-chave: rename-local para nome de memvar usada na função
 ( cd "$D" && "$BIN" rename fixmv.hbp b.prg:13:10 xConta > r6.log 2>&1 )
 RC=$?
 check "rename-local to a memvar used in the function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "sombrearia esses usos" "$D/r6.log"
+grep -q "would shadow those uses" "$D/r6.log"
 check "reverse guard explains the shadowing" $?
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
 check "sources untouched by all refusals" $?
@@ -1254,7 +1254,7 @@ D=$(freshmth case48)
 ( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:11:8 Junta > r1.log 2>&1 )
 RC=$?
 check "method owned by two classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "também é membro de: OUTRA" "$D/r1.log" && grep -q "despacho dinâmico" "$D/r1.log"
+grep -q "is also a member of: OUTRA" "$D/r1.log" && grep -q "dynamic dispatch" "$D/r1.log"
 check "refusal names the other class and the dispatch problem" $?
 ( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Soma > r2.log 2>&1 )
 RC=$?
@@ -1264,7 +1264,7 @@ check "refusal explains the message merge" $?
 ( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Fantasma > r3.log 2>&1 )
 RC=$?
 check "new name already sent somewhere refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "passaria a respondê-la" "$D/r3.log"
+grep -q "would start answering it" "$D/r3.log"
 check "refusal explains the hijack"    $?
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "sources untouched by the refusals" $?
@@ -1381,14 +1381,14 @@ check "A->B->A round-trip byte-exact"  $?
 ( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:10:6 Freio > col.log 2>&1 )
 RC=$?
 check "predicted symbol colliding with existing function refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "FREIO_RODA" "$D/col.log" && grep -q "já existe como função" "$D/col.log"
+grep -q "FREIO_RODA" "$D/col.log" && grep -q "already exists as a function" "$D/col.log"
 check "refusal NAMES the predicted artifact (G5)" $?
 printf '\nFUNCTION Chama()\n   RETURN on_Click()\n' >> "$D/e1.prg"
 cp "$D/e1.prg" "$D/e1.saved"
 ( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Novo > orf.log 2>&1 )
 RC=$?
 check "source spelling a generated name gates the rename" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "soletra o nome gerado 'on_Click'" "$D/orf.log"
+grep -q "spells out the generated name 'on_Click'" "$D/orf.log"
 check "refusal points at the spelled generated name" $?
 cmp -s "$D/e1.prg" "$D/e1.saved" && cmp -s "$D/e2.prg" "$HERE/fixppm/e2.prg"
 check "sources untouched by all refusals" $?
@@ -1480,7 +1480,7 @@ grep -q "hb_ntos( nDx + nDy )" "$D/w1.prg"
 check "method body left untouched (params keep their names)" $?
 grep -q "oW:Grow( 2, 1 )" "$D/w2.prg"
 check "send call site arguments reordered" $?
-grep -q "símbolos intactos" "$D/ren.log"
+grep -q "symbols intact" "$D/ren.log"
 check "verified: symbols/functions intact (pcode legitimately changed)" $?
 ( cd "$D" && $HB_BIN/hbmk2 w1.prg w2.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
@@ -1488,11 +1488,11 @@ check "execution identical after reorder" $?
 ( cd "$D" && "$BIN" reorder-params fixsig.hbp Widget:Grow "nDx,nDy" > /dev/null 2>&1 )
 cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg" && cmp -s "$D/w2.prg" "$HERE/fixsig/w2.prg"
 check "A->B->A round-trip byte-exact"  $?
-# Resize é homônimo (Widget e Panel) -> send é despacho dinâmico -> recusa
+# Resize é homônimo (Widget e Panel) -> send é dynamic dispatch -> recusa
 ( cd "$D" && "$BIN" reorder-params fixsig.hbp Widget:Resize "nH,nW" > amb.log 2>&1 )
 RC=$?
 check "method owned by two classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "mais de uma classe" "$D/amb.log" && grep -q "PANEL" "$D/amb.log"
+grep -q "more than one class" "$D/amb.log" && grep -q "PANEL" "$D/amb.log"
 check "refusal names the classes and the dynamic dispatch" $?
 cmp -s "$D/w1.prg" "$HERE/fixsig/w1.prg" && cmp -s "$D/w2.prg" "$HERE/fixsig/w2.prg"
 check "sources untouched by the refusal" $?
@@ -1561,7 +1561,7 @@ check "fixture runs before"           $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 Miolo > ex.log 2>&1 )
 RC=$?
 check "extract of a ::-using range exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "novo método Conta:Miolo( nValor )" "$D/ex.log"
+grep -q "new method Conta:Miolo( nValor )" "$D/ex.log"
 check "reports the new METHOD of the class" $?
 grep -q "::Miolo( nValor )" "$D/e1.prg"
 check "call site is a send on Self (::)" $?
@@ -1571,7 +1571,7 @@ grep -q "METHOD Miolo( nValor ) CLASS Conta" "$D/e1.prg"
 check "implementation signature matches the prototype" $?
 grep -q "LOCAL nTaxa, nLiquido" "$D/e1.prg"
 check "selection-only locals migrated into the new method" $?
-grep -q "verified: símbolos preservados (+Conta_Miolo), mensagem Miolo registrada" "$D/ex.log"
+grep -q "verified: symbols preserved (+Conta_Miolo), message Miolo registered" "$D/ex.log"
 check "verification: predicted symbol + message registration" $?
 extrun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
@@ -1608,7 +1608,7 @@ extrun "$D" saida_antes.txt
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-22 CalculaLiquido > ex.log 2>&1 )
 RC=$?
 check "extract of a Self-free range in a method exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "novo método Conta:CalculaLiquido( nValor )" "$D/ex.log"
+grep -q "new method Conta:CalculaLiquido( nValor )" "$D/ex.log"
 check "container is a method => target is a METHOD even without Self" $?
 grep -q "nLiquido := ::CalculaLiquido( nValor )" "$D/e1.prg"
 check "call site is a send with the out-value" $?
@@ -1627,22 +1627,22 @@ D=$(freshext case60)
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 43-43 Pedaco > r1.log 2>&1 )
 RC=$?
 check "range reassigning Self refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "reatribui Self" "$D/r1.log"
+grep -q "reassigns Self" "$D/r1.log"
 check "refusal names the Self reassignment" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 47-47 Pedaco > r2.log 2>&1 )
 RC=$?
 check "range passing @Self refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "por referência" "$D/r2.log"
+grep -q "by reference" "$D/r2.log"
 check "refusal names the by-reference Self" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 nReservado > r3.log 2>&1 )
 RC=$?
 check "name colliding with a class VAR refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "já é membro (VAR/DATA/METHOD) da classe CONTA" "$D/r3.log"
+grep -q "is already a member (VAR/DATA/METHOD) of class CONTA" "$D/r3.log"
 check "refusal names the owning class (registration fact)" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 64-65 nReservado > r4.log 2>&1 )
 RC=$?
 check "name colliding with an INHERITED member refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "já é membro (VAR/DATA/METHOD) da classe CONTA" "$D/r4.log"
+grep -q "is already a member (VAR/DATA/METHOD) of class CONTA" "$D/r4.log"
 check "ancestor chain walked to the in-project parent" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 Extrato > r5.log 2>&1 )
 RC=$?
@@ -1652,17 +1652,17 @@ check "refusal names the generated symbol" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e1.prg 21-25 Processa > r6.log 2>&1 )
 RC=$?
 check "name already SENT in the project refused (dynamic dispatch)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "já é mensagem enviada em e2.prg:5" "$D/r6.log"
+grep -q "is already a message sent in e2.prg:5" "$D/r6.log"
 check "refusal points at the existing send site" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e2.prg 17-17 Pedaco > r7.log 2>&1 )
 RC=$?
 check "Self-using range OUTSIDE a method refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "não é método de classe" "$D/r7.log"
+grep -q "is not a class method" "$D/r7.log"
 check "refusal says the container is not a method" $?
 ( cd "$D" && "$BIN" extract-function fixext.hbp e2.prg 9-10 Pedaco > r8.log 2>&1 )
 RC=$?
 check "method of a class declared in an include refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "classe declarada em include" "$D/r8.log"
+grep -q "class declared in an include" "$D/r8.log"
 check "refusal explains the prototype lives in an include" $?
 cmp -s "$D/e1.prg" "$HERE/fixext/e1.prg" && cmp -s "$D/e2.prg" "$HERE/fixext/e2.prg"
 check "sources untouched by all refusals" $?
@@ -1671,9 +1671,9 @@ extrun "$D" saida_antes.txt
 ( cd "$D" && "$BIN" extract-function fixext.hbp e2.prg 27-28 Passo > w1.log 2>&1 )
 RC=$?
 check "class FROM an out-of-project parent still extracts" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "warning: pai HBPERSISTENT fora do projeto" "$D/w1.log"
+grep -q "warning: parent HBPERSISTENT outside the project" "$D/w1.log"
 check "honest warning names the unverifiable parent" $?
-test "$(grep -c "warning: pai" "$D/w1.log")" = "1"
+test "$(grep -c "warning: parent" "$D/w1.log")" = "1"
 check "only the real parent is warned (FROM word filtered by stream fact)" $?
 extrun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
@@ -1725,7 +1725,7 @@ check "the mirror query resolves the other class" $?
 ( cd "$D" && "$BIN" usages fixmth.hbp Caixa: > mf.log 2>&1 )
 RC=$?
 check "malformed Classe: refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "malformada" "$D/mf.log"
+grep -q "malformed" "$D/mf.log"
 check "refusal names the malformed form" $?
 
 }
@@ -2171,8 +2171,8 @@ grep -q "OFICIO Verniz DA Banca PEDE nLado, nBrilho" "$D/o1.prg"
 check "param homônimo (nLado) de OUTRO ofício intacto (escopo por identidade)" $?
 grep -q "b:Talha( 5, 2 )" "$D/o2.prg"
 check "send call site com argumentos reordenados" $?
-grep -q "símbolos intactos" "$D/ren.log"
-check "verificação: símbolos/funções intactos" $?
+grep -q "symbols intact" "$D/ren.log"
+check "verification: symbols/functions intact" $?
 ofirun "$D" saida_depois.txt
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execução idêntica após o reorder" $?
@@ -2183,12 +2183,12 @@ RC=$?
 check "forma crua (mensagem única) resolve pelo fato" $([ $RC -eq 0 ] && echo 0 || echo 1)
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "A->B->A round-trip byte-exact"  $?
-# Lustro é de duas donas (Banca e Tear) - send é despacho dinâmico
+# Lustro é de duas donas (Banca e Tear) - send é dynamic dispatch
 ( cd "$D" && "$BIN" reorder-params fixofi.hbp Banca:Lustro "nPano,nCera" > amb.log 2>&1 )
 RC=$?
 check "mensagem de duas donas de DSL recusada" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "mais de uma classe" "$D/amb.log" && grep -q "TEAR" "$D/amb.log"
-check "recusa nomeia as donas e o despacho dinâmico" $?
+grep -q "more than one class" "$D/amb.log" && grep -q "TEAR" "$D/amb.log"
+check "refusal names the owners and the dynamic dispatch" $?
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "fontes intactos após a recusa" $?
 
@@ -2223,8 +2223,8 @@ check "A->B->A round-trip byte-exact"  $?
 ( cd "$D" && "$BIN" rename fixofi.hbp o1.prg:27:8 Polir > amb.log 2>&1 )
 RC=$?
 check "membro homônimo em duas donas recusado" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "também é membro de: TEAR (o2.prg)" "$D/amb.log"
-check "recusa nomeia a outra dona (política de unicidade)" $?
+grep -q "is also a member of: TEAR (o2.prg)" "$D/amb.log"
+check "refusal names the other owner (uniqueness policy)" $?
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "fontes intactos após a recusa" $?
 
@@ -2272,9 +2272,9 @@ check "fixture runs before"           $?
 ( cd "$D" && "$BIN" extract-function fixofi.hbp o1.prg 23-23 Ajusta > ex.log 2>&1 )
 RC=$?
 check "range SEM Self-análogo em corpo de ofício extrai" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "contêiner de DSL própria (regra 'oficio')" "$D/ex.log" && \
-   grep -q "exceção do hbclass" "$D/ex.log"
-check "relato nomeia a regra da DSL e a exceção de síntese" $?
+grep -q "custom DSL container (rule 'oficio')" "$D/ex.log" && \
+   grep -q "hbclass exception" "$D/ex.log"
+check "report names the DSL rule and the synthesis exception" $?
 grep -q "nTom := Ajusta( nLado, nBrilho )" "$D/o1.prg" && \
    grep -q "STATIC FUNCTION Ajusta( nLado, nBrilho )" "$D/o1.prg"
 check "alvo é FUNÇÃO (nunca síntese de METHOD em projeto alheio)" $?
@@ -2285,8 +2285,8 @@ D=$(freshofi case79b)
 ( cd "$D" && "$BIN" extract-function fixofi.hbp o1.prg 22-22 Rotula > rec.log 2>&1 )
 RC=$?
 check "range COM QSelf em corpo de ofício recusado" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "QSelf()/Self" "$D/rec.log" && grep -q "receptor não viajaria" "$D/rec.log" && \
-   grep -q "exceção do hbclass" "$D/rec.log"
+grep -q "QSelf()/Self" "$D/rec.log" && grep -q "receiver would not travel" "$D/rec.log" && \
+   grep -q "hbclass exception" "$D/rec.log"
 check "recusa nomeia o fato (nó SELF) e a exceção de síntese" $?
 cmp -s "$D/o1.prg" "$HERE/fixofi/o1.prg" && cmp -s "$D/o2.prg" "$HERE/fixofi/o2.prg"
 check "fontes intactos após a recusa" $?
@@ -2363,7 +2363,7 @@ check "posição sem identificador recusa (fallback da extensão)" $?
   grep -qi "^query: Totem:Brilho$" u1.log && grep -q "cog declaration (rig TOTEM)" u1.log )
 check "usages --at resolve a posição e consulta numa chamada só" $?
 ( cd "$D" && "$BIN" usages fixhom.hbp --at m1.prg:39:1 > u2.log 2>&1; [ $? -ne 0 ] ) && \
-  grep -q "nenhum identificador" "$D/u2.log"
+  grep -q "no compile-time identifier" "$D/u2.log"
 check "usages --at recusa posição vazia nomeando o fato (fallback da extensão)" $?
 
 }
@@ -2424,14 +2424,14 @@ check "restrição que vaza: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || ec
 # do marker restrito (ast-5), então a ferramenta sabe que o nome novo faria a
 # regra deixar de casar e diz isso, em vez de editar/recompilar/rollback com um
 # "syntax error" opaco. Arquivos nem chegam a ser tocados (era: rollback)
-grep -q "não é uma das alternativas do marker RESTRITO" "$D/rd4.log" && \
+grep -q "is not one of the alternatives of the rule's RESTRICTED marker" "$D/rd4.log" && \
    cmp -s "$D/forja.ch" "$D/forja.ch.antes" && cmp -s "$D/forja.prg" "$D/forja.prg.antes"
 check "recusa ANTES de editar, nomeando as alternativas; fontes intactos" $?
 # resolve-at DENTRO de diretiva (camada 4): a posição vira palavra de regra
 ( cd "$D" && "$BIN" resolve-at molde.hbp molde.prg 6 51 > ra.log 2>&1 )
 RC=$?
 check "resolve-at dentro de diretiva exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "palavra no result da regra (#xcommand MOLDE, molde.prg:6)" "$D/ra.log" && \
+grep -q "word in the result of rule (#xcommand MOLDE, molde.prg:6)" "$D/ra.log" && \
    grep -q "query: CunhoNovo" "$D/ra.log"
 check "camada 4: palavra dentro da diretiva por posição-fato, consulta crua" $?
 # régua do caso 64: nenhuma palavra das DSLs de fixture na ferramenta nem
@@ -2507,7 +2507,7 @@ check "órfão: resposta válida VAZIA com exit 0 (picker cai para todos)" $?
 check "--json: o array que a extensão decodifica (tcheck via hb_jsonDecode)" $?
 ( cd "$D" && "$BIN" projects-of a.prg naoexiste.hbp p1.hbp > own5.log 2> own5.err )
 RC=$?
-[ $RC -eq 0 ] && [ "$(cat "$D/own5.log")" = "p1.hbp" ] && grep -q "não resolveu no hbmk2" "$D/own5.err"
+[ $RC -eq 0 ] && [ "$(cat "$D/own5.log")" = "p1.hbp" ] && grep -q "did not resolve in hbmk2" "$D/own5.err"
 check "candidato quebrado no meio: fora do páreo com nota, resposta segue" $?
 ( cd "$D" && "$BIN" projects-of a.prg naoexiste.hbp > /dev/null 2>&1 )
 RC=$?
@@ -2736,7 +2736,7 @@ D=$(freshb7b case89)
 # relatório (sem edição): 3 locais nível 2 + 2 retornos de método declaráveis
 ( cd "$D" && "$BIN" annotate fixb7b.hbp > rep.log 2>&1 )
 check "annotate relatório exit 0" $?
-grep -q "nível2=3 " "$D/rep.log" && grep -q "retornos-metodo-declaráveis=2" "$D/rep.log"
+grep -q "level2=3 " "$D/rep.log" && grep -q "declarable-method-returns=2" "$D/rep.log"
 check "relatório: 3 locais nível 2, 2 completadores (g)" $?
 ! grep -q "_HB_MEMBER SOMA" "$D/q1.prg"
 check "relatório NÃO tocou a cópia (nenhuma edição)" $?
@@ -2746,9 +2746,9 @@ check "annotate --apply exit 0" $?
 # re-baseline fatia 3 (era 4+3): +1 declaração (_HB_CLASS FORNALHA do
 # balde bp em q2) e +5 anotações (oPar/oCont em q1, 2 tigela em q2 -
 # params de bloco - e oFor em q2, destravada pelo registro)
-grep -q "5 declaração(ões) + 8 anotação(ões) AS CLASS" "$D/app.log"
+grep -q "5 declaration(s) + 8 AS CLASS annotation(s)" "$D/app.log"
 check "materializou declarações + anotações AS CLASS (inclui params de bloco - fatia 3)" $?
-grep -q "byte-idêntico sem -kt; compila limpo -w3 -es2; roda sob -kt" "$D/app.log"
+grep -q "byte-identical without -kt; compiles clean under -w3 -es2; runs under -kt" "$D/app.log"
 check "padrão-ouro completo: inerte + compila limpo + roda sob -kt" $?
 grep -q "_HB_MEMBER SOMA() AS CLASS MOEDA" "$D/q1.prg" && \
    grep -q "_HB_MEMBER PEGA() AS CLASS MOEDA" "$D/q1.prg"
@@ -2788,11 +2788,11 @@ D=$(freshrbk case90)
 check "pristino RODA limpo sob -kt: promessa de membro não é imposta, a mentira fica dormente" $?
 ( cd "$D" && "$BIN" annotate fixrbk.hbp > rep.log 2>&1 )
 check "annotate relatório exit 0" $?
-grep -q "nível2=2 " "$D/rep.log"
+grep -q "level2=2 " "$D/rep.log"
 check "análise honesta sobre o fato declarado: b e x são nível 2 (a mentira é indistinguível em compilação)" $?
 ! ( cd "$D" && "$BIN" annotate fixrbk.hbp --apply > app.log 2>&1 )
 check "annotate --apply RECUSA (exit != 0)" $?
-grep -q "padrão-ouro FALHOU após anotar locais" "$D/app.log" && \
+grep -q "gold standard FAILED after annotating locals" "$D/app.log" && \
    grep -q "declared type check failed: expected S:MOEDA, got N: MAIN:X" "$D/app.log"
 check "recusa NOMEIA o motivo: cheque -kt disparou no store da local anotada (expected S:MOEDA, got N @ MAIN:X)" $?
 cmp -s "$D/rbk.prg" "$HERE/fixrbk/rbk.prg"
@@ -2813,8 +2813,8 @@ echo "case 91: B9 fatia 2 - round-trip fixcls: semente 39/61 (w2 oMenu:Paint) re
 D=$(freshcls case91)
 ( cd "$D" && "$BIN" annotate fixcls.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "3 declaração(ões) + 1 anotação(ões) AS CLASS" "$D/app.log" && \
-   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+grep -q "3 declaration(s) + 1 AS CLASS annotation(s)" "$D/app.log" && \
+   grep -q "runs under -kt (checks pass)" "$D/app.log"
 check "materializou e verificou (padrão-ouro completo com execução -kt)" $?
 grep -q "DECLARE UWMENU NEW() AS CLASS UWMENU" "$D/w2.prg" && \
    grep -q "LOCAL oMenu AS CLASS UWMENU := UWMenu():New()" "$D/w2.prg"
@@ -2841,8 +2841,8 @@ echo "case 92: B9 fatia 2 - round-trip fixmth: semente 61 (c2 oC:Soma) por FATO;
 D=$(freshmth case92)
 ( cd "$D" && "$BIN" annotate fixmth.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "6 declaração(ões) + 2 anotação(ões) AS CLASS" "$D/app.log" && \
-   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+grep -q "6 declaration(s) + 2 AS CLASS annotation(s)" "$D/app.log" && \
+   grep -q "runs under -kt (checks pass)" "$D/app.log"
 check "materializou e verificou (padrão-ouro completo com execução -kt)" $?
 grep -q "DECLARE CAIXA NEW() AS CLASS CAIXA" "$D/c2.prg" && \
    grep -q "_HB_MEMBER NEW() AS CLASS OUTRA" "$D/c2.prg"
@@ -2874,8 +2874,8 @@ echo "case 93: B9 fatia 2 - round-trip fixrcv: semente 63 (r2 s:Zap) por FATO; r
 D=$(freshrcv case93)
 ( cd "$D" && "$BIN" annotate fixrcv.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "5 declaração(ões) + 5 anotação(ões) AS CLASS" "$D/app.log" && \
-   grep -q "projeto não-executável - passo -kt pulado (declared, não imposto)" "$D/app.log"
+grep -q "5 declaration(s) + 5 AS CLASS annotation(s)" "$D/app.log" && \
+   grep -q "project not runnable - -kt step skipped (declared, not enforced)" "$D/app.log"
 check "materializou; sem Main o passo -kt é pulado com relato honesto" $?
 grep -q "_HB_CLASS CAIXA" "$D/r2.prg" && \
    grep -q "LOCAL x AS CLASS CAIXA := Caixa():New( 9 )" "$D/r2.prg"
@@ -2905,7 +2905,7 @@ echo "case 94: B9 fatia 2 - round-trip fixdis: semente 66 (d1 oNm/oNs:Paint) - a
 D=$(freshdis case94)
 ( cd "$D" && "$BIN" annotate fixdis.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "12 declaração(ões) + 9 anotação(ões) AS CLASS" "$D/app.log"
+grep -q "12 declaration(s) + 9 AS CLASS annotation(s)" "$D/app.log"
 check "materializou (12 one-liners + 9 anotações no módulo de 4 DSLs)" $?
 ( cd "$D" && "$BIN" usages fixdis.hbp NCMain:Paint > u1.log 2>&1 && "$BIN" usages fixdis.hbp NCSecondary:Paint > u2.log 2>&1 )
 check "usages exit 0" $?
@@ -2932,8 +2932,8 @@ echo "case 95: B9 fatia 2 - round-trip fixext: semente 84 (e1 oC/oV:Deposita) - 
 D=$(freshext case95)
 ( cd "$D" && "$BIN" annotate fixext.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "2 declaração(ões) + 2 anotação(ões) AS CLASS" "$D/app.log" && \
-   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+grep -q "2 declaration(s) + 2 AS CLASS annotation(s)" "$D/app.log" && \
+   grep -q "runs under -kt (checks pass)" "$D/app.log"
 check "materializou e verificou (padrão-ouro completo com execução -kt)" $?
 grep -q "_HB_MEMBER NEW() AS CLASS CONTA" "$D/e1.prg" && \
    grep -q "_HB_MEMBER NEW() AS CLASS CONTAVIP" "$D/e1.prg"
@@ -2968,12 +2968,12 @@ echo "case 96: B9 fatia 2 - round-trip fixb7: semente 85 (b1 p:Gira) - fábrica 
 D=$(freshb7 case96)
 ( cd "$D" && "$BIN" annotate fixb7.hbp > rep.log 2>&1 )
 check "annotate relatório exit 0" $?
-grep -q "nível2=1 nível3=2" "$D/rep.log"
+grep -q "level2=1 level3=2" "$D/rep.log"
 check "relatório: p nível 2; oCoisa e o nível 3 (só inferência - recusa nomeada)" $?
 ( cd "$D" && "$BIN" annotate fixb7.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
-grep -q "1 declaração(ões) + 1 anotação(ões) AS CLASS" "$D/app.log" && \
-   grep -q "execução já falhava SEM edição - passo -kt pulado (declared, não imposto)" "$D/app.log"
+grep -q "1 declaration(s) + 1 AS CLASS annotation(s)" "$D/app.log" && \
+   grep -q "execution already failed WITHOUT the edit - -kt step skipped (declared, not enforced)" "$D/app.log"
 check "atribuição honesta: veneno de runtime pré-existente NÃO vira culpa da edição" $?
 grep -q "DECLARE NOVAPECA() AS CLASS PECA" "$D/b1.prg" && \
    grep -q "LOCAL p AS CLASS PECA := NovaPeca()" "$D/b1.prg"
@@ -3009,8 +3009,8 @@ echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
 ( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0 em projeto já--kt" $?
 # re-baseline fatia 3 (era 4+3): mesmos deltas do caso 89
-grep -q "5 declaração(ões) + 8 anotação(ões) AS CLASS" "$D/app.log" && \
-   grep -q "roda sob -kt (cheques passam)" "$D/app.log"
+grep -q "5 declaration(s) + 8 AS CLASS annotation(s)" "$D/app.log" && \
+   grep -q "runs under -kt (checks pass)" "$D/app.log"
 check "padrão-ouro completo: inerte (baseline SEM a flag) + compila limpo + roda sob -kt" $?
 grep -q "LOCAL oM AS CLASS MOEDA" "$D/q1.prg" && grep -q "_HB_MEMBER SOMA() AS CLASS MOEDA" "$D/q1.prg"
 check "declarações e anotações escritas no projeto -kt" $?
@@ -3111,7 +3111,7 @@ echo "case 100: B9 fatia 3 - generalidade JUNTO: param de bloco da DSL não-espe
 D=$(freshb7b case100)
 ( cd "$D" && "$BIN" annotate fixb7b.hbp > rep.log 2>&1 )
 check "annotate relatório exit 0" $?
-grep -q "FORNALHA {| TIGELA AS CLASS FORNALHA |   \[q2.prg:9 + registro antes: _HB_CLASS FORNALHA\]" "$D/rep.log"
+grep -q "FORNALHA {| TIGELA AS CLASS FORNALHA |   \[q2.prg:9 + record before: _HB_CLASS FORNALHA\]" "$D/rep.log"
 check "relatório: tigela anotável com o registro nomeado" $?
 ( cd "$D" && "$BIN" annotate fixb7b.hbp --apply > app.log 2>&1 )
 check "annotate --apply exit 0" $?
@@ -3147,12 +3147,12 @@ echo "case 101: B9 fatia 4 (F4.1) - exec-registry: retrato da tabela viva (o sna
 D=$(freshreg case101)
 ( cd "$D" && "$BIN" exec-registry fixreg.hbp --stamp fixo --out s1.astr.json > r1.log 2>&1 )
 check "exec-registry exit 0" $?
-grep -q "classe METAL_BRONZE  \[execução de FORJA_BRONZE(), seletores=3\]" "$D/r1.log" && \
-   grep -q "classe METAL_ACO  \[execução de FORJA_ACO(), seletores=4\]" "$D/r1.log"
+grep -q "class METAL_BRONZE  \[execution of FORJA_BRONZE(), selectors=3\]" "$D/r1.log" && \
+   grep -q "class METAL_ACO  \[execution of FORJA_ACO(), selectors=4\]" "$D/r1.log"
 check "metais de nome COMPUTADO reveladas com proveniência da chamada" $?
-grep -q "classe FORNO_BASE  \[startup (INIT), seletores=2\]" "$D/r1.log"
+grep -q "class FORNO_BASE  \[startup (INIT), selectors=2\]" "$D/r1.log"
 check "INIT PROCEDURE entra como startup" $?
-grep -q "resumo: executadas=2 falharam=1 classes-reveladas=2 startup=1 vm=1 fora=0" "$D/r1.log"
+grep -q "summary: run=2 failed=1 classes-revealed=2 startup=1 vm=1 outside=0" "$D/r1.log"
 check "resumo: helper com parâmetro quebra protegido (failed=1), VM separada" $?
 "$TCHECK" rtr101 "$D/s1.astr.json" > /dev/null 2>&1
 check "retrato rtr-1 profundo: proveniência, seletores com tipo, self-cast SUPER=5" $?
@@ -3161,9 +3161,9 @@ cmp -s "$D/s1.astr.json" "$D/s2.astr.json"
 check "dois runs -> retrato byte-idêntico (determinismo; carimbo vem de fora)" $?
 ( cd "$D" && "$BIN" exec-registry fixreg.hbp --stamp fixo --run RegistraEspecial,NaoExiste --out s3.astr.json > r3.log 2>&1 )
 check "--run exit 0" $?
-grep -q "classe METAL_ESPECIAL  \[execução de REGISTRAESPECIAL(), seletores=2\]" "$D/r3.log"
+grep -q "class METAL_ESPECIAL  \[execution of REGISTRAESPECIAL(), selectors=2\]" "$D/r3.log"
 check "--run compõe: registrador indireto revela o metal" $?
-grep -q "fora: NAOEXISTE - --run: não encontrada no projeto" "$D/r3.log"
+grep -q "outside: NAOEXISTE - --run: not found in the project" "$D/r3.log"
 check "--run inexistente relatado honesto" $?
 ! ls "$HERE"/fixreg/*.astr.json > /dev/null 2>&1
 check "fixture ORIGINAL intocado (retrato só no work dir)" $?
@@ -3389,7 +3389,7 @@ D=$(freshppm case107c)
 ( cd "$D" && "$BIN" rename fixppm.hbp e1.prg:8:9 Novo --dry-run > n7.log 2>&1 )
 grep -q "^rename-pp-marker: Click -> Novo" "$D/n7.log"
 check "PP-MARKER (e1.prg:8:9): resolve rename-pp-marker por FATO (golden)" $?
-# dsl: palavra de regra de pp num site de USO
+# dsl: pp rule word num site de USO
 D=$(freshdsl case107d)
 ( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM --dry-run > n8.log 2>&1 )
 grep -q "^rename-dsl: MENUITEM -> MENU_ITEM" "$D/n8.log"
@@ -3405,7 +3405,7 @@ check "REAL apply: fonte editada, comentário com o nome velho INTACTO" $?
 # degrade honesto: posição sem identificador de compilação recusa, nomeando
 ( cd "$D" && "$BIN" rename fix01.hbp a.prg:4:1 Foo > ref.log 2>&1 )
 check "REFUSA posição vazia: exit != 0"              $([ $? -ne 0 ] && echo 0 || echo 1)
-grep -q "nenhum identificador de compilação em a.prg:4:1" "$D/ref.log"
+grep -q "no compile-time identifier at a.prg:4:1" "$D/ref.log"
 check "REFUSA nomeando a exceção (nunca adivinha)"   $?
 # --- guardas da REVISÃO (Codex + Claude): o verbo resolve pelo BINDING do
 #     compilador, não pelo papel de pp. Um símbolo LIGADO que flui para
@@ -3422,7 +3422,7 @@ check "BINDING: local dentro de '? ...' resolve rename-local, não pp-marker (go
 # parse de posição: linha/col não-numéricas RECUSAM (Val('5x')=5 não passa)
 ( cd "$D" && "$BIN" rename fix01.hbp "a.prg:5x:10" nZeta --dry-run > mal.log 2>&1 )
 check "REFUSA posição malformada 'a.prg:5x:10': exit != 0"  $([ $? -ne 0 ] && echo 0 || echo 1)
-grep -q "linha e coluna devem ser numéricas" "$D/mal.log"
+grep -q "line and column must be numeric" "$D/mal.log"
 check "REFUSA malformada nomeando o motivo (não resolve '5x'->5)" $?
 # SOMBRA de homônimo: 'Dobra' é LOCAL em Main, FUNCTION em sh2 e FIELD em Calc
 D=$(freshshadow case107f)
@@ -3439,7 +3439,7 @@ grep -q "^rename-local: Dobra -> Triplica in MAIN" "$D/l.log"
 check "SOMBRA: o LOCAL Dobra (sem chamar) resolve rename-LOCAL" $?
 ( cd "$D" && "$BIN" rename fixshadow.hbp sh1.prg:19:16 Triplica --dry-run > f.log 2>&1 )
 check "FIELD: exit != 0 (nenhum verbo cobre campo de RDD)"  $([ $? -ne 0 ] && echo 0 || echo 1)
-grep -q "campo de área de trabalho (FIELD)" "$D/f.log"
+grep -q "work area field (FIELD)" "$D/f.log"
 check "FIELD: RECUSA nomeando (não vira rename-function do homônimo)" $?
 # CHAMADA em statement CONTINUADO com homônimo local (revisão Codex #3): a
 # chamada é resolvida por COLUNA ('(' no stream), sem depender de calls[].line
@@ -3465,7 +3465,7 @@ check "MÉTODO: param 'nQtd' (clone, em função de nome gerado) -> rename-param
 # duas STATIC homônimas: a posição sabe o arquivo e passa --file (Codex #1)
 D=$(freshstat case107j)
 ( cd "$D" && "$BIN" rename fixstat.hbp a.prg:6:17 Aux --dry-run > st.log 2>&1 )
-grep -q "^rename-function: Helper -> Aux (static, só a.prg)" "$D/st.log"
+grep -q "^rename-function: Helper -> Aux (static, only a.prg)" "$D/st.log"
 check "STATIC homônima: a posição passa --file e desambigua (Codex #1)" $?
 }
 
@@ -3538,7 +3538,7 @@ done
 # --- A: o site do marker que GERA resolve como marker, nao como o clone (local)
 D=$(freshp2 case109a)
 ( cd "$D" && "$BIN" resolve-at p2.hbp a.prg 9 8 > ra.log 2>&1 )
-grep -q "nome de marker" "$D/ra.log" && grep -q "LOG Preco" "$D/ra.log"
+grep -q "marker name" "$D/ra.log" && grep -q "LOG Preco" "$D/ra.log"
 check "generating marker site resolves as pp-marker, not the clone's local" $?
 # A2: nome novo que JA EXISTE (Custo, local irmao) -> re-deriva a string E
 # re-aponta o clone, verificado compilando (re-target correto por semantica)
@@ -3601,7 +3601,7 @@ D=$(freshdata case110)
 ( cd "$D" && "$BIN" rename fixdata.hbp c1.prg:15:8 nGuardado > ho.log 2>&1 )
 RC=$?
 check "DATA member homonym across classes refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "também é membro de: POUPANCA" "$D/ho.log" && grep -q "rename ambíguo" "$D/ho.log"
+grep -q "is also a member of: POUPANCA" "$D/ho.log" && grep -q "the rename is ambiguous" "$D/ho.log"
 check "refusal names the other class (unicidade herdada do rename-method)" $?
 cmp -s "$D/c1.prg" "$HERE/fixdata/c1.prg"
 check "sources untouched by the refusal" $?
@@ -3635,7 +3635,7 @@ D=$(freshmk case111)
 ( cd "$D" && "$BIN" rename mk.hbp mk.prg:6:10 zzz > rst.log 2>&1 )
 RC=$?
 check "restrict: novo nome fora das alternativas recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "não é uma das alternativas do marker RESTRITO" "$D/rst.log" && grep -q "LIGA, DESLIGA" "$D/rst.log"
+grep -q "is not one of the alternatives of the rule's RESTRICTED marker" "$D/rst.log" && grep -q "LIGA, DESLIGA" "$D/rst.log"
 check "recusa NOMEIA as alternativas, antes de recompilar" $?
 cmp -s "$D/mk.prg" "$HERE/fixmk/mk.prg"
 check "fonte intacto (nem chegou a editar)" $?
@@ -3644,17 +3644,17 @@ grep -q "^rename-pp-marker: LIGA -> DESLIGA" "$D/ok.log"
 check "restrict: alternativa VALIDA passa" $?
 # --- P5 wild (ast-14): conteudo engolido por marker nao-usado != palavra da regra
 ( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 7 10 > w1.log 2>&1 )
-grep -q "consumido e DESCARTADO pela diretiva" "$D/w1.log"
+grep -q "consumed and DISCARDED by directive" "$D/w1.log"
 check "wild: recheio de marker nao-usado e conteudo DESCARTADO, nao palavra de regra" $?
 ( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 7 4 > w2.log 2>&1 )
-grep -q "palavra de regra de pp" "$D/w2.log"
+grep -q "pp rule word" "$D/w2.log"
 check "wild: a palavra da regra DE VERDADE segue sendo palavra de regra" $?
 ( cd "$D" && "$BIN" rename mk.hbp mk.prg:7:10 outra > w3.log 2>&1 )
 RC=$?
 check "wild: rename do conteudo descartado recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 # --- P4 logical/nul: o valor NAO e emitido -> rename do local RELATA o descarte
 ( cd "$D" && "$BIN" rename mk.hbp mk.prg:3:10 zzz --dry-run > loc.log 2>&1 )
-grep -q "mk.prg:12:10: 'n' é consumido e DESCARTADO" "$D/loc.log" &&    grep -q "mk.prg:13:10: 'n' é consumido e DESCARTADO" "$D/loc.log"
+grep -q "mk.prg:12:10: 'n' is consumed and DISCARDED" "$D/loc.log" &&    grep -q "mk.prg:13:10: 'n' is consumed and DISCARDED" "$D/loc.log"
 check "logical/nul: rename do local RELATA as ocorrencias descartadas (nao as edita)" $?
 grep -q "mk.prg:11:10" "$D/loc.log" && grep -q "mk.prg:8:12" "$D/loc.log"
 check "block/extexp: o valor E emitido, entao esses sitios SAO editados" $?
@@ -3719,7 +3719,7 @@ D=$(freshp6 case113)
 # --- (1) REGRA SEM CABECA: fecha o item 3 do backlog (o dump ja registrava;
 #     a ferramenta a resolve/renomeia por CONSTRUCAO - nunca chaveia no head)
 ( cd "$D" && "$BIN" resolve-at p6.hbp p6.prg 11 17 > hl.log 2>&1 )
-grep -q "palavra de regra de pp (#xtranslate <sem cabeça>, p6.ch:10)" "$D/hl.log"
+grep -q "pp rule word (#xtranslate <headless>, p6.ch:10)" "$D/hl.log"
 check "sem cabeca: o site resolve como palavra de regra, rotulado <sem cabeça>" $?
 ( cd "$D" && "$BIN" rename p6.hbp p6.prg:11:17 TRIPLADO > hr.log 2>&1 )
 check "sem cabeca: rename-dsl exit 0" $?
@@ -3767,7 +3767,7 @@ check "multi-passe: o artefato nascido da 2a passada (GLIMER->VULK) e previsto" 
 ( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:18 LIGA > kr.log 2>&1 )
 RC=$?
 check "multi-passe: keyword emitida por OUTRA regra recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "sem posição no fonte" "$D/kr.log"
+grep -q "no source position" "$D/kr.log"
 check "multi-passe: a recusa NOMEIA o motivo (aplicacao sem posicao no fonte)" $?
 cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg" && cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch"
 check "multi-passe: fontes intactos apos a recusa" $?
@@ -3780,8 +3780,8 @@ check "multi-passe: fontes intactos apos a recusa" $?
 ( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:6 Pavesado --dry-run > o1.log 2>&1 )
 RC=$?
 check "orfao: --dry-run recusa (exit != 0) - nao aprova mais o que o apply desfaz" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "o fonte soletra o nome gerado 'vk_Escudo' (p6.prg:14)" "$D/o1.log" && \
-   grep -q "deixaria órfão" "$D/o1.log"
+grep -q "the source spells out the generated name 'vk_Escudo' (p6.prg:14)" "$D/o1.log" && \
+   grep -q "would orphan it" "$D/o1.log"
 check "orfao: a recusa NOMEIA o nome gerado e o site exato da grafia manual" $?
 ( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:6 Pavesado > o2.log 2>&1 )
 RC=$?
@@ -3828,7 +3828,7 @@ D=$(freshabr case115b)
 ( cd "$D" && "$BIN" rename abr.hbp abr.ch:9:10 REMOVER > a.log 2>&1 )
 RC=$?
 check "uso REALMENTE abreviado (APAG) ainda recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "uso abreviado 'APAG' da regra" "$D/a.log"
+grep -q "abbreviated use 'APAG' of the rule" "$D/a.log"
 check "a recusa legitima NOMEIA o site abreviado" $?
 cmp -s "$D/abr.ch" "$HERE/fixabr/abr.ch" && cmp -s "$D/abr.prg" "$HERE/fixabr/abr.prg"
 check "recusa legitima: fontes intactos" $?
@@ -3842,6 +3842,50 @@ freshseq() { # freshseq <case-name> -> sequestro REVERSO da cabeca (P11)
    rm -rf "$d"; mkdir -p "$d"
    cp "$HERE"/fixseq/*.prg "$HERE"/fixseq/*.ch "$HERE"/fixseq/*.hbp "$d"/
    echo "$d"
+}
+
+freshsw() { # freshsw <case-name> -> EXIT dentro de SWITCH (salto estrutural)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixsw/*.prg "$HERE"/fixsw/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_118() {
+echo "case 118: extract-function - EXIT termina o SWITCH (recusa FALSA); LOOP continua salto de laco"
+# O FURO: a guarda de salto so aceitava for/while como estrutura que COBRE um
+# EXIT - mas em Harbour o EXIT dentro de SWITCH e o fim do CASE, nao um salto
+# de laco. Extrair um bloco com um SWITCH INTEIRO dava recusa FALSA. O fato ja
+# vinha do compilador: blocks[] exporta o kind 'switch'. LOOP NAO entra na lista
+# (ele continua o laco EXTERNO e de dentro de um SWITCH cruza a borda de fato).
+"$HB_BIN/harbour" "$HERE/fixsw/sw.prg" -n -q0 -w3 -es2 -s > /dev/null 2>&1
+check "fixsw/sw.prg clean under -w3 -es2" $?
+
+# (1) POSITIVO: o SWITCH inteiro esta na selecao -> o EXIT nao escapa
+D=$(freshsw case118a)
+( cd "$D" && "$BIN" extract-function sw.hbp sw.prg 21-31 TipoMime > p.log 2>&1 )
+check "EXIT coberto pelo SWITCH: extract passa (antes: recusa FALSA)" $?
+grep -q "^extract-function: lines 21-31 of TIPO -> TipoMime( cNome ) returning cTipo" "$D/p.log"
+check "assinatura e RETURN deduzidos do fluxo de dados (cTipo escrito aqui, lido depois)" $?
+grep -q "LOCAL nI (line 19) is used only in the selection - moves to TipoMime" "$D/p.log"
+check "local que so vive na selecao MIGRA para a funcao nova" $?
+grep -q "verified: symbols preserved (+TipoMime)" "$D/p.log"
+check "verificado: simbolos preservados" $?
+grep -q "cTipo := TipoMime( cNome )" "$D/sw.prg" && grep -q "^STATIC FUNCTION TipoMime( cNome )" "$D/sw.prg"
+check "o bloco virou UMA chamada; a funcao nova nasceu STATIC" $?
+( cd "$D" && "$HB_BIN/harbour" sw.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+check "modulo segue limpo apos a extracao" $?
+
+# (2) NEGATIVO: o LOOP salta para o FOR EACH, que fica FORA -> recusa VERDADEIRA
+D=$(freshsw case118b)
+( cd "$D" && "$BIN" extract-function sw.hbp sw.prg 44-48 SoSwitch > n.log 2>&1 )
+RC=$?
+check "LOOP dentro de SWITCH: recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
+grep -q "LOOP on line 47 would jump outside the selection" "$D/n.log"
+check "a recusa NOMEIA o salto e a linha (o portao nao abriu demais)" $?
+cmp -s "$D/sw.prg" "$HERE/fixsw/sw.prg"
+check "recusa: fonte intacto" $?
+
 }
 
 unit_116() {
@@ -3860,9 +3904,9 @@ D=$(freshseq case116)
 ( cd "$D" && "$BIN" rename seq.hbp seq.prg:4:4 ROTULAGEM > s.log 2>&1 )
 RC=$?
 check "sequestro reverso recusado (antes: exit 0, ambiguidade latente)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "ROTULA" "$D/s.log" && grep -q "abreviação" "$D/s.log"
+grep -q "ROTULA" "$D/s.log" && grep -q "abbreviation" "$D/s.log"
 check "a recusa NOMEIA a regra sequestrada" $?
-grep -q "escrever 'ROTU' casaria com as DUAS regras" "$D/s.log"
+grep -q "writing 'ROTU' would match BOTH rules" "$D/s.log"
 check "a recusa exibe a GRAFIA-TESTEMUNHA (fato do pp, nao aritmetica)" $?
 cmp -s "$D/seq.ch" "$HERE/fixseq/seq.ch" && cmp -s "$D/seq.prg" "$HERE/fixseq/seq.prg"
 check "recusa: fontes intactos" $?
@@ -3958,17 +4002,17 @@ grep -q "p6.ch:13:17: marker 1 in match (regular)" "$D/u.log" && \
    grep -q "p6.ch:14:24: marker 1 in result (regular)" "$D/u.log" && \
    grep -q "p6.ch:14:43: marker 1 in result (strstd)" "$D/u.log"
 check "lista os 3 sites do marker 1: match, o PASTE e o STRINGIFY (com o mkind)" $?
-grep -q "3 result(s) for 'n' (marker local à diretiva #xcommand VULK)" "$D/u.log"
+grep -q "3 result(s) for 'n' (marker local to directive #xcommand VULK)" "$D/u.log"
 check "o relato diz que o marker e LOCAL a diretiva (nao e simbolo do projeto)" $?
 # marker HOMONIMO de OUTRA regra e OUTRA variavel - nao pode misturar
 ( cd "$D" && "$BIN" usages p6.hbp --at p6.ch:22:17 > u2.log 2>&1 )
-grep -q "2 result(s) for 'n' (marker local à diretiva #xcommand REGA)" "$D/u2.log" && \
+grep -q "2 result(s) for 'n' (marker local to directive #xcommand REGA)" "$D/u2.log" && \
    ! grep -q "VULK" "$D/u2.log"
 check "o <n> da REGA NAO mistura com o <n> homonimo da VULK (regra-local)" $?
 # --- (2) rename: os DOIS lados coerentes, por NUMERO de marker (nao por texto)
 ( cd "$D" && "$BIN" rename p6.hbp p6.ch:13:17 nome > r.log 2>&1 )
 check "rename do marker <n> (mirando DENTRO do .ch): exit 0" $?
-grep -q "^rename-rule-marker: <n> -> <nome> em #xcommand VULK" "$D/r.log" && \
+grep -q "^rename-rule-marker: <n> -> <nome> in #xcommand VULK" "$D/r.log" && \
    grep -q "p6.ch:13:17" "$D/r.log" && grep -q "p6.ch:14:24" "$D/r.log" && \
    grep -q "p6.ch:14:43" "$D/r.log"
 check "edita match + paste + stringify (diretiva CONTINUADA por ';', 2 linhas)" $?
@@ -3988,7 +4032,7 @@ check "A->B->A byte-exato (.ch e .prg)" $?
 ( cd "$D" && "$BIN" rename p6.hbp p6.ch:13:28 n > c.log 2>&1 )
 RC=$?
 check "colisao: renomear <cMat> para 'n' (ja e o marker 1) recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "já é outro marker da mesma diretiva" "$D/c.log" && grep -q "fundiria dois markers" "$D/c.log"
+grep -q "is already another marker of the same directive" "$D/c.log" && grep -q "would merge two markers" "$D/c.log"
 check "a recusa NOMEIA o motivo (antes de editar)" $?
 cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch"
 check "colisao: .ch intacto (nem chegou a editar)" $?
@@ -4001,7 +4045,7 @@ check "projects-of num .ch acha o dono (posse de include = fato do compilador, -
 check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

@@ -33,7 +33,7 @@ check('cmdUsages invoca usages --at com a posição',
 check('documento salvo ANTES da consulta (posição tem que casar com o disco)',
   src.indexOf('document.save()') > 0 && src.indexOf('document.save()') < src.indexOf("'--at'"));
 check('fallback para a palavra crua quando o CLI recusa a posição',
-  /nenhum identificador/.test(src) && /\[\s*'usages',\s*c\.spec,\s*word,/.test(src));
+  /no compile-time identifier/.test(src) && /\[\s*'usages',\s*c\.spec,\s*word,/.test(src));
 
 // 3. --show-expansion sempre-ligado (B5): o flag é só-rótulo do canal
 // (o --json do peek é byte-idêntico com/sem ele) e cada invocação

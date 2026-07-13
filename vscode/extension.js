@@ -232,7 +232,7 @@ async function cmdUsages() {
   const json = tmpJson();
   let res = await run(['usages', c.spec, '--at', at, '--json', json, '--show-expansion'], c.cwd);
   let title = 'usages @ ' + at;
-  if (res.code !== 0 && /nenhum identificador/.test(res.stderr + res.stdout)) {
+  if (res.code !== 0 && /no compile-time identifier/.test(res.stderr + res.stdout)) {
     res = await run(['usages', c.spec, word, '--json', json, '--show-expansion'], c.cwd);
     title = 'usages ' + word;
   }

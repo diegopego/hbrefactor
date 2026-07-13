@@ -145,8 +145,46 @@ header.top {
   pointer-events:none; z-index:0;
 }
 .hero .wrap { position:relative; z-index:1; }
-.hero-grid { display:grid; grid-template-columns:1.05fr .95fr; gap:44px; align-items:center; }
-@media (max-width:900px){ .hero-grid { grid-template-columns:1fr; gap:30px; } }
+/* herói: bloco único, centrado, MESMA largura do conteúdo abaixo */
+.hero-lead { max-width:780px; margin-inline:auto; text-align:center; }
+.hero-lead .avail, .hero-lead .cta, .hero-lead .dual { justify-content:center; }
+/* o max-width:33ch abaixo era do herói de 2 colunas: sem margin auto a caixa
+   encostava à esquerda. No herói de coluna única a sub é centrada e respira. */
+.hero-lead .sub { max-width:62ch; margin-inline:auto; }
+.hero-term { margin-top:34px; }
+.hero-note { margin-top:.75rem; font-size:.88rem; text-align:center; }
+
+/* exemplos GERADOS (make site-examples): antes -> comando -> depois, empilhados */
+/* o texto da seção fica na coluna estreita, mas o EXEMPLO escapa dela: um diff
+   lado a lado dentro de 760px daria dois painéis de ~370px - apertado demais */
+.ex { width:min(1180px, 94vw); margin:26px auto 34px; margin-left:50%; transform:translateX(-50%); }
+.ex > * + * { margin-top:14px; }
+.ex-run pre { font-size:.84rem; }
+/* diff lado a lado: as duas metades sao ALINHADAS pelo gerador (linhas vazias
+   onde um lado insere/remove), entao as faixas coloridas casam na horizontal */
+.exdiff { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+@media (max-width:760px){ .exdiff { grid-template-columns:1fr; } }
+.exdiff .ex-code { min-width:0; }
+.exdiff pre { font-size:.8rem; }
+.ex-note { margin-top:12px; }
+/* calha de numeros, estilo editor. O numero vem de um contador CSS (::before),
+   entao NAO entra no copy/paste - copia-se o codigo, nao a numeracao. */
+pre.num { counter-reset:ln; }
+pre.num code { display:block; }
+/* .l fica INLINE e as linhas se separam por quebra REAL dentro do bloco pre,
+   entao o botao Copy copia o codigo COM as quebras - nao tudo grudado */
+pre.num .l { counter-increment:ln; }
+pre.num .l::before {
+  content:counter(ln);
+  display:inline-block; width:2.4em; padding-right:1em;
+  margin-right:1em; border-right:1px solid var(--line);
+  text-align:right; color:var(--text-soft); opacity:.45;
+  -webkit-user-select:none; user-select:none;
+}
+.cap { border-top:1px solid var(--line); padding-top:26px; margin-top:38px; }
+.cap:first-of-type { border-top:0; padding-top:0; margin-top:0; }
+.cap h3 { font-size:1.25rem; letter-spacing:-.02em; margin:0 0 6px; }
+.cap > p { margin:0 0 4px; }
 .tagchip {
   display:inline-flex; align-items:center; gap:8px; font-size:.8rem; font-weight:650;
   color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent);
@@ -281,10 +319,12 @@ header.top {
 
 /* ============ command cards ============ */
 .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(258px,1fr)); gap:14px; margin-top:1.3rem; }
-.cmd { border:1px solid var(--border); border-radius:13px; padding:17px 18px; background:var(--bg-2); transition:border-color .18s ease, transform .18s ease; }
-.cmd:hover { border-color:var(--accent); transform:translateY(-2px); }
-.cmd .nm { font-family:ui-monospace,"JetBrains Mono",Menlo,monospace; font-weight:700; font-size:.92rem; color:var(--accent); }
-.cmd p { margin:.45rem 0 0; font-size:.9rem; color:var(--text-soft); }
+/* ESCOPADO em .cards: o `.cmd` solto vazava a CAIXA do card para o span .cmd
+   dos blocos de codigo - virava um "botao" enorme em volta do prompt $ */
+.cards .cmd { border:1px solid var(--border); border-radius:13px; padding:17px 18px; background:var(--bg-2); transition:border-color .18s ease, transform .18s ease; }
+.cards .cmd:hover { border-color:var(--accent); transform:translateY(-2px); }
+.cards .cmd .nm { font-family:ui-monospace,"JetBrains Mono",Menlo,monospace; font-weight:700; font-size:.92rem; color:var(--accent); }
+.cards .cmd p { margin:.45rem 0 0; font-size:.9rem; color:var(--text-soft); }
 
 /* ============ two-col feature ============ */
 .split { display:grid; grid-template-columns:1fr 1fr; gap:34px; align-items:start; }
@@ -366,11 +406,11 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
 <!-- ============ HERO ============ -->
 <section class="hero">
   <div class="wrap">
-    <div class="hero-grid">
-      <div>
+    <div>
+      <div class="hero-lead">
         <span class="tagchip">◆ Verified refactoring for Harbour</span>
         <h1>Far beyond <span class="hl">search-and-replace.</span></h1>
-        <p class="sub">A refactoring tool that reads your Harbour code the way the compiler does — so it renames exactly what you <em>mean</em>, never guesses, and <strong>proves</strong> every edit before it keeps it.</p>
+        <p class="sub">A refactoring tool that reads your Harbour code the way the compiler does — so it changes exactly what you <em>mean</em>, never guesses, and <strong>proves</strong> every edit before it keeps it. Rename, extract a function, reorder parameters — verified against the compiler, or not done at all.</p>
         <div class="avail" aria-label="Available as">
           <span class="av"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4 6l2.2 1.8L4 9.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 10h3.5" stroke-linecap="round"/></svg>A <b>command-line tool</b></span>
           <span class="av"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10.5 1.8 14 3.6v8.8l-3.5 1.8-7-4.6V6.4z" stroke-linejoin="round"/><path d="M10.5 1.8v12.2M3.5 6.4l7 4.2M3.5 9.6l7-4.2" stroke-linejoin="round"/></svg>and a <b>VSCode extension</b></span>
@@ -392,20 +432,72 @@ hr.soft { border:none; border-top:1px solid var(--border-soft); margin:2.4rem 0;
         </div>
       </div>
 
-      <div class="code term" aria-label="Comparison of Find and Replace versus hbrefactor">
-        <button class="copy" type="button">Copy</button>
-<pre><code><span class="bad">Find &amp; Replace</span>  <span class="dim">nTotal → nTotalGeral</span>
-  47 matches replaced
-  <span class="warn">⚠ 3 changed inside a string</span>
-  <span class="warn">⚠ 1 changed inside a comment</span>
-  <span class="warn">⚠ 2 hit another function's own nTotal</span>
-  <span class="bad">✗ missed 4 call sites in vendas.prg</span>
-
-<span class="cmd">hbrefactor</span> rename vendas.hbp vendas.prg:8:10 nTotalGeral
-  3 occurrences — the right ones
-  <span class="dim">strings · comments · homonyms: untouched</span>
-  <span class="ok">✓ project recompiled, byte-identical</span></code></pre>
-      </div>
+      <p class="hero-note muted" style="margin-top:30px"><strong>Pull a block out into its own function.</strong> You point at the lines — <em>13 to 17</em> — and nothing else. The tool works out the arguments, the return value, and which local should travel with it.</p>
+<!-- SITE-EX:01-extract-function:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ? Fatura( { 10, 20, 30 }, 10 )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Fatura( aItens, nDesconto )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal</span>
+<span class="l">   LOCAL nItem</span>
+<span class="l">   LOCAL cLinha</span>
+<span class="l"> </span>
+<span class="l">   nTotal := 0</span>
+<span class="l">   FOR EACH nItem IN aItens</span>
+<span class="l">      nTotal += nItem</span>
+<span class="l">   NEXT</span>
+<span class="l">   nTotal -= nTotal * nDesconto / 100</span>
+<span class="l"> </span>
+<span class="l">   cLinha := &quot;Total: &quot; + hb_ntos( nTotal )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cLinha</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ? Fatura( { 10, 20, 30 }, 10 )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Fatura( aItens, nDesconto )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal</span>
+<span class="l">   LOCAL cLinha</span>
+<span class="l"> </span>
+<span class="l">   nTotal := CalculaTotal( aItens, nDesconto )</span>
+<span class="l"> </span>
+<span class="l">   cLinha := &quot;Total: &quot; + hb_ntos( nTotal )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cLinha</span>
+<span class="l"> </span>
+<span class="l">STATIC FUNCTION CalculaTotal( aItens, nDesconto )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nItem</span>
+<span class="l"> </span>
+<span class="l">   nTotal := 0</span>
+<span class="l">   FOR EACH nItem IN aItens</span>
+<span class="l">      nTotal += nItem</span>
+<span class="l">   NEXT</span>
+<span class="l">   nTotal -= nTotal * nDesconto / 100</span>
+<span class="l"> </span>
+<span class="l">   RETURN nTotal</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> extract-function app.hbp app.prg 13-17 CalculaTotal
+extract-function: lines 13-17 of FATURA -&gt; CalculaTotal( aItens, nDesconto ) returning nTotal
+  LOCAL nItem (line 10) is used only in the selection - moves to CalculaTotal
+<span class="ok">verified: symbols preserved (+CalculaTotal); run your test suite to confirm behaviour</span></code></pre></div>
+</div>
+<!-- SITE-EX:01-extract-function:END -->
+      <p class="hero-note muted">Nobody told it that <span class="mono">aItens</span> and <span class="mono">nDesconto</span> are the arguments, that <span class="mono">nTotal</span> is what comes back, or that <span class="mono">nItem</span> is used nowhere else and should move in. It read that off the <strong>data flow the compiler already computed</strong> — then checked the symbol table before keeping a single line.</p>
     </div>
   </div>
 </section>
@@ -528,33 +620,479 @@ oMenu:<span class="fn">AddItem</span>( <span class="s">"Sair"</span> )
   <div class="narrow"><p class="muted">Comfortable so far? Here's what's really going on under the friendly surface — still no PhD required, still for the working programmer.</p></div>
 </div>
 
-<!-- §5b see it work (verified demo) -->
+<!-- §5b CAPABILITIES — cada exemplo abaixo é GERADO por `make site-examples`
+     (tests/site/): roda de verdade, compila antes E depois, e a suíte falha
+     se o bloco da página divergir da execução. Nada aqui é digitado. -->
 <section>
   <div class="narrow">
-    <p class="sec-eyebrow">See it work</p>
-    <h2>A method is more than its name</h2>
-    <p>Say you decide <span class="mono">Payment:Send( fone, mail )</span> should take its two arguments in the other order. By hand you'd hunt down every call and hope you found them all. Here:</p>
-    <div class="code">
-      <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> reorder-params billing.hbp Payment:Send cMail,cFone</code></pre>
+    <p class="sec-eyebrow">What it does</p>
+    <h2>Every refactoring, before and after</h2>
+    <p>Below is each thing the tool can do, shown as the code you start with, the one command you run, and the code you end up with. <strong>None of it is written by hand.</strong> Every block on this page is produced by running the tool for real: the "before" has to compile clean, the command has to run, and the "after" has to compile clean — or the build fails and the page does not ship.</p>
+
+    <div class="cap">
+      <h3>Reorder a function's parameters</h3>
+      <p class="muted">Change the signature once; every call site follows — including the ones you would have missed.</p>
+<!-- SITE-EX:03-reorder-params:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   Registra( &quot;erro&quot;, &quot;disco cheio&quot; )</span>
+<span class="l">   Registra( &quot;aviso&quot;, &quot;memoria baixa&quot; )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Registra( cNivel, cTexto )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNivel + &quot;: &quot; + cTexto</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   Registra( &quot;disco cheio&quot;, &quot;erro&quot; )</span>
+<span class="l">   Registra( &quot;memoria baixa&quot;, &quot;aviso&quot; )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Registra( cTexto, cNivel )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNivel + &quot;: &quot; + cTexto</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> reorder-params app.hbp Registra cTexto,cNivel
+reorder-params: Registra( CNIVEL, CTEXTO ) -&gt; ( CTEXTO, CNIVEL )
+  app.prg:3
+  app.prg:3
+  app.prg:4
+  app.prg:4
+  app.prg:8
+  app.prg:8
+<span class="ok">verified: 6 site(s) reordered; symbols intact; run your test suite to confirm behaviour</span></code></pre></div>
+</div>
+<!-- SITE-EX:03-reorder-params:END -->
     </div>
-    <p>rewrites <strong>every call site — all instances of <span class="mono">Payment</span> — plus the declaration and the definition</strong>, then recompiles to prove nothing else moved. Two <span class="mono">Payment</span> objects, <span class="mono">customerPayment</span> and <span class="mono">supplierPayment</span>? Both calls are fixed; you don't chase them.</p>
-    <p>Now the part search-and-replace can't do. Suppose a <span class="mono">Logger</span> class <em>also</em> has a <span class="mono">Send</span> method — same name, unrelated. Ask for the usages of <span class="mono">Payment:Send</span>:</p>
-    <div class="code term">
-      <button class="copy" type="button">Copy</button>
-<pre><code><span class="ok">confirmed</span> send (receiver declared AS CLASS PAYMENT)      | oPay:Send( "fone", "mail" )
-<span class="warn">excluded</span>  send within the declared class graph
-          (dispatches to LOGGER:SEND)                     | oLog:Send( "hello" )
-method definition Send (class Payment)
-<span class="warn">excluded</span>  method definition (implements LOGGER:SEND)</code></pre>
+
+    <div class="cap">
+      <h3>Rename a variable</h3>
+      <p class="muted">The word appears in a string, in a comment, and again as a different variable in another function. Only <em>your</em> variable moves.</p>
+<!-- SITE-EX:04-rename-local:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal</span>
+<span class="l"> </span>
+<span class="l">   nTotal := Soma( 2, 3 )</span>
+<span class="l"> </span>
+<span class="l">   // nTotal fecha o caixa do dia</span>
+<span class="l">   ? &quot;nTotal = &quot;, nTotal</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Soma( nA, nB )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal                 // outra funcao, outro nTotal</span>
+<span class="l"> </span>
+<span class="l">   nTotal := nA + nB</span>
+<span class="l"> </span>
+<span class="l">   RETURN nTotal</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotalGeral</span>
+<span class="l"> </span>
+<span class="l">   nTotalGeral := Soma( 2, 3 )</span>
+<span class="l"> </span>
+<span class="l">   // nTotal fecha o caixa do dia</span>
+<span class="l">   ? &quot;nTotal = &quot;, nTotalGeral</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Soma( nA, nB )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal                 // outra funcao, outro nTotal</span>
+<span class="l"> </span>
+<span class="l">   nTotal := nA + nB</span>
+<span class="l"> </span>
+<span class="l">   RETURN nTotal</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:3:10 nTotalGeral
+rename-local: nTotal -&gt; nTotalGeral in MAIN (app.prg)
+  app.prg:3:10
+  app.prg:5:4
+  app.prg:8:19
+<span class="ok">verified: all 1 module(s) byte-identical (-gh -l)</span></code></pre></div>
+</div>
+<!-- SITE-EX:04-rename-local:END -->
     </div>
-    <p>The look-alike isn't just flagged — it's <strong>excluded, with the proof named</strong>: the compiler records <strong>who inherits from whom</strong> (a declared parentage channel), so the tool resolves the dispatch by Harbour's own rule and <em>proves</em> <span class="mono">oLog:Send()</span> goes to <span class="mono">LOGGER:SEND</span>, never to <span class="mono">Payment</span>. In VSCode, "find all references" simply doesn't list it. And it never confuses inheritance with noise: a child class that <em>inherits</em> <span class="mono">Send</span> from <span class="mono">Payment</span> <strong>is</strong> a reference of <span class="mono">Payment:Send</span> and stays in the result.</p>
-    <p>And if you ask it to <span class="mono">reorder-params Payment:Send</span> while the name is shared across classes, it <strong>refuses</strong> rather than risk mangling a look-alike:</p>
-    <div class="callout">
-      <p style="margin:0"><span class="mono" style="font-size:.9rem">'Payment:Send': the message belongs to more than one class (PAYMENT, LOGGER) — a send is dynamic dispatch; reordering the arguments would be ambiguous. Refused.</span></p>
+
+    <div class="cap">
+      <h3>Rename a method</h3>
+      <p class="muted">The declaration, the definition, and every message sent to it — plus the function name Harbour generates behind your back, which the tool predicts and then verifies against the symbol table.</p>
+<!-- SITE-EX:05-rename-method:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oPag := Pagamento():New()</span>
+<span class="l">   LOCAL oReg := Registro():New()</span>
+<span class="l"> </span>
+<span class="l">   oPag:Enviar()</span>
+<span class="l">   oReg:Gravar()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Pagamento</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Pagamento</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Pagamento</span>
+<span class="l">   RETURN &quot;pago&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Registro</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Gravar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Registro</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Gravar() CLASS Registro</span>
+<span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oPag := Pagamento():New()</span>
+<span class="l">   LOCAL oReg := Registro():New()</span>
+<span class="l"> </span>
+<span class="l">   oPag:Transmitir()</span>
+<span class="l">   oReg:Gravar()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Pagamento</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Transmitir()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Pagamento</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Transmitir() CLASS Pagamento</span>
+<span class="l">   RETURN &quot;pago&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Registro</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Gravar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Registro</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Gravar() CLASS Registro</span>
+<span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:21:8 Transmitir
+rename-method: PAGAMENTO:Enviar -&gt; Transmitir
+  app.prg:15:11
+  app.prg:21:8
+  app.prg:8:9
+  predicted: PAGAMENTO_ENVIAR -&gt; PAGAMENTO_TRANSMITIR
+  predicted string: &quot;Enviar&quot; -&gt; &quot;Transmitir&quot; (app.prg)
+<span class="ok">verified: 3 edit(s); message and generated function renamed, other modules byte-identical</span></code></pre></div>
+</div>
+<!-- SITE-EX:05-rename-method:END -->
     </div>
-    <p>That refusal <em>is</em> the product: it would rather stop and tell you than guess wrong. Find&nbsp;&amp;&nbsp;Replace on "Send" would have rewritten both classes without a word.</p>
-    <p class="muted"><strong>Building toward (honest):</strong> today the tool resolves each call's <em>class</em>, not which <em>instance</em> — <span class="mono">customerPayment</span> and <span class="mono">supplierPayment</span> both count as <span class="mono">Payment:Send</span>. Narrowing usages to a single instance is a goal, not a current capability.</p>
+
+    <div class="cap">
+      <h3>Inline a variable</h3>
+      <p class="muted">The opposite move: fold a local back into the places that read it, and drop the declaration.</p>
+<!-- SITE-EX:02-inline-local:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ? Frete( 250 )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Frete( nPeso )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTaxa := 1.75</span>
+<span class="l"> </span>
+<span class="l">   IF nPeso &gt; 100</span>
+<span class="l">      RETURN nPeso * nTaxa * 2</span>
+<span class="l">   ENDIF</span>
+<span class="l"> </span>
+<span class="l">   RETURN nPeso * nTaxa</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ? Frete( 250 )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Frete( nPeso )</span>
+<span class="l"> </span>
+<span class="l">   IF nPeso &gt; 100</span>
+<span class="l">      RETURN nPeso * 1.75 * 2</span>
+<span class="l">   ENDIF</span>
+<span class="l"> </span>
+<span class="l">   RETURN nPeso * 1.75</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> inline-local app.hbp app.prg Frete nTaxa
+inline-local: nTaxa := 1.75 in FRETE (app.prg)
+  app.prg:12:22
+  app.prg:15:19
+  declaration on line 9 removed
+<span class="ok">verified: 2 use(s) replaced; symbols intact; run your test suite to confirm behaviour</span></code></pre></div>
+</div>
+<!-- SITE-EX:02-inline-local:END -->
+    </div>
+
+    <div class="cap">
+      <h3>Rename a word of your own DSL</h3>
+      <p class="muted">This is the one no other refactoring tool does. <span class="mono">REGISTRAR</span> is not Harbour — it is a command <em>you</em> invented with <span class="mono">#xcommand</span>. The tool renames the rule in the header <strong>and</strong> every place you used it, then proves the preprocessed output is unchanged.</p>
+<!-- SITE-EX:06-rename-dsl:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   REGISTRAR Caldeira AS Temperatura</span>
+<span class="l">   REGISTRAR Bomba    AS Pressao</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION AddSensor( cNome, cTipo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNome + &quot;/&quot; + cTipo</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   MONITORAR Caldeira AS Temperatura</span>
+<span class="l">   MONITORAR Bomba    AS Pressao</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION AddSensor( cNome, cTipo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNome + &quot;/&quot; + cTipo</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:4 MONITORAR
+rename-dsl: REGISTRAR -&gt; MONITORAR
+  app.prg:5:4
+  app.prg:6:4
+  app.ch:1:11
+<span class="ok">verified: 2 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical</span></code></pre></div>
+</div>
+<!-- SITE-EX:06-rename-dsl:END -->
+    </div>
+
+    <div class="cap">
+      <h3>Write down the types your code already proves</h3>
+      <p class="muted">The compiler knows <span class="mono">oConta</span> is a <span class="mono">Conta</span> — it just never wrote it down. <span class="mono">annotate</span> materializes that fact, and verifies the program is byte-identical afterwards. Now every message sent to <span class="mono">oConta</span> can be resolved with certainty instead of a guess.</p>
+<!-- SITE-EX:07-annotate:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Conta</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Saldo()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Conta</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Saldo() CLASS Conta</span>
+<span class="l">   RETURN 100</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oConta := Conta():New()</span>
+<span class="l"> </span>
+<span class="l">   ? oConta:Saldo()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Conta</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Saldo()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Conta</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Saldo() CLASS Conta</span>
+<span class="l">   RETURN 100</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oConta AS CLASS CONTA := Conta():New()</span>
+<span class="l"> </span>
+<span class="l">   ? oConta:Saldo()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> annotate app.hbp --apply
+annotate --apply: 0 declaration(s) + 1 AS CLASS annotation(s)
+<span class="ok">verified: .hrb byte-identical without -kt; compiles clean under -w3 -es2; runs under -kt (checks pass)</span></code></pre></div>
+</div>
+<!-- SITE-EX:07-annotate:END -->
+    </div>
+
+    <div class="cap">
+      <h3>Find every use of a method — and only <em>that</em> method</h3>
+      <p class="muted">Two classes, both with a method called <span class="mono">Enviar</span>. Ask who uses <span class="mono">Pagamento:Enviar</span> and the look-alike is not merely flagged — it is <strong>excluded, with the proof named</strong>.</p>
+<!-- SITE-EX:10-usages:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="code-card ex-code"><div class="code-top">the code — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oPag := Pagamento():New()</span>
+<span class="l">   LOCAL oReg := Registro():New()</span>
+<span class="l"> </span>
+<span class="l">   oPag:Enviar()</span>
+<span class="l">   oReg:Enviar()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Pagamento</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Pagamento</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Pagamento</span>
+<span class="l">   RETURN &quot;pago&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Registro</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Registro</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Registro</span>
+<span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> usages app.hbp Pagamento:Enviar
+app.prg:8: confirmed send (receiver class PAGAMENTO via declared types) in MAIN  | oPag:Enviar()
+app.prg:9: excluded send within the declared class graph (dispatches to REGISTRO:ENVIAR) in MAIN  | oReg:Enviar()
+app.prg:21: method definition Enviar (class Pagamento)  | METHOD Enviar() CLASS Pagamento
+app.prg:32: excluded method definition (implements REGISTRO:ENVIAR)  | METHOD Enviar() CLASS Registro
+app.prg:15: method declaration (class PAGAMENTO)  | METHOD Enviar()
+app.prg:26: excluded method declaration (declares REGISTRO:ENVIAR)  | METHOD Enviar()
+6 result(s) for &#x27;Pagamento:Enviar&#x27;</code></pre></div>
+  <p class="ex-note muted">This command only <strong>reads</strong>. It never edits — and the suite fails the build if a single byte of the source moves.</p>
+</div>
+<!-- SITE-EX:10-usages:END -->
+    </div>
+
+    <div class="cap">
+      <h3>Knowing when to stop — a string that is really a call</h3>
+      <p class="muted">Harbour is dynamic. Here <span class="mono">"Backup"</span> is not a label — it is handed to <span class="mono">&amp;cNome</span> and <b class="emph">becomes the call</b>. Rename the function and nothing in the compiled output would tell you the string went stale; the program would simply die at runtime, three weeks from now. No fact can prove whether a given string is a call, so the tool refuses to decide for you — it hands you the line and stops.</p>
+<!-- SITE-EX:09-string-guard:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ? Rodar( &quot;Backup&quot; )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Rodar( cNome )</span>
+<span class="l"> </span>
+<span class="l">   RETURN &amp;cNome + &quot;()&quot;</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Backup()</span>
+<span class="l"> </span>
+<span class="l">   RETURN &quot;feito&quot;</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:11:10 Salvaguarda
+<span class="warn">warning: app.prg:3: string equal to &#x27;Backup&#x27; - possible call by name (will NOT be changed)</span>
+<span class="bad">hbrefactor: textual references found (see warnings) - repeat with --force to proceed without touching them</span></code></pre></div>
+  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
+</div>
+<!-- SITE-EX:09-string-guard:END -->
+      <p class="muted">Say <span class="mono">--force</span> and it does the part it <em>can</em> prove, still leaving the string untouched. Notice which way the danger runs. Find&nbsp;&amp;&nbsp;Replace would have changed that string too — and been right <em>by luck</em>. A conventional refactoring tool would have renamed the function and said nothing about the string at all. <strong>hbrefactor is the only one of the three that tells you the line is there.</strong></p>
+    </div>
+
+    <div class="cap">
+      <h3>And knowing when to stop — an ambiguous rename</h3>
+      <p class="muted">Two classes, both with a method called <span class="mono">Enviar</span>. A send is dynamic dispatch — no fact says which one you meant. So it refuses, and names the other class.</p>
+<!-- SITE-EX:08-refuse-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oPag := Pagamento():New()</span>
+<span class="l">   LOCAL oReg := Registro():New()</span>
+<span class="l"> </span>
+<span class="l">   oPag:Enviar()</span>
+<span class="l">   oReg:Enviar()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Pagamento</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Pagamento</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Pagamento</span>
+<span class="l">   RETURN &quot;pago&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Registro</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Registro</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Registro</span>
+<span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:21:8 Transmitir
+<span class="bad">hbrefactor: &#x27;Enviar&#x27; is also a member of: REGISTRO (app.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing</span></code></pre></div>
+  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
+</div>
+<!-- SITE-EX:08-refuse-homonym:END -->
+    </div>
   </div>
 </section>
 
@@ -601,7 +1139,7 @@ METHOD Mostra() CLASS Conta
     <p>Point at the member and rename. The declaration, every <b>read</b>, every <b>write</b>, and the class's own internal registration of the member all move together:</p>
     <div class="code">
       <button class="copy" type="button">Copy</button>
-<pre><code>$ hbrefactor rename app.hbp c1.prg:16:8 nTeto
+<pre><code>$ hbrefactor rename fixdata.hbp c1.prg:16:8 nTeto
 rename-data: CONTA:nLimite -&gt; nTeto
   c1.prg:16:8
   c1.prg:10:7
@@ -614,8 +1152,8 @@ verified: 3 edit(s); DATA member getter+setter renamed, registration re-derived,
     <p>And the guard. If <b>two classes</b> in your project happen to have a member of the same name, the rename is genuinely ambiguous — <span class="mono">:nSaldo</span> is dynamic dispatch, and no fact says which class you meant. So it refuses, and names the other class:</p>
     <div class="code">
       <button class="copy" type="button">Copy</button>
-<pre><code>$ hbrefactor rename app.hbp c1.prg:15:8 nX
-hbrefactor: 'nSaldo' também é membro de: POUPANCA (c2.prg) - send é despacho dinâmico, rename ambíguo; recuso</code></pre>
+<pre><code>$ hbrefactor rename fixdata.hbp c1.prg:15:8 nX
+hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing</code></pre>
     </div>
     <p>That's the same rule that has always governed homonymous <em>methods</em> — data members simply inherit it.</p>
   </div>
@@ -629,26 +1167,32 @@ hbrefactor: 'nSaldo' também é membro de: POUPANCA (c2.prg) - send é despacho 
     <p>Real code reuses names. Say your DSL labels something <span class="mono">Vendas</span> — and a function named <span class="mono">Vendas()</span> already exists, unrelated:</p>
     <div class="code">
       <button class="copy" type="button">Copy</button>
-<pre><code>#xtranslate LABEL &lt;n&gt; =&gt; RegLabel( &lt;"n"&gt; )
+<pre><code><span class="c">// hom.ch — two DSL words, both built from the same marker</span>
+#xtranslate LABEL &lt;n&gt; =&gt; RegLabel( &lt;"n"&gt; )
+#xcommand  MAKE  &lt;n&gt; =&gt; FUNCTION mk_&lt;n&gt;() ;; RETURN &lt;"n"&gt;
 
 PROCEDURE Main()
    LABEL Vendas        <span class="c">// 'Vendas' here is a label your DSL turns into a string</span>
    ? Vendas()          <span class="c">// 'Vendas' HERE is the real function — a different owner</span>
    RETURN
 
+MAKE Vendas            <span class="c">// and here it becomes part of a generated function name</span>
+
 FUNCTION Vendas()
    RETURN 42</code></pre>
     </div>
-    <p>Rename the label, and only the label changes:</p>
+    <p>Rename the label. <strong>Both DSL sites move — and the real function does not:</strong></p>
     <div class="code term">
       <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> rename app.hbp a.prg:4:10 Receita
+<pre><code><span class="cmd">hbrefactor</span> rename hom.hbp h.prg:5:10 Receita
 rename-pp-marker: Vendas -&gt; Receita
-  a.prg:4:10
-  predicted string: "Vendas" -&gt; "Receita" (a.prg)
-<span class="ok">verified</span>: 1 edit(s); derived artifacts renamed as predicted</code></pre>
+  h.prg:5:10
+  h.prg:9:6
+  predicted: MK_VENDAS -&gt; MK_RECEITA
+  predicted string: "Vendas" -&gt; "Receita" (h.prg)
+<span class="ok">verified</span>: 2 edit(s); derived artifacts renamed as predicted</code></pre>
     </div>
-    <p>The call <span class="mono">? Vendas()</span> and the function are untouched — and the other direction holds too: renaming the <em>function</em> leaves the DSL sites alone. An occurrence is edited only when a compiler fact ties it to the thing you pointed at; a matching spelling is never enough.</p>
+    <p>Look at <span class="mono">predicted: MK_VENDAS → MK_RECEITA</span>. The DSL <em>generates a function</em> whose name is built from the word — so the tool works out what the compiler will produce, renames it, and then checks the symbol table to confirm the prediction came true. Meanwhile <span class="mono">? Vendas()</span> and <span class="mono">FUNCTION Vendas()</span> — the same six letters, a different owner — are left exactly as they were. An occurrence is edited only when a compiler fact ties it to the thing you pointed at; a matching spelling is never enough.</p>
     <p>It goes one level deeper. A directive can <em>define another directive</em> — that's how Harbour's own class system works inside, and your DSLs can do it too:</p>
     <div class="code">
       <button class="copy" type="button">Copy</button>
@@ -662,11 +1206,11 @@ PROCEDURE Main()
     <p>Renaming <span class="mono">Ponto</span> — at either position — edits both lines together and predicts the derived string:</p>
     <div class="code term">
       <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> rename app.hbp a.prg:4:13 Marco
+<pre><code><span class="cmd">hbrefactor</span> rename gen.hbp g.prg:5:13 Marco
 rename-pp-marker: Ponto -&gt; Marco
-  a.prg:4:13
-  a.prg:5:8
-  predicted string: "Ponto" -&gt; "Marco" (a.prg)
+  g.prg:5:13
+  g.prg:6:8
+  predicted string: "Ponto" -&gt; "Marco" (g.prg)
 <span class="ok">verified</span>: 2 edit(s); derived artifacts renamed as predicted</code></pre>
     </div>
     <p>Behind both: the compiler now records the <strong>genealogy</strong> of preprocessor rules — when a rule is created by another rule's expansion, the dump says which application created it — and the tool only edits an occurrence whose owner is proven. Honest limit: if one module mixes the two roles so tightly that even the symbol table can't separate them, the tool still refuses and rolls back rather than guess.</p>
@@ -680,28 +1224,30 @@ rename-pp-marker: Ponto -&gt; Marco
     <h2>A directive can be switched off — and the rename follows it there</h2>
     <p>A <span class="mono">#define</span> does not have to live to the end of the file. You can turn it off:</p>
     <div class="code-card">
-      <div class="code-top">app.prg</div>
-<pre><code>#define RETRY_LIMIT 3
-
-PROCEDURE Main()
-   LOCAL nTries := RETRY_LIMIT
-   ? nTries
+      <div class="code-top">un.ch — the rule is born here</div>
+<pre><code>#xcommand LACRA &lt;x&gt; =&gt; uu_( &lt;x&gt;, 1 )</code></pre>
+    </div>
+    <div class="code-card">
+      <div class="code-top">un.prg — and it dies here</div>
+<pre><code>PROCEDURE Main()
+   LACRA 1
    RETURN
 
-#undef RETRY_LIMIT      <span class="c">// from here on, RETRY_LIMIT means nothing again</span></code></pre>
+<span class="c">// from here on the directive is switched OFF</span>
+#xuncommand LACRA &lt;x&gt; =&gt; uu_( &lt;x&gt;, 1 )</code></pre>
     </div>
-    <p>That is ordinary hygiene — and a <strong>trap for every refactoring tool</strong>, because renaming the constant is only half the job. Rename <span class="mono">RETRY_LIMIT</span> and forget the <span class="mono">#undef</span>, and the switch-off is left pointing at a name that no longer exists. It then turns off <strong>nothing</strong>, and the definition <b class="emph">leaks</b> past the line where you ended it — silently changing the meaning of code the rename never touched. Nothing catches it: if no site after the switch-off uses the word, the compiled output is byte-identical either way, so a "verified" check happily passes.</p>
-    <p>hbrefactor follows the directive to where it dies:</p>
+    <p>That is ordinary hygiene — and a <strong>trap for every refactoring tool</strong>, because renaming the rule is only half the job. Rename <span class="mono">LACRA</span> and forget the <span class="mono">#xuncommand</span>, and the switch-off is left pointing at a rule that no longer exists. It then turns off <strong>nothing</strong>, and the rule <b class="emph">leaks</b> past the line where you ended it — silently changing the meaning of code the rename never touched. Nothing catches it: if no site after the switch-off uses the word, the compiled output is byte-identical either way, so a "verified" check happily passes.</p>
+    <p>hbrefactor follows the directive to where it dies — <strong>across the file boundary</strong>, from the header where it was born to the source where it ends:</p>
     <div class="code-card">
       <div class="code-top">terminal</div>
-<pre><code>$ hbrefactor rename app.hbp app.prg:4:22 MAX_RETRIES
-rename-dsl: RETRY_LIMIT -&gt; MAX_RETRIES
-  app.prg:4:20
-  app.prg:1:9
-  app.prg:8:8
+<pre><code>$ hbrefactor rename un.hbp un.prg:4:4 SELA
+rename-dsl: LACRA -&gt; SELA
+  un.prg:4:4
+  un.prg:8:13
+  un.ch:6:11
 <span class="ok">verified</span>: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical</code></pre>
     </div>
-    <p>The <span class="mono">#undef</span> on line 8 was renamed with the rest, so the constant still ends exactly where you said it ends. The same holds for <span class="mono">#xuncommand</span> and <span class="mono">#xuntranslate</span> — a command or translate rule has a lifetime too. This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#undef</span> in your source — blind to the abbreviated spellings, to the six forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
+    <p>Three sites, two files: the call, the <span class="mono">#xcommand</span> that creates the rule, and the <span class="mono">#xuncommand</span> that retires it. The rule still ends exactly where you said it ends. This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#xuncommand</span> in your source — blind to the abbreviated spellings, to the several forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
   </div>
 </section>
 
@@ -710,12 +1256,13 @@ rename-dsl: RETRY_LIMIT -&gt; MAX_RETRIES
   <div class="narrow">
     <p class="sec-eyebrow">Going deeper</p>
     <h2>"Would this new name collide?" — it asks the preprocessor instead of guessing</h2>
-    <p>A <span class="mono">#command</span> matches its keywords <strong>abbreviated</strong>. <span class="mono">#command LISTAR</span> is also matched by <span class="mono">LIST</span>, <span class="mono">LISTA</span>, <span class="mono">LISTAR</span> — from four letters on. So renaming one directive can quietly <b class="emph">hijack</b> another: give a rule a new head that happens to be an abbreviation of a rule that already exists, and the preprocessor starts routing your calls to the wrong one.</p>
-    <p>The tool refuses, and names the rule you would have collided with:</p>
+    <p>A <span class="mono">#command</span> matches its keywords <strong>abbreviated</strong>. <span class="mono">#command ROTULA</span> is also matched by <span class="mono">ROTU</span>, <span class="mono">ROTUL</span>, <span class="mono">ROTULA</span> — from four letters on. So renaming one directive can quietly <b class="emph">hijack</b> another: give a rule a new head that happens to share a four-letter prefix with a rule that already exists, and the preprocessor starts routing your calls to the wrong one.</p>
+    <p>Here two rules live side by side — <span class="mono">#command ROTULA</span> and <span class="mono">#command PAUTAR</span>. Rename <span class="mono">PAUTAR</span> to <span class="mono">ROTULAGEM</span>, which looks safe (no rule is called that). The tool refuses, names the rule you would have collided with, and <strong>shows you the exact spelling that would become ambiguous</strong>:</p>
     <div class="code-card">
       <div class="code-top">terminal</div>
-<pre><code>$ hbrefactor rename app.hbp app.prg:4:4 LIST
-hbrefactor: 'LIST' colide por abreviação com a regra #command LISTAR (c.ch:2)</code></pre>
+<pre><code>$ hbrefactor rename seq.hbp seq.prg:4:4 ROTULAGEM
+hbrefactor: 'ROTULAGEM' collides by abbreviation with rule #command ROTULA
+            (seq.ch:10) - after the rename, writing 'ROTU' would match BOTH rules</code></pre>
     </div>
     <p>What matters is <strong>who decided that</strong>. hbrefactor does not reimplement Harbour's matching rule — it starts a <strong>live preprocessor</strong>, feeds it the name you want, and watches whether the rule fires. The authority on "does this collide" is the same preprocessor that will compile your code tomorrow; when Harbour's rule changes, the answer changes with it, and nothing here has to be kept in sync. The difference is not academic: the earlier version <em>did</em> reimplement the rule — and it refused renames that were perfectly safe, because a hand-written copy of a compiler's logic is always a worse copy.</p>
   </div>
@@ -810,9 +1357,10 @@ Eval( bPaga )
         <p>Everything lives in the <strong>command-line tool</strong> — fully usable on its own. Nothing is hidden behind an IDE.</p>
         <div class="code">
           <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> rename   vendas.hbp vendas.prg:42:8 Dobrar
-<span class="cmd">hbrefactor</span> usages   vendas.hbp nTotal --func Main
-<span class="cmd">hbrefactor</span> annotate vendas.hbp --apply</code></pre>
+<pre><code><span class="cmd">hbrefactor</span> rename       hbhttpd.hbp core.prg:941:17 HttpErrorHandler
+<span class="cmd">hbrefactor</span> usages       hbhttpd.hbp UHttpd:LogError
+<span class="cmd">hbrefactor</span> call-graph   hbhttpd.hbp UErrorHandler
+<span class="cmd">hbrefactor</span> annotate     hbhttpd.hbp --apply</code></pre>
         </div>
         <p class="muted">A project is anything <span class="mono">hbmk2</span> accepts: a <span class="mono">.hbp</span>, a <span class="mono">.hbc</span>, or just a list of <span class="mono">.prg</span> files — including container / multi-target <span class="mono">.hbp</span> (<span class="mono">-hbcontainer</span>, sub-projects, <span class="mono">-target=</span>): sources of <em>all</em> targets count.</p>
       </div>
@@ -908,7 +1456,7 @@ Eval( bPaga )
   <div class="narrow">
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
-    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong><span data-metric="suite-cases">112</span> cases / <span data-metric="suite-checks">913</span> checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
+    <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong><span data-metric="suite-cases">113</span> cases / <span data-metric="suite-checks">923</span> checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
     <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
     <div class="grid-2">
       <div>
@@ -963,7 +1511,7 @@ Eval( bPaga )
 <pre><code>git clone https://github.com/diegopego/hbrefactor
 cd hbrefactor
 make build        <span class="c"># produces bin/hbrefactor</span>
-make test         <span class="c"># optional: the behavior suite (<span data-metric="suite-cases">112</span> cases)</span></code></pre>
+make test         <span class="c"># optional: the behavior suite (<span data-metric="suite-cases">113</span> cases)</span></code></pre>
         </div>
       </li>
       <li><b>VSCode (optional):</b> install the packaged extension <span class="mono">vscode/hbrefactor-0.13.0.vsix</span> and point <span class="mono">hbrefactor.hbBin</span> at your <span class="mono">HB_BIN</span>.</li>
