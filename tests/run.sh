@@ -45,6 +45,13 @@ fresh() { # fresh <case-name> -> echoes work dir
    echo "$d"
 }
 
+freshver() { # freshver <case-name> -> fixture for the exposed oracle (A.2)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixver/*.prg "$HERE"/fixver/*.hbp "$d"/
+   echo "$d"
+}
+
 freshdsl() { # freshdsl <case-name> -> fixture with a user pp DSL (B4)
    local d="$HERE/tmp/$1"
    rm -rf "$d"; mkdir -p "$d"
@@ -4256,7 +4263,81 @@ check "o core emite EXATAMENTE o schema que a ferramenta exige ($GOT == $WANT)" 
 check "um projeto real e consumido com o schema corrente (exit 0)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122"
+unit_123() {
+echo "case 123: A.2 - o ORACULO EXPOSTO: a ferramenta prova uma edicao que ela NAO fez"
+# A TESE (Diego, 2026-07-13): o programador vai pedir a refatoracao a um LLM, e o LLM
+# vai faze-la por SUBSTITUICAO DE TEXTO -- com confianca, e errado. O agente e, portanto,
+# o consumidor que MAIS precisa de um oraculo de fato.
+#
+# O REFRAME: o catalogo de verbos nao e o produto -- o VERIFICADOR e, e ele e AGNOSTICO
+# DE VERBO. Nenhum catalogo alcanca a imaginacao de um LLM; o verificador alcanca, porque
+# nao sabe nem se importa com qual foi a edicao. Aqui as edicoes sao feitas POR FORA
+# (sed/cat), nunca pela ferramenta -- e essa e a coisa toda.
+D=$(freshver case123)
+( cd "$D" && "$BIN" snapshot ver.hbp > snap.log 2>&1 )
+check "snapshot de um projeto que compila (exit 0)" $?
+grep -q "1 module(s) recorded" "$D/snap.log"
+check "o snapshot grava pcode + fontes" $?
+
+# --- (1) PRESERVED: a edicao cosmetica NAO muda o comportamento, e isso e PROVA.
+# So funciona porque se compila com -gh -l (o -l suprime a informacao de linha). Sem
+# ele, inserir uma linha em branco ja mudaria o pcode e nada seria jamais "preserved".
+( cd "$D" && printf '\n// o agente resolveu comentar\n' >> ver.prg && \
+  sed -i 's/^   RETURN nA + nB/\n   RETURN nA + nB/' ver.prg && \
+  "$BIN" verify ver.hbp > v1.log 2>&1 )
+check "verify apos edicao COSMETICA (exit 0)" $?
+grep -q "PRESERVED" "$D/v1.log"
+check "comentario/linha em branco/deslocamento: PRESERVED (o oraculo e cego a formatacao)" $?
+
+# --- (2) CHANGED: refatoracao LEGITIMA que muda o pcode. O LIMITE da fase mora aqui:
+# identidade de pcode e oraculo DE UM LADO SO -- "sim" e prova de preservacao, "nao"
+# NAO e prova de quebra. Ler "mudou o pcode" como "esta errado" seria CHUTAR A INTENCAO
+# do autor: heuristica, proibida. Por isso CHANGED sai com SUCESSO e sem reprovacao.
+D=$(freshver case123b)
+( cd "$D" && "$BIN" snapshot ver.hbp > /dev/null 2>&1 )
+( cd "$D" && sed -i 's/^   LOCAL nTotal := Soma( 2, 3 )/   LOCAL nTotal := Calcula()/' ver.prg && \
+  printf '\nSTATIC FUNCTION Calcula()\n   RETURN Soma( 2, 3 )\n' >> ver.prg && \
+  "$BIN" verify ver.hbp > v2.log 2>&1 )
+check "verify apos refatoracao LEGITIMA sai com SUCESSO (exit 0) - nao e reprovacao" $?
+grep -q "CHANGED" "$D/v2.log"
+check "pcode mudou legitimamente: CHANGED" $?
+grep -q "NOT a verdict that the edit is wrong" "$D/v2.log"
+check "CHANGED diz que preservacao NAO FOI PROVADA - jamais que o autor errou" $?
+! grep -qiE "wrong|incorrect|broke|invalid|failed" "$D/v2.log" || grep -q "NOT a verdict" "$D/v2.log"
+check "nenhuma palavra de reprovacao vaza no veredito CHANGED" $?
+# o DELTA: e isto que um diff de texto NAO sabe dizer -- o que o COMPILADOR viu
+grep -q "pcode of MAIN changed" "$D/v2.log"
+check "o delta nomeia a funcao cujo pcode mudou" $?
+grep -q "new function CALCULA" "$D/v2.log"
+check "o delta nomeia a funcao que nasceu" $?
+
+# --- (3) BROKEN: o agente quebra o build. Erro OBJETIVO -- aqui, sim, ha veredito.
+# --rollback age SO no broken: reverter um CHANGED destruiria trabalho legitimo.
+D=$(freshver case123c)
+( cd "$D" && "$BIN" snapshot ver.hbp > /dev/null 2>&1 )
+cp "$D/ver.prg" "$D/ver.orig"
+( cd "$D" && printf 'PROCEDURE Main()\n   LOCAL n :=\n   RETURN\n' > ver.prg && \
+  "$BIN" verify ver.hbp --rollback > v3.log 2>&1 )
+[ $? -eq 1 ]
+check "edicao que QUEBRA o build: exit 1 (o unico veredito adverso que existe)" $?
+grep -q "BROKEN" "$D/v3.log"
+check "verify diz BROKEN" $?
+cmp -s "$D/ver.prg" "$D/ver.orig"
+check "--rollback devolveu o fonte BYTE A BYTE" $?
+# e a prova final: apos o rollback, o projeto volta a ser PROVAVELMENTE o mesmo
+( cd "$D" && "$BIN" verify ver.hbp > v4.log 2>&1 ) && grep -q "PRESERVED" "$D/v4.log"
+check "apos o rollback, o verify prova que voltou ao estado do snapshot" $?
+
+# --- (4) sem snapshot, o verify RECUSA -- nunca inventa uma linha de base
+D=$(freshver case123d)
+( cd "$D" && "$BIN" verify ver.hbp > v5.log 2>&1 )
+[ $? -eq 1 ]
+check "verify sem snapshot RECUSA (fail-closed: nunca inventa a linha de base)" $?
+grep -q "snapshot" "$D/v5.log"
+check "a recusa DIZ o que fazer (rodar o snapshot antes)" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

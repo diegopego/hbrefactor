@@ -346,6 +346,35 @@ async function cmdFindDynamicCalls() {
   report('find-dynamic-calls', await run(['find-dynamic-calls', c.spec], c.cwd));
 }
 
+// snapshot/verify (A.2): o ORÁCULO EXPOSTO. Vale para QUALQUER edição - a sua,
+// a de um agente, a de outra ferramenta. Grave a linha de base, edite à vontade,
+// e o verify diz o que o COMPILADOR entendeu que mudou
+async function cmdSnapshot() {
+  const c = await projCtx();
+  if (!c) return;
+  await saveAll();
+  report('snapshot', await run(['snapshot', c.spec], c.cwd));
+}
+
+async function cmdVerify() {
+  const c = await projCtx();
+  if (!c) return;
+  await saveAll();
+  const res = await run(['verify', c.spec], c.cwd);
+  report('verify', res);
+  // BROKEN é o único veredito adverso: só aí faz sentido oferecer o rollback.
+  // Reverter um CHANGED destruiria trabalho legítimo - o pcode muda em toda
+  // refatoração honesta, e "mudou" nunca quer dizer "errado"
+  if (res.code !== 0 && /BROKEN/.test(res.stdout + res.stderr)) {
+    const pick = await vscode.window.showWarningMessage(
+      'The project no longer compiles after the edit. Restore the snapshot, byte for byte?',
+      { modal: true }, 'Roll back');
+    if (pick === 'Roll back') {
+      report('verify --rollback', await run(['verify', c.spec, '--rollback'], c.cwd));
+    }
+  }
+}
+
 // annotate ESTÁGIO 1 (relatório): a escada de anotações do arquivo atual,
 // nenhuma edição. O consumidor de uso diário vê o que fecharia por fato
 async function cmdAnnotate() {
@@ -397,7 +426,9 @@ function activate(context) {
     vscode.commands.registerCommand('hbrefactor.reorderParams', cmdReorderParams),
     vscode.commands.registerCommand('hbrefactor.extractFunction', cmdExtractFunction),
     vscode.commands.registerCommand('hbrefactor.callGraph', cmdCallGraph),
-    vscode.commands.registerCommand('hbrefactor.findDynamicCalls', cmdFindDynamicCalls)
+    vscode.commands.registerCommand('hbrefactor.findDynamicCalls', cmdFindDynamicCalls),
+    vscode.commands.registerCommand('hbrefactor.snapshot', cmdSnapshot),
+    vscode.commands.registerCommand('hbrefactor.verify', cmdVerify)
   );
 }
 

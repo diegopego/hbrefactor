@@ -225,7 +225,9 @@ decoy mais perto que NÃO é dono, órfão, objeto JSON) + 6 guardas novas
 no harness do caso 71 (32 pass).
 Restante, por fricção do uso diário:
 
-- preview `--dry-run --json` se a fricção pedir.
+- ~~preview `--dry-run --json` se a fricção pedir.~~ **ABSORVIDO pela fase A**
+  (2026-07-13): não era fricção de uso diário, era a falta de um CONTRATO DE
+  MÁQUINA — o mesmo buraco que faz a extensão casar prosa. Ver a fase A.1.
 
 **Critério**: Diego usa no dia a dia; sem regressão.
 
@@ -457,9 +459,10 @@ suíte (responde ao critério de matar do adr-003).
   canal novo de core — tudo já existia no dump, só passou a ser consumido.
   `usages <nome>` sem `--at` fica byte-idêntico ao de sempre. Suíte
   **844/0** (835 + 9 checks), zero regressão nos casos 50/107-111.
-  **Resíduo aberto (não bloqueou):** artefatos derivados (paste/stringify)
-  como `Location` estruturada no `--json` (item 2 do escopo original) —
-  hoje só texto colado sob `--show-expansion`, fica para quando doer.
+  **Resíduo → ABSORVIDO pela fase A (2026-07-13):** artefatos derivados
+  (paste/stringify) como `Location` estruturada no `--json` (item 2 do escopo
+  original) — hoje só texto colado sob `--show-expansion`. Não era "quando
+  doer": é o mesmo buraco do contrato de máquina (fase A.1).
   [spec-p § P3](spec-p-pp-refatoracao.md#eixo-a--p3-generates-para-usagesfind-references--entregue-2026-07-12).
   **P6 ✅ ESTRUTURA da regra ENTREGUE (2026-07-12, caso 113, fixture
   `fixp6` não-espelho)**: o miolo "regra-em-expansão" já caíra na P1
@@ -638,6 +641,10 @@ zero heurística nova na ferramenta, e três erros meus registrados com nome.
   a 1ª versão sai **sem mudança no core**. Plano de sondagem, usos candidatos e
   limites honestos: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-search.md)**.
   **NADA PROVADO AINDA** — o arquivo é plano, não registro.
+  **CONSUMIDOR NOMEADO pela fase A (2026-07-13)**: a primeira coisa que um agente faz
+  antes de editar é **PROCURAR** — e hoje ele grepa. Busca estrutural cujo casador é
+  **o do core** é capacidade de agente por excelência. A fase A não executa a P12; ela
+  responde a pergunta que a P12 deixava no ar (*"quem consome isto?"*).
 - **P13 — 1º achado ENTREGUE: `ast-16` (2026-07-12, caso 117)**. A diretiva tem
   **tempo de vida léxico**, e o dump agora o exporta: a diretiva de **remoção** entra
   em `ppRules` como registro próprio (com `match[]` POSICIONADO, logo editável por
@@ -909,6 +916,13 @@ e o comando certo era nenhum**; *(b)* a régua: **superfície de produto que dup
 peso, não capacidade** — a mesma família do "não existe compatibilidade" de hoje cedo.
 *(c)* O `unused-locals` era o **único verbo que não tocava na AST**. Sintoma, não detalhe.
 
+> **A sonda (a) virou item de fase (2026-07-13).** "JSON de erro não existe" é uma LACUNA DO
+> CORE, e o `-ge<mode>` já ter dois modos torna o conserto uma EXTENSÃO de opção existente, não
+> uma flag nova. Vive na **fase A.4** — com o veredito honesto de que **o hbrefactor é o
+> consumidor mais fraco dele** (a ferramenta usa o compilador como oráculo binário e tira os
+> fatos do dump). Quem o sustenta é o painel Problems, o agente do usuário, e o fato de ser um
+> PR pequeno e não-controverso.
+
 ### V — Velocidade da refatoração em PROJETO GRANDE — **ATIVA; FATIA 1 ENTREGUE (2026-07-13)**
 
 A P9 consertou o dump **por módulo**. O que sobrou é **estrutural, e é o que o usuário
@@ -967,6 +981,178 @@ esconder.
 **PRONTO da fase:** num projeto de dezenas de módulos, um comando que toca 1 módulo custa
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o modo
 `-rebuild` de hoje.
+
+### A — A IA COMO CONSUMIDOR DE PRIMEIRA CLASSE (jamais FONTE de fato) — **ATIVA: A.2 ENTREGUE (2026-07-13); A.1/A.3/A.4 em PORTÃO FECHADO**
+
+Spec: **[spec-a-oraculo-para-agentes.md](spec-a-oraculo-para-agentes.md)**.
+
+**A tese (Diego, 2026-07-13).** O programador Harbour vai pedir a um LLM *"renomeie este
+método no projeto inteiro"*. O LLM vai fazer isso por **substituição de texto** — com
+confiança, e errado: homônimo entre classes, nome que também é palavra de DSL, site gerado por
+diretiva, string que casa por coincidência. **É exatamente o modo de falha que o hbrefactor
+existe para eliminar.** Logo o agente não é "mais um consumidor": é o consumidor que **MAIS
+PRECISA** de um oráculo de fato, porque é o mais propenso à edição plausível-e-errada.
+**O hbrefactor é o que torna a refatoração por IA em Harbour SEGURA** — e isso é tese de
+produto, não recurso.
+
+**O enquadramento que impede a leitura errada.** LLM é máquina de **heurística**; hbrefactor é
+máquina **anti-heurística**. Não é contradição — é complementaridade: **o agente propõe a
+INTENÇÃO** (o que refatorar, onde, por quê — heurística é legítima aí); **a ferramenta decide o
+que é PROVÁVEL, executa verificando, e recusa com MOTIVO.** A fase muda a **SUPERFÍCIE**,
+jamais o motor.
+
+> **NÃO-OBJETIVO, e ele é executável, não retórico:** a ferramenta **não tem modelo, não tem
+> chave de API, não fala com rede, e NUNCA pergunta nada a um LLM**. Régua no fonte, na família
+> do caso 64. *(Regra durável no CLAUDE.md.)*
+
+**A REFRAME — o catálogo de verbos NÃO é o produto.** O produto é o **VERIFICADOR**: compilar
+antes/depois, comparar o pcode byte a byte, reverter (`CompileHrbAll`/`HrbEquivalent` + WorkDir
+atômico). Essa máquina é **agnóstica de verbo** — e hoje está **trancada dentro dos 12
+comandos**. Um agente nunca vai querer só os 12: ele vai querer *"converta este `DO CASE` em
+`SWITCH`"*, *"extraia esta lógica para uma classe"*. **O catálogo jamais alcança a imaginação de
+um LLM; o verificador alcança — porque não sabe nem se importa com qual foi a edição.**
+
+#### A.1 — Contrato de máquina na CLI *(base: sem isto, nada em cima se apoia)*
+
+**A contradição que se fecha:** a ferramenta **proíbe comparação de texto no MOTOR e obriga
+comparação de texto no CONSUMIDOR**. A extensão decide **fluxo** casando prosa (`/--force/`,
+`/--edit-rules/`, `/no compile-time identifier/` — `vscode/extension.js`), e já **quebrou
+calada** quando a CLI foi traduzida. É o **mesmo padrão da fase L** (*"o compilador SABE e joga
+o fato fora numa string"*), agora com a ferramenta fazendo isso com a **própria saída**.
+
+- `--json` vira flag **global, em STDOUT** — hoje só 3 dos 12 comandos têm, e escrevem em
+  **arquivo**. A forma antiga **morre** (não existe compatibilidade para trás); a extensão é
+  reacoplada **na mesma fase**.
+- **Envelope único, schema versionado** (à moda do `ast-16`/`rtr-1`). Semente pronta:
+  `LocationsJson()` já emite `Location[]` no formato LSP.
+- **Toda recusa carrega CÓDIGO.** `Refuse()` já é funil único — é adicionar campo. A taxonomia
+  **separa o que hoje está fundido**: recusa de política ("seria incorreto") × ambiente quebrado
+  ("seu projeto não compila") × **resposta vazia legítima** — hoje `usages` com **zero
+  resultados sai `EXIT_REFUSED`**: o agente não distingue "não há usos" de "eu me recusei".
+- **`--dry-run --json` devolve as EDIÇÕES como dado.** Absorve os dois resíduos que o roadmap
+  adiava por conta própria (B5 "se a fricção pedir"; P3 `Location` "para quando doer").
+
+> **Restrição de desenho que vem da tese, e é a mais séria da fase:** a recusa tem de ser
+> legível o bastante para o agente **RELATAR**, não para **CONTORNAR**. Um agente que recebe
+> "recusado" sem entender por quê vai fazer aquilo pelo que é famoso: **editar o texto na mão**
+> — e aí a ferramenta virou um obstáculo que se contorna, não uma proteção. O código precisa
+> distinguir *"pare e conte ao humano"* de *"repita com `--force`"*.
+
+#### A.2 — `verify`: o ORÁCULO EXPOSTO — ✅ **ENTREGUE (2026-07-13, portão aberto pelo Diego; caso 123, suíte 978/0)**
+
+Duas chamadas, e a máquina que **já existia** passa a servir edições que a ferramenta **não
+fez**: `snapshot <project>` grava a linha de base (pcode + cópia dos fontes); o agente edita à
+vontade; `verify <project> [--rollback]` responde com **três vereditos** — `PRESERVED` (prova),
+`CHANGED` (**ausência** de prova, com o DELTA) e `BROKEN` (erro objetivo, `--rollback` restaura
+byte a byte). **O agente ganha liberdade sem ganhar impunidade.** Nada no core faz isso.
+
+> **LIMITE, e é o CORAÇÃO do desenho:** identidade de pcode é oráculo **DE UM LADO SÓ**.
+> **`PRESERVED` é PROVA; `CHANGED` NÃO é prova de quebra** — um `extract-function` legítimo muda
+> o pcode. Ler "mudou" como "está errado" seria **chutar a intenção do autor** = heurística. Por
+> isso o `CHANGED` **sai com exit 0** e **nenhuma palavra de reprovação** — e o caso 123 trava
+> isso com uma régua textual (`! grep -qiE "wrong|incorrect|broke|invalid|failed"`).
+
+**O `CHANGED` é a saída MAIS valiosa, não a pior.** Ele traz o **delta que o COMPILADOR viu**
+(`pcode of MAIN changed`; `new function CALCULA`; `new symbol CALCULA`), lido do `.hrb` pelo
+`HrbParse` que já existia. **Um diff de texto mostra linhas; isto mostra o que o compilador
+entendeu que mudou** — o que nenhum LLM finge e nenhum grep dá.
+
+**SONDA que derriscou a fatia ANTES de codar** (spec § 3.4): o pcode carrega número de linha
+(`HB_P_LINE`), o que faria `PRESERVED` nunca disparar. **Não dispara porque a ferramenta já
+compila com `-gh -l`** — e o `-l` suprime a informação de linha. **Já estava lá**: o oráculo é
+insensível a formatação e sensível a semântica, por decisão anterior, não por sorte.
+
+**CICATRIZ (o gatilho de basename, e eu caí nele).** Chaveei o snapshot pelo **texto do spec**
+(`"app.hbp"`) — dois projetos homônimos em diretórios diferentes **liam a linha de base um do
+outro**. É o **gatilho nº 5 do CLAUDE.md**, escrito e ignorado. Pego pelo caso 123d, cuja quarta
+sub-fixture enxergou o snapshot da primeira. Chave agora é **caminho canônico** (`hb_cwd()` +
+spec). *(Snapshot alheio é fato VELHO de outro programa — e agir sobre fato velho é o que esta
+ferramenta promete nunca fazer.)*
+
+**Fica de fora, honesto:** a relação de equivalência do `verify` é a **mais estrita** (identidade
+byte a byte do `.hrb`). Os degraus mais frouxos que os verbos usam por dentro (`HrbEquivalent`
+para rename; `HrbExtractCheck` para extract) **dependem de saber o que se esperava mudar** — e
+numa edição que a ferramenta não fez **não existe expectativa**. Usá-los seria inventar intenção.
+
+#### A.3 — Servidor MCP *(a porta pela qual o agente entra)*
+
+O agente do usuário chama `resolve-at`/`usages`/`rename`/`verify` como **ferramenta nativa**, em
+vez de dar shell e regexar prosa. É aqui que a tese vira produto: o programador aponta o agente
+dele para o servidor, e **as refatorações passam a atravessar o oráculo** em vez do `sed` mental
+do modelo.
+
+- **Só existe DEPOIS do A.1** — MCP sobre a saída de hoje seria um regexador com outro nome.
+- **CRITÉRIO DE MATAR (o teste da fase L virado contra nós):** o servidor **não pode conter
+  DECISÃO**. Se precisar decidir algo que a CLI não decidiu, ele **morre** — a decisão pertence
+  à ferramenta, e a necessidade dele **prova que o contrato do A.1 ficou ruim**. Adaptador,
+  nunca dono de lógica.
+- **Subsome o "manifesto de capacidades"**: o MCP anuncia os schemas pelo protocolo —
+  **descoberta em vez de decoreba**, e morre a classe de bug "o manual do agente envelheceu".
+- Linguagem (prós/contras na spec): **Harbour** (JSON-RPC sobre stdin/stdout; `hb_jsonEncode`
+  basta; dogfooding real) × **Node** (a extensão já é JS; há SDK). Inclinação: Harbour — contra
+  honesto: escreveríamos o protocolo à mão.
+
+#### A.4 — `-ge2`: diagnóstico do compilador em JSON *(core; fecha a sonda da fase L)*
+
+`-ge<mode>` **já existe** (`0=Clipper`, `1=IDE`) → **`-ge2` é MODO NOVO de opção existente**,
+não flag nova. E `hb_compOutMsg()` é o **formatador único**, que **já recebe tudo desmontado**
+(módulo, linha, severidade, número, template, args) — e só então **achata numa string**. O
+identificador de um `W0032` **é o fato**, e hoje só existe **dentro da frase em inglês**; o
+**nível** do warning está escondido **no primeiro caractere** da string da tabela.
+
+**É útil? Sim — mas o hbrefactor é o consumidor MAIS FRACO dele, e isso fica escrito.** A
+ferramenta usa o compilador como **oráculo binário** e tira os fatos do **dump**; ela não
+precisa saber *qual* erro. O consumidor interno que serviria de prova — o `unused-locals` —
+**está morto**. Vendê-lo como "acelera o desenvolvimento" seria o argumento inflado que o
+CLAUDE.md proíbe. O que o sustenta, em ordem de força: **(1)** é o **PR fácil que abre a porta
+do PR difícil** — a B6 pede **um** canal (o dump) num diff grande e intrusivo; o `-ge2` é um
+diff **minúsculo e não-controverso**, com valor imediato para qualquer usuário de IDE, e
+estabelece a narrativa *"o Harbour fala com máquinas"* **antes** do pedido grande; **(2)** o
+**painel Problems** da extensão (que hoje não tem diagnóstico nenhum); **(3)** o agente do
+usuário que recebe *"conserta este erro"*. **Limite honesto: não há COLUNA** no diagnóstico —
+sondar se o lexer tem, antes de prometer. **No PR a palavra "AI" não aparece**: lá isso se chama
+*machine-readable diagnostics* — não é disfarce, é o nome certo.
+
+#### A.5 — Latência: **o contrato sem velocidade entrega uma ferramenta que o agente não vai querer chamar**
+
+Um humano faz 3 perguntas por hora; um agente faz 30 por minuto. Um `usages` no `work/xhb` custa
+**12–15 s** (medido na fatia 1 da fase V). Isso **não é detalhe da fase A — é pré-requisito
+dela**, e é a **fase V**. **Ordem sugerida: V.2 antes do A.3** (A.1 e A.2 são independentes).
+
+#### O que foi considerado e REJEITADO *(o teste da fase L, aplicado ANTES de escrever)*
+
+- **Comando `describe` ("dê ao agente o mapa do projeto")** — soa ótimo e **já existe**: o `dump`
+  gera os `.ast.json`. O que falta é ele **imprimir um caminho em vez de uma frase** (e em
+  português). Não é capacidade nova; é conserto de 3 linhas dentro do A.1.
+- **Regras de refatoração em linguagem natural** — é a heurística entrando pela janela. **Não.**
+- **"O agente sugere onde refatorar"** — é TRIAGEM, que a REGRA DO FATO já proíbe como produto.
+
+#### Riscos honestos
+
+1. **O `verify` vira heurística** se "mudou o pcode" for lido como "está errado". Risco nº 1.
+2. **O agente contorna a recusa** que não entende — recusa ilegível não protege, só é ignorada.
+3. **O rótulo é cavalo de Troia da heurística** se mal escrito → não-objetivo executável.
+4. **Drift em teste PRÉ-EXISTENTE → vai ao Diego, site a site.** Dois sítios já identificados:
+   `usages` com zero hits deixa de sair `1`; `--json <arquivo>` some. Quebram a suíte **e** a
+   extensão.
+5. **Superfície nova é peso** (régua da fase L). O envelope **não** é capacidade nova — é o mesmo
+   fato, dito sem perda. O **MCP e o `verify` são**, e por isso nascem com critério de matar.
+6. **Custo:** toca a saída dos 12 comandos, e o `verify` mexe no núcleo de verificação — a parte
+   do fonte onde um bug é mais caro.
+
+#### PRONTO da fase (executável, se o portão abrir)
+
+- Todo comando sob `--json` emite **um** envelope válido em stdout, e **nada mais** ali.
+- **Nenhuma** decisão de fluxo da extensão casa prosa — os três regexes morrem, e um caso da
+  suíte **prova** que morreram.
+- Toda recusa carrega código, e o código distingue *pare* de *repita com `--force`*.
+- "Zero resultados" deixa de ser recusa (com o drift aprovado pelo Diego).
+- **`verify` prova preservação de uma edição que a ferramenta NÃO fez**; um caso em que a edição
+  quebra e o `--rollback` devolve o fonte **byte a byte**; e um caso que trava o LIMITE — edição
+  legítima que **muda** o pcode → veredito *"não provei preservação"*, **nunca** *"está errado"*.
+- MCP: o agente lista e chama `resolve-at`/`usages`/`rename`/`verify`, recebe **fato**, e o
+  servidor **não contém decisão nenhuma** (verificado por leitura).
+- `make test` verde; `make site-check` verde.
 
 ### B-infra — suíte paralela ✅ ENTREGUE (Etapas 1 e 2) — narrativa no [arquivo](roadmap-fases-entregues.md)
 

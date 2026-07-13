@@ -19,6 +19,10 @@
 #define EXIT_REFUSED  1
 #define EXIT_USAGE    2
 
+// schema do snapshot do verify (fase A.2): EXATO, como o do dump - manifesto
+// de outra versão não se degrada, se recusa
+#define SNAP_SCHEMA   "snap-1"
+
 // sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
 #define PP_PROBE_HIT "__HBREF_PP_HIT__"
 
@@ -52,6 +56,10 @@ PROCEDURE Main()
       nExit := ResolveAt( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "dump"
       nExit := DumpOnly( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "snapshot"
+      nExit := Snapshot( aArgs )
+   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "verify"
+      nExit := Verify( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "projects-of"
       nExit := ProjectsOf( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "annotate"
@@ -92,6 +100,13 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor call-graph <project> [<function>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <project>" + hb_eol() )
    OutStd( "  hbrefactor dump <project>           (writes the .ast.json files and reports the directory)" + hb_eol() )
+   OutStd( "  hbrefactor snapshot <project>       (records the baseline: pcode + a copy of the sources)" + hb_eol() )
+   OutStd( "  hbrefactor verify <project> [--rollback]" + hb_eol() )
+   OutStd( "                                     (after ANY edit - yours, your agent's, made by any tool:" + hb_eol() )
+   OutStd( "                                      PRESERVED = proof the behaviour is unchanged;" + hb_eol() )
+   OutStd( "                                      CHANGED   = preservation not proven, with the delta the" + hb_eol() )
+   OutStd( "                                                  COMPILER sees - never a claim you are wrong;" + hb_eol() )
+   OutStd( "                                      BROKEN    = it stopped compiling; --rollback restores)" + hb_eol() )
    OutStd( "  hbrefactor projects-of <file.prg> <project1> [<project2> ...] [--json <out>]" + hb_eol() )
    OutStd( "                                     (which of these projects have the file as a source)" + hb_eol() )
    OutStd( "  hbrefactor projects-of <file.prg> [--root <dir>]... [--json <out>]" + hb_eol() )
@@ -833,6 +848,265 @@ STATIC FUNCTION DumpOnly( aArgs )
    OutStd( "dumps em: " + cTmp + hb_eol() )
 
    RETURN EXIT_OK
+
+// ---------------------------------------------------------------------------
+// snapshot / verify (fase A.2) - o ORÁCULO EXPOSTO.
+//
+// O catálogo de verbos não é o produto: o VERIFICADOR é, e ele é AGNÓSTICO DE
+// VERBO. Um agente jamais vai querer só os verbos que existem - ele vai propor
+// edições que nenhum catálogo alcança. Estas duas chamadas põem a máquina que
+// já existe (compilar, comparar pcode, reverter) a serviço de uma edição que a
+// ferramenta NÃO fez: o agente propõe, a ferramenta PROVA.
+//
+//   snapshot <project>          grava a linha de base (pcode + cópia dos fontes)
+//   verify   <project>          o DELTA SEMÂNTICO da edição, como FATO
+//
+// O ORÁCULO É DE UM LADO SÓ, e a fase morre se isto for esquecido:
+//   "preserved" é PROVA de preservação de comportamento;
+//   "changed"   NÃO é prova de quebra - é "não provei preservação".
+// Uma extração de função legítima MUDA o pcode. Ler "mudou" como "está errado"
+// seria chutar a intenção do autor - heurística, que aqui é proibida. Por isso
+// "changed" sai com sucesso e NUNCA carrega palavra de reprovação: ele DESCREVE
+// a consequência, não julga o propósito.
+//
+// A identidade de pcode é insensível a FORMATAÇÃO e sensível a SEMÂNTICA porque
+// se compila com -gh -l (o -l suprime a informação de linha). Sem o -l, inserir
+// uma linha em branco já mudaria o pcode e nada seria jamais "preserved".
+// ---------------------------------------------------------------------------
+
+// caminho determinístico do snapshot: o `verify` o encontra sozinho, sem o
+// usuário repassar nada. Fica no temp de propósito - fonte e repositório do
+// usuário não são lugar para artefato nosso.
+//
+// A CHAVE É O CAMINHO CANÔNICO, jamais o texto do spec: dois projetos homônimos
+// em diretórios diferentes (o `app.hbp` de cada um) dariam a MESMA chave, e um
+// leria a linha de base do outro - um snapshot alheio é fato VELHO de outro
+// programa, e agir sobre fato velho é o que esta ferramenta promete nunca fazer.
+// (Custou o caso 123d: as quatro sub-fixtures do teste tinham o mesmo `ver.hbp`
+// e a quarta enxergou o snapshot da primeira. É o gatilho de basename do
+// CLAUDE.md, e eu caí nele.)
+STATIC FUNCTION SnapDir( cSpec )
+   RETURN hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor-snap-" + ;
+          hb_MD5( hb_DirSepAdd( hb_cwd() ) + cSpec )
+
+// os fatos do .hrb de um módulo: o hash do objeto inteiro decide
+// preserved/changed; os símbolos e o pcode POR FUNÇÃO dão o delta
+STATIC FUNCTION HrbFacts( cHrb )
+
+   LOCAL hParsed := HrbParse( cHrb )
+   LOCAL aSyms := {}, aFuncs := {}, aItem
+
+   IF hParsed == NIL
+      RETURN NIL
+   ENDIF
+   FOR EACH aItem IN hParsed[ "syms" ]
+      AAdd( aSyms, { "name" => aItem[ 1 ], "scope" => hb_StrToHex( aItem[ 2 ] ) } )
+   NEXT
+   FOR EACH aItem IN hParsed[ "funcs" ]
+      AAdd( aFuncs, { "name" => aItem[ 1 ], "pcode" => hb_MD5( aItem[ 2 ] ) } )
+   NEXT
+
+   RETURN { "hrb" => hb_MD5( cHrb ), "syms" => aSyms, "funcs" => aFuncs }
+
+STATIC FUNCTION Snapshot( aArgs )
+
+   LOCAL hProj, cTmp, cSnap, cPath, cHrb, hFacts
+   LOCAL aMods := {}, nI := 0
+
+   IF Len( aArgs ) < 2
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   hProj := LoadProject( aArgs[ 2 ] )
+   IF hProj == NIL
+      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
+   ENDIF
+   cTmp := WorkDir()
+   IF ! CompileHrbAll( hProj, cTmp, "snap" )
+      RETURN Refuse( "the project does not compile - snapshot a project that builds" )
+   ENDIF
+
+   cSnap := SnapDir( hProj[ "spec" ] )
+   hb_DirCreate( cSnap )            // reutiliza o diretório: um snapshot por projeto
+   FOR EACH cPath IN hProj[ "files" ]
+      cHrb := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".snap.hrb" )
+      hFacts := HrbFacts( cHrb )
+      IF hFacts == NIL
+         RETURN Refuse( "could not read the .hrb of '" + cPath + "'" )
+      ENDIF
+      nI++
+      // a cópia do fonte é o que torna o --rollback possível quando a edição
+      // do agente quebra o build
+      hb_MemoWrit( hb_DirSepAdd( cSnap ) + "m" + hb_ntos( nI ) + ".src", hb_MemoRead( cPath ) )
+      hFacts[ "path" ] := cPath
+      hFacts[ "src" ]  := "m" + hb_ntos( nI ) + ".src"
+      AAdd( aMods, hFacts )
+   NEXT
+   hb_MemoWrit( hb_DirSepAdd( cSnap ) + "manifest.json", ;
+                hb_jsonEncode( { "schema"  => SNAP_SCHEMA, ;
+                                 "spec"    => hProj[ "spec" ], ;
+                                 "modules" => aMods } ) )
+
+   OutStd( "snapshot: " + hb_ntos( Len( aMods ) ) + " module(s) recorded (pcode + sources)" + hb_eol() )
+   OutStd( "edit freely, then run: hbrefactor verify " + hProj[ "spec" ] + hb_eol() )
+
+   RETURN EXIT_OK
+
+STATIC FUNCTION Verify( aArgs )
+
+   LOCAL hProj, cTmp, cSnap, cPath, hMan, hMod, hNow, cHrb
+   LOCAL lRollback := .F., nI, hByPath, aGone := {}, aNew := {}, aDelta := {}
+   LOCAL cWhat, nSame := 0
+
+   IF Len( aArgs ) < 2
+      Usage()
+      RETURN EXIT_USAGE
+   ENDIF
+   FOR nI := 3 TO Len( aArgs )
+      IF Lower( aArgs[ nI ] ) == "--rollback"
+         lRollback := .T.
+      ENDIF
+   NEXT
+   hProj := LoadProject( aArgs[ 2 ] )
+   IF hProj == NIL
+      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
+   ENDIF
+
+   cSnap := SnapDir( hProj[ "spec" ] )
+   hMan := hb_jsonDecode( hb_MemoRead( hb_DirSepAdd( cSnap ) + "manifest.json" ) )
+   IF ! HB_ISHASH( hMan ) .OR. ! hb_HGetDef( hMan, "schema", "" ) == SNAP_SCHEMA
+      RETURN Refuse( "no usable snapshot for this project - run `hbrefactor snapshot " + ;
+                     hProj[ "spec" ] + "` first" )
+   ENDIF
+
+   // índice do snapshot por caminho + o conjunto de módulos que sumiram
+   hByPath := { => }
+   FOR EACH hMod IN hMan[ "modules" ]
+      hByPath[ hMod[ "path" ] ] := hMod
+      IF hb_AScan( hProj[ "files" ], hMod[ "path" ],,, .T. ) == 0
+         AAdd( aGone, hMod[ "path" ] )
+      ENDIF
+   NEXT
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ! cPath $ hByPath
+         AAdd( aNew, cPath )
+      ENDIF
+   NEXT
+
+   cTmp := WorkDir()
+   IF ! CompileHrbAll( hProj, cTmp, "now" )
+      OutStd( "verify: BROKEN - the project does not compile after the edit" + hb_eol() )
+      IF lRollback
+         FOR EACH hMod IN hMan[ "modules" ]
+            hb_MemoWrit( hMod[ "path" ], ;
+                         hb_MemoRead( hb_DirSepAdd( cSnap ) + hMod[ "src" ] ) )
+         NEXT
+         OutStd( "rolled back " + hb_ntos( Len( hMan[ "modules" ] ) ) + ;
+                 " file(s) to the snapshot, byte for byte" + hb_eol() )
+         IF ! Empty( aNew )
+            OutStd( "note: " + hb_ntos( Len( aNew ) ) + ;
+                    " file(s) added after the snapshot were left untouched" + hb_eol() )
+         ENDIF
+      ELSE
+         OutStd( "the sources were left exactly as you edited them; " + ;
+                 "repeat with --rollback to restore the snapshot" + hb_eol() )
+      ENDIF
+      RETURN EXIT_REFUSED
+   ENDIF
+
+   // o delta, módulo a módulo: o que o COMPILADOR entendeu que mudou
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ! cPath $ hByPath
+         LOOP
+      ENDIF
+      cHrb := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".now.hrb" )
+      hNow := HrbFacts( cHrb )
+      IF hNow == NIL
+         RETURN Refuse( "could not read the .hrb of '" + cPath + "'" )
+      ENDIF
+      IF hNow[ "hrb" ] == hByPath[ cPath ][ "hrb" ]
+         nSame++
+      ELSE
+         AAdd( aDelta, { "path" => cPath, "what" => ModDelta( hByPath[ cPath ], hNow ) } )
+      ENDIF
+   NEXT
+
+   IF Empty( aDelta ) .AND. Empty( aGone ) .AND. Empty( aNew )
+      OutStd( "verify: PRESERVED - all " + hb_ntos( nSame ) + ;
+              " module(s) byte-identical (-gh -l)" + hb_eol() )
+      OutStd( "the edit provably preserves behaviour" + hb_eol() )
+      RETURN EXIT_OK
+   ENDIF
+
+   // "changed" NÃO é reprovação - é a ausência de uma prova. Descreve, não julga
+   OutStd( "verify: CHANGED - the program the compiler sees is not the same one" + hb_eol() )
+   OutStd( "this is NOT a verdict that the edit is wrong: it means preservation " + ;
+           "was not proven. An honest refactoring may legitimately change the pcode." + hb_eol() )
+   FOR EACH cPath IN aGone
+      OutStd( "  " + cPath + ": module no longer in the project" + hb_eol() )
+   NEXT
+   FOR EACH cPath IN aNew
+      OutStd( "  " + cPath + ": module new since the snapshot" + hb_eol() )
+   NEXT
+   FOR EACH hMod IN aDelta
+      FOR EACH cWhat IN hMod[ "what" ]
+         OutStd( "  " + hMod[ "path" ] + ": " + cWhat + hb_eol() )
+      NEXT
+   NEXT
+   IF nSame > 0
+      OutStd( "  (" + hb_ntos( nSame ) + " other module(s) byte-identical)" + hb_eol() )
+   ENDIF
+
+   RETURN EXIT_OK
+
+// o delta de UM módulo, em fatos do .hrb: função cujo pcode mudou, função e
+// símbolo que entraram ou saíram. É o que um diff de texto não sabe dizer
+STATIC FUNCTION ModDelta( hWas, hNow )
+
+   LOCAL aOut := {}, hItem, cName
+   LOCAL hWasFun := { => }, hNowFun := { => }, hWasSym := { => }, hNowSym := { => }
+
+   FOR EACH hItem IN hWas[ "funcs" ]
+      hWasFun[ hItem[ "name" ] ] := hItem[ "pcode" ]
+   NEXT
+   FOR EACH hItem IN hNow[ "funcs" ]
+      hNowFun[ hItem[ "name" ] ] := hItem[ "pcode" ]
+   NEXT
+   FOR EACH hItem IN hWas[ "syms" ]
+      hWasSym[ hItem[ "name" ] ] := hItem[ "scope" ]
+   NEXT
+   FOR EACH hItem IN hNow[ "syms" ]
+      hNowSym[ hItem[ "name" ] ] := hItem[ "scope" ]
+   NEXT
+
+   FOR EACH cName IN hb_HKeys( hNowFun )
+      DO CASE
+      CASE ! cName $ hWasFun
+         AAdd( aOut, "new function " + cName )
+      CASE ! hNowFun[ cName ] == hWasFun[ cName ]
+         AAdd( aOut, "pcode of " + cName + " changed" )
+      ENDCASE
+   NEXT
+   FOR EACH cName IN hb_HKeys( hWasFun )
+      IF ! cName $ hNowFun
+         AAdd( aOut, "function " + cName + " is gone" )
+      ENDIF
+   NEXT
+   FOR EACH cName IN hb_HKeys( hNowSym )
+      IF ! cName $ hWasSym
+         AAdd( aOut, "new symbol " + cName )
+      ENDIF
+   NEXT
+   FOR EACH cName IN hb_HKeys( hWasSym )
+      IF ! cName $ hNowSym
+         AAdd( aOut, "symbol " + cName + " is gone" )
+      ENDIF
+   NEXT
+   IF Empty( aOut )
+      AAdd( aOut, "the object changed, but no function or symbol did" )
+   ENDIF
+
+   RETURN aOut
 
 // ---------------------------------------------------------------------------
 // projects-of - de qual(is) projeto(s) o arquivo é fonte (picker ciente do

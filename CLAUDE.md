@@ -120,6 +120,33 @@ se **BERRA**, nunca se degrada. *(Diego, 2026-07-13. [cic §2.1])*
 - A suíte **sempre roda no schema corrente**; o **caso 122** fica vermelho no instante em
   que core e ferramenta divergirem.
 
+### 1.6 A IA é CONSUMIDORA de fato — jamais FONTE de fato
+
+*(Diego, 2026-07-13. Fase A no roadmap; spec: `docs/spec-a-oraculo-para-agentes.md`.)*
+
+**O agente propõe a INTENÇÃO; a ferramenta decide o que é PROVÁVEL, executa verificando, e
+recusa com MOTIVO.** LLM é máquina de **heurística**; o hbrefactor é máquina
+**anti-heurística**. Não é contradição — é **complementaridade**, e é ela que dá sentido ao
+produto: o programador vai pedir a um LLM *"renomeie este método no projeto inteiro"*, o LLM
+vai fazer isso por **substituição de texto** — com confiança, e errado —, e **esse é
+exatamente o modo de falha que esta ferramenta existe para eliminar**. O agente não é "mais um
+consumidor": é o que **mais precisa** de um oráculo de fato.
+
+- **NÃO-OBJETIVO, e é executável, não retórico:** a ferramenta **não tem modelo, não tem chave
+  de API, não fala com rede, e NUNCA pergunta nada a um LLM**. Régua na suíte, família do caso
+  64: nenhum `anthropic|openai|api[_-]?key|https?://` em `src/hbrefactor.prg`.
+- **Tratar IA como cidadã de primeira classe muda a SUPERFÍCIE, jamais o motor** — saída
+  estruturada, código de motivo na recusa, o verificador exposto. Nenhum princípio desta seção
+  cede em nome de "ser AI-first"; se ceder, o rótulo virou **cavalo de Troia da heurística**.
+- **A recusa tem de ser legível para o agente RELATAR, não para CONTORNAR.** Recusa que o
+  agente não entende não protege ninguém — ele volta a **editar o texto na mão**. Todo código
+  de recusa diz o que FAZER: *"pare e conte ao humano"* × *"repita com a flag"* × *"seu projeto
+  não compila"*.
+- **Corolário do lado da CRIAÇÃO:** contra o modo de falha de um contribuidor heurístico (que é
+  o que eu sou), o que funciona neste repo é **portão EXECUTÁVEL**, não documento — o hook
+  `anti-heuristica.sh`, a régua-grep do caso 64, o schema que berra. **Regra nova sem portão
+  novo é regra que eu vou violar de novo.**
+
 ---
 
 ## 2. Core e toolchain

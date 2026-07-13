@@ -20,6 +20,83 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
+## 2026-07-13 — `verify`: prove that an edit did not change behaviour — **including an edit you did not make**
+
+You are going to ask an AI to refactor your Harbour code. It will do it by **substituting
+text** — confidently, and sometimes wrongly: a method name that another class also uses, a
+word that is also part of a `#xcommand`, a call site that a directive generated, a string
+that happens to match. You will be left staring at a diff, wondering whether the program is
+still the same program.
+
+Now you can stop wondering.
+
+```
+$ hbrefactor snapshot myapp.hbp
+snapshot: 12 module(s) recorded (pcode + sources)
+edit freely, then run: hbrefactor verify myapp.hbp
+
+   ... let the AI (or yourself, or any other tool) edit the code ...
+
+$ hbrefactor verify myapp.hbp
+verify: PRESERVED - all 12 module(s) byte-identical (-gh -l)
+the edit provably preserves behaviour
+```
+
+`PRESERVED` is not an opinion and not a test run: the compiler produced **the same object
+code**, byte for byte. Rename a local, reindent everything, add comments, move blocks around
+— if the program the compiler sees is identical, you have a **proof**, not a good feeling.
+
+**It works for ANY edit.** This is the point. The refactorings hbrefactor performs are a
+finite list, and no list will ever cover what you — or an AI — will want to do next. The
+verifier does not know, and does not care, who made the edit or what it was trying to
+achieve. It only reports what the compiler saw.
+
+### When the edit legitimately changes the program
+
+```
+$ hbrefactor verify myapp.hbp
+verify: CHANGED - the program the compiler sees is not the same one
+this is NOT a verdict that the edit is wrong: it means preservation was not proven.
+An honest refactoring may legitimately change the pcode.
+  billing.prg: pcode of INVOICE changed
+  billing.prg: new function CALCULATETAX
+  billing.prg: new symbol CALCULATETAX
+```
+
+**`CHANGED` is not a failure, and hbrefactor will never tell you that it is.** Extracting a
+function *must* change the object code — that is what extracting a function means. What you
+get instead is the **delta the compiler itself sees**: which function's code changed, which
+function or symbol was born, which one is gone. A text diff shows you lines. This shows you
+what the *compiler* understood to be different — and that is the thing no AI can fake and no
+`grep` can give you.
+
+Read it as the honest sentence it is: *"I could not prove this is the same program."*
+
+### When the edit breaks the build
+
+```
+$ hbrefactor verify myapp.hbp --rollback
+verify: BROKEN - the project does not compile after the edit
+rolled back 12 file(s) to the snapshot, byte for byte
+```
+
+`--rollback` **only acts when the build is broken.** It will never revert a `CHANGED` — that
+would destroy work that is probably correct.
+
+### The honest limits
+
+- **The oracle is one-sided.** `PRESERVED` proves preservation. `CHANGED` proves **nothing**
+  — it is the *absence* of a proof, not the presence of a defect. Never read it as "the AI
+  got it wrong".
+- **It compares object code, not intent.** Two programs that behave the same but compile
+  differently (a loop rewritten as a different loop) come out as `CHANGED`. That is honest:
+  hbrefactor does not guess what you meant.
+- **A snapshot goes stale if the project's files change underneath it.** Take a fresh one.
+- The snapshot lives in your temp directory, keyed by the project's full path — **nothing is
+  written into your repository.**
+
+*(Internals: `docs/roadmap.md` § A, `docs/spec-a-oraculo-para-agentes.md`.)*
+
 ## 2026-07-13 — `unused-locals` is gone: the compiler already tells you
 
 **Removed, from the CLI and from the VSCode extension.** If you were using it, this is
