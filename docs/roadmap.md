@@ -558,7 +558,32 @@ suíte (responde ao critério de matar do adr-003).
   12,35→**8,36 s** — **~1,4–1,6× (um terço da espera)**, que é ganho de verdade e é a
   manchete honesta. Os quatro anúncios (CHANGELOG, NEWS, as duas páginas) foram
   reescritos. **Lição: medir o STRESS não é medir o PRODUTO.**
-- **P10** síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
+- **P10 ✅ ENTREGUE (2026-07-13): síntese — e a completude achou um BUG que teria
+  matado a ferramenta.** (a) **O `adr-003` está FECHADO**: as 5 perguntas que ele
+  abriu têm veredito, respondidas *pelo critério que ele mesmo fixou* — granularidade
+  (booleano certo, `genOp` recusado, P1); marker que gera E passa (segurança
+  ESTRUTURAL, P2); custo (era quadrático, P9); "descoberta ruim" (**passou no
+  critério, e por pouco**: o 2º consumidor apareceu por BUG, não por elegância — o
+  `usages --at` estava errado sem o fato, P3); e o **acoplamento**, cuja resposta
+  inverte a pergunta — o medo era perder independência do pp, e a fase provou que
+  **independência do core é o que PRODUZ réplica degradada** (cada desacoplamento que
+  restava virou bug: `ast-15`, `ast-14`, a aritmética de colisão do P11, a busca de
+  include do P8). (b) **`ast-schema.md` alcança o core** (título dizia `ast-14`).
+  (c) **O BUG que a completude achou:** o canal `ast-16` entrou no core **sem
+  versionar o `HB_AST_SCHEMA`** — o dump entregava os campos novos declarando-se
+  `ast-15`, e o `NEWS`/página mandam o consumidor *conferir esse campo*: contrato
+  mentindo. Ao consertar o número, a ferramenta **recusou o projeto inteiro** — o
+  `ReadAst` tinha **lista ENUMERADA** de versões aceitas, que morre em silêncio a cada
+  bump (e ainda mentia no diagnóstico: *"dump missing"*, com o dump no lugar). **Um
+  esquecimento escondia o outro.** O `ast-schema.md` já registrara essa lição no bump
+  `ast-8` ("portão usa VERSÃO MÍNIMA, NUNCA lista") e **abria exceção para o
+  `ReadAst`** — a exceção era o bug. Conserto: core versiona (`ast-16`), leitor vira
+  **PISO** (`AstAtLeast`), dump velho é dito com o nome certo. **Caso 122** guarda a
+  régua (lista enumerada não volta). Suíte **965/0**, ppcorpus 42/0, lexdiff 0.
+  **Commit do core pendente de autorização por-commit do Diego.**
+
+**FASE P ENCERRADA (2026-07-13).** Saldo: 4 canais novos no core (`ast-13`..`ast-16`),
+zero heurística nova na ferramenta, e três erros meus registrados com nome.
 - **P11 — ENTREGUE (2026-07-12): o pp VIVO como oráculo; morre a última gramática
   replicada, e com ela um SEQUESTRO DE REGRA silencioso.** A API está mapeada e a
   **equivalência com o pp do build foi PROVADA** (mesma regra, mesmo site, mesmo

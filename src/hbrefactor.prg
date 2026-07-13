@@ -267,34 +267,60 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 
    LOCAL cPath := hb_DirSepAdd( cTmp ) + hb_FNameName( cModPath ) + ".ast.json"
    LOCAL hAst := hb_jsonDecode( hb_MemoRead( cPath ) )
+   LOCAL cGot
 
-   // ast-3 = ast-2 + rastro de derivação ("from" nos tokens sintetizados,
-   // fase B4d); ast-4 = ast-3 + canal de tipos da linguagem (declarations
-   // tipadas parse-time + tabelas DECLARE em "declared", fase B4f);
-   // ast-5 = ast-4 + a regra por dentro (match[]/result[] em ppRules,
-   // fase B4g); ast-6 = ast-5 + "ret": true no push que carrega o valor
-   // de RETURN (fase B7); ast-9 = posição do token ESCRITO do nome nas
-   // declarations (nameLine/nameCol, âncora do materializador - B9
-   // fatia 3); ast-10 = canal de parentesco DECLARADO no stream
-   // (_HB_SUPER, RE.6/F6.1 - o gate do fato de exclusão de send);
-   // ast-11 = params do bloco no PRÓPRIO nó CODEBLOCK ("params":
-   // [{sym,type,class}], completude M-B) - tipa o receptor de um send
-   // pelo bloco EXATO, destravando getter+setter de VAR..IS na mesma linha;
-   // ast-12 = "generates": true no token-fonte de marker do ppApplications
-   // (o nome PASTEIA/STRINGIFICA -> gera artefato; fase U/revisão) - separa
-   // "nome que a diretiva vira código" of "símbolo ligado num comando";
-   // ast-13 = GENEALOGIA de regra ("from" nos tokens de match[]/result[]
-   // de regra GERADA por expansão de outra regra - liga a regra à
-   // aplicação/marker que a criou; fase P).
-   // O leitor usa só seções presentes em todos - comandos que
-   // exigem o rastro/o canal/a regra recusam ou degradam com mensagem
-   // clara (FromReady/Ast4Ready/RuleToksReady)
-   IF ! HB_ISHASH( hAst ) .OR. ;
-      hb_AScan( { "ast-2", "ast-3", "ast-4", "ast-5", "ast-6", "ast-7", "ast-8", "ast-9", "ast-10", "ast-11", "ast-12", "ast-13", "ast-14", "ast-15" }, hb_HGetDef( hAst, "schema", "" ) ) == 0
+   // O SCHEMA É EXATO - a ferramenta exige a versão que o core do branch emite
+   // HOJE, e ponto. (Diego, 2026-07-13: *"estamos fazendo a AST sob demanda,
+   // então mexer no core é parte do trabalho; não existe esta busca de
+   // compatibilidade - estamos INVENTANDO a ferramenta"*.)
+   //
+   // Por que não há o que compatibilizar: o dump é gerado NA HORA, a cada
+   // comando, pelo harbour do HB_BIN (AstDumps passa -rebuild). Não existe
+   // "dump antigo" - existe TOOLCHAIN antigo, e isso é um erro de build, que se
+   // BERRA, não se degrada. A escada de portões de versão que vivia aqui (cinco
+   // funções, 23 sítios) fingia ler um dump que não pode chegar, e o preço era
+   // pior que o peso morto: com um HB_BIN defasado ela entregaria "possible" em
+   // vez de "confirmed" - rebaixando o VEREDITO por causa de um build velho,
+   // calada. (O caso 122 guarda a régua; não reintroduzir nem os nomes.)
+   //
+   // A cicatriz que ensinou: o canal ast-16 entrou no core sem versionar o
+   // schema, e o leitor tinha uma LISTA enumerada de versões aceitas. Um
+   // esquecimento escondia o outro, e no dia em que se versionou a ferramenta
+   // recusou o projeto inteiro dizendo "dump missing" - com o dump no lugar.
+   // Agora o caso 122 quebra a suíte no instante em que os dois divergirem.
+   IF ! HB_ISHASH( hAst )
+      RETURN NIL
+   ENDIF
+   cGot := hb_HGetDef( hAst, "schema", "" )
+   IF ! HB_ISSTRING( cGot ) .OR. ! cGot == AstSchema()
+      SchemaMismatch( cGot )
       RETURN NIL
    ENDIF
 
    RETURN hAst
+
+// a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
+// contra o que o compilador do HB_BIN realmente emite.
+STATIC FUNCTION AstSchema()
+   RETURN "ast-16"
+
+// o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
+// genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
+// que está no lugar, em vez de reconstruir o harbour do branch.
+STATIC PROCEDURE SchemaMismatch( cGot )
+
+   STATIC s_lSaid := .F.
+
+   IF ! s_lSaid
+      s_lSaid := .T.
+      OutErr( "hbrefactor: the dump is there, but speaks schema " + ;
+              iif( Empty( cGot ), "(none)", "'" + cGot + "'" ) + " and this tool " + ;
+              "speaks '" + AstSchema() + "' - the harbour on HB_BIN is out of step " + ;
+              "with the tool; rebuild both from branch feature/compiler-ast-dump" + ;
+              hb_eol() )
+   ENDIF
+
+   RETURN
 
 // scratch único por invocação (R1 da suíte paralela e de qualquer uso
 // concorrente real - o timestamp de 1 s colidia entre processos no mesmo
@@ -545,7 +571,7 @@ STATIC FUNCTION Usages( aArgs )
             LocAdd( aLoc, cPath, hFunc[ "line" ], TokenCols( hAst, hFunc[ "line" ], cName ), Len( cName ) )
             OutStd( cModFile + ":" + hb_ntos( hFunc[ "line" ] ) + ": definition (" + ;
                iif( hFunc[ "static" ], "static ", "" ) + hFunc[ "kind" ] + ")" + hb_eol() )
-         ELSEIF ! lAtSym .AND. FromReady( hAst ) .AND. ;
+         ELSEIF ! lAtSym .AND. ;
             ( aLift := PpMarkerLift( hAst, hFunc, cUpMeth, hAtPairs ) ) != NIL
             // lifting B4d: o programador escreveu METHOD Paint() CLASS
             // UWMenu (ou HANDLER Click de qualquer DSL); a função gerada é
@@ -656,7 +682,7 @@ STATIC FUNCTION Usages( aArgs )
       //      builds do hbclass sem declarações e DSLs que só registram.
       // Dedup por posição; veredito pela resolução da CONSULTADA
       hDone := { => }
-      IF ! Empty( cClass ) .AND. FromReady( hAst )
+      IF ! Empty( cClass )
          aDecl  := {}
          cCur   := NIL
          nState := 0
@@ -770,7 +796,7 @@ STATIC FUNCTION Usages( aArgs )
 
       // sites do NOME DE MARKER que atravessam diretivas (B4d): posições
       // escritas que nenhum relator acima cobriu (decl. de método/handler...)
-      IF ! lAtSym .AND. FromReady( hAst )
+      IF ! lAtSym
          nHits += PpMarkerHits( hAst, cUp, cModFile, aSrc, aLoc, cPath, Len( cName ), lShowExp, hAtPairs )
       ENDIF
    NEXT
@@ -1570,44 +1596,39 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
       // identificador comum; o fato do SITE é a palavra da regra.
       // match[]/result[] do ast-5 dão a palavra por posição-fato; consulta
       // crua (o usages responde com os sites, RuleSiteHits inclusos)
-      IF RuleToksReady( hAst )
-         FOR EACH hRule IN hAst[ "ppRules" ]
-            IF hRule[ "file" ] == NIL .OR. ;
-               ! Lower( hb_FNameNameExt( hRule[ "file" ] ) ) == ;
-                 Lower( hb_FNameNameExt( hAst[ "module" ] ) )
-               LOOP
-            ENDIF
-            FOR EACH cSide IN { "match", "result" }
-               FOR EACH hTok IN hRule[ cSide ]
-                  IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
-                     hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
-                     nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
-                     cMk    := hTok[ "text" ]
-                     cKind  := iif( hTok[ "role" ] == "marker", ;
-                                    "rule marker name (local to the directive; ", ;
-                               iif( hTok[ "role" ] == "restrict", ;
-                                    "restriction word (", ;
-                                    "word in the " + cSide + " of rule (" ) ) + ;
-                               RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")"
-                     cQuery := cMk
-                     // P8: o nome de MARKER é "variável local" da regra - não é
-                     // palavra da DSL (não aparece no uso) nem símbolo ligado.
-                     // Renomeá-lo é um ALPHA-RENAME: coerente entre match[] e
-                     // result[] da MESMA regra, e invisível na expansão. Carrega
-                     // a identidade (regra + NÚMERO do marker) porque o nome
-                     // sozinho é ambíguo - `<n>` de outra regra é outra variável
-                     IF hTok[ "role" ] == "marker"
-                        cRole    := "rulemarker"
-                        nRuleId  := hRule[ "id" ]
-                        nRuleMk  := hTok[ "marker" ]
-                        cRuleFil := hRule[ "file" ]
-                     ELSE
-                        cRole  := "dsl"
-                     ENDIF
-                     EXIT
+      FOR EACH hRule IN hAst[ "ppRules" ]
+         IF hRule[ "file" ] == NIL .OR. ;
+            ! Lower( hb_FNameNameExt( hRule[ "file" ] ) ) == ;
+              Lower( hb_FNameNameExt( hAst[ "module" ] ) )
+            LOOP
+         ENDIF
+         FOR EACH cSide IN { "match", "result" }
+            FOR EACH hTok IN hRule[ cSide ]
+               IF Len( hb_HGetDef( hTok, "text", "" ) ) > 0 .AND. ;
+                  hTok[ "col" ] != NIL .AND. hTok[ "line" ] == nLine .AND. ;
+                  nCol0 >= hTok[ "col" ] .AND. nCol0 < hTok[ "col" ] + hTok[ "len" ]
+                  cMk    := hTok[ "text" ]
+                  cKind  := iif( hTok[ "role" ] == "marker", ;
+                                 "rule marker name (local to the directive; ", ;
+                            iif( hTok[ "role" ] == "restrict", ;
+                                 "restriction word (", ;
+                                 "word in the " + cSide + " of rule (" ) ) + ;
+                            RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")"
+                  cQuery := cMk
+                  // P8: o nome de MARKER é "variável local" da regra - não é
+                  // palavra da DSL (não aparece no uso) nem símbolo ligado.
+                  // Renomeá-lo é um ALPHA-RENAME: coerente entre match[] e
+                  // result[] da MESMA regra, e invisível na expansão. Carrega
+                  // a identidade (regra + NÚMERO do marker) porque o nome
+                  // sozinho é ambíguo - `<n>` de outra regra é outra variável
+                  IF hTok[ "role" ] == "marker"
+                     cRole    := "rulemarker"
+                     nRuleId  := hRule[ "id" ]
+                     nRuleMk  := hTok[ "marker" ]
+                     cRuleFil := hRule[ "file" ]
+                  ELSE
+                     cRole  := "dsl"
                   ENDIF
-               NEXT
-               IF cQuery != NIL
                   EXIT
                ENDIF
             NEXT
@@ -1615,7 +1636,10 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                EXIT
             ENDIF
          NEXT
-      ENDIF
+         IF cQuery != NIL
+            EXIT
+         ENDIF
+      NEXT
       // camada 4: identificador comum do stream do compilador
       IF cQuery == NIL
          aPrev := NIL
@@ -3171,9 +3195,6 @@ STATIC FUNCTION RenameFunction( aArgs )
    // entra no conjunto de edições e passa pelo MESMO oráculo de sempre
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
-      IF ! RuleToksReady( hAst )
-         LOOP           // dump antigo: sem o fato (o oráculo pega regra aplicada)
-      ENDIF
       FOR EACH hRule IN hAst[ "ppRules" ]
          cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ] + "|" + ;
                  iif( hRule[ "head" ] == NIL, "", hRule[ "head" ] )
@@ -5941,9 +5962,6 @@ STATIC FUNCTION ArrJoin( aArr, cSep )
 // literal da própria regra) do dump ast-2 - ver docs/ast-schema.md.
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION PpReady( hAst )
-   RETURN hb_HHasKey( hAst, "ppRules" ) .AND. hb_HHasKey( hAst, "ppApplications" )
-
 STATIC FUNCTION RuleTag( hRule )
    RETURN "#" + hRule[ "kind" ] + " " + ;
           iif( hRule[ "head" ] == NIL, "<headless>", hRule[ "head" ] )
@@ -5963,10 +5981,6 @@ STATIC FUNCTION RuleWhere( hRule )
 STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen )
 
    LOCAL hRule, hApp, hTok, nHits := 0, cKey, lHead, cWhat
-
-   IF ! PpReady( hAst )      // dump ast-1: sem os fatos, sem os hits
-      RETURN 0
-   ENDIF
 
    // definição: a diretiva (o mesmo .ch registra a regra em cada módulo
    // que o inclui - dedupe global por arquivo+linha+tipo)
@@ -6033,9 +6047,6 @@ STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen )
 
    LOCAL hRule, hTok, cSide, nHits := 0, cKey, cWhat, cWhere
 
-   IF ! RuleToksReady( hAst )
-      RETURN 0                  // dump antigo: sem o fato, sem os hits
-   ENDIF
    FOR EACH hRule IN hAst[ "ppRules" ]
       cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ] + "|" + ;
               iif( hRule[ "head" ] == NIL, "", hRule[ "head" ] )
@@ -6133,14 +6144,6 @@ STATIC FUNCTION RenameDsl( aArgs )
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
          RETURN Refuse( "dump missing/invalid for '" + cPath + "'" )
-      ENDIF
-      IF ! PpReady( hAst )
-         RETURN Refuse( "dump without ppRules/ppApplications (schema ast-2) - " + ;
-                        "rebuild harbour from branch feature/compiler-ast-dump" )
-      ENDIF
-      IF ! RuleToksReady( hAst )
-         RETURN Refuse( "dump without match[]/result[] (schema older than ast-5) - " + ;
-                        "rebuild harbour from branch feature/compiler-ast-dump" )
       ENDIF
       hAsts[ cPath ] := hAst
 
@@ -6501,9 +6504,6 @@ STATIC FUNCTION RuleMarkerUsages( hProj, hAsts, hResAt, cJsonOut )
    LOCAL cWant := AbsOf( ResolveInclude( hProj, hResAt[ "rulefile" ] ) )
 
    FOR EACH cPath IN hb_HKeys( hAsts )
-      IF ! RuleToksReady( hAsts[ cPath ] )
-         LOOP
-      ENDIF
       FOR EACH hTok IN hAsts[ cPath ][ "ppRules" ]
          IF hTok[ "id" ] == hResAt[ "ruleid" ] .AND. hTok[ "file" ] != NIL .AND. ;
             AbsOf( ResolveInclude( hProj, hTok[ "file" ] ) ) == cWant
@@ -6577,9 +6577,6 @@ STATIC FUNCTION ResolveAtRuleFile( hProj, hAsts, cRuleFile, nLine, nCol0 )
    ENDIF
 
    FOR EACH cPath IN hb_HKeys( hAsts )
-      IF ! RuleToksReady( hAsts[ cPath ] )
-         LOOP
-      ENDIF
       FOR EACH hRule IN hAsts[ cPath ][ "ppRules" ]
          IF hRule[ "file" ] == NIL
             LOOP
@@ -6661,9 +6658,6 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    // Basta a visão de um módulo que a registre - as posições são do arquivo
    hRule := NIL
    FOR EACH cPath IN hProj[ "files" ]
-      IF ! RuleToksReady( hAsts[ cPath ] )
-         LOOP
-      ENDIF
       FOR EACH hTok IN hAsts[ cPath ][ "ppRules" ]
          IF hTok[ "id" ] == nRuleId .AND. hTok[ "file" ] != NIL .AND. ;
             hR[ "rulefile" ] != NIL .AND. ;
@@ -7489,17 +7483,6 @@ STATIC FUNCTION MvLineHits( hAst, nLine, cUpOld )
 // diretiva que venha a ser criada no mesmo funil.
 // ---------------------------------------------------------------------------
 
-// portão de capacidade por VERSÃO MÍNIMA do schema ("ast-N" com N >=
-// nMin). A forma antiga enumerava versões e MORRIA em silêncio a cada
-// bump (o ast-8/RE.5 apagou lifting/canal/regras até esta lição);
-// o teto de aceitação continua fechado no ReadAst
-STATIC FUNCTION AstAtLeast( hAst, nMin )
-   LOCAL cSchema := hb_HGetDef( hAst, "schema", "" )
-   RETURN hb_LeftEq( cSchema, "ast-" ) .AND. Val( SubStr( cSchema, 5 ) ) >= nMin
-
-STATIC FUNCTION FromReady( hAst )
-   RETURN AstAtLeast( hAst, 3 )
-
 // ---------------------------------------------------------------------------
 // B4f - canal de tipos da linguagem (schema ast-4). O compilador PARSEIA e
 // transporta as declarações de tipo da gramática (AS CLASS/AS <tipo> nas
@@ -7512,9 +7495,6 @@ STATIC FUNCTION FromReady( hAst )
 // declarado é promessa do programador, não verificada em runtime.
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION Ast4Ready( hAst )
-   RETURN AstAtLeast( hAst, 4 )
-
 // ---------------------------------------------------------------------------
 // B4g - a regra por dentro (schema ast-5): ppRules[] ganha match[]/result[],
 // um item por token do padrão com o PAPEL que o próprio pp atribuiu ao
@@ -7526,9 +7506,6 @@ STATIC FUNCTION Ast4Ready( hAst )
 // exigem a regra por dentro degradam/recusam com o fato em dump antigo.
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION RuleToksReady( hAst )
-   RETURN AstAtLeast( hAst, 5 )
-
 // tabelas DECLARE agregadas do PROJETO (as do dump são por módulo):
 // { "f" => { FUNÇÃO => item }, "c" => { CLASSE => { MÉTODO => item } } }.
 // NIL quando qualquer módulo não é ast-4 - as camadas confirmed/excluded
@@ -7539,9 +7516,6 @@ STATIC FUNCTION DeclTables( hAsts )
    LOCAL hAst, hItem, hCls, hMth, cCls
 
    FOR EACH hAst IN hAsts
-      IF ! Ast4Ready( hAst )
-         RETURN NIL
-      ENDIF
       FOR EACH hItem IN hAst[ "declared" ][ "functions" ]
          hDecl[ "f" ][ Upper( hItem[ "name" ] ) ] := hItem
       NEXT
@@ -9545,10 +9519,6 @@ STATIC FUNCTION B7Ctx( hAsts, hDecl )
 
    RETURN hInter
 
-// o dump carrega o rótulo de RETURN? (ast-6+)
-STATIC FUNCTION B7Ret6( hAst )
-   RETURN AstAtLeast( hAst, 6 )
-
 // função por nome: STATIC/pública do MÓDULO primeiro, depois pública do
 // projeto (colisão de públicas = NIL). Fora do projeto => NIL
 STATIC FUNCTION B7FunOf( cUpFun, hAst, hInter )
@@ -9760,7 +9730,7 @@ STATIC FUNCTION B7FunRet( cUpFun, hAst, hInter )
    IF hb_HHasKey( hInter[ "rets" ], cKey )
       RETURN hInter[ "rets" ][ cKey ]
    ENDIF
-   IF hb_HHasKey( hInter[ "active" ], cKey ) .OR. ! B7Ret6( aFA[ 1 ] )
+   IF hb_HHasKey( hInter[ "active" ], cKey )
       RETURN NIL
    ENDIF
    hInter[ "active" ][ cKey ] := .T.
@@ -10730,7 +10700,7 @@ STATIC FUNCTION OracleLoad()
       ENDIF
    ENDIF
    hAst := hb_jsonDecode( hb_MemoRead( cJson ) )
-   IF ! HB_ISHASH( hAst ) .OR. ! B7Ret6( hAst )
+   IF ! HB_ISHASH( hAst )
       RETURN NIL
    ENDIF
    // acha a função-classe pelo par que se auto-referencia
@@ -10922,9 +10892,6 @@ STATIC FUNCTION ClassSuperFacts( hAsts )
    LOCAL cCur, lExpectCls, lInSuper
 
    FOR EACH hAst IN hAsts
-      IF ! AstAtLeast( hAst, 10 )
-         LOOP
-      ENDIF
       aToks := hb_HGetDef( hAst, "tokens", {} )
       cCur := ""
       lExpectCls := .F.
@@ -11556,9 +11523,6 @@ STATIC FUNCTION OwnerVocabMap( hAsts )
 
    FOR EACH cPath IN hb_HKeys( hAsts )
       hAst := hAsts[ cPath ]
-      IF ! FromReady( hAst )
-         LOOP
-      ENDIF
       // fonte 1: canal declared no stream (cobre dona SEM função geradora)
       lNext := .F.
       FOR EACH hTok IN hAst[ "tokens" ]
@@ -11765,10 +11729,6 @@ STATIC FUNCTION RenameMethod( aArgs )
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
          RETURN Refuse( "dump missing/invalid for '" + cPath + "'" )
-      ENDIF
-      IF ! FromReady( hAst )
-         RETURN Refuse( "dump without derivation trail (schema ast-3) - " + ;
-                        "rebuild harbour AND hbmk2 from branch feature/compiler-ast-dump" )
       ENDIF
       hAsts[ cPath ] := hAst
       IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
@@ -12107,7 +12067,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    // byte-exata, como artefato de stringify do nome NOVO
    FOR EACH cPath IN hb_HKeys( hPredStr )
       hAst := ReadAst( cTmp, cPath )
-      IF hAst == NIL .OR. ! FromReady( hAst )
+      IF hAst == NIL
          RollbackAll( hOrig )
          RETURN Refuse( "post-edit dump missing for " + hb_FNameNameExt( cPath ) + " - rollback" )
       ENDIF

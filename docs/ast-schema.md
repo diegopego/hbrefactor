@@ -1,9 +1,37 @@
-# Schema `ast-14` — o dump AST do compilador (spec)
+# Schema `ast-16` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
 em `src/pp/ppcore.c`) e o hbrefactor. Um `.ast.json` por módulo compilado
 com `-x`.
+
+> **O bump é PARTE do canal, não um detalhe administrativo (cicatriz da P10,
+> 2026-07-13).** O `ast-16` entrou no core **sem versionar o `HB_AST_SCHEMA`** —
+> o dump entregava os campos novos declarando-se `ast-15`, e este documento
+> ainda dizia `ast-14` no título. O `NEWS.md` e a landing page do core mandam o
+> consumidor *"conferir o campo `schema`"*, então isso não era desleixo de doc:
+> era o **contrato mentindo**. Pior, ao consertar o número a ferramenta
+> **recusou o projeto inteiro** — o `ReadAst` tinha uma **lista enumerada** de
+> versões aceitas (`{ "ast-2", …, "ast-15" }`) e ela morre em silêncio a cada
+> bump. Um esquecimento escondia o outro.
+>
+> **E o conserto certo era mais radical do que eu tinha feito (Diego, 2026-07-13):**
+> *"estamos fazendo a AST sob demanda, então mexer no core é parte do trabalho e é
+> normal — não existe esta busca de compatibilidade; estamos INVENTANDO a ferramenta"*.
+> Eu tinha trocado a lista por um **piso** (`ast-2` para cima) — ainda maquinaria de
+> compatibilidade, **com o quê?**. O dump é gerado **na hora**, a cada comando, pelo
+> `harbour` do `HB_BIN`: **não existe "dump antigo"** — existe **toolchain fora de
+> passo**, e isso se **BERRA**. Hoje: **o schema é EXATO** (`AstSchema()`, um só lugar
+> na ferramenta), e divergiu → recusa alta nomeando as duas versões. As **cinco funções
+> e 23 sítios** de degradação por versão foram **removidos** — e nada na suíte dependia
+> deles. *Ao entregar um canal: versionar o `"schema"` no core, atualizar este documento
+> e o `AstSchema()` — **no mesmo commit**. O **caso 122** fica vermelho se você esquecer.*
+
+O **`ast-16` (fase P-AUDIT / P11) = `ast-15` + TEMPO DE VIDA E FAMÍLIA DA REGRA**
+(o prefixo de modo em `kind` — `""` dBase / `x` exato / `y` exato e
+case-sensitive —, o `un` de diretiva que REMOVE, o `undoes` e o `removed`);
+detalhado na seção `ppRules[]`. O **`ast-15` (P-AUDIT) = `ast-14` + `ruletok`**
+(QUAL literal da regra o token casou), detalhado em `ppApplications[]`.
 
 O **`ast-14` (fase P / P5) = `ast-13` + TODO MARKER DE MATCH É NUMERADO.**
 Antes, o pp só dava índice a um marker de match que o RESULT referenciasse
@@ -1358,15 +1386,26 @@ adversarial provado), e para param de BLOCO a posição é capturada no
 PARSE (`BlockVarList` → `HB_CBVAR.iPosLine/iPosCol`, padrão K1) porque
 a materialização acontece no fim do bloco, com o stream já além do
 corpo. Nome sem token de fonte (prov ≠ 's': diretiva, include) = campo
-AUSENTE, honesto. O leitor da
-ferramenta (`ReadAst`) aceita `ast-2`..`ast-9`; comandos que EXIGEM o
-rastro usam `FromReady` (ast-3+), a classificação de receptor exige
-projeto inteiro em ast-4+ (`Ast4Ready`/`DeclTables`), a regra por dentro
-usa `RuleToksReady` (ast-5) e o rótulo de RETURN `B7Ret6` (ast-6+) — em
-dump antigo degrada/recusa com o fato, sem quebrar. **Regra aprendida
-no bump ast-8 (custou uma bissecção): portão de capacidade usa VERSÃO
-MÍNIMA (`AstAtLeast( hAst, n )`), NUNCA lista enumerada de versões —
-a lista morria em silêncio a cada bump (lifting/canal/regras apagados
-até o tcheck); o teto fechado vive só no `ReadAst`. Próximo a avaliar: span original de string no posTrack
+AUSENTE, honesto.
+
+**O leitor da ferramenta (`ReadAst`) exige o schema EXATO** — o que o core do branch
+emite hoje (`AstSchema()`). Não há piso, teto, lista nem degradação: o dump nasce a cada
+comando do compilador que está no `HB_BIN`, então um dump de outra versão só pode
+significar **toolchain fora de passo**, e a resposta é recusa alta com as duas versões
+nomeadas. **A escada de degradação por versão foi REMOVIDA** (cinco funções, 23 sítios) —
+ela fingia ler um dump que não pode chegar e, pior, com um build velho teria rebaixado o
+**veredito** (entregando `possible` onde há `confirmed`) **em silêncio**, que é o oposto
+do que este produto promete. *Registro do que ela dizia, para não voltar: "dump antigo
+degrada/recusa com o fato, sem quebrar" — a boa intenção que custava a mentira.*
+
+**Regra aprendida no bump `ast-8`** (custou uma bissecção) **e depois EXCETUADA — e a
+exceção era o bug**: o documento dizia *"portão de capacidade usa VERSÃO MÍNIMA, NUNCA
+lista enumerada"* e, no mesmo parágrafo, abria mão dela para o `ReadAst` (*"o teto
+fechado vive só no `ReadAst`"*). A P10 achou essa lista viva, e ela **matou a ferramenta
+inteira** no instante em que o core versionou para `ast-16` — recusa de todo módulo, com
+o diagnóstico enganoso *"dump missing"*, com o dump no lugar. **Regra excetuada não é
+regra.**
+
+Próximo a avaliar: span original de string no posTrack
 (mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e atualizar este
 documento NO MESMO commit.

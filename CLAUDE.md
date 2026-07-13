@@ -88,6 +88,39 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
      dump porque era barato; o canal certo (`harbour -gd`, lista de dependências
      oficial, com caminho RESOLVIDO e fecho transitivo) já existia e eu não tinha
      procurado. **Barato ≠ correto; e "não achei" quase sempre = "não procurei".**
+- **NÃO EXISTE COMPATIBILIDADE PARA TRÁS — a ferramenta está sendo INVENTADA (Diego,
+  2026-07-13: *"estamos fazendo a AST sob demanda, então mexer no core do Harbour é
+  parte do trabalho e é normal; não existe esta busca de compatibilidade"*)**. O dump
+  é gerado **na hora**, a cada comando, pelo `harbour` do `HB_BIN` — logo **não existe
+  "dump antigo"**: existe **toolchain fora de passo**, e isso é erro de build, que se
+  **BERRA**, nunca se degrada. Corolários: (a) o schema é **EXATO** (`AstSchema()`, um
+  só lugar), não piso e jamais lista enumerada — divergiu, recusa alta nomeando as
+  duas versões; (b) **nenhum portão de degradação por versão** ("dump sem o canal X
+  degrada para possible") — degradar rebaixaria o **VEREDITO** por causa de um build
+  velho, **calado**, que é o oposto do produto; (c) a suíte **sempre roda no schema
+  corrente**, e o **caso 122** fica vermelho no instante em que core e ferramenta
+  divergirem — o esquecimento de bump vira impossível de embarcar. *(O corte: 5
+  funções e 23 sítios de compatibilidade saíram e **nada** na suíte dependia deles —
+  964 checks passaram sem tocar em nenhum. Peso morto que ainda por cima mentia.)*
+  **Complemento do Diego:** *"usar testes como amarração para descobrir se estamos indo
+  no caminho certo é uma coisa; forçar compatibilidade em ferramenta em criação, não"*
+  — e **teste que quebra tem de ser TRAZIDO a ele**: a premissa errada pode ser a do
+  teste, e quem decide qual lado cede é o Diego (é a regra do drift, acima).
+- **MEDIR O STRESS NÃO É MEDIR O PRODUTO — e número de benchmark é AFIRMAÇÃO, não
+  enfeite (Diego, 2026-07-13)**: consertei uma quadrática no dump, medi num stress
+  SINTÉTICO (uma expansão de pp por linha — densidade que código Harbour real não
+  tem), e **publiquei "330×" nos quatro anúncios** (CHANGELOG, NEWS, as duas páginas)
+  — ainda por cima afirmando que "16 mil linhas expandidas é um tamanho ordinário em
+  aplicação real", coisa que eu **nunca medi**. Ponta a ponta, na FERRAMENTA, em
+  projeto real, o ganho é **~1/3 da espera** (xhb 42 módulos: 12,35 s → 8,36 s). É
+  ganho de verdade — e é a manchete honesta. **A regra:** (a) o número que se ANUNCIA
+  é o do **produto rodando como o usuário roda** (comando completo, projeto real do
+  corpus), nunca o do microbenchmark; (b) o stress serve para achar a CURVA
+  (quadrática × linear), não para dimensionar a notícia; (c) **"tamanho típico de
+  aplicação real" é uma afirmação sobre o mundo** — ou se mede no corpus, ou não se
+  escreve. *(É o mesmo pecado da REGRA DO FATO, do lado de fora: afirmar sem medir é
+  a heurística vestida de manchete. E veio no MESMO dia em que a P9 flagrou que eu
+  chamara um custo de "barato" olhando uma fixture.)*
 - **NÃO declare IMPOSSÍVEL/RECUSA sem VARRER a superfície do core (2026-07-12)**:
   toda recusa ("o pp não consegue X") é uma afirmação sobre o CORE e exige
   varredura ANTES, com o que foi varrido REGISTRADO na spec: (a) `harbour`/`hbmk2`

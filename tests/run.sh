@@ -4237,7 +4237,42 @@ check "projects-of num .ch acha o dono (posse de include = fato do compilador, -
 check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121"
+unit_122() {
+echo "case 122: P10 - o schema e EXATO: o core e a ferramenta falam a MESMA versao, ou berra"
+# A CICATRIZ (dois bugs, um escondendo o outro): o canal ast-16 entrou no core sem
+# versionar HB_AST_SCHEMA -- o dump entregava os campos novos dizendo-se "ast-15",
+# e o NEWS manda o consumidor CONFERIR esse campo (contrato mentindo). Ao consertar
+# o numero, a ferramenta RECUSOU o projeto inteiro: o ReadAst tinha uma LISTA
+# enumerada de versoes aceitas. O esquecimento do bump era o que mantinha a lista viva.
+#
+# A POLITICA (Diego, 2026-07-13): "estamos fazendo a AST sob demanda, entao mexer no
+# core e parte do trabalho; NAO existe esta busca de compatibilidade - estamos
+# inventando a ferramenta". O dump e gerado NA HORA pelo harbour do HB_BIN: nao existe
+# "dump antigo", existe TOOLCHAIN velho -- e isso se BERRA, nunca se degrada (degradar
+# rebaixaria o VEREDITO por causa de um build, calado).
+#
+# Esta regua torna o esquecimento de hoje IMPOSSIVEL de embarcar: se o core versionar
+# e a ferramenta nao acompanhar (ou o contrario), a suite fica vermelha na hora.
+! grep -nE '"ast-[0-9]+"[[:space:]]*,[[:space:]]*"ast-[0-9]+"' "$HERE/../src/hbrefactor.prg"
+check "o fonte NAO tem lista enumerada de schemas (nunca mais um teto que morre calado)" $?
+! grep -nE "AstAtLeast|FromReady|RuleToksReady|Ast4Ready|PpReady\(" "$HERE/../src/hbrefactor.prg"
+check "nenhum portao de DEGRADACAO por versao (compatibilidade e peso morto aqui)" $?
+# o que a FERRAMENTA fala
+WANT=$(grep -A1 "^STATIC FUNCTION AstSchema()" "$HERE/../src/hbrefactor.prg" | grep -oE 'ast-[0-9]+')
+[ -n "$WANT" ]
+check "a ferramenta declara O schema que fala (um unico lugar: AstSchema())" $?
+# o que o COMPILADOR do HB_BIN realmente emite
+D=$(freshp6 case122)
+( cd "$D" && "$HB_BIN/harbour" p6.prg -n -q0 -o"$D/" -x"$D/" > /dev/null 2>&1 )
+GOT=$(grep -oE '"schema": "ast-[0-9]+"' "$D/p6.ast.json" | grep -oE 'ast-[0-9]+')
+[ "$GOT" = "$WANT" ]
+check "o core emite EXATAMENTE o schema que a ferramenta exige ($GOT == $WANT)" $?
+# e o projeto real e lido de ponta a ponta com ele
+( cd "$D" && "$BIN" call-graph p6.hbp > cg.log 2>&1 )
+check "um projeto real e consumido com o schema corrente (exit 0)" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

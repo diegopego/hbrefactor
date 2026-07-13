@@ -77,22 +77,47 @@ resolve pelo binding (o local/param que ele é).
 - **NÃO** foi provado geral. Foi provado para UMA coisa: a resolução de kind
   do `rename` nos oito alvos (caso 107, 29 checks). Tudo além é hipótese.
 
-## Perguntas em aberto (podem levar a coisas boas OU ruins)
+## Perguntas em aberto — **TODAS RESPONDIDAS (P10, 2026-07-13; fase P encerrada)**
 
-- **Granularidade.** `generates` funde `paste` e `stringify` num booleano.
+> Este ADR foi escrito para ABRIR perguntas, com um **critério de matar** explícito.
+> Fechá-lo é responder cada uma **pelo critério que ele fixou** — não pelo viés
+> retrospectivo de chamar de arquitetural o que deu trabalho. Segue o veredito de
+> cada uma, com a fatia que a decidiu.
+
+- **Granularidade.** ~~`generates` funde `paste` e `stringify` num booleano.
   Existe caso em que `paste` (gera SÍMBOLO, verificável por recompilação) e
   `stringify` (gera STRING, NÃO editável sem `--force`) precisam de vereditos
   DIFERENTES? Se sim, o booleano é grosso demais e vira dois fatos. Não sei
-  ainda.
-- **Marker que gera E passa adiante.** Um `<n>` usado como `s_<n>` (paste) E
+  ainda.~~
+  **NÃO — o booleano está certo (P1).** O `genOp` (separar os dois num fato) foi
+  **recusado por prova**: a RESOLUÇÃO só precisa saber *"gera ou não"* (casos
+  51/52/107); a PREDIÇÃO, que precisa da operação, já a lê do rastro `from` (que
+  carrega `op: clone|paste|stringify` por item); e o `stringify` não exige
+  `--force` — o artefato é re-derivado, não editado às cegas. Fato sem consumidor
+  não vira canal.
+- **Marker que gera E passa adiante.** ~~Um `<n>` usado como `s_<n>` (paste) E
   `<n>` (clone) na MESMA regra: gera E é pass-through. Hoje `generates` vence
   → pp-marker. Pode estar errado num caso que ainda não vi. É contrived, mas
-  existe.
-- **Acoplamento.** A resolução da ferramenta passa a depender de um conceito
+  existe.~~
+  **`generates` vencer está certo, e a segurança é ESTRUTURAL (P2, caso 109).** Não
+  há corrupção silenciosa possível: a rede dupla (recompilação `-es2` + identidade
+  de símbolos do `.hrb`) confere o **artefato compilado final**, indiferente à
+  multiplicidade (provado com paste×3 e paste×2+stringify×2) e ao aninhamento. Todo
+  caso é rollback honesto OU re-derivação verificada.
+- **Acoplamento.** ~~A resolução da ferramenta passa a depender de um conceito
   INTERNO do pp (a operação de derivação). É principiado (é FATO exposto pelo
   core), mas amarra o modelo de resolução à mecânica do pp — se a semântica
   de derivação do pp mudar, o fato muda junto. Bom (fica fiel ao compilador)
-  e arriscado (menos independência) ao mesmo tempo.
+  e arriscado (menos independência) ao mesmo tempo.~~
+  **O acoplamento era a VIRTUDE, não o risco — e a fase P andou na direção de MAIS
+  acoplamento, de propósito.** O medo aqui era perder independência; o que a fase
+  provou é que **independência do core é exatamente o que produz réplica degradada**.
+  Cada desacoplamento que restava virou bug: o `AbbrevClash` reimplementava a
+  abreviação dBase e **recusava renames seguros** (P-AUDIT/`ast-15`), e a predição de
+  colisão só ficou correta quando parou de calcular e passou a **perguntar ao pp
+  vivo** (P11, `__pp_init`/`__pp_process`). Se a semântica do pp mudar, a resposta
+  muda junto — e isso é o que se QUER: é a diferença entre acompanhar o compilador e
+  divergir dele em silêncio.
 - **Custo.** ~~`hb_compAstMarkerGenerates` é reverse-scan O(tokens × from) por
   marker consultado. Barato no dump de um módulo; um ponto a vigiar se o dump
   crescer muito ou se o fato for consultado em massa.~~
@@ -106,13 +131,37 @@ resolve pelo binding (o local/param que ele é).
   conjunto se computa **uma vez por módulo** e o token responde por lookup; 16k
   passou a **0,21 s** e o crescimento virou linear, com os dumps do corpus inteiro
   byte-idênticos. [spec-p § P9](spec-p-pp-refatoracao.md).
-- **Descoberta que pode ser RUIM.** Se `generates` se mostrar um
+- **Descoberta que pode ser RUIM.** ~~Se `generates` se mostrar um
   special-case que NÃO generaliza, teremos pago um canal de core (schema bump,
   rebuild) por um problema de nicho do `rename`. O critério honesto de matar:
   se nenhum outro consumidor pedir o fato e nenhum caso novo o exercitar além
   do rename, ele fica como o que é — um fato local do rename — e não vira
-  "arquitetura". Registrar isso agora evita o viés retrospectivo de o chamar
-  de arquitetural só porque custou trabalho.
+  "arquitetura".~~
+  **PASSOU no próprio critério — e por pouco.** O critério era: *outro consumidor
+  pediu o fato?* **Sim, e não por elegância: por BUG.** O `usages --at` misturava um
+  marker de pp com um símbolo homônimo do programa (`LABEL Vendas` × `FUNCTION
+  Vendas()`), devolvendo o mesmo punhado de hits em qualquer um dos quatro sites —
+  porque calculava `generates`/`genrule` e os **descartava**. Consertar exigiu o
+  find-references CONSUMIR o fato (P3, caso 112). Então o `ast-12` deixou de ser
+  local do `rename` **pela porta certa**: um segundo consumidor precisou dele para
+  não estar errado. *(Honestidade sobre o "por pouco": se a P3 não tivesse achado
+  aquele bug, o veredito deste bullet seria o outro — fato local, não arquitetura.)*
+
+## Veredito final (P10, 2026-07-13) — a fase P está encerrada
+
+**O que o `ast-12` virou:** um fato com **dois** consumidores (rename e
+find-references), um custo **medido e consertado** (P9), e uma granularidade
+**recusada por prova** (P1). Vira arquitetura pelo critério escrito aqui em
+2026-07-11, não pelo trabalho que custou.
+
+**O que a fase P provou, além do fato:** que o caminho é sempre em direção ao core.
+Toda esperteza que sobrou na ferramenta caiu — a réplica da abreviação dBase
+(`ast-15`), a inferência do recheio por comparação de texto (`ast-14`), a aritmética
+de colisão (P11, substituída pelo **pp vivo**), a busca de include à mão (P8,
+substituída pelo `harbour -gd`). O saldo: **quatro canais novos** no core
+(`ast-13`..`ast-16`), **zero heurística nova** na ferramenta, e três erros meus
+registrados com nome (o custo que chamei de barato, a recusa que declarei sem varrer,
+o número do stress que publiquei como se fosse o produto).
 
 ## Prova executável (o que ESTÁ fechado)
 

@@ -141,77 +141,55 @@ suíte 904/0, `ppcorpus` 42/0, **zero core**. Conhecimento:
 [pp-as-instrument.md](pp-corpus/pp-as-instrument.md) ·
 [abbreviation.md](pp-corpus/abbreviation.md).
 
-## P9 ✅ — o custo do reverse-scan do `generates` (2026-07-13)
+## P9 ✅ — o custo do `generates` era QUADRÁTICO (2026-07-13)
 
-O [adr-003](adr-003-derivacao-pp-como-fato.md) registrou o custo do `generates`
-(`ast-12`) como *"barato no dump de um módulo; um ponto a vigiar"*. **Não era barato,
-e o "ponto a vigiar" era uma parede** — achado por medição, que era a entrega desta
-fatia.
+O adr-003 registrava o custo como *"barato; um ponto a vigiar"* — **errado nos dois
+adjetivos**, e a MEDIÇÃO era a entrega da fatia. A resposta *"este marker alimenta um
+paste/stringify?"* era recalculada **por token**, varrendo o módulo inteiro a cada vez:
+O(markers × módulo). Conserto no core (`compast.c`): o fato é propriedade do par
+**(aplicação, marker)** → conjunto construído **uma vez por módulo**, token responde por
+lookup. Virou **linear**, com os **847 dumps** do corpus **byte-idênticos** (otimização
+que muda resposta é bug). **⚠️ E o ANÚNCIO mentiu:** publiquei o ganho do *stress
+sintético* (uma expansão por linha — densidade que código real não tem) como se fosse o
+produto, e ainda inventei que "16k linhas expandidas é tamanho de aplicação real". Medido
+ponta a ponta em projeto real, o ganho é **~1/3 da espera**, não 330×. Os quatro anúncios
+foram reescritos. Números e a lição no [roadmap § P9](roadmap.md); regra durável no
+[CLAUDE.md](../CLAUDE.md).
 
-**O que estava errado.** `hb_compAstMarkerGenerates` respondia a pergunta *"o valor
-escrito neste marker alimenta um paste/stringify?"* com uma varredura reversa
-**por token consultado**, e cada varredura percorria o fluxo de tokens INTEIRO **e**
-todas as aplicações do pp. Como o número de tokens-marker consultados cresce junto
-com o número de aplicações, isso é **O(markers × módulo)** — quadrático no tamanho do
-módulo.
+## P10 ✅ — síntese: o adr-003 fecha, e a completude achou um BUG (2026-07-13)
 
-**A medição** (linhas de comando expandido, `harbour -x`, melhor de 3):
+**O [adr-003](adr-003-derivacao-pp-como-fato.md) está FECHADO** — as 5 perguntas têm
+veredito, pelo critério que ele mesmo fixou. A que **inverte de sinal** é o
+**acoplamento**: o ADR o listava como risco ("menos independência do pp"), e a fase provou
+o contrário — **independência do core é o que PRODUZ réplica degradada** (cada
+desacoplamento restante virou bug: `ast-15`, `ast-14`, a aritmética de colisão do P11, a
+busca de include do P8). E "isto pode ser descoberta RUIM?" **passou por pouco**: o 2º
+consumidor do `ast-12` apareceu por **BUG** (o `usages --at` estava errado sem o fato,
+P3), não por elegância.
 
-| N linhas | antes | depois |
-|---:|---:|---:|
-| 4 000 | 1,42 s | 0,05 s |
-| 8 000 | 8,76 s | 0,09 s |
-| 16 000 | **69,30 s** | **0,21 s** |
-| 32 000 | (não medido) | 0,45 s |
-| 64 000 | (não medido) | 0,94 s |
+**O bug que a completude achou:** o canal `ast-16` entrou no core **sem versionar o
+`HB_AST_SCHEMA`** — contrato mentindo, num campo que o NEWS manda o consumidor conferir. E
+o conserto detonou o segundo: o `ReadAst` tinha **lista ENUMERADA** de versões aceitas, que
+morre em silêncio a cada bump — a ferramenta **recusou o projeto inteiro**, dizendo *"dump
+missing"* com o dump no lugar. **Um esquecimento escondia o outro.** O pior: o
+`ast-schema.md` **já tinha essa lição** (bump `ast-8`: *"portão usa VERSÃO MÍNIMA, NUNCA
+lista"*) **e abria exceção para o `ReadAst`** — **a exceção era o bug; regra excetuada não
+é regra**.
 
-Dobrar N quadruplicava o tempo (assinatura de quadrática); agora dobrar N **dobra** o
-tempo.
+**E o Diego foi mais fundo do que o meu conserto.** Eu troquei a lista por um **piso**
+(`ast-2` para cima) — e piso ainda é compatibilidade, **com o quê?** *"Estamos fazendo a
+AST sob demanda, então mexer no core é parte do trabalho e é normal; não existe esta busca
+de compatibilidade — estamos INVENTANDO a ferramenta"*. O dump nasce **a cada comando**, do
+`harbour` do `HB_BIN`: **não existe dump antigo**, existe **toolchain fora de passo** — e
+isso se **BERRA**, não se degrada. Pior que peso morto: com um build velho, a escada
+entregaria `possible` onde há `confirmed` — **rebaixando o veredito por causa de um build,
+calada**. Hoje o schema é **EXATO** (`AstSchema()`), e as **5 funções + 23 sítios** de
+degradação por versão **saíram** — nada na suíte dependia deles (964 checks passaram sem
+tocar em um). O **caso 122** confere que o schema que a ferramenta fala é o que o binário
+do core **realmente emite**: o esquecimento de bump vira **impossível de embarcar**.
+Regra durável no [CLAUDE.md](../CLAUDE.md); contrato no [ast-schema.md](ast-schema.md).
 
-**⚠️ O 330× é do STRESS, não do dia a dia — e eu quase publiquei a mentira contrária.**
-O stress tem **uma aplicação de pp por linha**, densidade que código Harbour real não
-tem; o que dirige o custo é o **número de expansões**, não o de linhas. Escrevi no
-CHANGELOG que 16 mil linhas expandidas são *"um tamanho ordinário em aplicação real"* —
-**eu inventei isso** (o Diego pegou perguntando *"então por que você me disse que não
-houve ganho no dia a dia?"*, e a resposta exigia medir a ferramenta INTEIRA, coisa que
-eu não tinha feito). O pecado é o mesmo que a P9 flagrou: afirmar sem medir. A medição
-ponta a ponta, comando completo, projetos reais do corpus (melhor de 2):
-
-| projeto | módulos | antes | depois |
-|---|---:|---:|---:|
-| hbhttpd | 3 | 1,16 s | 1,07 s |
-| gtwvg | 28 | 12,28 s | **7,49 s** |
-| xhb | 42 | 12,35 s | **8,36 s** |
-
-**O ganho real é ~1,4–1,6× (um terço da espera), não 330×** — e é ganho de verdade, mas
-essa é a manchete honesta. O caso catastrófico é **patológico** (módulo denso em
-expansão), e vale dizer que ele existe *sem* afirmar que o código do leitor é assim.
-
-**O conserto (core, `compast.c`).** A resposta é propriedade do **par (aplicação,
-marker)**, não do token — então o conjunto dos pares que geram é construído **uma vez
-por módulo**, numa passada linear sobre as **mesmas duas fontes** que a varredura
-antiga percorria (o fluxo de tokens sobrevivente e os tokens consumidos das
-aplicações), e cada token responde por **lookup**. Nenhum canal novo, nenhum campo
-novo, **nenhuma mudança de semântica**.
-
-**A prova de equivalência é o ponto.** Otimização que muda resposta é bug: os
-**847 dumps** do corpus (toda fixture da suíte + 6 módulos reais do core, incluindo
-`debugger.prg` e `tbrowse.prg`) saem **byte a byte idênticos** ao binário anterior.
-Suíte **961/0**, `lexdiff` 0 divergências reais.
-
-**O que fica registrado como limite honesto:** o que sobra é linear e é dominado por
-**escrever o JSON** (64 mil linhas produzem um dump de 107 MB). Se um dia doer, o
-alvo é o tamanho do dump — não mais a busca do fato. *(O `-inc` do hbmk2 já dá dumps
-incrementais; item 0c do backlog.)*
-
----
-
-# Fatias em aberto
-
-| fatia | o que é |
-|---|---|
-| **P9** | custo do reverse-scan `O(tokens × from)` (adr-003:96-98) |
-| **P10** | síntese/completude da fase + atualização de adr-003, ast-schema, CHANGELOG |
-| **P12** | **o pp como ENGENHO DE BUSCA** (ideia do Diego) — casar para ACHAR; plano em [pp-as-search.md](pp-corpus/pp-as-search.md) |
-| **P-AUDIT** | continuar: `ResolveInclude`, os "se não é X então é Y", comparações de texto onde há id |
-| **D-P5** | *(portão do Diego)* migração de DSL ganha verbo próprio? — **desbloqueado**: o instrumento (P11) está na mão |
+**FASE P ENCERRADA.** Saldo: 4 canais novos no core (`ast-13`..`ast-16`), **zero heurística
+nova** na ferramenta, e três erros meus registrados com nome — o custo que chamei de
+"barato" sem medir (P9), a recusa que declarei sem varrer o core (P7), e o número do stress
+publicado como se fosse o produto (P9).
