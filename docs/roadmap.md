@@ -550,8 +550,14 @@ suíte (responde ao critério de matar do adr-003).
   fixture + 6 módulos reais do core) saem **byte a byte idênticos** ao binário
   anterior. Suíte **961/0**, lexdiff 0. O que sobra é linear e dominado por escrever
   o JSON (64k linhas = 107 MB) — se doer, o alvo é o TAMANHO do dump, não mais a
-  busca do fato. [spec-p § P9](spec-p-pp-refatoracao.md). **Commit do core pendente
-  de autorização por-commit do Diego.**
+  busca do fato. [spec-p § P9](spec-p-pp-refatoracao.md).
+  **⚠️ CORREÇÃO no MESMO dia (o Diego pegou):** o 330× é do **stress sintético** (uma
+  aplicação de pp por linha); eu ANUNCIEI que "16k linhas expandidas é tamanho de
+  aplicação real" **sem medir** — invenção, o mesmo pecado que a P9 flagrou. Medido
+  ponta a ponta (comando completo, projetos reais): gtwvg 12,28→**7,49 s**, xhb
+  12,35→**8,36 s** — **~1,4–1,6× (um terço da espera)**, que é ganho de verdade e é a
+  manchete honesta. Os quatro anúncios (CHANGELOG, NEWS, as duas páginas) foram
+  reescritos. **Lição: medir o STRESS não é medir o PRODUTO.**
 - **P10** síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
 - **P11 — ENTREGUE (2026-07-12): o pp VIVO como oráculo; morre a última gramática
   replicada, e com ela um SEQUESTRO DE REGRA silencioso.** A API está mapeada e a
@@ -828,6 +834,44 @@ Toda prova em **DSL inventada NÃO-espelho** ([revisao-generalidade.md:57-64](re
 módulos homônimos. Spec dedicada a criar: `docs/spec-p-pp-refatoracao.md`
 (molde da [spec-u](spec-u-verbos-unificados.md)). Plano detalhado salvo em
 `~/.claude/plans/crie-um-plano-para-enchanted-flask.md`.
+
+### V — Velocidade da refatoração em PROJETO GRANDE — **ATIVA (ordem do Diego, 2026-07-13)**
+
+A P9 consertou o dump **por módulo**. O que sobrou é **estrutural, e é o que o usuário
+sente**: todo comando re-dumpa o **projeto INTEIRO** — `AstDumps` passa `-rebuild`
+([hbrefactor.prg:249](../src/hbrefactor.prg)), de propósito (*"dump sempre fresco"*: a
+ferramenta jamais pode agir sobre fato velho). Consequência medida: xhb (42 módulos)
+**8,36 s**, gtwvg (28) **7,49 s** — dezenas de segundos, e **a espera é a mesma para
+renomear 1 variável ou 20**. Num projeto de aplicação de verdade isso deixa de ser
+incômodo e vira o motivo de não usar a ferramenta. *(A extensão VSCode é o consumidor
+diário do Diego — é lá que a espera dói mais.)*
+
+**Fatia 1 — MEDIR ONDE O TEMPO VAI (obrigatória, e vem PRIMEIRO).** É a lição da P9
+aplicada antes do erro, não depois: repartir os ~8 s do xhb entre (a) o hbmk2 +
+compilador GERANDO os dumps, (b) a ferramenta LENDO/parseando o JSON, (c) a análise.
+Otimizar sem isso é chute — e se o tempo estiver em (b)/(c), **cache de dump não
+resolve nada**. *Pronto:* número por etapa, registrado.
+
+**Fatia 2 — o canal CORRETO para "o que mudou" (REGRA DO FATO).** É PROIBIDO inventar
+staleness na ferramenta (comparar mtime é heurística e o include transitivo a quebra).
+Quem decide o que precisa recompilar é o **`hbmk2 -inc`** — sondado em 2026-07-13:
+tocando 1 de 3 módulos, **só o dump dele é regravado**; e quem dá o fecho transitivo de
+include é o **`harbour -gd`** (já usado na P8, com caminho resolvido). O desenho sai
+desses dois, nunca de esperteza nossa.
+
+**Fatia 3 — cache de dumps por projeto.** Hoje o diretório de dump é um tmp por
+invocação, então **nada é reaproveitável por construção**. O portão é a garantia que
+hoje justifica o `-rebuild`: o resultado com cache tem de ser **byte-idêntico** ao
+resultado sem cache — a mesma régua de equivalência que provou a P9 (suíte inteira
+verde nos dois modos).
+
+**Riscos honestos:** (i) cache é a classe de bug mais cara que existe, e "agiu sobre
+fato velho" é **exatamente** o que esta ferramenta promete nunca fazer — fail-closed em
+qualquer dúvida; (ii) o ganho pode estar noutro lugar (ver fatia 1).
+
+**PRONTO da fase:** num projeto de dezenas de módulos, um comando que toca 1 módulo
+custa proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o modo
+`-rebuild` de hoje.
 
 ### B-infra — suíte paralela ✅ ENTREGUE (Etapas 1 e 2) — narrativa no [arquivo](roadmap-fases-entregues.md)
 
@@ -1127,8 +1171,10 @@ sujeitos ao mesmo apodrecimento. Migrá-los para `tests/site/` é o próximo pas
    um tmp (`-o<dir>`) no site que roda o compilador a partir da raiz. Ecoa a regra
    "ferramenta do core: PROBE, nunca memória" do CLAUDE.md.
 
-0c. **Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
-   verificação proporcional à edição quando o uso real doer.
+0c. ~~**Velocidade em projetos grandes**: `-inc` já dá dumps incrementais;
+   verificação proporcional à edição quando o uso real doer.~~ **PROMOVIDO a FASE V
+   (Diego, 2026-07-13)** — deixou de ser "quando doer": está medido que dói (xhb,
+   42 módulos: 8,36 s por comando, edite-se 1 linha ou 20). Ver a fase acima.
 1. **Análise de programa inteiro (tipos interprocedurais)** — **PROMOVIDA
    para a fase B7 (2026-07-08)**, spec no portão:
    [spec-b7-tipos-interprocedurais.md](spec-b7-tipos-interprocedurais.md).

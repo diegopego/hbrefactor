@@ -166,10 +166,26 @@ módulo.
 | 64 000 | (não medido) | 0,94 s |
 
 Dobrar N quadruplicava o tempo (assinatura de quadrática); agora dobrar N **dobra** o
-tempo. Um módulo de 16 mil linhas expandidas levava **mais de um minuto** para dumpar
-o que se compila numa fração de segundo — e módulos assim existem em aplicação real.
-Nos módulos reais do core o custo era menos dramático mas real (`debugger.prg`,
-3797 linhas: 0,45 s → 0,32 s).
+tempo.
+
+**⚠️ O 330× é do STRESS, não do dia a dia — e eu quase publiquei a mentira contrária.**
+O stress tem **uma aplicação de pp por linha**, densidade que código Harbour real não
+tem; o que dirige o custo é o **número de expansões**, não o de linhas. Escrevi no
+CHANGELOG que 16 mil linhas expandidas são *"um tamanho ordinário em aplicação real"* —
+**eu inventei isso** (o Diego pegou perguntando *"então por que você me disse que não
+houve ganho no dia a dia?"*, e a resposta exigia medir a ferramenta INTEIRA, coisa que
+eu não tinha feito). O pecado é o mesmo que a P9 flagrou: afirmar sem medir. A medição
+ponta a ponta, comando completo, projetos reais do corpus (melhor de 2):
+
+| projeto | módulos | antes | depois |
+|---|---:|---:|---:|
+| hbhttpd | 3 | 1,16 s | 1,07 s |
+| gtwvg | 28 | 12,28 s | **7,49 s** |
+| xhb | 42 | 12,35 s | **8,36 s** |
+
+**O ganho real é ~1,4–1,6× (um terço da espera), não 330×** — e é ganho de verdade, mas
+essa é a manchete honesta. O caso catastrófico é **patológico** (módulo denso em
+expansão), e vale dizer que ele existe *sem* afirmar que o código do leitor é assim.
 
 **O conserto (core, `compast.c`).** A resposta é propriedade do **par (aplicação,
 marker)**, não do token — então o conjunto dos pares que geram é construído **uma vez

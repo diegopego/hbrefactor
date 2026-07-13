@@ -20,22 +20,31 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
-## 2026-07-13 — a big module no longer makes the tool crawl
+## 2026-07-13 — every command got faster on a real project
 
-Every command here starts by having the compiler dump the facts of your project, and
-on a large module that dump had been getting **quadratic**: doubling the module's size
-quadrupled the wait. A module of 16 000 expanded command lines — an ordinary size in a
-real application — took **over a minute** before the tool could even begin, so on a
-big project the tool did not feel slow, it felt broken.
+Before it touches anything, every command here has the compiler export the facts of
+your project — that is the price of never guessing. That export was costing **more
+than proportionally** to a module's size: the more your code leans on `#command` and
+`#define`, the worse it got, because the compiler was re-answering a question it had
+already answered, once per word. It is **linear** now.
 
-It is now **linear**: the same module is ready in **a fifth of a second**. Nothing you
-see changed — the facts, the refusals, the edits and the verification are exactly what
-they were, byte for byte. The compiler was simply asking itself the same question once
-per word instead of once per module.
+**What it bought, measured on real Harbour projects** (the whole command, end to end —
+`contrib/gtwvg`, 28 modules; `xhb`, 42 modules): about **a third off the wait**. Not a
+different tool; a tool that stopped wasting your time. Nothing you *see* changed —
+the facts, the refusals, the edits and the verification are byte for byte what they
+were.
 
-**Where it still bites:** the wait that remains grows with the **size** of what the
-compiler has to export, so a genuinely huge module is still a heavier one. If it hurts,
-build the project incrementally — only what you touched is re-dumped.
+**The honest size of the news.** You may read elsewhere that this was a 300× fix. It
+was — on a module *dense* in expansions, which is a shape real Harbour code does not
+usually have. On your code it is a third, unless your code is unusual. Time it and
+see.
+
+**Where it still bites, honestly.** Every command re-dumps your **whole project**, from
+scratch, every time — the tool asks for a fresh dump on purpose, so it can never act on
+a stale fact. So what you wait for now grows with the size of the project, not with the
+size of your edit. On a big codebase that is still a real wait, and it is the same wait
+whether you rename one variable or twenty. Making it proportional to what you touched is
+the next thing worth doing here; it is not done.
 
 *(You need to rebuild the branch of the compiler for this: it is a fix there, not here.
 See [harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md).)*
