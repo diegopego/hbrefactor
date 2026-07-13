@@ -654,8 +654,7 @@ per-call check has a cost in very hot loops).
 <!-- prov: Usage() in src/hbrefactor.prg; per-command cases: renames 1–7/10–13/21/24/
      27/32/37/45–49/74/77/110 (110 = class data member, commit 437a6a6);
      usages 8–9/18/23/25–26/29/39/61–63/66/70/104/105; extract 16–17/
-     33/43/59–60/79; inline 35–36; reorder 14–15/31/34/56/76; unused-locals 19;
-     call-graph 20/57/78; find-dynamic-calls 22/58; dsl/pp 38/40–41/50–53/82;
+     33/43/59–60/79; inline 35–36; reorder 14–15/31/34/56/76;      call-graph 20/57/78; find-dynamic-calls 22/58; dsl/pp 38/40–41/50–53/82;
      annotate 89–100; exec-registry 101; projects-of 83/102/103. -->
 
 Every classic refactoring, re-seated on the compiler's facts; each one verified
@@ -668,7 +667,6 @@ Every classic refactoring, re-seated on the compiler's facts; each one verified
 | `extract-function` | Pull a range of lines into a new function — or a new METHOD when you're inside one; the locals it needs move with it. |
 | `inline-local` | Fold a variable back into its uses — purity judged by the compiler's own tree. |
 | `reorder-params` | Change a function's or method's parameter order and fix every call site to match. |
-| `unused-locals` | Find variables never used, or assigned but never read, across the project. |
 | `call-graph` | See who calls what — across modules, out to external functions; method sends shown as dynamic edges, honestly distinct from static calls. |
 | `find-dynamic-calls` | Surface strings and macros that might be dynamic function calls — an honest audit that filters out the class system's own internals. |
 | `annotate` | Materialize implied types (`DECLARE` / `AS CLASS`), verified, with automatic rollback. |

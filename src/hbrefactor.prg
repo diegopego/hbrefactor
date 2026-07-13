@@ -42,8 +42,6 @@ PROCEDURE Main()
       nExit := ExtractFunction( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "inline-local"
       nExit := InlineLocal( aArgs )
-   CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "unused-locals"
-      nExit := UnusedLocals( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "call-graph"
       nExit := CallGraph( aArgs )
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "find-dynamic-calls"
@@ -91,7 +89,6 @@ STATIC PROCEDURE Usage()
    OutStd( "  hbrefactor inline-local <project> <file.prg> <function> <name> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project> <name|Class:Method|--at file:line:col> [--func <function>] [--json <out>] [--show-expansion]" + hb_eol() )
    OutStd( "  hbrefactor resolve-at <project> <file.prg> <line> <column>   (position -> 'query: <spec>')" + hb_eol() )
-   OutStd( "  hbrefactor unused-locals <project>" + hb_eol() )
    OutStd( "  hbrefactor call-graph <project> [<function>]" + hb_eol() )
    OutStd( "  hbrefactor find-dynamic-calls <project>" + hb_eol() )
    OutStd( "  hbrefactor dump <project>           (writes the .ast.json files and reports the directory)" + hb_eol() )
@@ -4740,7 +4737,8 @@ STATIC FUNCTION InlineLocal( aArgs )
       RETURN Refuse( "'" + cName + "' has no initializer in its declaration" )
    ENDIF
    IF nReads == 0
-      RETURN Refuse( "'" + cName + "' has no reads - use unused-locals" )
+      RETURN Refuse( "'" + cName + "' has no reads - nothing to inline " + ;
+                     "(the compiler reports unused variables under -w3)" )
    ENDIF
 
    // nome citado em string no módulo (stringify de pp/call-by-name): a
@@ -4981,42 +4979,6 @@ STATIC FUNCTION VarDeclLine( hFunc, cUpSym )
 // ---------------------------------------------------------------------------
 // relatórios (read-only)
 // ---------------------------------------------------------------------------
-
-STATIC FUNCTION UnusedLocals( aArgs )
-
-   LOCAL hProj, cPath, cFlags := "", cTok, cOut, cErr, cLine, nFound := 0
-
-   IF Len( aArgs ) < 2
-      Usage()
-      RETURN EXIT_USAGE
-   ENDIF
-   hProj := LoadProject( aArgs[ 2 ] )
-   IF hProj == NIL
-      RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
-   ENDIF
-   // análise do próprio compilador (W0003/W0032); -w/-es do projeto saem
-   // para o -w3 desta análise não virar erro de build
-   FOR EACH cTok IN hProj[ "flags" ]
-      IF ! Left( cTok, 2 ) == "-w" .AND. ! Left( cTok, 3 ) == "-es"
-         cFlags += " " + cTok
-      ENDIF
-   NEXT
-   FOR EACH cPath IN hProj[ "files" ]
-      cOut := cErr := ""
-      IF hb_processRun( HarbourBin() + " " + cPath + " -q0 -w3 -s" + cFlags,, @cOut, @cErr ) != 0
-         OutErr( "hbrefactor: " + cPath + " does not compile:" + hb_eol() + ErrLines( cOut + cErr ) )
-         RETURN Refuse( "'" + cPath + "' does not compile" )
-      ENDIF
-      FOR EACH cLine IN hb_ATokens( StrTran( cOut + cErr, Chr( 13 ), "" ), Chr( 10 ) )
-         IF "W0003" $ cLine .OR. "W0032" $ cLine
-            nFound++
-            OutStd( AllTrim( cLine ) + hb_eol() )
-         ENDIF
-      NEXT
-   NEXT
-   OutStd( hb_ntos( nFound ) + " finding(s)" + hb_eol() )
-
-   RETURN EXIT_OK
 
 STATIC FUNCTION CallGraph( aArgs )
 

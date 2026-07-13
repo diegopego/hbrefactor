@@ -19,7 +19,6 @@
       { "command": "hbrefactor.execRegistry", "title": "hbrefactor: Exec-registry snapshot (RUNS class-registration code in a sandbox, no edits)" },
       { "command": "hbrefactor.reorderParams", "title": "hbrefactor: Reorder parameters of function under cursor" },
       { "command": "hbrefactor.extractFunction", "title": "hbrefactor: Extract selection to new function" },
-      { "command": "hbrefactor.unusedLocals", "title": "hbrefactor: Unused locals (project report)" },
       { "command": "hbrefactor.callGraph", "title": "hbrefactor: Call graph (word under cursor or whole project)" },
       { "command": "hbrefactor.findDynamicCalls", "title": "hbrefactor: Find dynamic calls (strings/macros audit)" }
     ],

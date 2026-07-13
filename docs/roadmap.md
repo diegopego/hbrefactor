@@ -875,49 +875,39 @@ módulos homônimos. Spec dedicada a criar: `docs/spec-p-pp-refatoracao.md`
 (molde da [spec-u](spec-u-verbos-unificados.md)). Plano detalhado salvo em
 `~/.claude/plans/crie-um-plano-para-enchanted-flask.md`.
 
-### L — Locais mortos por FATO: `ast-17` + o verbo que REMOVE — **ATIVA, ANTES da V-2 (portão do Diego, 2026-07-13)**
+### L — Locais mortos ~~por FATO (`ast-17` + verbo que remove)~~ — **MORTA NO DIA EM QUE NASCEU (Diego, 2026-07-13): o COMANDO SAIU**
 
-**O que está errado hoje.** O `unused-locals` **raspa `stderr`**: roda `harbour -w3 -s`
-por módulo e casa `"W0003" $ cLine` / `"W0032"`. Texto de diagnóstico **não é canal** —
-é mensagem para humano (o Harbour pode reescrevê-la, traduzi-la ou renumerá-la, e a
-ferramenta quebra **em silêncio**). É o gatilho *"canal mais barato ≠ canal correto"*, e
-é o **único verbo que não toca na AST**. Ainda por cima ele não é refatoração: só
-**relata** o que o `-w3` já relata — superfície de produto duplicando o compilador.
-*(Sonda: `harbour -ge<mode>` tem só DOIS modos — `0=Clipper`, `1=IDE`; **JSON de erro não
-existe**. O `--hbinfo` do hbmk2 é JSON de build, não de diagnóstico. Trocar para `-ge1`
-só trocaria um texto por outro.)*
+Registro completo porque a fase inteira foi um **erro de julgamento meu, corrigido por
+uma pergunta de duas linhas do Diego** — e o valor está em como ele chegou lá.
 
-**O core JÁ TEM o fato, e ele é EXATO (exploração feita 2026-07-13, ANTES de desenhar).**
-Não é uma mensagem — é um enum por variável: `include/hbcomp.h:112-114`,
-**`HB_VU_NOT_USED`** (0, declarada e nunca tocada) / **`HB_VU_INITIALIZED`** (1,
-**atribuída e nunca lida** — a base do `W0032`) / **`HB_VU_USED`** (2). O compilador LÊ
-esse enum em `hbmain.c:1887` (`hb_compWarnUnusedVar`) e em `:3935` (param de codeblock)
-e o **transforma em frase**. O fato nasce estruturado e morre como texto.
+**O caminho.** (1) Fui propor **paralelizar** o `unused-locals` (fatia 3 da fase V): ele
+dispara o compilador 43× em série. (2) O Diego perguntou ***"pra que serve o
+unused-locals?"*** — e não servia: ele **raspa `stderr`** (`"W0003" $ cLine`) e só
+**relata** o que o `-w3` já relata. (3) Eu então propus **fase L**: canal `ast-17` no core
+(o compilador tem o fato num enum — `HB_VU_NOT_USED`/`HB_VU_INITIALIZED`/`HB_VU_USED`,
+`hbcomp.h:112-114` — e o joga fora numa string) + um verbo que **REMOVE** o local morto.
+(4) O Diego: ***"muito trabalho pra algo que o compilador já avisa"***. **Fase morta, e
+o comando REMOVIDO** (CLI + extensão VSCode + manual + página).
 
-**Fatia 1 — `ast-17` no core: o compilador publica o veredito que ele já computa.** Campo
-de USO por declaração (o `declarations[]` já carrega nome, escopo e a âncora de escrita
-do `ast-9`), cobrindo LOCAL, param de função e **param de codeblock**. Gated pelo `fAst`
-(build default byte-a-byte intocado), `lexdiff` 0. *Pronto:* o dump responde "este local
-nunca é lido" **sem `-w3`, sem `stderr`, sem substring**.
+**Por que ele está certo, e eu errado três vezes seguidas.** Meu instinto foi sempre
+*salvar* o verbo — primeiro otimizando, depois "promovendo" a refatoração de verdade com
+canal novo no core. Mas o valor do produto nunca esteve ali: o compilador **já avisa**, de
+graça, em todo build com `-w3`, continuamente. Um canal de core + um verbo + um oráculo
+próprio (o `.hrb` byte-idêntico **não serve**: remover código muda o pcode legitimamente)
+é caro, e compraria... um aviso que o usuário já tem. **A pergunta certa não era "como
+faço isto melhor?", era "isto tem de existir?"** — e ela veio dele, não de mim.
 
-**Fatia 2 — o verbo que EDITA (e o `unused-locals` SAI, CLI + extensão).** Refatoração de
-verdade: remove a declaração morta, com verificação e rollback.
-**A armadilha, que é onde o verbo ganha o pão:** `LOCAL x := Foo()` — o `x` é morto, mas
-**o `Foo()` tem de continuar rodando**. O dump **já** carrega a árvore da expressão do
-inicializador, então o fato existe: (a) inicializador literal/constante → remove tudo;
-(b) inicializador com **chamada, macro ou `@ref`** → **NÃO se apaga**: ou preserva a
-expressão como statement, ou recusa nomeando o motivo (a decisão do Diego decide qual —
-`fail-closed` é o default). *Nunca* apagar o que tem efeito.
-**Oráculo (e este é DIFERENTE do resto da ferramenta):** remover código **muda o pcode
-legitimamente**, então a régua `.hrb` byte-idêntico **não serve** aqui. O oráculo é:
-recompila limpo com as flags do projeto + `-w3`; o veredito daquela variável **sumiu** do
-dump novo; **nenhum aviso novo** apareceu; nenhuma outra declaração/uso mudou. Qualquer
-falha → **rollback**.
+**E havia um footgun no fim do caminho:** `LOCAL lOk := SaveEverything()` — a variável é
+morta, o *save* não é. Apagar a linha deixa código que **compila limpo, passa em tudo, e
+parou de salvar**. Preservar o efeito (`SaveEverything()` como statement) era possível,
+mas é exatamente o tipo de risco que não se assume por um ganho que é zero.
 
-**PRONTO da fase:** um projeto do corpus com local morto real tem a declaração removida e
-recompila limpo; o `LOCAL x := Foo()` é tratado sem perder o efeito; o `unused-locals`
-(raspador de `stderr`) não existe mais; caso na suíte com fixture que exercita os dois
-ramos (puro × com efeito).
+**O que FICA da fase, e vale ouro:** *(a)* a sonda do `-ge<mode>` (**dois** modos —
+`0=Clipper`, `1=IDE`; **JSON de erro não existe**; o `--hbinfo` do hbmk2 é JSON de *build*)
+— então **raspar texto de diagnóstico não tem alternativa boa: o canal certo seria o dump,
+e o comando certo era nenhum**; *(b)* a régua: **superfície de produto que duplica o core é
+peso, não capacidade** — a mesma família do "não existe compatibilidade" de hoje cedo.
+*(c)* O `unused-locals` era o **único verbo que não tocava na AST**. Sintoma, não detalhe.
 
 ### V — Velocidade da refatoração em PROJETO GRANDE — **ATIVA; FATIA 1 ENTREGUE (2026-07-13)**
 

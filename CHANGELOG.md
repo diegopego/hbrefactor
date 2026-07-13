@@ -20,7 +20,33 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
-## 2026-07-13 — the tool and the compiler must now be in step, and it says so
+## 2026-07-13 — `unused-locals` is gone: the compiler already tells you
+
+**Removed, from the CLI and from the VSCode extension.** If you were using it, this is
+what to run instead — and it was always the real source of the answer anyway:
+
+```
+$ harbour yourfile.prg -w3 -s
+yourfile.prg(12) Warning W0003  Variable 'nTotal' declared but not used in function 'MAIN(9)'
+yourfile.prg(14) Warning W0032  Variable 'cName' is assigned but not used in function 'MAIN(9)'
+```
+
+That is exactly what `unused-locals` printed, because that is exactly what it *did*: it
+ran the compiler on each module and filtered those two warning lines. It added a command
+to your vocabulary and gave you nothing the compiler was not already giving you. Turn
+`-w3` on in your build and you get it continuously, on every compile, for free.
+
+**Why not make it remove them for you instead?** Because of this:
+
+```harbour
+LOCAL lOk := SaveEverything()    // lOk is never read
+```
+
+The variable is dead; the *save* is not. A tool that deletes that line leaves you with
+code that compiles cleanly, passes every check, and silently stopped saving. Removing
+the variable while keeping the call is possible — but it buys little over a warning you
+already get, and this tool would rather not own a footgun for that price. **What it will
+never do is delete something whose effect it cannot account for.**
 
 **If you update the tool, rebuild the compiler branch too.** The tool now requires the
 *exact* dump version the compiler branch emits today. If the `harbour` on your `HB_BIN`

@@ -329,13 +329,6 @@ async function cmdExtractFunction() {
   report(`extract-function ${first}-${last} -> ${nome}`, res);
 }
 
-async function cmdUnusedLocals() {
-  const c = await projCtx();
-  if (!c) return;
-  await saveAll();
-  report('unused-locals', await run(['unused-locals', c.spec], c.cwd));
-}
-
 async function cmdCallGraph() {
   const c = await projCtx();
   if (!c) return;
@@ -403,7 +396,6 @@ function activate(context) {
     vscode.commands.registerCommand('hbrefactor.annotateApply', cmdAnnotateApply),
     vscode.commands.registerCommand('hbrefactor.reorderParams', cmdReorderParams),
     vscode.commands.registerCommand('hbrefactor.extractFunction', cmdExtractFunction),
-    vscode.commands.registerCommand('hbrefactor.unusedLocals', cmdUnusedLocals),
     vscode.commands.registerCommand('hbrefactor.callGraph', cmdCallGraph),
     vscode.commands.registerCommand('hbrefactor.findDynamicCalls', cmdFindDynamicCalls)
   );

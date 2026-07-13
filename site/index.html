@@ -1357,7 +1357,6 @@ Eval( bPaga )
       <div class="cmd"><span class="nm">extract-function</span><p>Pull a range of lines into a new function — or a new METHOD when you're inside one; the locals it needs move with it.</p></div>
       <div class="cmd"><span class="nm">inline-local</span><p>Fold a variable back into its uses — purity judged by the compiler's own tree, not a guess.</p></div>
       <div class="cmd"><span class="nm">reorder-params</span><p>Change a function's or method's parameter order and fix every call site to match, behavior-preserving.</p></div>
-      <div class="cmd"><span class="nm">unused-locals</span><p>Find variables never used, or assigned but never read, across the whole project.</p></div>
       <div class="cmd"><span class="nm">call-graph</span><p>See who calls what — across modules and out to external functions; method sends shown as dynamic edges, honestly distinct from static calls.</p></div>
       <div class="cmd"><span class="nm">find-dynamic-calls</span><p>Surface strings and macros that might be dynamic function calls — an honest audit that filters out the class system's own internals.</p></div>
       <div class="cmd"><span class="nm">annotate</span><p>Materialize implied types (<span class="mono">DECLARE</span> / <span class="mono">AS CLASS</span>), verified, with automatic rollback.</p></div>
