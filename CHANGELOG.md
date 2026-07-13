@@ -19,6 +19,72 @@ O compilador que sustenta tudo isto tem o seu próprio: **[harbour-core/NEWS.md]
 é `NEWS` por convenção GNU — o Harbour já tem um `ChangeLog.txt`, que é o log do
 *desenvolvedor*; `NEWS` é o do *usuário*.
 
+## 2026-07-12 — o rename para de mexer em include que não é seu (e para de recusar o que é legítimo)
+
+Três consertos que saíram de uma auditoria do próprio código da ferramenta. Os dois
+primeiros mudam o que ela **faz**; o terceiro, o que ela **te diz**.
+
+**1. O include COMPARTILHADO ficou de fora — de verdade.** Quando você renomeia a
+palavra de um comando de pp, a ferramenta também edita a diretiva que o define. Ela
+sempre prometeu recusar mexer num include de *sistema*, mas media isso pelo diretório
+**de onde você chamou a ferramenta** — não pelo projeto. O efeito, medido:
+
+```
+# o .ch mora FORA do projeto (compartilhado entre projetos), mas dentro do seu cwd
+$ cd ~/trabalho
+$ hbrefactor rename app/app.hbp app/main.prg:5:4 FIXA
+  app/main.prg:5:4
+  ../comum/lib.ch:2:11          <-- editou um include de OUTROS projetos
+verified: .ppo and .hrb byte-identical
+```
+
+E dizia `verified` porque, do ponto de vista **deste** projeto, estava tudo certo: um
+rename consistente não muda a expansão. O estrago aparecia no projeto do vizinho. Com
+o cwd na sua `$HOME`, isso alcançava até o `hbclass.ch` da sua instalação do Harbour.
+Agora a fronteira é o **diretório do `.hbp`**, e um `.ch` de fora dele recebe recusa:
+
+```
+hbrefactor: directive in '../comum/lib.ch' is outside the project's directory -
+            refusing to edit a system/shared include
+```
+
+**O outro lado da mesma moeda:** rodar a ferramenta de qualquer diretório passou a
+funcionar. Antes, `hbrefactor rename /caminho/app.hbp ...` chamado de fora da pasta do
+projeto recusava editar o `.ch` **do próprio projeto**, dizendo que ele era "de sistema".
+
+**2. Regra desligada por `#uncommand` não bloqueia mais o seu nome.** Um comando de pp
+vale do `#xcommand` até o `#xuncommand` — depois disso a palavra volta a ser código cru.
+A ferramenta ignorava esse desligamento e tratava a palavra como reservada para sempre:
+
+```harbour
+#include "lib.ch"                       // define  #xcommand TRAVA <x> => ...
+#xuncommand TRAVA <x> => Cinta( <x> )   // ...e aqui ela morre
+
+PROCEDURE Morta()
+   LOCAL nVal                           // renomear para TRAVA:
+   ...                                  // antes: "collides with a preprocessor rule"
+```
+
+O nome era legítimo — nada ali captura `TRAVA` — e ficava **irrenomeável**. Agora a
+ferramenta lê o desligamento. **O limite honesto:** ela só libera quando o `#un...` vem
+**antes de qualquer linha de código do módulo**. Se houver código acima dele, a regra
+viveu sobre esse trecho e a recusa continua — a ferramenta não adivinha por onde o seu
+nome vai aparecer.
+
+**3. Renomear uma FUNÇÃO para a palavra de um comando agora recusa na hora.** Se o nome
+novo é a cabeça de uma regra viva, escrever `MinhaFunc( 2 )` como `TRAVA( 2 )` faz o pp
+**capturar a chamada** — sua função nunca é chamada. A rede de verificação já barrava
+isso (o programa era restaurado, nada se perdia), mas a mensagem era um erro genérico de
+verificação. Agora vem o fato, antes de qualquer edição:
+
+```
+hbrefactor: new name 'TRAVA' collides with a preprocessor rule (#xcommand TRAVA, lib.ch:1)
+```
+
+Os outros cinco verbos de rename já faziam essa pergunta; a de função era a que faltava.
+
+*Detalhes internos e o resto da auditoria: [docs/roadmap.md](docs/roadmap.md) § P.*
+
 ## 2026-07-12 — a ferramenta agora fala INGLÊS
 
 **Isto muda o que você lê no terminal.** Todas as mensagens do `hbrefactor` —

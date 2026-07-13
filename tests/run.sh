@@ -3851,6 +3851,114 @@ freshsw() { # freshsw <case-name> -> EXIT dentro de SWITCH (salto estrutural)
    echo "$d"
 }
 
+freshlife() { # freshlife <case-name> -> regra com TEMPO DE VIDA: morta num modulo, viva no outro (P-AUDIT/A2)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixlife/*.prg "$HERE"/fixlife/*.ch "$HERE"/fixlife/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_120() {
+echo "case 120: P-AUDIT/A2+A3 - o guard de cabeca de regra le o TEMPO DE VIDA (ast-16) e vale para TODO verbo"
+# A2 - O FURO: 'removed' era fato do dump SEM CONSUMIDOR. Uma regra ja desligada
+# por #un... continuava sendo tratada como viva, e o nome dela ficava
+# IRRENOMEAVEL para sempre - recusa FALSA, a classe do caso 115.
+# A3 - O FURO: rename-function era o UNICO verbo que nao consultava o guard.
+# Escrever o nome de uma cabeca VIVA fazia o pp CAPTURAR a chamada; a rede pegava
+# (mapa de simbolos muda) e o usuario levava um erro de verificacao, nao o FATO.
+"$HB_BIN/harbour" "$HERE/fixlife/dead.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixlife" > /dev/null 2>&1
+check "fixlife/dead.prg clean under -w3 -es2" $?
+
+# (1) o FATO no dump: a regra do modulo dead esta REMOVIDA (ast-16)
+D=$(freshlife case120)
+( cd "$D" && "$BIN" dump fixlife.hbp > d.log 2>&1 )
+AST=$(sed -n 's/^dumps em: //p' "$D/d.log")/dead.ast.json
+python3 - "$AST" <<'PY'
+import json,sys
+rs=json.load(open(sys.argv[1]))["ppRules"]
+mk=[r for r in rs if r.get("head")=="TRAVA" and "undoes" not in r]
+un=[r for r in rs if r.get("head")=="TRAVA" and "undoes" in r]
+sys.exit(0 if (len(mk)==1 and len(un)==1 and mk[0].get("removed") is True
+               and un[0]["undoes"]==mk[0]["id"]) else 1)
+PY
+check "ast-16: no modulo 'dead' a regra consta REMOVIDA, com o vinculo por ID" $?
+
+# (2) A2 - regra MORTA antes de qualquer codigo do modulo: o nome esta LIVRE
+( cd "$D" && "$BIN" rename fixlife.hbp dead.prg:9:10 TRAVA > a2.log 2>&1 )
+check "regra ja desligada: rename do local para o nome dela PASSA (antes: recusa FALSA)" $?
+grep -q "LOCAL TRAVA" "$D/dead.prg"
+check "o local foi renomeado para a palavra da regra morta" $?
+( cd "$D" && "$HB_BIN/harbour" dead.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+check "o modulo segue limpo (a regra morta nao captura 'TRAVA')" $?
+
+# (3) A2 - onde o fato NAO libera: no modulo em que a regra esta VIVA, recusa
+D=$(freshlife case120b)
+( cd "$D" && "$BIN" rename fixlife.hbp alive.prg:5:10 TRAVA > a2b.log 2>&1 )
+[ $? -ne 0 ]
+check "regra VIVA no modulo: a recusa conservadora FICA" $?
+grep -q "collides with a preprocessor rule" "$D/a2b.log"
+check "a recusa nomeia a regra" $?
+
+# (4) A3 - rename-function passa a consultar o guard (antes: caia na rede)
+D=$(freshlife case120c)
+( cd "$D" && "$BIN" rename fixlife.hbp alive.prg:14:11 TRAVA > a3.log 2>&1 )
+[ $? -ne 0 ]
+check "rename-function para cabeca de regra VIVA: recusa" $?
+grep -q "collides with a preprocessor rule" "$D/a3.log"
+check "a recusa traz o FATO (a regra), nao um erro de verificacao" $?
+grep -q "PROCEDURE Cinta" "$D/alive.prg"
+check "nada foi editado" $?
+
+# regua do caso 64
+! grep -qiwE "trava|cinta" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixlife (régua do caso 64)" $?
+}
+
+freshout() { # freshout <case-name> -> projeto com include COMPARTILHADO fora do dir do projeto (P-AUDIT/A1)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp -r "$HERE"/fixout/proj "$HERE"/fixout/shared "$d"/
+   echo "$d"
+}
+
+unit_119() {
+echo "case 119: P-AUDIT/A1 - a fronteira do projeto e o .hbp, NUNCA o cwd do processo"
+# O FURO: o guard "recuso editar include de sistema/compartilhado" perguntava so
+# "o caminho comeca com hb_cwd()?". A MESMA edicao no MESMO projeto era permitida
+# ou recusada conforme o diretorio de onde a ferramenta foi chamada - e, com o cwd
+# num ancestral, um include de FORA do projeto entrava no plano de edicao (medido:
+# o hbclass.ch da instalacao do Harbour). A rede nao salva: ela confere .ppo/.hrb
+# dos modulos DESTE projeto, e um rename consistente nao muda expansao nenhuma ->
+# passava dizendo "verified". A fronteira agora e o diretorio do proprio .hbp.
+"$HB_BIN/harbour" "$HERE/fixout/proj/a.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixout/shared" > /dev/null 2>&1
+check "fixout/proj/a.prg clean under -w3 -es2" $?
+
+# (1) A DIRECAO PERIGOSA: o include mora FORA do projeto mas DENTRO do cwd.
+# Antes: editado em silencio ("verified"). Agora: recusa nomeando o arquivo.
+D=$(freshout case119a)
+( cd "$D" && "$BIN" rename proj/fixout.hbp proj/a.prg:5:4 FIXA > r.log 2>&1 )
+[ $? -ne 0 ]
+check "include compartilhado FORA do projeto: recusa (antes: editava e dizia 'verified')" $?
+grep -q "outside the project's directory" "$D/r.log"
+check "a recusa nomeia o fato (nao e um erro de verificacao generico)" $?
+grep -q "TRAVA" "$D/shared/lib.ch" && ! grep -q "FIXA" "$D/shared/lib.ch"
+check "o include compartilhado ficou INTACTO" $?
+
+# (2) A RECUSA FALSA: o MESMO projeto, a MESMA regra, invocado de OUTRO cwd.
+# Antes: "outside the project directory" - o menu.ch do proprio projeto.
+D=$(freshdsl case119b)
+( cd "$HERE" && "$BIN" rename "$D/fixdsl.hbp" "$D/a.prg:11:4" MENU_ITEM > "$D/r2.log" 2>&1 )
+check "rename-dsl de fora do diretorio do projeto: exit 0 (antes: recusa FALSA)" $?
+grep -q "^#command MENU_ITEM " "$D/menu.ch"
+check "a diretiva do PROPRIO projeto foi editada, invocada de qualquer cwd" $?
+grep -q "\.ppo and \.hrb byte-identical" "$D/r2.log"
+check "rede de verificacao verde (rename consistente)" $?
+
+# regua do caso 64
+! grep -qiwE "trava|fixa|cinta" "$HERE/../src/hbrefactor.prg"
+check "a ferramenta não menciona NENHUMA palavra da DSL fixout (régua do caso 64)" $?
+}
+
 unit_118() {
 echo "case 118: extract-function - EXIT termina o SWITCH (recusa FALSA); LOOP continua salto de laco"
 # O FURO: a guarda de salto so aceitava for/while como estrutura que COBRE um
@@ -4045,7 +4153,7 @@ check "projects-of num .ch acha o dono (posse de include = fato do compilador, -
 check "o probe de dependencias nao deixa lixo (.d) no projeto" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

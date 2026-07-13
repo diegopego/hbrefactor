@@ -930,6 +930,32 @@ STATIC FUNCTION DirAtOrAbove( cSpec, cAbs )
 
    RETURN Left( cFileDir, Len( cSpecDir ) ) == cSpecDir
 
+// o arquivo mora no CORREDOR DO PROJETO? É o portão de EDIÇÃO de diretiva: um
+// `.ch` do projeto é editável; um include de fora (o hbclass.ch/std.ch da
+// instalação, um include compartilhado entre projetos) NUNCA é - editá-lo
+// mudaria código que ninguém pediu, e a rede de verificação (.ppo/.hrb dos
+// módulos DESTE projeto) não veria diferença nenhuma num rename consistente.
+//
+// A âncora é o diretório do PRÓPRIO .hbp - fato do projeto -, nunca o `hb_cwd()`
+// do processo: com o cwd como fronteira, a MESMA edição no MESMO projeto era
+// permitida ou recusada conforme o diretório de onde a ferramenta foi chamada
+// (recusa falsa rodando de fora; e, com o cwd num ancestral da instalação do
+// Harbour, o include do CORE entrava no plano de edição). Um .hbp pode resolver
+// para vários specs (lista separada por vírgula, como o hbmk2 aceita): o
+// corredor é a união deles.
+STATIC FUNCTION ProjectOwnsFile( hProj, cPath )
+
+   LOCAL cSpec
+   LOCAL cAbs := AbsOf( cPath )
+
+   FOR EACH cSpec IN hb_ATokens( hProj[ "spec" ], "," )
+      IF ! Empty( cSpec ) .AND. DirAtOrAbove( AbsOf( cSpec ), cAbs )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
 STATIC FUNCTION ProjectsOf( aArgs )
 
    LOCAL cFile, cAbs, cCwd, cJsonOut := "", aCand := {}, aRoots := {}, nI
@@ -2604,6 +2630,44 @@ STATIC FUNCTION OneWord( cName )
 // de ppRules (ast-2): cobre includes aninhados, regras builtin aplicadas e
 // a abreviação dBase de #command/#translate. Substitui o DefineCollision/
 // PpHeadIn textual da era B2 (auditoria: réplica marcada para morrer na B4).
+// a regra já estava DESLIGADA antes de existir código neste módulo? Fato do
+// ast-16: `removed` na regra + o registro da REMOÇÃO (o que carrega `undoes`
+// com o id dela) com arquivo e linha REAIS. Uma regra vale do `#[x|y]command`
+// até o `#un...`; depois disso a palavra volta a ser código cru e a regra não
+// captura mais NADA. Se nenhum token de fonte do módulo precede a linha do
+// desligamento, ela não capturou (nem capturará) nada aqui - um nome novo
+// escrito neste módulo é, para ela, código cru.
+//
+// Onde o fato NÃO decide - desligamento em OUTRO arquivo (a ordem de expansão
+// do include não está no dump), ou código ANTES dele (a regra viveu sobre esse
+// trecho) -, a recusa CONSERVADORA fica. Sem este fato, uma regra morta tornava
+// o nome dela IRRENOMEÁVEL para sempre: recusa falsa da classe do caso 115.
+STATIC FUNCTION RuleDeadInModule( hAst, hRule )
+
+   LOCAL hDel, hTok, nDel := 0
+
+   IF ! hb_HGetDef( hRule, "removed", .F. )
+      RETURN .F.
+   ENDIF
+   FOR EACH hDel IN hAst[ "ppRules" ]
+      IF hb_HHasKey( hDel, "undoes" ) .AND. ValType( hDel[ "undoes" ] ) == "N" .AND. ;
+         hDel[ "undoes" ] == hRule[ "id" ] .AND. hDel[ "file" ] != NIL .AND. ;
+         AbsOf( hDel[ "file" ] ) == AbsOf( hAst[ "module" ] )
+         nDel := hDel[ "line" ]
+         EXIT
+      ENDIF
+   NEXT
+   IF nDel == 0
+      RETURN .F.                       // desligamento fora deste arquivo: não decide
+   ENDIF
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "prov" ] == "s" .AND. hTok[ "line" ] < nDel
+         RETURN .F.                    // houve código ANTES: a regra viveu aqui
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
 STATIC FUNCTION RuleHeadCollision( hAst, cUpNew )
 
    LOCAL hRule
@@ -2613,6 +2677,7 @@ STATIC FUNCTION RuleHeadCollision( hAst, cUpNew )
          // o nome novo é um IDENTIFICADOR (não tem regra própria): a pergunta
          // é só "escrever este nome casaria com esta regra?" - pergunta-se ao pp
          IF hRule[ "head" ] != NIL .AND. ! IsRuleDel( hRule ) .AND. ;
+            ! RuleDeadInModule( hAst, hRule ) .AND. ;
             PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew )
             RETURN hRule
          ENDIF
@@ -2951,6 +3016,15 @@ STATIC FUNCTION RenameFunction( aArgs )
          RETURN Refuse( "ast-1 dump missing/invalid for '" + cPath + "'" )
       ENDIF
       hAsts[ cPath ] := hAst
+      // o nome novo é cabeça de regra de pp VIVA neste módulo? Escrevê-lo faria
+      // o pp CAPTURAR o site (a chamada vira a expansão da regra e a função
+      // renomeada some da chamada). Era o único verbo de rename que não fazia
+      // esta pergunta: a rede pegava (o mapa de símbolos muda) e o usuário
+      // levava um erro de verificação em vez do FATO
+      IF ( hRule := RuleHeadCollision( hAst, cUpNew ) ) != NIL
+         RETURN Refuse( "new name '" + cNew + "' collides with a preprocessor rule (" + ;
+                        RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
+      ENDIF
       FOR EACH hFunc IN hAst[ "functions" ]
          IF hFunc[ "fileDecl" ]
             LOOP
@@ -3046,11 +3120,11 @@ STATIC FUNCTION RenameFunction( aArgs )
          IF Empty( cChPath )
             RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
          ENDIF
-         IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
-            RETURN Refuse( "directive in '" + cChPath + "' outside the project directory - " + ;
-                           "refusing to edit a system/shared include" )
+         IF ! ProjectOwnsFile( hProj, cChPath )
+            RETURN Refuse( "directive in '" + cChPath + "' is outside the project's " + ;
+                           "directory - refusing to edit a system/shared include" )
          ENDIF
-         cChPath := hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) )
+         cChPath := AbsOf( cChPath )
          // diretiva num fonte do PROJETO (regra no próprio .prg): a chave
          // tem que ser o cPath do projeto - as edições vão na mesma aplicação
          FOR EACH cPath IN hProj[ "files" ]
@@ -5903,7 +5977,7 @@ STATIC FUNCTION RenameDsl( aArgs )
    LOCAL cUpOld, cUpNew, aTargets := {}, cKey, aDefSeen := {}
    LOCAL hEdits := { => }, aE, cChPath, cText, hOrig := { => }
    LOCAL nSites := 0, nDirEdits := 0, nLine
-   LOCAL hPpoBefore := { => }, cPpo, cCwd
+   LOCAL hPpoBefore := { => }, cPpo
    LOCAL lTarget, hTargetKeys := { => }, aMk
    LOCAL nRTok, lOurs                    // ast-15: QUAL literal da regra o site casou
    LOCAL hTgt, cWitness                  // P11: ambiguidade julgada pelo pp VIVO
@@ -6148,15 +6222,14 @@ STATIC FUNCTION RenameDsl( aArgs )
    // reais - P3). A reancoragem textual da cabeça morreu aqui (B4g). O
    // lado do RESULTADO fica intocado: regra recursiva que emita a própria
    // palavra quebra a expansão e a rede .ppo/.hrb recusa com rollback
-   cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
    FOR EACH hRule IN aTargets
       cChPath := ResolveInclude( hProj, hRule[ "file" ] )
       IF Empty( cChPath )
          RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
       ENDIF
-      IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
-         RETURN Refuse( "directive in '" + cChPath + "' outside the project directory - " + ;
-                        "refusing to edit a system/shared include" )
+      IF ! ProjectOwnsFile( hProj, cChPath )
+         RETURN Refuse( "directive in '" + cChPath + "' is outside the project's " + ;
+                        "directory - refusing to edit a system/shared include" )
       ENDIF
       aE := {}
       FOR EACH hTok IN hRule[ "match" ]
@@ -6398,7 +6471,7 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    LOCAL hProj, cTmp, cPath, hAsts := { => }, hRule, hTok, cSide
    LOCAL cOld := hR[ "old" ], nMk := hR[ "marker" ], nRuleId := hR[ "ruleid" ]
    LOCAL cUpNew := Upper( cNew )
-   LOCAL cChPath, cCwd, aE := {}, hEdits := { => }, hOrig := { => }
+   LOCAL cChPath, aE := {}, hEdits := { => }, hOrig := { => }
    // nEdits SEM inicializador: `LOCAL x := 0` seguido de `x := <valor>` sem
    // leitura no meio é DEAD STORE e o Harbour avisa W0032 (quebra sob -es2)
    LOCAL hPpoBefore := { => }, cPpo, cText, nLine := 0, cKey, nEdits
@@ -6462,10 +6535,9 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    IF Empty( cChPath )
       RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
    ENDIF
-   cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
-   IF ! Left( hb_PathNormalize( hb_PathJoin( cCwd, cChPath ) ), Len( cCwd ) ) == cCwd
-      RETURN Refuse( "directive in '" + cChPath + "' outside the project directory - " + ;
-                     "refusing to edit a system/shared include" )
+   IF ! ProjectOwnsFile( hProj, cChPath )
+      RETURN Refuse( "directive in '" + cChPath + "' is outside the project's " + ;
+                     "directory - refusing to edit a system/shared include" )
    ENDIF
 
    // os sites: os DOIS lados da regra, por NÚMERO de marker (o fato)

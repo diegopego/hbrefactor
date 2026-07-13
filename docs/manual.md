@@ -20,7 +20,7 @@
       measured by hand, once, with no script. Re-measured 2026-07-12 with
       tools/pcode-identity.sh: 889/889 identical, ZERO divergences. The claim holds; the
       count was fantasy. The body now points at the measurement, not at a number.
-  suite at baseline: 113 cases, 923 checks green
+  suite at baseline: 115 cases, 942 checks green
   updated: 2026-07-12
 
   This file is the single, current-state, user-facing description of hbrefactor.

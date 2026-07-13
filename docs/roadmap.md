@@ -664,6 +664,84 @@ suíte (responde ao critério de matar do adr-003).
   > [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristica.md). Não a rode
   > como apêndice de uma entrega: quem acabou de escrever o código é o pior juiz dele.
 
+- **P-AUDIT — VARREDURA EXECUTADA (sessão dedicada, 2026-07-12)**: três achados
+  **provados por fixture executável**, um passe explícito, uma hipótese registrada.
+  **Nenhum precisa de extensão do core** — os três são fato JÁ disponível (dois deles
+  já implementados no próprio arquivo) e apenas não consultado. Portão do Diego aberto
+  para consertar (2026-07-12: *"coloque no roadmap para resolver e comece já"*).
+  Ordem de conserto = risco:
+
+  - **A1 ✅ ENTREGUE (2026-07-12, caso 119; suíte 942/0)** — **a fronteira do projeto era o
+    CWD do processo** (`hbrefactor.prg` 3049 `RenameFunction --edit-rules`, 6157 `RenameDsl`,
+    6466 `RenameRuleMarker`).
+    O guard que promete "recuso editar include de sistema/compartilhado" pergunta só
+    *"o caminho começa com `hb_cwd()`?"* — e erra nas DUAS direções, provado:
+    (a) **recusa falsa** — o mesmo projeto, a mesma regra, invocado de outro diretório:
+    `directive in '<proj>/menu.ch' outside the project directory`; (b) **autorização
+    falsa, a que morde** — com `cwd = ~`, o `hbclass.ch` do CORE entra no plano de
+    edição (`hbclass.ch:250:11`), e sem `--dry-run` o `hb_MemoWrit` grava. **A rede não
+    salva**: ela confere `.ppo`/`.hrb` byte-idênticos DOS MÓDULOS DO PROJETO, e um
+    rename consistente não muda expansão nenhuma → passa sem rollback → mutação
+    silenciosa de um include compartilhado que quebra todo outro projeto da máquina.
+    *Gatilho 6 (canal barato) + 3.* **Fato já disponível, e o predicado certo já existe
+    no arquivo**: `DirAtOrAbove( cSpec, cAbs )` ancora no diretório do `.hbp` (é o que o
+    `projects-of` usa) e `IncludeOwnedBy`/`ModuleDeps` respondem posse pelo `harbour -gd`
+    (caminho resolvido, fecho transitivo). Ancorar no SPEC preserva o comportamento de
+    hoje no caso normal (cwd = dir do projeto).
+    **Como ficou:** `ProjectOwnsFile( hProj, cPath )` — o corredor é o diretório do(s)
+    `.hbp` (união, quando o spec resolve para vários), sobre o `DirAtOrAbove` que já
+    existia. Fixture `fixout/` (include **compartilhado fora** do diretório do projeto,
+    mas **dentro** do cwd) + o rename-dsl do `fixdsl` invocado **de outro cwd** — as duas
+    direções na suíte. Medido no binário de HEAD antes do conserto: ele editava o
+    `shared/lib.ch` e dizia **`verified`**.
+
+  - **A2 ✅ ENTREGUE (2026-07-12, caso 120)** — **o `removed` do ast-16 era fato SEM
+    CONSUMIDOR → recusa falsa** (`RuleHeadCollision`, 2607; consumido por 5 verbos). Regra já morta por
+    `#xuncommand` continua sendo tratada como viva: renomear um LOCAL para `PINTA`
+    recusa (`collides with a preprocessor rule (#xcommand PINTA, y.ch:1)`) — e a
+    mão-livre compila limpo sob `-w3 -es2`, porque a regra morta não captura nada.
+    É a recusa falsa da classe do caso 115 (nome irrenomeável por uma regra que não
+    existe mais). *Gatilho 3.* **Fato já no dump** (`removed: true`; o registro da
+    remoção traz `file`/`line`; `undoes` liga os dois). A leitura honesta NÃO é "pule
+    regra `removed`" — uma regra removida na linha 100 ainda captura na linha 50 —, é
+    *"a regra está VIVA neste sítio?"*: decidível pela linha quando remoção e sítio
+    estão no mesmo arquivo; onde a ordem não decide, a recusa conservadora FICA.
+    **Como ficou:** `RuleDeadInModule( hAst, hRule )` — a regra é pulada **só** quando
+    (a) traz `removed`, (b) o registro da remoção (o que carrega `undoes` com o id dela)
+    mora **no arquivo do próprio módulo**, e (c) **nenhum token de fonte do módulo
+    precede** a linha do desligamento (então a regra não viveu sobre código nenhum aqui).
+    Fora disso — remoção em outro arquivo, ou código antes dela —, o fato não decide e a
+    recusa fica. Fixture `fixlife/` prova os dois lados (módulo `dead` libera, módulo
+    `alive` recusa).
+
+  - **A3 ✅ ENTREGUE (2026-07-12, caso 120)** — **`RenameFunction` era o único verbo sem o
+    guard de cabeça de regra** (2891; os outros cinco chamam `RuleHeadCollision`: 2128
+    local, 2769 static, 3384 extract, 7007 memvar, 11538 method). Provado: `#xcommand
+    PINTA <x>` + `rename Foo → PINTA` não recusava, o call site virava `PINTA( 2 )` e era
+    CAPTURADO pela regra; a rede pegava (`the number of symbols/functions changed -
+    rollback`) e restaurava. Dano: nenhum; custo: o usuário levava um erro de verificação
+    em vez do FATO. *Omissão, não heurística.* Agora recusa nomeando a regra.
+
+  - **A4 — RESÍDUO ABERTO (mesma família do A2)**: as colisões do **próprio `rename-dsl`**
+    (`"'X' is already a rule head"` e as de abreviação, ~5988-6003) ainda tratam regra
+    MORTA como viva — o `RuleDeadInModule` existe e ali não é consultado. E o **`#un…`
+    órfão** (`undoes: null`) segue **sem consumidor**: é código morto silencioso que a
+    ferramenta poderia diagnosticar (o `usages` da palavra é o lugar natural).
+
+  **Passa (registrado, não é achado):** `HeadClashWitness` — a completude do conjunto de
+  candidatos é raciocínio sobre o core, e é VERDADEIRA (`hb_pp_tokenValueCmp`,
+  ppcore.c:2704: só casa por prefixo no modo dBase, por igualdade nos demais; um witness
+  casa as duas cabeças, logo é prefixo de ambas). Quem julga cada candidato é o pp vivo.
+  **Hipóteses registradas (não consegui quebrar):** `ResolveInclude` — o dump já traz o
+  caminho resolvido (`hb_pp_FileNew` reescreve `szFileName` para o caminho ONDE ABRIU,
+  ppcore.c:2945-3060), então o fallback dos `-i` é código dormente; ou morre, ou consome
+  `ModuleDeps`. Família `y` (case-sensitive, `HB_PP_CMP_CASE` = memcmp): a ferramenta
+  uniformiza toda palavra de regra com `Upper()` e funde duas regras `y` que o core vê
+  como distintas — erro fail-closed, sem quebra demonstrada.
+  **Descartado COM PROVA:** `ProjectMember` por basename — o hbmk2 colapsa dois fontes
+  homônimos no MESMO `.o` (link falha), então projeto com fontes homônimos não existe:
+  o basename é único por FATO do builder, não por sorte.
+
 **P-DOC — corpus exploratório/explicativo do PP (ESSENCIAL, ordem do Diego,
 2026-07-11):** uma bateria de testes que casa diretivas REAIS do Harbour
 (examples/, contribs/, os `.ch` do core — std.ch, hbclass.ch, box.ch, inkey.ch,
