@@ -1,26 +1,25 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@63be8f0 · harbour-core@838c740b4a (feature/compiler-ast-dump)
-    — this round the CORE moved three schema steps (ast-14, ast-15, ast-16), and two of
-      them changed what the tool can promise the user:
-      * NEW SECTION "A directive can be switched off — and the rename follows it there"
-        (ast-16, case 117). A `#undef` / `#xuncommand` ends a directive's life. Renaming
-        the directive used to leave that switch-off behind, pointing at a name that no
-        longer existed — so it turned off NOTHING and the directive LEAKED past the line
-        where the programmer ended it, silently, with the compiled output byte-identical
-        either way. The removal directive is now renamed along with the rule it ends.
-      * NEW SECTION '"Would this new name collide?" — it asks the preprocessor instead of
-        guessing' (phase P/P11). `#command` matches its keywords abbreviated, so a rename
-        can hijack another rule. The tool used to REIMPLEMENT that matching rule and
-        therefore refused safe renames; it now starts a live preprocessor and lets the
-        real authority answer.
-      CORRECTED, and worth stating plainly: this file claimed "1085 of 1085 modules
-      byte-identical" as the zero-impact proof. That figure is NOT reproducible — it was
-      measured by hand, once, with no script. Re-measured 2026-07-12 with
-      tools/pcode-identity.sh: 889/889 identical, ZERO divergences. The claim holds; the
-      count was fantasy. The body now points at the measurement, not at a number.
-  updated: 2026-07-12
+  baseline: hbrefactor@1141943 · harbour-core@8092e33a0b (feature/compiler-ast-dump)
+    — this round the tool got FASTER and STRICTER, and lost a command:
+      * SPEED (new "Still rough" item). The compiler's fact export was growing as the
+        SQUARE of a module's preprocessor expansions; it is linear now, which took about
+        a third off every command on real Harbour code. What remains is the honest price:
+        every command re-exports the WHOLE project, so you wait for the project, not for
+        your edit. Measured end to end, not from a microbenchmark.
+      * TOOLCHAIN IN STEP (new "Still rough" item). The tool now requires the EXACT dump
+        version the branch emits. A stale `harbour` used to make it quietly report a
+        `possible` where it had a `confirmed` — a build problem dressed up as a limit on
+        what can be known about your code. It refuses loudly instead, naming both
+        versions. There is no backward compatibility here, on purpose: the dump is
+        generated on every command, so an old dump cannot exist — only an out-of-step
+        build can.
+      * REMOVED: `unused-locals`. It ran the compiler on each module and filtered two
+        warning lines out of its output. `harbour yourfile.prg -w3 -s` prints exactly the
+        same thing, continuously, on every build. A command that duplicates the compiler
+        is weight, not capability.
+  updated: 2026-07-13
 
   This file is the single, current-state, user-facing description of hbrefactor.
   The landing page (site/) is GENERATED FROM this content — iterate the words here,
@@ -798,12 +797,15 @@ does** — never build a guess inside the tool.
 
 ## Where it stands — honest status
 
-<!-- prov: roadmap.md (delivered table, RE.6/RD-c entregues, U slices 1-2 delivered,
-     phase P/P1 delivered, gates B6/B8/D), CLI 0.5.0 / extension 0.13.0, suite 796/0
-     (this commit, phase P/P1 - ast-13 rule genealogy consumed, case 108); rough
-     edges: cases 88 (@ref, PARAMETERS AS), commit c127b1f (same-basename limit),
-     CHANGELOG 2026-07-10/11; limits doc (limites-e-alavancas.md: irreducible maybe,
-     library openness). -->
+<!-- prov: roadmap.md (delivered table; phase P CLOSED 2026-07-13 with P9/P10; phase V
+     slice 1 delivered; gates B6/B8/D), CLI 0.5.0 / extension 0.13.0, suite 962/0;
+     rough edges: cases 88 (@ref, PARAMETERS AS), commit c127b1f (same-basename limit);
+     speed item: commits 226eaf6 (measured end to end: xhb 43 modules, 12.35s -> 8.36s)
+     + core 1c062d88e6, and phase V slice 1 (where the time goes: dump generation ~58%
+     of call-graph but only ~35% of usages, where ANALYSIS dominates);
+     toolchain-in-step item: commit 1d407df + core 2c980299d1 (exact schema, the
+     enumerated version list and the 23 degradation gates removed; case 122);
+     limits doc (limites-e-alavancas.md: irreducible maybe, library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
 `0.13.0`; they version independently). The behavior contract is an **executable suite** —
@@ -834,6 +836,24 @@ stock compiler.
 - The per-call `-kt` check has a cost in very hot loops (so it's opt-in), and it doesn't
   cover pass-by-reference (`@x`) or legacy `PARAMETERS x AS ...` — those sites are never
   labeled `guaranteed`.
+- **You wait for the project, not for your edit.** Acting on facts has a price: before
+  touching anything, every command has the compiler re-export your **whole project**,
+  from scratch — deliberately, so it can never act on a stale fact. Renaming one variable
+  costs the same wait as renaming twenty, and on a big codebase that is real, in the tens
+  of seconds. *(It used to be worse: the export grew as the **square** of a module's
+  preprocessor expansions, and fixing that took about a third off every command on real
+  Harbour code. What's left is the honest price of exporting everything, and making it
+  proportional to what you **touched** is the next thing worth doing here.)* Don't take
+  our word for the size of it — time a command against your own biggest project before
+  you commit to the tool.
+- **The tool and the compiler branch must be in step.** The tool requires the *exact*
+  dump version the branch emits today. Build one without the other and every command
+  refuses, telling you which version each side speaks and to rebuild. It will never
+  *degrade* instead: a stale toolchain used to make it quietly report a `possible` where
+  it had a `confirmed` — a build problem dressed up as a limit on what can be known about
+  your code. There is no backward compatibility here, and that is deliberate: the dump is
+  produced fresh on every command, so an *old dump* cannot exist — only an out-of-step
+  build can, and that is an error to shout, not to work around.
 
 **What's next, if it all goes well**
 
