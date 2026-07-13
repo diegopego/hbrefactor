@@ -1,7 +1,7 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@8893796 · harbour-core@a465e85bd1 (feature/compiler-ast-dump)
+  baseline: hbrefactor@63be8f0 · harbour-core@838c740b4a (feature/compiler-ast-dump)
     — this round the CORE moved three schema steps (ast-14, ast-15, ast-16), and two of
       them changed what the tool can promise the user:
       * NEW SECTION "A directive can be switched off — and the rename follows it there"

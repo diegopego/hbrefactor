@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@8893796 -->
+<!-- changelog-baseline: hbrefactor@63be8f0 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 8893796..HEAD   (see § Maintaining this file, at the end).
+     To resume:  git log 63be8f0..HEAD   (see § Maintaining this file, at the end).
 
 # Changelog
 
