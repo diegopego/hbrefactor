@@ -12,7 +12,7 @@ HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
-.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-numbers site-check site-examples help
+.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-check site-examples help
 
 ## build       compila a ferramenta em bin/hbrefactor (alvo padrão)
 build: hooks $(BIN)
@@ -65,13 +65,8 @@ bin/parrun: tests/parrun.prg
 
 # porta de precisão da B1: dump ast vs TokenScan arquivado, corpus
 # fixtures + hbhttpd (0 divergências reais exigidas)
-## site-numbers  remede TODO indicador das páginas (nenhum número é digitado)
-site-numbers: tools/site-numbers.sh
-	@tools/site-numbers.sh
-
-## site-check   falha se indicador OU exemplo das páginas estiver defasado
-site-check: tools/site-numbers.sh $(BIN)
-	@tools/site-numbers.sh --check
+## site-check   falha se algum exemplo das páginas estiver defasado
+site-check: $(BIN)
 	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tools/site-examples.sh --check
 
 ## site-examples  RE-EXECUTA todo exemplo da página e regrava os blocos (nada é digitado)

@@ -2,8 +2,9 @@
 # Suite dos EXEMPLOS DA PAGINA (tests/site/).
 #
 # A regra: exemplo na landing page so existe se ele RODA e a refatoracao e
-# PROVADA - mesmo principio dos indicadores (tools/site-numbers.sh): nada de
-# transcript digitado a mao, que envelhece calado e mente.
+# PROVADA - nada de transcript digitado a mao, que envelhece calado e mente.
+# (Os INDICADORES medidos que existiam ao lado deste portao foram REMOVIDOS em
+# 2026-07-13, ordem do Diego: numero na pagina so atrapalha, vira comando.)
 #
 # Cada tests/site/<nn-nome>/ tem:
 #   app.hbp (+ fontes)   projeto compilavel

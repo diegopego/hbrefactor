@@ -266,24 +266,28 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   (b) a FERRAMENTA jamais pode abandonar `#command`/`#translate`: ela refatora o
   código dos OUTROS, e o `std.ch`, o `hbclass.ch` e toda a herança Clipper são
   dBase. A política é sobre o que escrevemos, nunca sobre o que suportamos.
-- **NÚMERO NA PÁGINA: só o que se MEDE SOZINHO. O resto vira COMANDO (Diego,
-  2026-07-12 — a regra passou por duas correções DELE até chegar aqui)**.
-  O que sobrevive como indicador é o que se mede **sem base de comparação e sem
-  lista de exclusão**: hoje, o tamanho da suíte e a contagem de schemas. Eles são
-  elementos marcados (`<span data-metric="suite-checks">`) que o
-  `tools/site-numbers.sh` recalcula — `make site-numbers` escreve, **`make site-check`
-  FALHA** se defasar (no core: `make -C site numbers|check`).
-  **Tudo o mais vira o COMANDO que o leitor roda**, não um número: a prova de
-  impacto zero (`tools/pcode-identity.sh`, exige buildar DOIS compiladores) e a forma
-  do diff (`git diff --stat`).
-  **As duas cicatrizes, porque a regra não é óbvia:** *(1)* quatro números estavam
-  errados ao mesmo tempo e ninguém notou (`1085/1085`, `112/112`,
-  `105 cases / 825 checks`, "thirteen schema steps") — número mantido à mão envelhece
-  calado. *(2)* Aí eu automatizei a **forma do diff** e ela me traiu: dependia de uma
-  BASE (`master` local, **7 commits atrasado**) e de uma lista de exclusão — e o
-  resultado foi **acusar o UPSTREAM de poluir o branch**, achado falso e publicado.
-  O Diego cortou: *"prefiro que não publique estes números, isto está complicando o
-  projeto"*. **Automatizar um número frágil é pior que não tê-lo.**
+- **NENHUM NÚMERO NAS PÁGINAS — todo indicador vira COMANDO (Diego, 2026-07-13:
+  *"quero que tire estes medidores, isto só atrapalha"*; REVOGA a regra anterior
+  "só o que se mede sozinho", que ainda admitia indicador medido e automatizado)**.
+  Não existe mais `data-metric`, `tools/site-numbers.sh`, `make site-numbers` nem
+  `make -C site numbers|check`. Nenhum tamanho de suíte, contagem de casos ou de
+  schemas nas `site/index.html` (dos DOIS repositórios) — **o que o leitor recebe é o
+  comando que ele roda** (`make test`, `tools/pcode-identity.sh`, `git diff --stat`),
+  e o comando não envelhece. `make site-check` sobrevive, mas agora **só** com o
+  portão dos EXEMPLOS (regra abaixo).
+  **A escalada que justifica o corte** — a regra foi endurecendo porque cada versão
+  dela ainda custava caro: *(1)* quatro números estavam errados ao mesmo tempo e
+  ninguém notou (`1085/1085`, `112/112`, `105 cases / 825 checks`, "thirteen schema
+  steps") — número mantido à mão envelhece calado; *(2)* automatizei a **forma do
+  diff** e ela me traiu (dependia de uma BASE desatualizada + lista de exclusão →
+  **acusei o UPSTREAM** de poluir o branch, achado falso e publicado); *(3)* mesmo os
+  dois indicadores "seguros" viraram **imposto por entrega**: cada fatia mexia no
+  número, exigia re-medir nos dois repositórios e sujava o core (que só commita sob
+  autorização por-commit) — trabalho recorrente que não servia a leitor nenhum.
+  **Automatizar um número frágil é pior que não tê-lo; e um número que sobrevive à
+  automação ainda custa mais do que vale.**
+  *(Números em `docs/roadmap.md`, specs e mensagem de commit CONTINUAM — lá são
+  registro datado da entrega, não promessa viva ao leitor.)*
 - **EXEMPLO NA PÁGINA: só o que se EXECUTA sozinho — a suíte do site (Diego,
   2026-07-12: *"esta técnica de suíte de testes que vai para o site é o caminho
   correto"*)**. É a regra do número medido, um nível acima e valendo para CÓDIGO:

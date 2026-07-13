@@ -20,7 +20,6 @@
       measured by hand, once, with no script. Re-measured 2026-07-12 with
       tools/pcode-identity.sh: 889/889 identical, ZERO divergences. The claim holds; the
       count was fantasy. The body now points at the measurement, not at a number.
-  suite at baseline: 116 cases, 961 checks green
   updated: 2026-07-12
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -809,8 +808,8 @@ does** — never build a guess inside the tool.
      library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.13.0`; they version independently). The behavior contract is a suite of **116 cases /
-961 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.13.0`; they version independently). The behavior contract is an **executable suite** —
+`make test` runs it, green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
@@ -853,7 +852,7 @@ stock compiler.
 <!-- prov: Diego's explicit ask (2026-07-10); branch inventory from git log. -->
 
 I built the `harbour-core` branch that makes these compiler facts exist — the AST dump
-(sixteen schema steps), the `-kt` enforcement, the parentage channel, the segfault and
+(one schema step at a time), the `-kt` enforcement, the parentage channel, the segfault and
 warning fixes. But I'm a Harbour **application** developer, **not a compiler/VM
 specialist**. I would genuinely value people who know Harbour's core taking a look.
 
@@ -879,7 +878,7 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (116 cases)
+   make test         # optional: the behavior suite
    ```
 3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.

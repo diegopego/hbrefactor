@@ -30,10 +30,14 @@ contradição mais cara possível.
 
 ## O princípio
 
-É o mesmo do `tools/site-numbers.sh`, um nível acima:
-
-> **número na página: só o que se mede sozinho.**
 > **exemplo na página: só o que se executa sozinho.**
+
+Houve um irmão mais velho desta regra — `tools/site-numbers.sh`, que re-media os
+indicadores da página (tamanho da suíte, contagem de schemas) e falhava o build se
+defasassem. Ele **foi removido** em 2026-07-13, por ordem do Diego: *"quero que tire
+estes medidores, isto só atrapalha"*. O número, mesmo automatizado, cobrava um imposto
+por entrega (re-medir nos dois repositórios, sujar o core) e não servia a leitor nenhum.
+**Número vira comando**; o portão do EXEMPLO, que prova capacidade, é o que fica.
 
 Se um exemplo não pode ser gerado por execução, ele não vai para a página. E se
 alguém editar um bloco à mão, o `make site-check` quebra o build — a página não

@@ -135,16 +135,15 @@ escrever, o ponteiro avança.
    byte-idênticos — estava nos commits.)*
    Depois de editar, **republicar o artifact** (mesmo `file_path` → mesma URL).
 
-0.4c **INDICADORES: rodar `make site-check` (Diego, 2026-07-12).** Só é indicador o
-   que se mede **sozinho** (sem base de comparação, sem lista de exclusão): hoje, o
-   tamanho da suíte e a contagem de schemas. São elementos marcados (`data-metric`)
-   que o `tools/site-numbers.sh` recalcula; `make site-check` FALHA se defasou (no
-   core: `make -C site numbers|check`). **Todo o resto vira o COMANDO que o leitor
-   roda**, nunca um número — impacto zero (`tools/pcode-identity.sh`) e forma do
-   diff (`git diff --stat`). *(Duas cicatrizes: quatro números envelheceram sem
-   ninguém notar; e a forma do diff, quando eu a automatizei, dependia de uma base
-   desatualizada e produziu um achado FALSO contra o upstream. Automatizar um número
-   frágil é pior que não tê-lo.)*
+0.4c **NENHUM NÚMERO NAS PÁGINAS (Diego, 2026-07-13: *"quero que tire estes medidores,
+   isto só atrapalha"* — REVOGA o "só o que se mede sozinho").** Não existe mais
+   `data-metric`, `tools/site-numbers.sh` nem `make site-numbers`. **Não reintroduza
+   contagem de casos, de checks ou de schemas** em `site/index.html` (dos dois
+   repositórios) — o que o leitor recebe é o **comando que ele roda** (`make test`,
+   `tools/pcode-identity.sh`, `git diff --stat`), e o comando não envelhece.
+   `make site-check` continua existindo e continua obrigatório, mas agora só com o
+   portão dos EXEMPLOS. *(Números em roadmap, specs e mensagem de commit continuam —
+   lá são registro datado, não promessa viva ao leitor.)*
 
 0.5 **Régua anti-buraco (roda sempre, é barata):** confirmar que todo comando que
    o binário expõe hoje (`hbrefactor` sem args) aparece em alguma entrada do
