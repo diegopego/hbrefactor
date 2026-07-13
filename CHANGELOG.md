@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@5ef8e8b -->
+<!-- changelog-baseline: hbrefactor@86e03bc -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 5ef8e8b..HEAD   (see § Maintaining this file, at the end).
+     To resume:  git log 86e03bc..HEAD   (see § Maintaining this file, at the end).
 
 # Changelog
 
@@ -19,6 +19,26 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-07-13 — a big module no longer makes the tool crawl
+
+Every command here starts by having the compiler dump the facts of your project, and
+on a large module that dump had been getting **quadratic**: doubling the module's size
+quadrupled the wait. A module of 16 000 expanded command lines — an ordinary size in a
+real application — took **over a minute** before the tool could even begin, so on a
+big project the tool did not feel slow, it felt broken.
+
+It is now **linear**: the same module is ready in **a fifth of a second**. Nothing you
+see changed — the facts, the refusals, the edits and the verification are exactly what
+they were, byte for byte. The compiler was simply asking itself the same question once
+per word instead of once per module.
+
+**Where it still bites:** the wait that remains grows with the **size** of what the
+compiler has to export, so a genuinely huge module is still a heavier one. If it hurts,
+build the project incrementally — only what you touched is re-dumped.
+
+*(You need to rebuild the branch of the compiler for this: it is a fix there, not here.
+See [harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md).)*
 
 ## 2026-07-12 — a rule you switched off no longer blocks your rename (and dead switch-offs get named)
 

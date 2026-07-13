@@ -535,8 +535,24 @@ suíte (responde ao critério de matar do adr-003).
   o dono por fato, e a **extensão VSCode passa a funcionar com o include em foco
   sem código novo**. Suíte **882/0**, zero core.
   [spec-p § P8](spec-p-pp-refatoracao.md).
-- **P9** custo do reverse-scan O(tokens×from) (adr-003:96-98); **P10**
-  síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
+- **P9 ✅ ENTREGUE (2026-07-13): o custo do reverse-scan era QUADRÁTICO — medido,
+  consertado no core, equivalência provada.** O adr-003:96-98 registrara o custo do
+  `generates` como *"barato no dump de um módulo; um ponto a vigiar"*. A medição (a
+  entrega desta fatia) desmentiu: `hb_compAstMarkerGenerates` respondia **por token
+  consultado**, e cada resposta varria o fluxo de tokens inteiro E todas as
+  aplicações → **O(markers × módulo)**. Módulo de **16k linhas expandidas: 69,30 s**
+  de dump (contra fração de segundo para compilar); dobrar N quadruplicava o tempo.
+  Conserto (`compast.c`): a resposta é propriedade do par **(aplicação, marker)** →
+  o conjunto é construído **uma vez por módulo**, numa passada linear sobre as MESMAS
+  duas fontes, e o token responde por lookup. **16k → 0,21 s (330×)**, e o
+  crescimento virou **linear** (64k = 0,94 s). Sem canal novo, sem campo novo, sem
+  mudança de semântica — e a prova disso é o ponto: os **847 dumps** do corpus (toda
+  fixture + 6 módulos reais do core) saem **byte a byte idênticos** ao binário
+  anterior. Suíte **961/0**, lexdiff 0. O que sobra é linear e dominado por escrever
+  o JSON (64k linhas = 107 MB) — se doer, o alvo é o TAMANHO do dump, não mais a
+  busca do fato. [spec-p § P9](spec-p-pp-refatoracao.md). **Commit do core pendente
+  de autorização por-commit do Diego.**
+- **P10** síntese/completude + atualização de adr-003, ast-schema, CHANGELOG.
 - **P11 — ENTREGUE (2026-07-12): o pp VIVO como oráculo; morre a última gramática
   replicada, e com ela um SEQUESTRO DE REGRA silencioso.** A API está mapeada e a
   **equivalência com o pp do build foi PROVADA** (mesma regra, mesmo site, mesmo

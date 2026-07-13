@@ -141,6 +141,53 @@ suíte 904/0, `ppcorpus` 42/0, **zero core**. Conhecimento:
 [pp-as-instrument.md](pp-corpus/pp-as-instrument.md) ·
 [abbreviation.md](pp-corpus/abbreviation.md).
 
+## P9 ✅ — o custo do reverse-scan do `generates` (2026-07-13)
+
+O [adr-003](adr-003-derivacao-pp-como-fato.md) registrou o custo do `generates`
+(`ast-12`) como *"barato no dump de um módulo; um ponto a vigiar"*. **Não era barato,
+e o "ponto a vigiar" era uma parede** — achado por medição, que era a entrega desta
+fatia.
+
+**O que estava errado.** `hb_compAstMarkerGenerates` respondia a pergunta *"o valor
+escrito neste marker alimenta um paste/stringify?"* com uma varredura reversa
+**por token consultado**, e cada varredura percorria o fluxo de tokens INTEIRO **e**
+todas as aplicações do pp. Como o número de tokens-marker consultados cresce junto
+com o número de aplicações, isso é **O(markers × módulo)** — quadrático no tamanho do
+módulo.
+
+**A medição** (linhas de comando expandido, `harbour -x`, melhor de 3):
+
+| N linhas | antes | depois |
+|---:|---:|---:|
+| 4 000 | 1,42 s | 0,05 s |
+| 8 000 | 8,76 s | 0,09 s |
+| 16 000 | **69,30 s** | **0,21 s** |
+| 32 000 | (não medido) | 0,45 s |
+| 64 000 | (não medido) | 0,94 s |
+
+Dobrar N quadruplicava o tempo (assinatura de quadrática); agora dobrar N **dobra** o
+tempo. Um módulo de 16 mil linhas expandidas levava **mais de um minuto** para dumpar
+o que se compila numa fração de segundo — e módulos assim existem em aplicação real.
+Nos módulos reais do core o custo era menos dramático mas real (`debugger.prg`,
+3797 linhas: 0,45 s → 0,32 s).
+
+**O conserto (core, `compast.c`).** A resposta é propriedade do **par (aplicação,
+marker)**, não do token — então o conjunto dos pares que geram é construído **uma vez
+por módulo**, numa passada linear sobre as **mesmas duas fontes** que a varredura
+antiga percorria (o fluxo de tokens sobrevivente e os tokens consumidos das
+aplicações), e cada token responde por **lookup**. Nenhum canal novo, nenhum campo
+novo, **nenhuma mudança de semântica**.
+
+**A prova de equivalência é o ponto.** Otimização que muda resposta é bug: os
+**847 dumps** do corpus (toda fixture da suíte + 6 módulos reais do core, incluindo
+`debugger.prg` e `tbrowse.prg`) saem **byte a byte idênticos** ao binário anterior.
+Suíte **961/0**, `lexdiff` 0 divergências reais.
+
+**O que fica registrado como limite honesto:** o que sobra é linear e é dominado por
+**escrever o JSON** (64 mil linhas produzem um dump de 107 MB). Se um dia doer, o
+alvo é o tamanho do dump — não mais a busca do fato. *(O `-inc` do hbmk2 já dá dumps
+incrementais; item 0c do backlog.)*
+
 ---
 
 # Fatias em aberto

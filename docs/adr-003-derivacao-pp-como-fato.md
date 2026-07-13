@@ -93,9 +93,19 @@ resolve pelo binding (o local/param que ele é).
   core), mas amarra o modelo de resolução à mecânica do pp — se a semântica
   de derivação do pp mudar, o fato muda junto. Bom (fica fiel ao compilador)
   e arriscado (menos independência) ao mesmo tempo.
-- **Custo.** `hb_compAstMarkerGenerates` é reverse-scan O(tokens × from) por
+- **Custo.** ~~`hb_compAstMarkerGenerates` é reverse-scan O(tokens × from) por
   marker consultado. Barato no dump de um módulo; um ponto a vigiar se o dump
-  crescer muito ou se o fato for consultado em massa.
+  crescer muito ou se o fato for consultado em massa.~~
+  **MEDIDO E CONSERTADO na P9 (2026-07-13) — e este parágrafo estava ERRADO nos
+  dois adjetivos.** Não era barato e não era um ponto a vigiar: o custo era
+  **quadrático no tamanho do módulo** (a varredura rodava por token consultado, e o
+  número de tokens consultados cresce com o número de aplicações), e um módulo de
+  16 mil linhas expandidas levava **69 s** para dumpar. O erro de julgamento é
+  instrutivo: escrevi "barato" olhando o dump de uma FIXTURE — corpus pequeno esconde
+  quadrática. Conserto: o fato é propriedade do par (aplicação, marker), então o
+  conjunto se computa **uma vez por módulo** e o token responde por lookup; 16k
+  passou a **0,21 s** e o crescimento virou linear, com os dumps do corpus inteiro
+  byte-idênticos. [spec-p § P9](spec-p-pp-refatoracao.md).
 - **Descoberta que pode ser RUIM.** Se `generates` se mostrar um
   special-case que NÃO generaliza, teremos pago um canal de core (schema bump,
   rebuild) por um problema de nicho do `rename`. O critério honesto de matar:
