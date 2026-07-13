@@ -4,474 +4,321 @@ Refatoração automatizada para Harbour sobre a AST do compilador
 (dump `.ast.json` do branch feature/compiler-ast-dump). Fontes de verdade:
 docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
 
-## Regras de trabalho
+**Este arquivo é a lei; `docs/cicatrizes.md` é a jurisprudência** — cada regra aqui é
+um imperativo curto com uma linha de porquê, e o erro concreto que a comprou está lá,
+datado (as referências `[cic §N]` apontam para a seção). Antes de achar que uma regra é
+excesso de zelo, leia a cicatriz dela. Regra nova entra AQUI; a narrativa dela, lá.
 
-- **PORTÃO DE AUTORIZAÇÃO — heurística e réplica são PROIBIDAS por padrão, e a
-  exploração do core vem ANTES de projetar a solução (Diego, 2026-07-12; a regra
-  existia e vinha sendo quebrada "de tempos em tempos" — o que faltava não era
-  regra, era PORTÃO)**. A ordem é OBRIGATÓRIA e não se pula:
-  1. **Explorar PRIMEIRO se o core pode dar o fato.** Antes de desenhar qualquer
-     solução no hbrefactor, a pergunta é *"dá para o Harbour gerar essa
-     informação?"*. Projetar a solução na ferramenta e só depois perguntar isso é
-     ordem invertida — quando a solução já está desenhada, a heurística já venceu.
-  2. **Se o core pode → o core faz.** Estender/usar o core é o caminho, sempre.
-  3. **Se você concluir que o core NÃO pode → isso é uma RECUSA, e recusa exige
-     varredura registrada** (a regra abaixo: `--help`, API pública, `tests/` do
-     core, ChangeLog). "Não achei" quase sempre é "não procurei".
-  4. **Só então, e SÓ COM AUTORIZAÇÃO EXPLÍCITA DO DIEGO PARA AQUELE CASO**, pode
-     existir heurística/inferência/réplica de gramática no hbrefactor. É um portão
-     por-caso, igual ao de commit: aprovar um não aprova o próximo.
-  **Como pedir:** apresentar (a) o fato que falta, (b) a varredura feita no core,
-  (c) por que o core não pode dar, (d) a heurística proposta e **onde ela erra**.
-  **É PROIBIDO** implementar a heurística "provisoriamente" e pedir depois — o
-  código provisório é o que fica. Na dúvida sobre se algo É heurística, veja os
-  **GATILHOS** abaixo; se bater um gatilho, PARE e pergunte.
-  **O portão é EXECUTÁVEL, não só escrito:** o hook
-  `.claude/hooks/anti-heuristica.sh` (PreToolUse/Bash) intercepta o `git commit` e
-  **recusa** quando o diff staged de `src/hbrefactor.prg` adiciona linhas com os
-  cheiros dos gatilhos. Autorizado pelo Diego, sela-se a linha com
-  `// FATO-OK(diego,AAAA-MM-DD): <por que o core não pode dar este fato>` — e o selo
-  só se escreve DEPOIS do "ok" dele. Auditoria periódica do fonte inteiro: o prompt
-  de sessão dedicada está em `docs/prompt-revisao-anti-heuristica.md`.
-  *(Histórico do custo: `ast-14`, `ast-15` e `ast-16` foram os três casos em que o
-  fato faltava no core e eu remendei/ia remendar na ferramenta. Nos três, o core
-  sabia e não exportava.)*
-- **O hbrefactor CONSTRÓI a AST de que precisa — editar o harbour-core
-  não é só permitido, é DEVER (Diego, 2026-07-09)**: o preceito fundador
-  é que a ferramenta age só sobre FATO da AST do compilador; a AST é
-  produzida pelo core; logo *ser capaz de moldar a AST* — estendendo o
-  core para o fato passar a existir — é parte da definição da ferramenta,
-  não uma exceção tolerada. Uma ferramenta que não pode construir a AST
-  de que precisa está amputada do próprio princípio. Permissão TOTAL e
-  esperada de EDITAR a árvore do core em
-  `~/devel/harbour-core/harbour` (branch `feature/compiler-ast-dump`;
-  acesso concedido no `.claude/settings.json`) sempre que a REGRA DO FATO
-  pedir. O único freio é o de sempre: **commit no core continua sob
-  autorização por-commit do Diego** (não editar ≠ não commitar). É a
-  perna concreta da REGRA DO FATO ("estender o core para o fato existir").
-- **FALTA DE INFORMAÇÃO → VÁ AO CORE, IMEDIATAMENTE (Diego, 2026-07-12)**:
-  a missão é fazer o core do Harbour **gerar o MÁXIMO de informação
-  necessária**. Ao detectar QUALQUER falta de fato, a primeira reação é
-  ir ao core estendê-lo — **nunca** remendar na ferramenta com
-  heurística, inferência ou comparação de texto. **"Zero mudança no core"
-  NÃO é virtude — é sinal de alerta**: se um conserto precisou de
-  esperteza na ferramenta, quase sempre o fato faltava no core e a
-  esperteza é o sintoma. Anti-padrão FLAGRADO pelo Diego (P5, 2026-07-12,
-  o erro que gerou esta regra): o recheio de um marker de match
-  NÃO-NUMERADO (casado mas não usado no result) chega ao dump com
-  `marker=0`, colidindo com "palavra literal da regra" — o pp SABE a
-  diferença (ele casou!) e não exportava. Em vez de estender o
-  rastreador, inferi por COMPARAÇÃO DE TEXTO ("se não é palavra da regra,
-  é recheio") — furo provado em 1 linha: conteúdo do usuário igual a uma
-  keyword da regra classifica errado. Fato que o core sabe e não exporta
-  é lacuna DO CORE, não problema a contornar.
-- **GATILHOS da REGRA DO FATO — os CHEIROS que obrigam a parar e ir ao core
-  (catálogo de erros, 2026-07-12; o Diego me pegou 3× no MESMO dia)**. A
-  regra acima já existia e eu a violei assim mesmo — logo o que faltava não
-  era regra, era **gatilho**. Ao escrever QUALQUER uma destas linhas, PARE e
-  pergunte "o core sabe isto e não me conta?" antes de continuar:
-  1. **Comparação de TEXTO para decidir PAPEL/IDENTIDADE** (`Upper(a) == Upper(b)`,
-     prefixo, `Left()`, `$`) quando o dump já tem número/id/índice. *(P5: recheio
-     de marker vs palavra da regra → `ast-14`.)*
-  2. **Constante mágica de gramática** (`>= 4`, `Len() > N`) — é réplica de regra
-     do compilador. *(P-AUDIT: `AbbrevClash` reescrevia `ppcore.c:2533` → RECUSA
-     FALSA, cabeça de DSL irrenomeável → `ast-15`.)*
-  3. **"se não é X, então é Y"** sem um fato que SEPARE X de Y. *(A guarda de
-     órfão do P6: "grafia manual = token sem `from`" — cega para todo site
-     dentro de um comando.)*
-  4. **Re-implementar resolução/busca que o core faz** (achar include, casar
-     nome, expandir): `ResolveInclude` varre os `-i` à mão. Cópia degradada.
-  5. **Casar arquivo por BASENAME** em vez de caminho canônico. *(Diego pegou:
-     dois `.ch` homônimos colidem.)*
-  6. **Escolher o canal MAIS BARATO** (Diego, 2026-07-12): *"tem que usar o canal
-     CORRETO, não apenas o mais barato"*. Eu ia responder posse de include pelo
-     dump porque era barato; o canal certo (`harbour -gd`, lista de dependências
-     oficial, com caminho RESOLVIDO e fecho transitivo) já existia e eu não tinha
-     procurado. **Barato ≠ correto; e "não achei" quase sempre = "não procurei".**
-- **NÃO EXISTE COMPATIBILIDADE PARA TRÁS — a ferramenta está sendo INVENTADA (Diego,
-  2026-07-13: *"estamos fazendo a AST sob demanda, então mexer no core do Harbour é
-  parte do trabalho e é normal; não existe esta busca de compatibilidade"*)**. O dump
-  é gerado **na hora**, a cada comando, pelo `harbour` do `HB_BIN` — logo **não existe
-  "dump antigo"**: existe **toolchain fora de passo**, e isso é erro de build, que se
-  **BERRA**, nunca se degrada. Corolários: (a) o schema é **EXATO** (`AstSchema()`, um
-  só lugar), não piso e jamais lista enumerada — divergiu, recusa alta nomeando as
-  duas versões; (b) **nenhum portão de degradação por versão** ("dump sem o canal X
-  degrada para possible") — degradar rebaixaria o **VEREDITO** por causa de um build
-  velho, **calado**, que é o oposto do produto; (c) a suíte **sempre roda no schema
-  corrente**, e o **caso 122** fica vermelho no instante em que core e ferramenta
-  divergirem — o esquecimento de bump vira impossível de embarcar. *(O corte: 5
-  funções e 23 sítios de compatibilidade saíram e **nada** na suíte dependia deles —
-  964 checks passaram sem tocar em nenhum. Peso morto que ainda por cima mentia.)*
-  **Complemento do Diego:** *"usar testes como amarração para descobrir se estamos indo
-  no caminho certo é uma coisa; forçar compatibilidade em ferramenta em criação, não"*
-  — e **teste que quebra tem de ser TRAZIDO a ele**: a premissa errada pode ser a do
-  teste, e quem decide qual lado cede é o Diego (é a regra do drift, acima).
-- **MEDIR O STRESS NÃO É MEDIR O PRODUTO — e número de benchmark é AFIRMAÇÃO, não
-  enfeite (Diego, 2026-07-13)**: consertei uma quadrática no dump, medi num stress
-  SINTÉTICO (uma expansão de pp por linha — densidade que código Harbour real não
-  tem), e **publiquei "330×" nos quatro anúncios** (CHANGELOG, NEWS, as duas páginas)
-  — ainda por cima afirmando que "16 mil linhas expandidas é um tamanho ordinário em
-  aplicação real", coisa que eu **nunca medi**. Ponta a ponta, na FERRAMENTA, em
-  projeto real, o ganho é **~1/3 da espera** (xhb 42 módulos: 12,35 s → 8,36 s). É
-  ganho de verdade — e é a manchete honesta. **A regra:** (a) o número que se ANUNCIA
-  é o do **produto rodando como o usuário roda** (comando completo, projeto real do
-  corpus), nunca o do microbenchmark; (b) o stress serve para achar a CURVA
-  (quadrática × linear), não para dimensionar a notícia; (c) **"tamanho típico de
-  aplicação real" é uma afirmação sobre o mundo** — ou se mede no corpus, ou não se
-  escreve. *(É o mesmo pecado da REGRA DO FATO, do lado de fora: afirmar sem medir é
-  a heurística vestida de manchete. E veio no MESMO dia em que a P9 flagrou que eu
-  chamara um custo de "barato" olhando uma fixture.)*
-  **(d) O projeto do benchmark tem de PASSAR — conferir o exit E que ele leu/analisou
-  (2026-07-13, o MESMO erro na 3ª rodada).** Ao re-medir "de verdade", publiquei uma
-  tabela de 3 projetos e um deles (`work/gtwvg`, contrib **Windows-only**) **não
-  compila**: a ferramenta RECUSA, e o número media um **comando abortado**. Só apareceu
-  ao instrumentar a ferramenta por dentro (`ler+parsear = 0 ms`) — por FORA, emulando o
-  que eu *achava* que ela fazia, o tempo parecia legítimo. **Cronometrar processo não é
-  medir trabalho: comando que morre também gasta segundos.**
-  **(e) NÃO PUBLIQUE TABELA DE BENCHMARK (Diego, 2026-07-13, à pergunta *"pra que serve
-  esta tabela publicada?"*)**: ela não serve ao leitor (não é a máquina dele, nem o
-  projeto dele, e ele não reproduz) — serve ao AUTOR, como defesa (*"olha, desta vez eu
-  medi"*). É medidor, a mesma coisa que saiu das páginas, escondida no CHANGELOG/NEWS.
-  E cobra caro: **para sustentar a defesa eu precisei de volume, e enfiei o projeto que
-  não compila** — a mentira voltou pela porta que abri para me redimir. No anúncio vai a
-  **afirmação** + o **comando** para o leitor medir no projeto dele; o número medido vive
-  em `roadmap.md`/spec, como registro datado.
-- **NÃO declare IMPOSSÍVEL/RECUSA sem VARRER a superfície do core (2026-07-12)**:
-  toda recusa ("o pp não consegue X") é uma afirmação sobre o CORE e exige
-  varredura ANTES, com o que foi varrido REGISTRADO na spec: (a) `harbour`/`hbmk2`
-  `--help` inteiro (flags existem e são esquecidas: `-gd` deps, `-sm`, `-u`,
-  `-p`/`-p+`); (b) a **API pública** (`include/hbpp.h` e afins); (c) **`tests/` do
-  core** — é lá que a API viva aparece; (d) ChangeLog. Custou um VEREDITO ERRADO
-  publicado: recusei "pp como motor de reescrita" (P7) olhando só o `.ppo`
-  destrutivo; o Diego apontou `tests/hbpp/hbpptest.prg` → `__pp_init()` +
-  `__pp_process()` (pp vivo, in-process, LINHA A LINHA) derrubam a premissa.
-  Ecoa o P4 ("não tem uso nenhum" com base num `grep` quebrado): **silêncio de
-  busca minha NÃO é evidência de ausência.**
-- **Ferramenta do core: PROBE, nunca memória (2026-07-12)**: antes de consumir a
-  saída de um utilitário do core, sonde ONDE ele escreve e O QUE reporta — com
-  fonte em SUBDIRETÓRIO (o caso que quebra). Assumi que `harbour -gd` grava o
-  `.d` ao lado do fonte (como o `.ppo`); ele grava no **CWD** → deixei **lixo no
-  repo** (`hbrefactor.d`) e a função devolvia vazio para fonte em subdir. Conserto:
-  `-o<tmp>` (não se adivinha o destino: manda-se). **Depois de qualquer comando que
-  rode o compilador ao lado dos fontes, conferir `git status`** — `.d`/`.ppo`/`.c`
-  vazam para o repo.
-- **Chave OPCIONAL do dump: sempre `hb_HGetDef` (2026-07-12)**: campo que só existe
-  em ALGUNS papéis (`marker` não vem em token literal; `ruletok` só em `marker: 0`;
-  `from`, `generates`, `col`) acessado direto é `BASE/1132` em produção — e a suíte
-  não pega (custou um crash no `rename` dentro de `.ch`). Ler o contrato no
-  ast-schema.md ANTES; na dúvida, `hb_HGetDef`.
-- **Buildar o core após editar — 3 armadilhas que custam diagnóstico
-  (Diego, 2026-07-11; consolida notas espalhadas em specs)**: (a) mudança
-  no COMPILADOR (harbour.y, hbmain.c, compast.c, complex.c…) exige
-  rebuildar `harbour` **E** `hbmk2` — o hbmk2 EMBUTE o compilador
-  (libhbcplr); o built-in velho rejeita gramática/canal novo com erro
-  enganoso. (b) O `make` costuma reportar `harbour`/`hbmk2` "up to date" e
-  NÃO relincar mesmo após reconstruir a `libhbcplr.a` (dependência
-  quebrada) → binário STALE com o compilador antigo; conserto: apagar os
-  binários (`rm bin/linux/gcc/harbour bin/linux/gcc/hbmk2`) e refazer o
-  make. (c) `HB_REBUILD_PARSER=yes` regenera o `obj/<plat>/harboury.c`
-  (artefato de build), **NÃO** o `harbour.yyc`/`.yyh` COMMITADOS — é
-  preciso COPIAR à mão `obj/harboury.c`→`src/compiler/harbour.yyc` e o
-  `.h`→`harbour.yyh`, senão um checkout limpo (build default, SEM a flag)
-  usa a gramática VELHA; commitar os três juntos (.y + .yyc + .yyh) e
-  conferir que um rebuild default (binários apagados) carrega a feature.
-  Provado na RD (`_HB_INLINESELF`, core `da61c647cb`).
-- **CORPUS DE MATURAÇÃO = código do CORE do Harbour; o código do Diego
-  NÃO é régua (Diego, 2026-07-10)**: a ferramenta amadurece resolvendo
-  problemas em código BEM ESCRITO E TESTADO do core (work/ = cópias de
-  pastas extraídas de `~/devel/harbour-core/harbour` — tests, hbhttpd;
-  copiar MAIS pastas pertinentes do core quando a fase pedir). O código
-  do Diego (`~/devel/bravo-experimento*`) é bagunçado e
-  pré-melhores-práticas (ex.: PRIVATE em massa, que o próprio Harbour
-  desaconselha) — serve para EXPERIMENTAÇÃO/EXPLORAÇÃO pontual e SÓ
-  isso; nunca como régua de valor de fase, nunca como alvo de entrega.
-  Só viramos para o bravo quando hbrefactor + branch do core estiverem
-  funcionando bem no código do core. REVOGA o "a régua final é o
-  dogfooding no código do Diego" que os docs repetiam (notas datadas em
-  limites-e-alavancas.md; não propor dogfooding no bravo como critério
-  de decisão). Nuance da **xhb** (Diego, 2026-07-10): é do braço
-  xHarbour, marcada como NÃO-mantida pelos mantenedores do core —
-  funcional e cheia de ideias interessantes, vale como corpus de
-  MEDIÇÃO, mas código novo não deve usá-la; número vindo só dela não
-  justifica capacidade sozinho.
-- **Compile todo .prg (fixture, exemplo, teste) ANTES de usá-lo em
-  qualquer teste** — `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto
-  via hbmk2. Fixture que não compila gera diagnóstico enganoso.
-- Fluxos definidos vivem no Makefile; hbmk2 direto é só experimentação.
-- **Exportar `HB_BIN` ao invocar a ferramenta fora do Makefile**: sem ele o
-  `HbMk2Bin()` cai no hbmk2 do SISTEMA (`/usr/local/bin`, sem `-x`) e o
-  sintoma é o enganoso "o projeto não compila" (custou um diagnóstico na
-  P2a; a suíte exporta, invocação manual esquece).
-- Nenhuma réplica de gramática na ferramenta: fatos vêm do compilador
-  (dump ast, hb_compileFromBuf, harbour.hbx).
-- Reutilizar o **hbmk2** (builder oficial) para projeto/flags/build: entende
-  `.hbp`/`.hbc`, resolve `-I`/`-D` (`hbmk2 -trace` expõe a linha do harbour),
-  repassa `-prgflag=`. Todo parsing paralelo é cópia degradada que diverge —
-  reescrever só o estritamente necessário.
-- Contrato executável: `make test` (deve permanecer verde).
-- **`make test JOBS=1` só ao mexer no RUNNER (Diego, 2026-07-10)**: o
-  contrato "paralelo × JOBS=1 byte-idêntico" é propriedade da INFRA de
-  paralelização (bin/parrun, modo `--unit` do run.sh, join), não do
-  conteúdo dos testes nem da ferramenta — re-rodá-lo a cada entrega é
-  desperdício. Rodar JOBS=1 apenas quando a mudança tocar o runner ou
-  introduzir saída potencialmente não-determinística na ferramenta
-  (ex.: imprimir na ordem de iteração de um hash). Para mudança de
-  conteúdo/lógica, o run paralelo verde basta.
-- **Drift em teste PRÉ-EXISTENTE → consultar o Diego (2026-07-10)**: o
-  projeto é um experimento VIVO — quando uma mudança faz testes que já
-  existiam divergirem, há motivos legítimos tanto para adaptar o código
-  aos testes quanto para RE-BASELINAR os testes (contrato que evoluiu,
-  ex.: caso 88 no RE.5). A decisão de qual lado cede é do Diego:
-  apresentar o drift site a site (o que mudou, por quê, qual contrato
-  está em jogo) ANTES de escolher o lado. Teste novo da própria entrega
-  não precisa de consulta; re-rotular/mover expectativa antiga, sim.
-- **roadmap.md é minha responsabilidade e vive preenchido**: fases futuras com
-  escopo + critério de pronto ANTES de executá-las; concluída uma fase,
-  atualizar o status na mesma sessão; trabalho novo entra como fase/item.
-  Decisões de produto e autorizações continuam com o Diego.
-- **O PRODUTO É EM INGLÊS; a CONVERSA é em português (Diego, 2026-07-13 — REVOGA o
-  "CHANGELOG.md em português" que esta seção mandava)**. A régua não é o repositório,
-  é **quem lê**: se a superfície é lida pelo USUÁRIO, ela é inglês — mensagens da CLI,
-  `docs/manual.md`, `site/index.html`, `CHANGELOG.md` e **toda string que a extensão
-  VSCode mostra** (modais, placeholders, erros; os títulos da paleta já eram). Se a
-  superfície é a nossa conversa e o nosso raciocínio, ela é português — `CLAUDE.md`,
-  `docs/roadmap.md`, specs, `tests/*/README.md`, comentários do fonte, e a mensagem de
-  commit **do hbrefactor**. *(No `harbour-core` tudo é inglês, inclusive a mensagem de
-  commit — regra separada, abaixo: aquele branch é upstreamável.)* **O erro que gerou a
-  regra:** eu traduzi a CLI e deixei o CHANGELOG e quatro strings da extensão em
-  português — o produto ficou bilíngue no meio, e o manual chegou a AFIRMAR que "a CLI
-  está em português" depois de ela já falar inglês.
-- **DOIS changelogs de USUÁRIO, um por repositório — e o público é o PROGRAMADOR
-  HARBOUR, nunca o contribuidor (Diego, 2026-07-12)**. Aqui é o `CHANGELOG.md`; no
-  core é o **`NEWS.md`** — nome diferente de propósito: o Harbour já tem um
-  `ChangeLog.txt`, e a convenção GNU que ele segue é exatamente esta divisão
-  (**`ChangeLog` = desenvolvedor; `NEWS` = usuário**), então `CHANGELOG.md` ao lado
-  de `ChangeLog.txt` só criaria confusão (diferem por caixa e extensão). **No
-  hbrefactor fica `CHANGELOG.md` — decisão do Diego (2026-07-12), NÃO re-litigar**:
-  a convenção GNU é uma DESAMBIGUAÇÃO, e aqui não há o que desambiguar (não existe
-  `ChangeLog.txt`); `CHANGELOG.md` é o nome que o GitHub reconhece e destaca, então
-  adotar `NEWS.md` por simetria trocaria DESCOBERTA por uma elegância que não serve
-  a leitor nenhum. **A assimetria é deliberada.**
-  Tudo que se faz no core é feito
-  para esta ferramenta, e o programador Harbour merece saber o que o compilador
-  passou a lhe dar (`-x`, `-kt`, os fixes). **Regra: cada repositório com commit
-  novo ganha a sua entrada** — commitou no core, o changelog do core ganha entrada;
-  commitou nos dois, os dois ganham. **O changelog do contribuidor JÁ EXISTE e é o
-  git** (completo, preciso, datado): duplicá-lo em markdown não agrega e cria uma
-  segunda fonte de verdade que envelhece pior. O CHANGELOG só se justifica ao
-  responder o que o git NÃO responde: *"o que eu passo a poder fazer, e onde isso
-  me morde?"* **Reprova o CORPO da entrada que contiver**: nome de função C /
-  arquivo de implementação, nome de struct, jargão de build (`lexdiff`, `pcode`,
-  `gated`), número de caso da suíte, sigla de fase. *(Ponteiro para os docs
-  internos no FIM da entrada continua permitido — é a regra de 2026-07-09 abaixo;
-  e citar a saída REAL da ferramenta é sempre permitido, mesmo que ela mencione uma
-  fase: é o que o usuário vê no terminal.)* **Cada CHANGELOG carrega um PONTEIRO DE
-  DELTA** no topo (`<!-- changelog-baseline: <repo>@<sha> -->`) — o último commit já
-  descrito ali; é o que torna o serviço **retomável** se o fluxo não rodar
-  (`git log <baseline>..HEAD` diz o que falta). Fluxo e régua anti-buraco na skill
-  `/update-manual`. *(O buraco que gerou a regra: `extract-function`, `inline-local`,
-  `call-graph`, `unused-locals`, `find-dynamic-calls` e `reorder-params` — seis
-  comandos VIVOS — ficaram sem uma linha de changelog porque a regra nasceu depois
-  deles.)*
-- **PIPELINE DO CORE: `commit → NEWS.md → landing page` (Diego, 2026-07-12)**. O
-  core tem uma **proposta aos MANTENEDORES** em `harbour-core/site/index.html` — é
-  ela que decide se o PR (fase B6) é sequer avaliado, então é trabalho sério, não
-  enfeite. **Ela NÃO é um log**: não ganha seção por commit e não lista schema; ela
-  carrega o **conceito consolidado** (o argumento central, a forma do diff, os quatro
-  canais, os bugs do stock que o branch conserta, o que se pede ao mantenedor, e o
-  que ainda não sabemos). Muda **só quando o conceito muda** — e "não mudou" é
-  resposta legítima. **Nenhum número nela sem medição na hora**: o público é
-  mantenedor, e um número inflado ou um comando que não roda queima o PR inteiro.
-  Fluxo e checklist na skill `/update-manual` (§ 0.4b). Artifact de endereço fixo
-  para distribuir: republicar o mesmo `file_path` mantém a URL.
-- **TUDO no harbour-core é em INGLÊS (Diego, 2026-07-12)**: código, comentário,
-  documentação **e mensagem de commit**. É o projeto Harbour internacional e este
-  branch é upstreamável (fase B6) — um contribuidor de qualquer lugar tem de
-  conseguir ler. A língua de trabalho com o Diego é o português; o que ATERRISSA
-  naquela árvore, não. *(Custou um rewrite de histórico: 10 mensagens em português
-  foram traduzidas com `filter-branch` + force-push, e os SHAs citados nos docs do
-  hbrefactor tiveram de ser corrigidos.)*
-- **CHANGELOG.md para o programador final (Diego, 2026-07-09)**: toda
-  capacidade/entrega ganha entrada no CHANGELOG.md escrita para o
-  programador Harbour FINAL — o problema de todo dia, o que muda na
-  prática (exemplo antes/depois quando couber), o que a ferramenta
-  NUNCA faz, e os limites honestos da entrega. Sem jargão interno de
-  fase (B9/F2.x ficam nos docs; a entrada só aponta para eles no fim).
-  Atualizar na mesma sessão da entrega, como o roadmap.
-- **Código NOVO nosso usa `#xcommand`/`#xtranslate`, nunca `#command`/`#translate`
-  (Diego, 2026-07-12)**: provado no dispatch do core (`ppcore.c`, o `#[x]command` é a
-  MESMA chamada com um único argumento diferente) que o `x` significa **exatamente e
-  somente** "modo de comparação EXATO" em vez do **dBase** (que casa a palavra
-  abreviada a partir de 4 letras). Nada mais muda — nenhuma capacidade se perde. A
-  família dBase é a origem de uma CLASSE INTEIRA de ambiguidade (o sequestro de
-  regra do P11, a recusa falsa do P5, `MENUITEM` vs `MENUBOX` disputando `MENU`);
-  na família `x` esses bugs são **impossíveis**. Vale para fixture, exemplo, doc e
-  sonda que EU escrever. *(Existe ainda a família `y` — `#ycommand`/`#ytranslate` —
-  que é exata E case-sensitive.)*
-  **DUAS exceções, ambas obrigatórias:** (a) fixture cujo ASSUNTO é a abreviação
-  dBase (hoje `fixabr`/caso 115, `fixseq`/caso 116, o `MENUITEM`/`MENUBOX` do
-  `fixdsl`) — trocar para `x` faria o teste passar por VACUIDADE, provando nada;
-  (b) a FERRAMENTA jamais pode abandonar `#command`/`#translate`: ela refatora o
-  código dos OUTROS, e o `std.ch`, o `hbclass.ch` e toda a herança Clipper são
-  dBase. A política é sobre o que escrevemos, nunca sobre o que suportamos.
-- **NENHUM NÚMERO NAS PÁGINAS — todo indicador vira COMANDO (Diego, 2026-07-13:
-  *"quero que tire estes medidores, isto só atrapalha"*; REVOGA a regra anterior
-  "só o que se mede sozinho", que ainda admitia indicador medido e automatizado)**.
-  Não existe mais `data-metric`, `tools/site-numbers.sh`, `make site-numbers` nem
-  `make -C site numbers|check`. Nenhum tamanho de suíte, contagem de casos ou de
-  schemas nas `site/index.html` (dos DOIS repositórios) — **o que o leitor recebe é o
-  comando que ele roda** (`make test`, `tools/pcode-identity.sh`, `git diff --stat`),
-  e o comando não envelhece. `make site-check` sobrevive, mas agora **só** com o
-  portão dos EXEMPLOS (regra abaixo).
-  **A escalada que justifica o corte** — a regra foi endurecendo porque cada versão
-  dela ainda custava caro: *(1)* quatro números estavam errados ao mesmo tempo e
-  ninguém notou (`1085/1085`, `112/112`, `105 cases / 825 checks`, "thirteen schema
-  steps") — número mantido à mão envelhece calado; *(2)* automatizei a **forma do
-  diff** e ela me traiu (dependia de uma BASE desatualizada + lista de exclusão →
-  **acusei o UPSTREAM** de poluir o branch, achado falso e publicado); *(3)* mesmo os
-  dois indicadores "seguros" viraram **imposto por entrega**: cada fatia mexia no
-  número, exigia re-medir nos dois repositórios e sujava o core (que só commita sob
-  autorização por-commit) — trabalho recorrente que não servia a leitor nenhum.
-  **Automatizar um número frágil é pior que não tê-lo; e um número que sobrevive à
-  automação ainda custa mais do que vale.**
-  *(Números em `docs/roadmap.md`, specs e mensagem de commit CONTINUAM — lá são
-  registro datado da entrega, não promessa viva ao leitor.)*
-- **EXEMPLO NA PÁGINA: só o que se EXECUTA sozinho — a suíte do site (Diego,
-  2026-07-12: *"esta técnica de suíte de testes que vai para o site é o caminho
-  correto"*)**. É a regra do número medido, um nível acima e valendo para CÓDIGO:
-  nenhum bloco de fonte e nenhuma saída de terminal da `site/index.html` se
-  escreve à mão. Os exemplos vivem em `tests/site/` (contrato, cicatriz e como
-  adicionar: `tests/site/README.md`), `make site-examples` os RE-EXECUTA e regrava
-  os blocos, e **`make site-check` FALHA** se a página divergir da execução.
-  Quatro portas por exemplo: o fonte ANTES compila limpo, o comando sai com o exit
-  esperado, o fonte DEPOIS compila limpo, e recusa/relatório deixam o fonte **byte
-  a byte intacto**. *(A cicatriz: a página nasceu com `vendas.hbp`, `billing.hbp` e
-  classes `Payment`/`Logger` — projetos que NÃO EXISTEM — e uma saída de terminal
-  com números que nenhuma execução produziu, tudo dentro de uma caixa de terminal
-  com botão Copy. Quando a CLI foi traduzida, um desses blocos passou a exibir uma
-  mensagem em português que o programa não emite mais: apodreceu calado, igual a
-  número mantido à mão. Para uma ferramenta cuja tese é "eu não chuto, eu provo",
-  publicar exemplo não-provado é a contradição mais cara que existe.)*
-  **Dívida aberta:** as seções profundas da página (rename de DATA, genealogia de
-  regra, tempo de vida de diretiva, sequestro por abreviação) ainda têm transcript
-  colado à mão — corretos hoje, mas FORA do portão; migrá-los para `tests/site/`.
-- **VERIFICAR A BASE antes de concluir dela (2026-07-12)**: `git diff master...HEAD`
-  com um `master` local desatualizado produziu um veredito ERRADO sobre o branch (ver
-  acima). Antes de comparar contra qualquer ref, **`git fetch` e conferir a que
-  altura ela está**. É a REGRA DO FATO um nível acima: o fato do diff é tão bom
-  quanto a base dele. *(Base do branch do core = `upstream/master`, nunca o `master`
-  local. E o `push` do `upstream` está **DISABLE** de propósito — o Harbour leva o
-  trabalho deles a sério e nada vai para lá por engano.)*
-- **Genérico > específico**: comando dedicado só com razão forte (o
-  `usages-dsl` foi absorvido pelo `usages`); ao consumir fatos de pp, operar
-  sobre o genérico (cabeça/kind/marker), nunca por DSL/família conhecida.
-- **A REGRA DO FATO — META: ZERO INFERÊNCIA (Diego, 2026-07-08; revoga a
-  escada "inferência antes de linguagem" do mesmo dia)**: o hbrefactor
-  lida com FATOS. Nada de heurística e nada de TRIAGEM (ajuda
-  probabilística para conferência manual não é produto). Quando o fato
-  não existe em compilação, o caminho é (a) **ESTENDER O CORE** para o
-  fato passar a existir (novo canal/invariante — ex.: tipos declarados
-  IMPOSTOS, spec-b9) ou (b) **usar ferramenta do core** como oráculo
-  (compilador-biblioteca, hbmk2, `.ppt`, tabelas DECLARE) — **nunca
-  construir inferência**. A inferência existente (B7/B7b) fica como
-  está e converge para SUGERIDORA de anotações (o ciclo virtuoso do
-  mapa: a análise materializa `AS CLASS` provados → o core os impõe →
-  o veredito vira fato), não como fonte de veredito de longo prazo.
-  **Definição de CORE (Diego, 2026-07-08)**: core = QUALQUER coisa que
-  exista oficialmente no projeto Harbour — não só o compilador. hbrun,
-  hbmk2, hbpp, RTL/VM, utilitários e o resto da árvore oficial contam;
-  estender ou usar qualquer um deles é o caminho preferido sobre
-  qualquer inferência na ferramenta.
-  apoia em diretivas para criar açúcar sintático — DSLs e comandos novos,
-  já existentes no core ou criados pelo desenvolvedor no PRÓPRIO aplicativo.
-  O hbrefactor refatora QUALQUER código, com ou sem açúcar, SEM ajustes
-  quando diretivas criam açúcar novo. **Classes são SÓ UM CASO** — o
-  princípio vale para todo construto (função, local, var, método, marker,
-  palavra de DSL). Fato faltante → fato de compilação ou relato honesto
+---
+
+## 1. A REGRA DO FATO — o princípio central
+
+**Meta: ZERO INFERÊNCIA.** O hbrefactor age só sobre FATO produzido por compilação.
+Nada de heurística, nada de réplica de gramática, nada de TRIAGEM (ajuda probabilística
+para conferência manual não é produto). Quando o fato não existe, o caminho é
+(a) **estender o core** para o fato passar a existir, ou (b) **usar ferramenta do core**
+como oráculo (compilador-biblioteca, hbmk2, `.ppt`, tabelas DECLARE) — **nunca**
+construir inferência. *(Diego, 2026-07-08.)*
+
+- **CORE = qualquer coisa oficial do projeto Harbour**, não só o compilador: hbrun,
+  hbmk2, hbpp, RTL/VM, utilitários, a árvore inteira. Estender ou usar qualquer um deles
+  vence qualquer esperteza na ferramenta.
+- **O princípio vale para TODO construto** (função, local, var, método, marker, palavra
+  de DSL) — **classes são só um caso**. O Harbour se apoia em diretivas para criar açúcar
+  sintático: DSLs e comandos novos, do core ou inventados pelo programador no próprio
+  aplicativo. O hbrefactor refatora QUALQUER código, com ou sem açúcar, **sem ajustes**
+  quando diretivas criam açúcar novo. Fato faltante → fato de compilação ou relato honesto
   (`possible`/recusa com rollback); nunca ajeito, nunca árvore quebrada.
-  Provas executáveis na suíte: casos 64 e 72-74 (régua: nenhuma palavra de
-  DSL de fixture em `src/hbrefactor.prg`). Fatos da linguagem que a análise
-  consome estão no ast-schema.md (escrita `o:x := v` = mensagem `_NOME`;
-  par de dados do VAR; `_HB_MEMBER { }`; strings de registro sem posição;
-  sufixo `$` de INIT PROCEDURE; classes de runtime = teto da linguagem).
-  **REVISÃO EM CURSO (ordem do Diego, 2026-07-07)**: eras B4e/B4f-2/
-  extensão derraparam para enquadramento hbclass-cêntrico — achados e
-  checklist executável em docs/revisao-generalidade.md; capacidade
-  entregue sobre hbclass só conta como genérica com prova adversarial em
-  DSL inventada NÃO-espelho.
-- **Nunca editar o não-verificável**: a ferramenta só aplica o que o oráculo
-  prova e a recompilação verifica; conteúdo sem verificação (strings, dados,
-  comentários) recebe detecção e relato preciso, jamais edição automática (nem
-  com opt-in) — editar string por coincidência de nome é "ajeito".
-- **Extensão VSCode sempre com os últimos recursos**: todo comando/capacidade
-  nova do CLI tem que chegar à `extension.js` — expô-la é escopo da fase que a
-  entrega, não fase adiável (é o consumidor de uso diário do Diego).
-- smoketest/hbrefactor-occ.prg é a primeira encarnação, arquivada:
-  só leitura, nunca editar.
-- **Revisão externa via Codex (`/codex:rescue`)**: o brief é instrumento
-  versionado em docs/ e NÃO se contamina com o juízo do Claude; em conta
-  ChatGPT valem só os modelos do models_cache do CLI (2026-07-09:
-  `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`; `gpt-5-codex` e `spark` falham
-  com invalid_request_error — custou 3 tentativas); achado externo é
-  HIPÓTESE até verificação no fonte com arquivo:linha (idioma da fase
-  RE) — nunca agir direto sobre o relato. **Tarefa Codex pode morrer em
-  SILÊNCIO** (2026-07-09: log congelado + PID sumido com status
-  "running" órfão no broker — custou 13 min de espera morta): antes de
-  esperar conclusão, conferir `ps -p <pid>` do task; morto = cancelar
-  (`codex-companion.mjs cancel <id>`) e re-executar com modelo
-  explícito (`--model gpt-5.5`).
-- **GitHub é pelo `gh` (Diego, 2026-07-13)**: autenticação e operações de GitHub usam o
-  **`gh` CLI** (logado como `diegopego`, protocolo ssh), nunca o credential-manager do
-  Windows. O `credential.helper` global apontava para
-  `/mnt/c/.../git-credential-manager-core.exe` — caminho do Windows que **não existe
-  dentro do WSL**, e cada `push` cuspia um erro do helper (inofensivo, mas ruído que
-  esconde erro de verdade). Conserto feito: `gh auth setup-git` + remoção do helper
-  genérico quebrado. Se voltar a aparecer, é o helper global de novo.
-- Commits só com autorização explícita do Diego **para AQUELE commit**;
-  concluir/aprovar o trabalho não autoriza o commit. Um pedido por commit —
-  não encadear. Sem push salvo pedido.
-- **Só Fable** (instrução do Diego, 2026-07-07, revoga a regra anterior de
-  delegação): não usar subagentes opus/sonnet — capacidade de solução vale
-  mais que economia de tokens; todo o trabalho fica no Fable.
-- Regra/preferência durável deste repo vai AQUI (versionado), não na memória
-  privada do Claude (que não viaja com o repo); a memória fica para o que não
-  pertence a um repo.
+- **Prova executável**: casos 64 e 72-74 (régua: nenhuma palavra de DSL de fixture em
+  `src/hbrefactor.prg`). Capacidade entregue sobre hbclass só conta como genérica com
+  prova adversarial em DSL inventada NÃO-espelho — régua de `docs/revisao-generalidade.md`
+  (revisão concluída em 2026-07-07; o doc segue como régua para trabalho futuro).
+- **Nunca editar o não-verificável**: a ferramenta só aplica o que o oráculo prova e a
+  recompilação verifica. Conteúdo sem verificação (strings, dados, comentários) recebe
+  detecção e relato preciso, **jamais** edição automática — nem com opt-in.
+- **Genérico > específico**: comando dedicado só com razão forte (o `usages-dsl` foi
+  absorvido pelo `usages`); ao consumir fatos de pp, operar sobre o genérico
+  (cabeça/kind/marker), nunca por DSL/família conhecida.
 
-## Harbour (linguagem) — armadilhas ao escrever fixtures/.prg
+### 1.1 O PORTÃO DE AUTORIZAÇÃO — a ordem não se pula
 
-Os fixtures da suíte são `.prg` idiomático (o "caso 0" exige saída limpa sob
-`-w3 -es2`). Armadilhas que já morderam:
+Heurística e réplica são **PROIBIDAS por padrão**, e a exploração do core vem **ANTES**
+de projetar a solução. *(Diego, 2026-07-12; a regra já existia e eu a quebrava assim
+mesmo — o que faltava não era regra, era PORTÃO. [cic §1.1])*
 
-- **Não nomear variável formando keyword em uppercase**: Harbour é
-  case-insensitive e lê identificadores em uppercase — `LOCAL nIL` vira a
-  reservada `NIL` (`E0030 syntax error`). Evitar `nIL`, `cFor`, etc.
-- **MEMVAR antes de PRIVATE/PUBLIC**: referenciar `PRIVATE`/`PUBLIC` sem uma
-  declaração `MEMVAR` compile-time gera W0002 na criação e W0001 em cada uso —
-  com `-es2` o build falha. Idioma: `MEMVAR xCfg` / `PRIVATE xCfg := 7`.
-- **Comentário de linha `//` em .prg** (não `/* */`): um `*/` que apareça no
-  conteúdo (ex.: `assert_*/`) fecha o bloco antes da hora e o resto vira
-  código. Aplicar em código novo/editado, sem conversão em massa.
-- **Verificar comportamento no fonte do Harbour ANTES de afirmar** (não
-  teorizar): ler/grep o `src/` relevante. `Empty(" ")` é `.T.` — usar
-  `Len(c) == 0` para "vazia".
-- **`LOCAL x := 0` seguido de `x := <valor>` é DEAD STORE → W0032 → quebra
-  sob `-es2`** (2026-07-12): o Harbour avisa que o INICIALIZADOR nunca é lido,
-  mesmo que a variável seja lida depois. Reproduz em 4 linhas. Idioma: declarar
-  **sem** inicializador (`LOCAL nEdits`), ou usar `+=` (que LÊ). *(A mensagem
-  "assigned but not used" engana — parece que a variável é inútil, e não é.)*
-- **Régua do caso 64 vale para COMENTÁRIO também** (2026-07-12): a régua
-  (`! grep -qiwE "palavras|da|dsl" src/hbrefactor.prg`) é textual — citar a DSL
-  de uma fixture num comentário do fonte QUEBRA a suíte, e está certa em quebrar:
-  o fonte da ferramenta não deve conter vocabulário de DSL nenhuma, nem de
-  exemplo. Ilustre o formato genericamente ("keyword secundária prefixo da
-  cabeça"), nunca com as palavras da fixture.
-- **Coluna de probe/teste: COMPUTAR, nunca contar na cabeça** (2026-07-12): errei
-  4× nesta sessão (inclusive fazendo a suíte falhar), e uma delas por ler a coluna
-  de um arquivo que o rename ANTERIOR já tinha mudado. Extrair sempre do arquivo
-  no estado CORRENTE (`python3 -c "...l.index('<n>')+1"`). Lembrar: dump é 0-based,
-  CLI é 1-based; o `col` de um marker aponta o NOME, não o `<`.
-- **Diagnóstico do IDE ≠ veredito**: o lint do VSCode usa o harbour do
-  SISTEMA (`/usr/local/bin`, sem os patches do branch — ex.: acusa
-  W0019 em `_HB_MEMBER` que completa tipo, silenciado pelo candidato
-  (g) no core do projeto). A régua é sempre o toolchain de `HB_BIN`
-  (2026-07-10: quase derrubou a fixture fixrbk por falso positivo).
+1. **Explore primeiro se o core pode dar o fato.** Projetar a solução na ferramenta e só
+   depois perguntar isso é ordem invertida: quando a solução já está desenhada, a
+   heurística já venceu.
+2. **Se o core pode → o core faz.**
+3. **Se o core NÃO pode → isso é uma RECUSA**, e recusa exige varredura registrada (§1.3).
+4. **Só então, e SÓ COM AUTORIZAÇÃO EXPLÍCITA DO DIEGO PARA AQUELE CASO**, pode existir
+   heurística no hbrefactor. Portão por-caso, igual ao de commit: aprovar um não aprova o
+   próximo.
+
+**Como pedir:** (a) o fato que falta, (b) a varredura feita no core, (c) por que o core
+não pode dar, (d) a heurística proposta e **onde ela erra**.
+**É PROIBIDO** implementar "provisoriamente" e pedir depois — o código provisório é o que
+fica.
+**O portão é executável:** o hook `.claude/hooks/anti-heuristica.sh` (PreToolUse/Bash)
+intercepta o `git commit` e recusa o diff staged de `src/hbrefactor.prg` que cheire a
+gatilho. Autorizado, sela-se a linha com
+`// FATO-OK(diego,AAAA-MM-DD): <por que o core não pode dar este fato>` — e o selo só se
+escreve **depois** do "ok" dele. Auditoria periódica: `docs/prompt-revisao-anti-heuristica.md`.
+
+### 1.2 GATILHOS — os cheiros que obrigam a parar e ir ao core
+
+Ao escrever QUALQUER uma destas linhas, **PARE** e pergunte "o core sabe isto e não me
+conta?". *(Catálogo de erros, 2026-07-12 — cada gatilho tem um cadáver embaixo: [cic §1.3])*
+
+1. **Comparação de TEXTO para decidir PAPEL/IDENTIDADE** (`Upper(a) == Upper(b)`, prefixo,
+   `Left()`, `$`) quando o dump já tem número/id/índice.
+2. **Constante mágica de gramática** (`>= 4`, `Len() > N`) — é réplica de regra do
+   compilador.
+3. **"se não é X, então é Y"** sem um fato que SEPARE X de Y.
+4. **Re-implementar resolução/busca que o core faz** (achar include, casar nome, expandir).
+5. **Casar arquivo por BASENAME** em vez de caminho canônico.
+6. **Escolher o canal MAIS BARATO**: *"tem que usar o canal CORRETO, não apenas o mais
+   barato"* (Diego). Barato ≠ correto.
+
+**Falta de informação → VÁ AO CORE, IMEDIATAMENTE.** A missão é fazer o core gerar o
+MÁXIMO de informação necessária. **"Zero mudança no core" NÃO é virtude — é sinal de
+alerta**: se um conserto precisou de esperteza na ferramenta, quase sempre o fato faltava
+no core e a esperteza é o sintoma. *(Diego, 2026-07-12. [cic §1.2])*
+
+### 1.3 Nunca declare IMPOSSÍVEL sem VARRER a superfície do core
+
+Toda recusa ("o pp não consegue X") é uma **afirmação sobre o CORE** e exige varredura
+ANTES, com o que foi varrido **registrado na spec**: (a) `harbour`/`hbmk2` `--help`
+inteiro (flags existem e são esquecidas: `-gd`, `-sm`, `-u`, `-p`/`-p+`); (b) a **API
+pública** (`include/hbpp.h` e afins); (c) **`tests/` do core** — é lá que a API viva
+aparece; (d) ChangeLog.
+**Silêncio de busca minha NÃO é evidência de ausência**; "não achei" quase sempre é "não
+procurei". *(Custou um veredito errado publicado: [cic §1.4])*
+
+### 1.4 Editar o harbour-core não é permissão — é DEVER
+
+A ferramenta age só sobre fato da AST; a AST é produzida pelo core; logo **moldar a AST**
+— estendendo o core para o fato existir — faz parte da definição da ferramenta. Uma
+ferramenta que não pode construir a AST de que precisa está amputada do próprio princípio.
+*(Diego, 2026-07-09.)*
+
+Permissão **total e esperada** de editar `~/devel/harbour-core/harbour` (branch
+`feature/compiler-ast-dump`, acesso no `.claude/settings.json`). O único freio é o de
+sempre: **commit no core continua sob autorização por-commit do Diego** — não editar ≠
+não commitar.
+
+### 1.5 Não existe compatibilidade para trás — a ferramenta está sendo INVENTADA
+
+O dump é gerado **na hora**, a cada comando, pelo `harbour` do `HB_BIN`. Logo **não existe
+"dump antigo"**: existe **toolchain fora de passo**, que é erro de build — e erro de build
+se **BERRA**, nunca se degrada. *(Diego, 2026-07-13. [cic §2.1])*
+
+- O schema é **EXATO** (`AstSchema()`, um só lugar), não piso e jamais lista enumerada —
+  divergiu, recusa alta nomeando as duas versões.
+- **Nenhum portão de degradação por versão** ("dump sem o canal X degrada para possible"):
+  degradar rebaixaria o **VEREDITO** por causa de um build velho, **calado**.
+- A suíte **sempre roda no schema corrente**; o **caso 122** fica vermelho no instante em
+  que core e ferramenta divergirem.
+
+---
+
+## 2. Core e toolchain
+
+- **Buildar o core após editar — 3 armadilhas** *(Diego, 2026-07-11. [cic §5.1])*:
+  (a) mudança no compilador exige rebuildar `harbour` **E** `hbmk2` (o hbmk2 EMBUTE o
+  compilador); (b) o `make` mente "up to date" e não relinca → apagar os binários
+  (`rm bin/linux/gcc/harbour bin/linux/gcc/hbmk2`) e refazer; (c) `HB_REBUILD_PARSER=yes`
+  regenera o `obj/<plat>/harboury.c`, **não** os `harbour.yyc`/`.yyh` commitados — copiar
+  à mão e commitar os três juntos (`.y` + `.yyc` + `.yyh`), conferindo que um rebuild
+  default carrega a feature.
+- **Exportar `HB_BIN` ao invocar a ferramenta fora do Makefile**: sem ele o `HbMk2Bin()`
+  cai no hbmk2 do sistema e o sintoma é o enganoso "o projeto não compila". *([cic §5.2])*
+- **Ferramenta do core: PROBE, nunca memória**: antes de consumir a saída de um utilitário,
+  sonde ONDE ele escreve e O QUE reporta — com fonte em **subdiretório** (o caso que
+  quebra). Não se adivinha o destino: manda-se (`-o<tmp>`). **Depois de qualquer comando
+  que rode o compilador ao lado dos fontes, conferir `git status`** — `.d`/`.ppo`/`.c`
+  vazam para o repo. *([cic §1.5])*
+- **Chave OPCIONAL do dump: sempre `hb_HGetDef`** — campo que só existe em ALGUNS papéis
+  (`marker`, `ruletok`, `from`, `generates`, `col`) acessado direto é BASE/1132 em
+  produção, e a suíte não pega. Ler o contrato no ast-schema.md ANTES. *([cic §1.6])*
+- **Reutilizar o hbmk2** (builder oficial) para projeto/flags/build: entende `.hbp`/`.hbc`,
+  resolve `-I`/`-D` (`hbmk2 -trace` expõe a linha do harbour), repassa `-prgflag=`. Todo
+  parsing paralelo é cópia degradada que diverge.
+- Fluxos definidos vivem no **Makefile**; hbmk2 direto é só experimentação.
+
+---
+
+## 3. Testes, suíte e corpus
+
+- **Contrato executável: `make test`** — deve permanecer verde.
+- **Compile todo `.prg` (fixture, exemplo, teste) ANTES de usá-lo** —
+  `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto via hbmk2. Fixture que não compila
+  gera diagnóstico enganoso.
+- **`make test JOBS=1` só ao mexer no RUNNER** *(Diego, 2026-07-10)*: o contrato "paralelo
+  × JOBS=1 byte-idêntico" é propriedade da INFRA (bin/parrun, `--unit` do run.sh, join),
+  não do conteúdo dos testes. Rodar JOBS=1 apenas quando a mudança tocar o runner ou
+  introduzir saída potencialmente não-determinística (ex.: imprimir na ordem de iteração
+  de um hash).
+- **Drift em teste PRÉ-EXISTENTE → consultar o Diego** *(2026-07-10)*: o projeto é um
+  experimento VIVO — há motivos legítimos tanto para adaptar o código aos testes quanto
+  para **re-baselinar** os testes (contrato que evoluiu). **A premissa errada pode ser a do
+  teste, e quem decide qual lado cede é o Diego**: apresentar o drift site a site (o que
+  mudou, por quê, qual contrato está em jogo) ANTES de escolher o lado. Teste novo da
+  própria entrega não precisa de consulta; re-rotular expectativa antiga, sim.
+- **CORPUS DE MATURAÇÃO = código do CORE do Harbour** *(Diego, 2026-07-10)*: a ferramenta
+  amadurece em código bem escrito e testado (`work/` = cópias de pastas do core; copiar
+  mais pastas quando a fase pedir). O código do Diego (`~/devel/bravo-experimento*`) é
+  bagunçado e pré-melhores-práticas — serve para exploração pontual e SÓ isso, **nunca**
+  como régua de valor de fase nem alvo de entrega. *(Nuance da **xhb**: braço xHarbour,
+  não-mantido — vale como corpus de MEDIÇÃO, mas número vindo só dela não justifica
+  capacidade sozinho.)*
+
+---
+
+## 4. Medição e anúncio
+
+- **O número que se ANUNCIA é o do PRODUTO rodando como o usuário roda** (comando
+  completo, projeto real do corpus), nunca o do microbenchmark. O stress serve para achar
+  a **curva** (quadrática × linear), não para dimensionar a notícia. *(Diego, 2026-07-13.
+  [cic §3.1])*
+- **"Tamanho típico de aplicação real" é uma afirmação sobre o mundo** — ou se mede no
+  corpus, ou não se escreve. Afirmar sem medir é a heurística vestida de manchete.
+- **O projeto do benchmark tem de PASSAR**: conferir o **exit** E que ele **leu/analisou**
+  de fato. Cronometrar processo não é medir trabalho — **comando que morre também gasta
+  segundos**. *([cic §3.2])*
+- **NÃO PUBLIQUE TABELA DE BENCHMARK**: ela não serve ao leitor (não é a máquina dele, nem
+  o projeto dele) — serve ao autor, como defesa. No anúncio vai a **afirmação** + o
+  **comando** para o leitor medir no projeto dele. *([cic §3.3])*
+- **NENHUM NÚMERO NAS PÁGINAS — todo indicador vira COMANDO** *(Diego, 2026-07-13)*: nenhum
+  tamanho de suíte, contagem de casos ou de schemas nas `site/index.html` (dos DOIS
+  repositórios). O leitor recebe o comando que ele roda (`make test`,
+  `tools/pcode-identity.sh`, `git diff --stat`) — e comando não envelhece. **Automatizar um
+  número frágil é pior que não tê-lo.** *([cic §3.4])*
+- **EXEMPLO NA PÁGINA: só o que se EXECUTA sozinho** *(Diego, 2026-07-12)*: nenhum bloco de
+  fonte e nenhuma saída de terminal da `site/index.html` se escreve à mão. Os exemplos
+  vivem em `tests/site/` (contrato em `tests/site/README.md`), `make site-examples`
+  re-executa e regrava os blocos, e **`make site-check` FALHA** se a página divergir.
+  Quatro portas por exemplo: o fonte ANTES compila limpo, o comando sai com o exit
+  esperado, o fonte DEPOIS compila limpo, e recusa/relatório deixam o fonte **byte a byte
+  intacto**. *([cic §3.5])*
+  **Dívida aberta**: as seções profundas da página (rename de DATA, genealogia de regra,
+  tempo de vida de diretiva, sequestro por abreviação) ainda têm transcript colado à mão —
+  corretos hoje, mas FORA do portão; migrá-los para `tests/site/`.
+- **Números em `docs/roadmap.md`, specs e mensagem de commit CONTINUAM** — lá são registro
+  datado da entrega, não promessa viva ao leitor.
+- **VERIFICAR A BASE antes de concluir dela**: antes de comparar contra qualquer ref,
+  `git fetch` e conferir a que altura ela está — **o fato do diff é tão bom quanto a base
+  dele**. Base do branch do core = `upstream/master`, nunca o `master` local. *(O `push` do
+  `upstream` está **DISABLE** de propósito. [cic §3.6])*
+
+---
+
+## 5. Documentação, idioma e anúncio ao usuário
+
+- **O PRODUTO É EM INGLÊS; a CONVERSA é em português** *(Diego, 2026-07-13)*. A régua não é
+  o repositório, é **quem lê**:
+  - **Inglês** (lido pelo usuário): mensagens da CLI, `docs/manual.md`, `site/index.html`,
+    `CHANGELOG.md` e **toda string que a extensão VSCode mostra** (modais, placeholders,
+    erros).
+  - **Português** (nossa conversa e nosso raciocínio): `CLAUDE.md`, `docs/roadmap.md`,
+    specs, `tests/*/README.md`, comentários do fonte, e a mensagem de commit **do
+    hbrefactor**. *([cic §4.1])*
+- **TUDO no harbour-core é em INGLÊS**: código, comentário, documentação **e mensagem de
+  commit** — o projeto é internacional e este branch é upstreamável (fase B6). *(Diego,
+  2026-07-12. [cic §4.2])*
+- **DOIS changelogs de USUÁRIO, um por repositório** — `CHANGELOG.md` aqui, **`NEWS.md`** no
+  core *(a assimetria é deliberada e **não se re-litiga**: [cic §4.4])*. **Cada repositório
+  com commit novo ganha a sua entrada.**
+  - **O público é o PROGRAMADOR HARBOUR FINAL, nunca o contribuidor**: o problema de todo
+    dia, o que muda na prática (antes/depois quando couber), o que a ferramenta NUNCA faz,
+    e os limites honestos. **O changelog do contribuidor já existe e é o git.** A entrada só
+    se justifica ao responder o que o git NÃO responde: *"o que eu passo a poder fazer, e
+    onde isso me morde?"*
+  - **Reprova o CORPO da entrada que contiver**: nome de função C / arquivo de
+    implementação, nome de struct, jargão de build, número de caso da suíte, sigla de fase.
+    *(Ponteiro para docs internos no FIM da entrada é permitido; citar a saída REAL da
+    ferramenta é sempre permitido.)*
+  - **Ponteiro de delta** no topo (`<!-- changelog-baseline: <repo>@<sha> -->`): o último
+    commit já descrito. É o que torna o serviço **retomável** (`git log <baseline>..HEAD`
+    diz o que falta). Fluxo e régua na skill `/update-manual`. *([cic §4.3])*
+- **PIPELINE DO CORE: `commit → NEWS.md → landing page`** *(Diego, 2026-07-12)*. A
+  `harbour-core/site/index.html` é uma **proposta aos MANTENEDORES** — é ela que decide se o
+  PR (fase B6) é sequer avaliado. **Não é um log**: não ganha seção por commit nem lista
+  schema; carrega o **conceito consolidado** (argumento central, forma do diff, os quatro
+  canais, os bugs do stock que o branch conserta, o pedido ao mantenedor, e o que ainda não
+  sabemos). Muda **só quando o conceito muda** — "não mudou" é resposta legítima. **Nenhum
+  número nela sem medição na hora.** Checklist na skill `/update-manual` (§ 0.4b).
+- **`docs/roadmap.md` é minha responsabilidade e vive preenchido**: fases futuras com escopo
+  + critério de pronto ANTES de executá-las; concluída uma fase, atualizar o status na mesma
+  sessão; trabalho novo entra como fase/item.
+  **Plano ≠ spec** *(ordem do Diego)*: o **plano** (plan mode) decide *como* e *quais
+  requisitos* — é o documento de análise/design/racional. A **spec executável** mora no
+  `docs/roadmap.md`, no formato das fases existentes (`### Fase X — Título`, `**Escopo**`,
+  `**Critério de pronto (mecânico)**`). Ao terminar um plano de código, transforme-o em
+  spec e adicione ao roadmap — **não implemente no mesmo passo**, salvo pedido explícito.
+- **Extensão VSCode sempre com os últimos recursos**: todo comando/capacidade nova do CLI
+  tem que chegar à `extension.js` — expô-la é escopo da fase que a entrega, não fase
+  adiável (é o consumidor de uso diário do Diego).
+
+---
+
+## 6. Processo
+
+- **Commits só com autorização explícita do Diego PARA AQUELE commit** — concluir/aprovar o
+  trabalho não autoriza o commit. Um pedido por commit, não encadear. **Sem push salvo
+  pedido.**
+- **GitHub é pelo `gh`** *(Diego, 2026-07-13)*: autenticação e operações via `gh` CLI
+  (logado como `diegopego`, ssh), nunca o credential-manager do Windows. *([cic §5.4])*
+- **Revisão externa via Codex (`/codex:rescue`)**: o brief é instrumento versionado em
+  `docs/` e **não se contamina com o juízo do Claude**; achado externo é **HIPÓTESE** até
+  verificação no fonte com arquivo:linha — nunca agir direto sobre o relato. **Tarefa Codex
+  pode morrer em silêncio**: antes de esperar conclusão, conferir `ps -p <pid>`; morto =
+  cancelar e re-executar com `--model` explícito. *([cic §5.5])*
+- **`smoketest/hbrefactor-occ.prg` é a primeira encarnação, arquivada**: só leitura, nunca
+  editar.
+- **Regra/preferência durável deste repo vai AQUI** (versionado), não na memória privada do
+  Claude (que não viaja com o repo); a memória fica para o que não pertence a um repo.
+
+---
+
+## 7. Harbour (linguagem) — armadilhas ao escrever fixtures/.prg
+
+Os fixtures da suíte são `.prg` idiomático (o "caso 0" exige saída limpa sob `-w3 -es2`).
+
+- **Código NOVO nosso usa `#xcommand`/`#xtranslate`, nunca `#command`/`#translate`**
+  *(Diego, 2026-07-12)*: provado no dispatch do core (`ppcore.c`) que o `x` significa
+  **exatamente e somente** "comparação EXATA" em vez do **dBase** (que casa a palavra
+  abreviada a partir de 4 letras). Nenhuma capacidade se perde — e a família dBase é a
+  origem de uma CLASSE INTEIRA de ambiguidade (sequestro de regra, recusa falsa, cabeças
+  disputando prefixo); na família `x` esses bugs são **impossíveis**. Vale para fixture,
+  exemplo, doc e sonda que EU escrever. *(Existe ainda a família `y` — exata E
+  case-sensitive.)*
+  **DUAS exceções, ambas obrigatórias:** (a) fixture cujo **assunto** é a abreviação dBase
+  (`fixabr`/caso 115, `fixseq`/caso 116, o par de cabeças do `fixdsl`) — trocar para `x`
+  faria o teste passar por **vacuidade**; (b) a **ferramenta** jamais pode abandonar
+  `#command`/`#translate`: ela refatora o código dos OUTROS, e o `std.ch`, o `hbclass.ch` e
+  toda a herança Clipper são dBase. **A política é sobre o que escrevemos, nunca sobre o
+  que suportamos.**
+- **Não nomear variável formando keyword em uppercase**: Harbour é case-insensitive e lê
+  identificadores em uppercase — `LOCAL nIL` vira a reservada `NIL` (`E0030`). Evitar
+  `nIL`, `cFor`, etc.
+- **MEMVAR antes de PRIVATE/PUBLIC**: sem a declaração compile-time, W0002 na criação e
+  W0001 em cada uso — com `-es2` o build falha. Idioma: `MEMVAR xCfg` / `PRIVATE xCfg := 7`.
+- **`LOCAL x := 0` seguido de `x := <valor>` é DEAD STORE → W0032 → quebra sob `-es2`**: o
+  Harbour avisa que o **inicializador** nunca é lido, mesmo que a variável seja lida depois.
+  Idioma: declarar **sem** inicializador (`LOCAL nEdits`), ou usar `+=` (que LÊ). *(A
+  mensagem "assigned but not used" engana. [cic §6.1])*
+- **Comentário de linha `//` em .prg** (não `/* */`): um `*/` que apareça no conteúdo (ex.:
+  `assert_*/`) fecha o bloco antes da hora. Aplicar em código novo/editado, sem conversão em
+  massa.
+- **A régua do caso 64 vale para COMENTÁRIO também**: ela é textual — citar a DSL de uma
+  fixture num comentário de `src/hbrefactor.prg` QUEBRA a suíte, e está **certa** em
+  quebrar. Ilustre o formato genericamente ("keyword secundária prefixo da cabeça"), nunca
+  com as palavras da fixture. *([cic §6.2])*
+- **Coluna de probe/teste: COMPUTAR, nunca contar na cabeça** — extrair sempre do arquivo no
+  estado **corrente** (`python3 -c "...l.index('<n>')+1"`). Dump é 0-based, CLI é 1-based; o
+  `col` de um marker aponta o **NOME**, não o `<`. *([cic §6.3])*
+- **Verificar comportamento no fonte do Harbour ANTES de afirmar** (não teorizar): ler/grep
+  o `src/` relevante. Ex.: `Empty(" ")` é `.T.` — usar `Len(c) == 0` para "vazia".
+- **Diagnóstico do IDE ≠ veredito**: o lint do VSCode usa o harbour do **sistema**, sem os
+  patches do branch. A régua é sempre o toolchain de `HB_BIN`. *([cic §5.3])*
