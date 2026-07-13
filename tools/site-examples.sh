@@ -41,18 +41,21 @@ for dir in "$SITEDIR"/*/; do
    name="$(basename "$dir")"
    [ -f "$dir/cmd" ] || continue
    cmd="$(cat "$dir/cmd")"
-   show="$(cat "$dir/show")"
+   # o `show` pode listar VARIOS arquivos (um por linha): a refatoracao que
+   # atravessa a fronteira de arquivo so e honesta se a pagina mostrar os dois
+   shows="$(cat "$dir/show")"
    expect=0
    [ -f "$dir/expect" ] && expect="$(cat "$dir/expect")"
    kind=refactor
    [ -f "$dir/kind" ] && kind="$(cat "$dir/kind")"
 
    w="$TMP/$name"
-   mkdir -p "$w"
+   snap="$TMP/$name.snap"
+   mkdir -p "$w" "$snap"
    cp "$dir"/* "$w"/ 2>/dev/null
    rm -f "$w/cmd" "$w/show" "$w/expect" "$w/kind"
 
-   cp "$w/$show" "$TMP/$name.before"
+   for s in $shows; do cp "$w/$s" "$snap/${s//\//_}"; done
 
    # PORTA 1: o ANTES tem de compilar limpo (fixture que nao compila mente)
    ( cd "$w" && "$HBMK2" app.hbp -q0 -s > "$TMP/$name.build0" 2>&1 )
@@ -71,8 +74,6 @@ for dir in "$SITEDIR"/*/; do
       FAILED=1; continue
    fi
 
-   cp "$w/$show" "$TMP/$name.after"
-
    # PORTA 2: o DEPOIS tem de compilar limpo (a refatoracao e PROVADA)
    ( cd "$w" && "$HBMK2" app.hbp -q0 -s > "$TMP/$name.build1" 2>&1 )
    if [ $? -ne 0 ]; then
@@ -83,15 +84,18 @@ for dir in "$SITEDIR"/*/; do
 
    # PORTA 3: recusa OU relatorio tem de deixar o fonte INTACTO
    if [ "$expect" -ne 0 ] || [ "$kind" = "report" ]; then
-      if ! cmp -s "$TMP/$name.before" "$TMP/$name.after"; then
+      dirty=0
+      for s in $shows; do
+         cmp -s "$snap/${s//\//_}" "$w/$s" || dirty=1
+      done
+      if [ "$dirty" -ne 0 ]; then
          echo "site-examples: FALHA [$name] recusou mas MEXEU no fonte"
          FAILED=1; continue
       fi
    fi
 
    python3 "$HERE/tools/site-examples-emit.py" \
-      "$name" "$show" "$cmd" \
-      "$TMP/$name.before" "$TMP/$name.after" "$TMP/$name.out" "$expect" "$kind" \
+      "$name" "$cmd" "$TMP/$name.out" "$expect" "$kind" "$w" "$snap" $shows \
       > "$FRAG/$name.html" || { echo "site-examples: FALHA [$name] emit"; FAILED=1; }
 done
 

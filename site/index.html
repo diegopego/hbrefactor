@@ -970,7 +970,7 @@ annotate --apply: 0 declaration(s) + 1 AS CLASS annotation(s)
       <p class="muted">Two classes, both with a method called <span class="mono">Enviar</span>. Ask who uses <span class="mono">Pagamento:Enviar</span> and the look-alike is not merely flagged — it is <strong>excluded, with the proof named</strong>.</p>
 <!-- SITE-EX:10-usages:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
 <div class="ex">
-  <div class="code-card ex-code"><div class="code-top">the code — app.prg</div>
+    <div class="code-card ex-code"><div class="code-top">the code — app.prg</div>
 <pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
 <span class="l"> </span>
 <span class="l">PROCEDURE Main()</span>
@@ -1023,7 +1023,7 @@ app.prg:26: excluded method declaration (declares REGISTRO:ENVIAR)  | METHOD Env
       <p class="muted">Harbour is dynamic. Here <span class="mono">"Backup"</span> is not a label — it is handed to <span class="mono">&amp;cNome</span> and <b class="emph">becomes the call</b>. Rename the function and nothing in the compiled output would tell you the string went stale; the program would simply die at runtime, three weeks from now. No fact can prove whether a given string is a call, so the tool refuses to decide for you — it hands you the line and stops.</p>
 <!-- SITE-EX:09-string-guard:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
 <div class="ex">
-  <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
 <pre class="num"><code><span class="l">PROCEDURE Main()</span>
 <span class="l"> </span>
 <span class="l">   ? Rodar( &quot;Backup&quot; )</span>
@@ -1052,7 +1052,7 @@ app.prg:26: excluded method declaration (declares REGISTRO:ENVIAR)  | METHOD Env
       <p class="muted">Two classes, both with a method called <span class="mono">Enviar</span>. A send is dynamic dispatch — no fact says which one you meant. So it refuses, and names the other class.</p>
 <!-- SITE-EX:08-refuse-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
 <div class="ex">
-  <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
 <pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
 <span class="l"> </span>
 <span class="l">PROCEDURE Main()</span>
@@ -1124,37 +1124,115 @@ VAR nVia  AS Numeric IS nCount TO oPart</code></pre>
   <div class="narrow">
     <p class="sec-eyebrow">Data, not just behavior</p>
     <h2>A class's data, not just its methods</h2>
-    <p>A class is data plus behavior — and renaming the <em>data</em> used to be the gap: the tool would stop and say "that's a <span class="mono">VAR</span>/<span class="mono">DATA</span>, not a method". Now it does it. Take a balance you want to call something else:</p>
-    <div class="code">
-      <button class="copy" type="button">Copy</button>
-<pre><code>CLASS Conta
-   VAR nSaldo INIT 0
-   METHOD Mostra()
-ENDCLASS
-
-METHOD Mostra() CLASS Conta
-   ::nSaldo := ::nSaldo + 1     <span class="c">// a write…</span>
-   RETURN ::nSaldo              <span class="c">// …and a read</span></code></pre>
-    </div>
-    <p>Point at the member and rename. The declaration, every <b>read</b>, every <b>write</b>, and the class's own internal registration of the member all move together:</p>
-    <div class="code">
-      <button class="copy" type="button">Copy</button>
-<pre><code>$ hbrefactor rename fixdata.hbp c1.prg:16:8 nTeto
+    <p>A class is data plus behavior — and renaming the <em>data</em> used to be the gap: the tool would stop and say "that's a <span class="mono">VAR</span>/<span class="mono">DATA</span>, not a method". Now it does it. Point at the member and rename: the declaration, every <b>read</b>, every <b>write</b>, and the class's own internal registration of the member all move together.</p>
+<!-- SITE-EX:11-rename-data:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oConta := Conta():New()</span>
+<span class="l"> </span>
+<span class="l">   oConta:nLimite := 500</span>
+<span class="l"> </span>
+<span class="l">   ? oConta:nLimite</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Conta</span>
+<span class="l">   VAR nSaldo  INIT 0</span>
+<span class="l">   VAR nLimite INIT 0</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Sobra()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Conta</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Sobra() CLASS Conta</span>
+<span class="l">   ::nLimite := ::nLimite - ::nSaldo</span>
+<span class="l">   RETURN ::nLimite</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oConta := Conta():New()</span>
+<span class="l"> </span>
+<span class="l">   oConta:nTeto := 500</span>
+<span class="l"> </span>
+<span class="l">   ? oConta:nTeto</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Conta</span>
+<span class="l">   VAR nSaldo  INIT 0</span>
+<span class="l">   VAR nTeto INIT 0</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Sobra()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Conta</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Sobra() CLASS Conta</span>
+<span class="l">   ::nTeto := ::nTeto - ::nSaldo</span>
+<span class="l">   RETURN ::nTeto</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:15:8 nTeto
 rename-data: CONTA:nLimite -&gt; nTeto
-  c1.prg:16:8
-  c1.prg:10:7
-  c1.prg:11:20
+  app.prg:15:8
+  app.prg:7:11
+  app.prg:9:13
+  app.prg:24:6
+  app.prg:24:19
+  app.prg:25:13
   predicted: _NLIMITE -&gt; _NTETO
-  predicted string: "nLimite" -&gt; "nTeto" (c1.prg)
-verified: 3 edit(s); DATA member getter+setter renamed, registration re-derived, other modules byte-identical</code></pre>
-    </div>
-    <p>Reading a member and writing to it are two <em>different</em> messages as far as the compiler is concerned (<span class="mono">nSaldo</span> and <span class="mono">_nSaldo</span>) — the tool renames <b>both</b>, and proves it against the symbol table before keeping a single edit.</p>
+  predicted string: &quot;nLimite&quot; -&gt; &quot;nTeto&quot; (app.prg)
+<span class="ok">verified: 6 edit(s); DATA member getter+setter renamed, registration re-derived, other modules byte-identical</span></code></pre></div>
+</div>
+<!-- SITE-EX:11-rename-data:END -->
+    <p>Reading a member and writing to it are two <em>different</em> messages as far as the compiler is concerned (<span class="mono">nLimite</span> and <span class="mono">_nLimite</span>) — the tool renames <b>both</b>, and proves it against the symbol table before keeping a single edit.</p>
     <p>And the guard. If <b>two classes</b> in your project happen to have a member of the same name, the rename is genuinely ambiguous — <span class="mono">:nSaldo</span> is dynamic dispatch, and no fact says which class you meant. So it refuses, and names the other class:</p>
-    <div class="code">
-      <button class="copy" type="button">Copy</button>
-<pre><code>$ hbrefactor rename fixdata.hbp c1.prg:15:8 nX
-hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing</code></pre>
-    </div>
+<!-- SITE-EX:12-refuse-data-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oConta := Conta():New()</span>
+<span class="l"> </span>
+<span class="l">   oConta:nSaldo := 100</span>
+<span class="l"> </span>
+<span class="l">   ? oConta:nSaldo</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Conta</span>
+<span class="l">   VAR nSaldo INIT 0</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Conta</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Poupanca</span>
+<span class="l">   VAR nSaldo INIT 0</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Poupanca</span>
+<span class="l">   RETURN Self</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:14:8 nDisponivel
+<span class="bad">hbrefactor: &#x27;nSaldo&#x27; is also a member of: POUPANCA (app.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing</span></code></pre></div>
+  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
+</div>
+<!-- SITE-EX:12-refuse-data-homonym:END -->
     <p>That's the same rule that has always governed homonymous <em>methods</em> — data members simply inherit it.</p>
   </div>
 </section>
@@ -1164,55 +1242,100 @@ hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg) - a send is dynamic 
   <div class="narrow">
     <p class="sec-eyebrow">Owned by fact</p>
     <h2>Same name, different owner — it only edits yours</h2>
-    <p>Real code reuses names. Say your DSL labels something <span class="mono">Vendas</span> — and a function named <span class="mono">Vendas()</span> already exists, unrelated:</p>
-    <div class="code">
-      <button class="copy" type="button">Copy</button>
-<pre><code><span class="c">// hom.ch — two DSL words, both built from the same marker</span>
-#xtranslate LABEL &lt;n&gt; =&gt; RegLabel( &lt;"n"&gt; )
-#xcommand  MAKE  &lt;n&gt; =&gt; FUNCTION mk_&lt;n&gt;() ;; RETURN &lt;"n"&gt;
-
-PROCEDURE Main()
-   LABEL Vendas        <span class="c">// 'Vendas' here is a label your DSL turns into a string</span>
-   ? Vendas()          <span class="c">// 'Vendas' HERE is the real function — a different owner</span>
-   RETURN
-
-MAKE Vendas            <span class="c">// and here it becomes part of a generated function name</span>
-
-FUNCTION Vendas()
-   RETURN 42</code></pre>
-    </div>
-    <p>Rename the label. <strong>Both DSL sites move — and the real function does not:</strong></p>
-    <div class="code term">
-      <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> rename hom.hbp h.prg:5:10 Receita
+    <p>Real code reuses names. Say your DSL labels something <span class="mono">Vendas</span> — and a function named <span class="mono">Vendas()</span> already exists, unrelated. Rename the label: <strong>both DSL sites move, and the real function does not.</strong></p>
+<!-- SITE-EX:13-dsl-owner:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ROTULO Vendas   // a label your DSL turns into a string</span>
+<span class="l">   ? Vendas()      // the real function - same spelling, a different owner</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">GERA Vendas        // the word becomes part of a generated function name</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Vendas()</span>
+<span class="l"> </span>
+<span class="l">   RETURN 42</span>
+<span class="l"> </span>
+<span class="l">FUNCTION RegRotulo( cNome )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNome</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   ROTULO Receita   // a label your DSL turns into a string</span>
+<span class="l">   ? Vendas()      // the real function - same spelling, a different owner</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">GERA Receita        // the word becomes part of a generated function name</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Vendas()</span>
+<span class="l"> </span>
+<span class="l">   RETURN 42</span>
+<span class="l"> </span>
+<span class="l">FUNCTION RegRotulo( cNome )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNome</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:11 Receita
 rename-pp-marker: Vendas -&gt; Receita
-  h.prg:5:10
-  h.prg:9:6
-  predicted: MK_VENDAS -&gt; MK_RECEITA
-  predicted string: "Vendas" -&gt; "Receita" (h.prg)
-<span class="ok">verified</span>: 2 edit(s); derived artifacts renamed as predicted</code></pre>
-    </div>
-    <p>Look at <span class="mono">predicted: MK_VENDAS → MK_RECEITA</span>. The DSL <em>generates a function</em> whose name is built from the word — so the tool works out what the compiler will produce, renames it, and then checks the symbol table to confirm the prediction came true. Meanwhile <span class="mono">? Vendas()</span> and <span class="mono">FUNCTION Vendas()</span> — the same six letters, a different owner — are left exactly as they were. An occurrence is edited only when a compiler fact ties it to the thing you pointed at; a matching spelling is never enough.</p>
-    <p>It goes one level deeper. A directive can <em>define another directive</em> — that's how Harbour's own class system works inside, and your DSLs can do it too:</p>
-    <div class="code">
-      <button class="copy" type="button">Copy</button>
-<pre><code>#xcommand DEFREGRA &lt;n&gt; =&gt; #xcommand USA &lt;n&gt; =&gt; ? Marca( &lt;"n"&gt; )
-
-PROCEDURE Main()
-   DEFREGRA Ponto      <span class="c">// creates, at preprocess time, the rule `USA Ponto`</span>
-   USA Ponto           <span class="c">// uses the rule that was just created</span>
-   RETURN</code></pre>
-    </div>
-    <p>Renaming <span class="mono">Ponto</span> — at either position — edits both lines together and predicts the derived string:</p>
-    <div class="code term">
-      <button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">hbrefactor</span> rename gen.hbp g.prg:5:13 Marco
+  app.prg:5:11
+  app.prg:10:6
+  predicted: GERA_VENDAS -&gt; GERA_RECEITA
+  predicted string: &quot;Vendas&quot; -&gt; &quot;Receita&quot; (app.prg)
+<span class="ok">verified: 2 edit(s); derived artifacts renamed as predicted</span></code></pre></div>
+</div>
+<!-- SITE-EX:13-dsl-owner:END -->
+    <p>Look at <span class="mono">predicted: GERA_VENDAS → GERA_RECEITA</span>. The DSL <em>generates a function</em> whose name is built from the word — so the tool works out what the compiler will produce, renames it, and then checks the symbol table to confirm the prediction came true. Meanwhile <span class="mono">? Vendas()</span> and <span class="mono">FUNCTION Vendas()</span> — the same six letters, a different owner — are left exactly as they were. An occurrence is edited only when a compiler fact ties it to the thing you pointed at; a matching spelling is never enough.</p>
+    <p>It goes one level deeper. A directive can <em>define another directive</em> — that's how Harbour's own class system works inside, and your DSLs can do it too. Renaming the word — at either position — edits both lines together and predicts the derived string:</p>
+<!-- SITE-EX:14-rule-genealogy:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   DEFREGRA Ponto   // creates, at preprocess time, the rule `USA Ponto`</span>
+<span class="l">   USA Ponto        // uses the rule that was just created</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Marca( cNome )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNome</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   DEFREGRA Marco   // creates, at preprocess time, the rule `USA Ponto`</span>
+<span class="l">   USA Marco        // uses the rule that was just created</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Marca( cNome )</span>
+<span class="l"> </span>
+<span class="l">   RETURN cNome</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:13 Marco
 rename-pp-marker: Ponto -&gt; Marco
-  g.prg:5:13
-  g.prg:6:8
-  predicted string: "Ponto" -&gt; "Marco" (g.prg)
-<span class="ok">verified</span>: 2 edit(s); derived artifacts renamed as predicted</code></pre>
-    </div>
+  app.prg:5:13
+  app.prg:6:8
+  predicted string: &quot;Ponto&quot; -&gt; &quot;Marco&quot; (app.prg)
+<span class="ok">verified: 2 edit(s); derived artifacts renamed as predicted</span></code></pre></div>
+</div>
+<!-- SITE-EX:14-rule-genealogy:END -->
     <p>Behind both: the compiler now records the <strong>genealogy</strong> of preprocessor rules — when a rule is created by another rule's expansion, the dump says which application created it — and the tool only edits an occurrence whose owner is proven. Honest limit: if one module mixes the two roles so tightly that even the symbol table can't separate them, the tool still refuses and rolls back rather than guess.</p>
   </div>
 </section>
@@ -1222,51 +1345,121 @@ rename-pp-marker: Ponto -&gt; Marco
   <div class="narrow">
     <p class="sec-eyebrow">Going deeper</p>
     <h2>A directive can be switched off — and the rename follows it there</h2>
-    <p>A <span class="mono">#define</span> does not have to live to the end of the file. You can turn it off:</p>
-    <div class="code-card">
-      <div class="code-top">un.ch — the rule is born here</div>
-<pre><code>#xcommand LACRA &lt;x&gt; =&gt; uu_( &lt;x&gt;, 1 )</code></pre>
-    </div>
-    <div class="code-card">
-      <div class="code-top">un.prg — and it dies here</div>
-<pre><code>PROCEDURE Main()
-   LACRA 1
-   RETURN
-
-<span class="c">// from here on the directive is switched OFF</span>
-#xuncommand LACRA &lt;x&gt; =&gt; uu_( &lt;x&gt;, 1 )</code></pre>
-    </div>
-    <p>That is ordinary hygiene — and a <strong>trap for every refactoring tool</strong>, because renaming the rule is only half the job. Rename <span class="mono">LACRA</span> and forget the <span class="mono">#xuncommand</span>, and the switch-off is left pointing at a rule that no longer exists. It then turns off <strong>nothing</strong>, and the rule <b class="emph">leaks</b> past the line where you ended it — silently changing the meaning of code the rename never touched. Nothing catches it: if no site after the switch-off uses the word, the compiled output is byte-identical either way, so a "verified" check happily passes.</p>
+    <p>A <span class="mono">#define</span> does not have to live to the end of the file. You can turn it off — and that is ordinary hygiene, but also a <strong>trap for every refactoring tool</strong>, because renaming the rule is only half the job. Rename the directive and forget the <span class="mono">#xuncommand</span>, and the switch-off is left pointing at a rule that no longer exists. It then turns off <strong>nothing</strong>, and the rule <b class="emph">leaks</b> past the line where you ended it — silently changing the meaning of code the rename never touched. Nothing catches it: if no site after the switch-off uses the word, the compiled output is byte-identical either way, so a "verified" check happily passes.</p>
     <p>hbrefactor follows the directive to where it dies — <strong>across the file boundary</strong>, from the header where it was born to the source where it ends:</p>
-    <div class="code-card">
-      <div class="code-top">terminal</div>
-<pre><code>$ hbrefactor rename un.hbp un.prg:4:4 SELA
+<!-- SITE-EX:15-directive-lifetime:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.ch</div>
+<pre class="num"><code><span class="l">// the rule is born here</span>
+<span class="l">#xcommand LACRA &lt;x&gt; =&gt; Selar( &lt;x&gt;, 1 )</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.ch</div>
+<pre class="num"><code><span class="l">// the rule is born here</span>
+<span class="l">#xcommand SELA &lt;x&gt; =&gt; Selar( &lt;x&gt;, 1 )</span></code></pre></div>
+  </div>
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LACRA 1</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">// from here on the directive is switched OFF</span>
+<span class="l">#xuncommand LACRA &lt;x&gt; =&gt; Selar( &lt;x&gt;, 1 )</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Selar( nVal, nSelo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN nVal + nSelo</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   SELA 1</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">// from here on the directive is switched OFF</span>
+<span class="l">#xuncommand SELA &lt;x&gt; =&gt; Selar( &lt;x&gt;, 1 )</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Selar( nVal, nSelo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN nVal + nSelo</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:4 SELA
 rename-dsl: LACRA -&gt; SELA
-  un.prg:4:4
-  un.prg:8:13
-  un.ch:6:11
-<span class="ok">verified</span>: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical</code></pre>
-    </div>
+  app.prg:5:4
+  app.prg:10:13
+  app.ch:2:11
+<span class="ok">verified: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical</span></code></pre></div>
+</div>
+<!-- SITE-EX:15-directive-lifetime:END -->
     <p>Three sites, two files: the call, the <span class="mono">#xcommand</span> that creates the rule, and the <span class="mono">#xuncommand</span> that retires it. The rule still ends exactly where you said it ends.</p>
     <p>And it reads that lifetime in the <strong>other direction</strong> too. Once a rule is switched off, its word is an ordinary word again — so a name that word had made <em>un-renameable</em> becomes free. Renaming a local to <span class="mono">TRAVA</span>, below the line where <span class="mono">TRAVA</span> was switched off, used to be refused forever; now it simply works, because nothing there captures it. <strong>The honest limit:</strong> it only frees the name when the switch-off comes <em>before any line of code in that module</em> — a rule switched off on line 100 still captures on line 50, and the tool won't pretend to know where your name will land.</p>
     <p> This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#xuncommand</span> in your source — blind to the abbreviated spellings, to the several forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
-    <p>That freed name is available to a <strong>command</strong> too — and there the lifetime hides a trap. <b class="emph">A <span class="mono">#uncommand</span> removes by pattern, not by head.</b> Switching <span class="mono">VERIFY</span> off does not simply free the word: if the rule you now rename to <span class="mono">VERIFY</span> has the <em>same shape</em> as the one you switched off, that same <span class="mono">#uncommand</span> removes <strong>the rule you just renamed</strong>, and your call sites quietly start expanding through the <em>other</em> rule. It compiles clean. Nothing warns you.</p>
+    <p>That freed name is available to a <strong>command</strong> too — and there the lifetime hides a trap. <b class="emph">A <span class="mono">#uncommand</span> removes by pattern, not by head.</b> Switching a word off does not simply free it: if the rule you now rename to that word has the <em>same shape</em> as the one you switched off, that same <span class="mono">#uncommand</span> removes <strong>the rule you just renamed</strong>, and your call sites quietly start expanding through the <em>other</em> rule. It compiles clean. Nothing warns you.</p>
     <p>The tool doesn't reason about this — it <strong>asks the preprocessor</strong>, before touching a byte. Different shapes, so the switch-off can't bite, and the rename goes through. Same shape, and it refuses, naming the directive that would do the damage:</p>
-    <div class="code-card">
-      <div class="code-top">terminal</div>
-<pre><code>$ hbrefactor rename app.hbp lib.ch:2:11 VERIFY
-<span class="bad">hbrefactor: 'VERIFY' would be turned off by the #xuncommand VERIFY at app.prg:4 -
-after the rename that directive removes the renamed rule (it matches by pattern),
-and the sites would expand through #xcommand VERIFY (lib.ch:1)</span></code></pre>
-    </div>
+<!-- SITE-EX:16-refuse-uncommand-pattern:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.ch</div>
+<pre class="num"><code><span class="l">// both rules have the SAME shape &lt;x&gt;, and VERIFICA is switched off below</span>
+<span class="l">#xcommand VERIFICA &lt;x&gt; =&gt; Checa( &lt;x&gt;, 2 )</span>
+<span class="l">#xcommand CONFERE  &lt;x&gt; =&gt; Checa( &lt;x&gt;, 1 )</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">// VERIFICA is switched off here, before a single line of code in this module</span>
+<span class="l">#xuncommand VERIFICA &lt;x&gt; =&gt; Checa( &lt;x&gt;, 2 )</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   CONFERE 1</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Checa( nVal, nModo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN nVal + nModo</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.ch:3:11 VERIFICA
+<span class="bad">hbrefactor: &#x27;VERIFICA&#x27; would be turned off by the #xuncommand VERIFICA at app.prg:4 - after the rename that directive removes the renamed rule (it matches by pattern), and the sites would expand through #xcommand VERIFICA (app.ch:2)</span></code></pre></div>
+  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
+</div>
+<!-- SITE-EX:16-refuse-uncommand-pattern:END -->
     <p>And the mirror image: a <span class="mono">#uncommand</span> whose pattern matches <em>no</em> rule removes nothing. Harbour accepts it in silence — you read the file, see the switch-off, and believe the command is off while it is still live. <span class="mono">usages</span> names it:</p>
-    <div class="code-card">
-      <div class="code-top">terminal</div>
-<pre><code>$ hbrefactor usages app.hbp ASSERT
-lib.ch:1: directive (#xcommand ASSERT, 1 marker(s))
-app.prg:4: directive (#xuncommand ASSERT, 2 marker(s)) - <span class="bad">ORPHAN: removes no rule (dead directive)</span>
-app.prg:8:4: application (#xcommand ASSERT, lib.ch:1)  | ASSERT .T.</code></pre>
-    </div>
+<!-- SITE-EX:17-orphan-uncommand:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">// This removal switches off NOTHING: the shape &lt;x&gt;, &lt;y&gt; was never registered.</span>
+<span class="l">// Harbour accepts it in silence - the directive sits there, dead, looking alive.</span>
+<span class="l">#xuncommand CONFERE &lt;x&gt;, &lt;y&gt; =&gt; Checa( &lt;x&gt;, &lt;y&gt; )</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   CONFERE 1</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Checa( nVal, nModo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN nVal + nModo</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> usages app.hbp CONFERE
+app.ch:1: directive (#xcommand CONFERE, 1 marker(s))
+app.prg:5: directive (#xuncommand CONFERE, 2 marker(s)) - ORPHAN: removes no rule (dead directive)
+app.prg:9:4: application (#xcommand CONFERE, app.ch:1)  | CONFERE 1
+app.ch:1:11: in rule match (#xcommand CONFERE)
+app.prg:5:13: in rule match (#xuncommand CONFERE)
+5 result(s) for &#x27;CONFERE&#x27;</code></pre></div>
+  <p class="ex-note muted">This command only <strong>reads</strong>. It never edits — and the suite fails the build if a single byte of the source moves.</p>
+</div>
+<!-- SITE-EX:17-orphan-uncommand:END -->
     <p>A <strong>report, never an edit</strong>. The tool won't rewrite a directive whose intent it can't verify: it can prove the switch-off is dead, but not what you meant it to say.</p>
   </div>
 </section>
@@ -1278,12 +1471,26 @@ app.prg:8:4: application (#xcommand ASSERT, lib.ch:1)  | ASSERT .T.</code></pre>
     <h2>"Would this new name collide?" — it asks the preprocessor instead of guessing</h2>
     <p>A <span class="mono">#command</span> matches its keywords <strong>abbreviated</strong>. <span class="mono">#command ROTULA</span> is also matched by <span class="mono">ROTU</span>, <span class="mono">ROTUL</span>, <span class="mono">ROTULA</span> — from four letters on. So renaming one directive can quietly <b class="emph">hijack</b> another: give a rule a new head that happens to share a four-letter prefix with a rule that already exists, and the preprocessor starts routing your calls to the wrong one.</p>
     <p>Here two rules live side by side — <span class="mono">#command ROTULA</span> and <span class="mono">#command PAUTAR</span>. Rename <span class="mono">PAUTAR</span> to <span class="mono">ROTULAGEM</span>, which looks safe (no rule is called that). The tool refuses, names the rule you would have collided with, and <strong>shows you the exact spelling that would become ambiguous</strong>:</p>
-    <div class="code-card">
-      <div class="code-top">terminal</div>
-<pre><code>$ hbrefactor rename seq.hbp seq.prg:4:4 ROTULAGEM
-hbrefactor: 'ROTULAGEM' collides by abbreviation with rule #command ROTULA
-            (seq.ch:10) - after the rename, writing 'ROTU' would match BOTH rules</code></pre>
-    </div>
+<!-- SITE-EX:18-refuse-abbrev-hijack:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;app.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   PAUTAR 1</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">FUNCTION Registra( nVal, nTipo )</span>
+<span class="l"> </span>
+<span class="l">   RETURN nVal + nTipo</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:4 ROTULAGEM
+<span class="bad">hbrefactor: &#x27;ROTULAGEM&#x27; collides by abbreviation with rule #command ROTULA (app.ch:3) - after the rename, writing &#x27;ROTU&#x27; would match BOTH rules</span></code></pre></div>
+  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
+</div>
+<!-- SITE-EX:18-refuse-abbrev-hijack:END -->
     <p>What matters is <strong>who decided that</strong>. hbrefactor does not reimplement Harbour's matching rule — it starts a <strong>live preprocessor</strong>, feeds it the name you want, and watches whether the rule fires. The authority on "does this collide" is the same preprocessor that will compile your code tomorrow; when Harbour's rule changes, the answer changes with it, and nothing here has to be kept in sync. The difference is not academic: the earlier version <em>did</em> reimplement the rule — and it refused renames that were perfectly safe, because a hand-written copy of a compiler's logic is always a worse copy.</p>
   </div>
 </section>
@@ -1392,7 +1599,6 @@ Eval( bPaga )
             <li><span><span class="pfx">hbrefactor:</span> Rename Symbol under cursor</span><span class="kb">F2</span></li>
             <li><span><span class="pfx">hbrefactor:</span> Extract selection to new function</span></li>
             <li><span><span class="pfx">hbrefactor:</span> Annotate apply (verified)</span></li>
-            <li><span><span class="pfx">hbrefactor:</span> Unused locals (project report)</span></li>
             <li><span><span class="pfx">hbrefactor:</span> Call graph</span></li>
           </ul>
         </div>
@@ -1419,7 +1625,7 @@ Eval( bPaga )
     <p>hbrefactor never re-implements Harbour's grammar. Re-parsing the language in a tool is a degraded copy that drifts from the real thing. Instead it asks the official tools and reads the answer:</p>
     <ul class="clean">
       <li>The <b>compiler dumps a full AST</b> of your code — tokens, scopes, every call site, with exact positions. That dump is the source of truth; the tool reads facts, it doesn't parse.</li>
-      <li><b>hbmk2</b>, the official builder, resolves your project — flags, includes, <span class="mono">.hbc</span> packages, containers and multi-target builds. The tool uses the <em>already-resolved</em> command, so it never guesses a flag.</li>
+      <li><b>hbmk2</b>, the official builder, resolves your project — flags, includes, <span class="mono">.hbc</span> packages, containers and multi-target builds. The tool <em>asks</em> it (<span class="mono">hbmk2 --hbproject</span>) and reads the answer as data, so it never guesses a flag — and never has to build your project just to learn what it is made of.</li>
       <li>Every edit is <b>proven</b>: recompile, compare the binary byte-for-byte, roll back on any difference.</li>
       <li>Under <span class="mono">-kt</span>, the runtime <b>checks types by name</b> on the live object — which reaches classes built at runtime that no static analysis could ever see.</li>
       <li><b>exec-registry</b> compiles a minimal driver (never your <span class="mono">Main</span>), runs only the class-registration functions in a sandbox, and snapshots the live class table.</li>
@@ -1485,7 +1691,6 @@ Eval( bPaga )
           <li>Function <b>parameters</b> aren't annotated yet — only local variables and code-block parameters.</li>
           <li>Some "maybe" is <b>irreducible</b>: a receiver whose class depends on runtime input honestly stays <em>possible</em> — the nature of the problem, not a bug. Library code keeps more <em>possible</em> than a closed program.</li>
           <li>In a chained call (<span class="mono">oM:Soma(1):Soma(2)</span>) the label stays <em>confirmed</em>, not <em>guaranteed</em>, even under <span class="mono">-kt</span>.</li>
-          <li>Two modules with the <b>same filename</b> under a multi-target <span class="mono">.hbp</span> can get confused in fine analysis (ownership works).</li>
           <li>A switch-off only frees a name when it sits <b>in the module's own file</b>. If the <span class="mono">#uncommand</span> arrives from an included header, the tool doesn't decide — it can't see from the compiler in what order your headers reached that module — and the refusal stays. Fail-closed, on purpose.</li>
           <li>The per-call <span class="mono">-kt</span> check has a cost in very hot loops (so it's opt-in), and it doesn't cover pass-by-reference (<span class="mono">@x</span>) or legacy <span class="mono">PARAMETERS x AS ...</span> — those sites are never labeled <em>guaranteed</em>.</li>
           <li><b>The tool and the compiler branch must be in step.</b> It requires the <em>exact</em> dump version the branch emits today: build one without the other and every command refuses, telling you which version each side speaks and to rebuild. It will never <em>degrade</em> instead — a stale toolchain used to make it quietly report a <span class="mono">possible</span> where it had a <span class="mono">confirmed</span>, dressing a build problem up as a limit on what can be known about your code. There's no backward compatibility here, on purpose: the dump is produced fresh on every command, so an <em>old dump</em> cannot exist — only an out-of-step build, and that's an error to shout, not to work around.</li>
@@ -1551,6 +1756,7 @@ make test         <span class="c"># optional: the behavior suite</span></code></
       <li><b>Never edits an include that is not yours</b> — the boundary is the directory of your <span class="mono">.hbp</span>, not the directory you happen to have run the command from. A shared <span class="mono">.ch</span> living outside your project is refused by name.</li>
       <li><b>Never guesses:</b> no fact → it reports "possible" or refuses, and rolls back.</li>
       <li><b>Never excludes by guess:</b> a homonym is only excluded when the receiver's type is known <em>and</em> the whole inheritance chain is declared in your project — otherwise it stays an honest "possible".</li>
+      <li><b>Never mixes up two modules that share a base name:</b> if a multi-target <span class="mono">.hbp</span> builds <span class="mono">subA/util.prg</span> and <span class="mono">subB/util.prg</span>, the tool refuses by name, shows you both paths, and tells you to rename one. It does not pick one and answer. Fail-closed.</li>
       <li><b>Never keeps an edit that changes your program</b> — proven byte-for-byte, or undone.</li>
       <li><b>Never edits without you asking</b> — <span class="mono">annotate</span> needs <span class="mono">--apply</span>, and the extension confirms first.</li>
       <li><b>Never runs your whole program</b> — <span class="mono">exec-registry</span> runs only registration functions, sandboxed.</li>

@@ -1,24 +1,18 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@1141943 · harbour-core@8092e33a0b (feature/compiler-ast-dump)
-    — this round the tool got FASTER and STRICTER, and lost a command:
-      * SPEED (new "Still rough" item). The compiler's fact export was growing as the
-        SQUARE of a module's preprocessor expansions; it is linear now, which took about
-        a third off every command on real Harbour code. What remains is the honest price:
-        every command re-exports the WHOLE project, so you wait for the project, not for
-        your edit. Measured end to end, not from a microbenchmark.
-      * TOOLCHAIN IN STEP (new "Still rough" item). The tool now requires the EXACT dump
-        version the branch emits. A stale `harbour` used to make it quietly report a
-        `possible` where it had a `confirmed` — a build problem dressed up as a limit on
-        what can be known about your code. It refuses loudly instead, naming both
-        versions. There is no backward compatibility here, on purpose: the dump is
-        generated on every command, so an old dump cannot exist — only an out-of-step
-        build can.
-      * REMOVED: `unused-locals`. It ran the compiler on each module and filtered two
-        warning lines out of its output. `harbour yourfile.prg -w3 -s` prints exactly the
-        same thing, continuously, on every build. A command that duplicates the compiler
-        is weight, not capability.
+  baseline: hbrefactor@9251a1c · harbour-core@f8b2c9ab31 (feature/compiler-ast-dump)
+    — this round the tool stopped OBSERVING the builder and started ASKING it:
+      * THE PROJECT IS NOW AN ANSWER, NOT A GUESS. hbmk2 gained a new command,
+        `--hbproject`, that reports in JSON what a project is made of — sources, include
+        paths, compiler flags, one block per target, everything already resolved from
+        your `.hbp`/`.hbc`, and WITHOUT building anything. The tool used to read the
+        build command hbmk2 was about to run, which lists the files it would RECOMPILE —
+        not the files of the target. So it forced a full rebuild of your project just to
+        find out what the project was. That is gone.
+      * A SILENT WRONG ANSWER BECAME A REFUSAL (moved out of "Still rough", into "What it
+        never does"). Two sources with the same base name in a multi-target build used to
+        confuse the tool. It now names both paths and refuses.
   updated: 2026-07-13
 
   This file is the single, current-state, user-facing description of hbrefactor.
@@ -705,7 +699,7 @@ and calls the same CLI — and it finds the right `.hbp` for you by asking hbmk2
 project actually compiles your file (nearest first when it must ask; never guessed by
 proximity). Command Palette entries include *Usages*, a single **Rename Symbol** (the
 familiar F2 — it figures out the kind from the cursor), *Extract selection to new
-function*, *Annotate apply*, *Unused locals*, *Call graph*, and more.
+function*, *Annotate apply*, *Call graph*, and more.
 
 ---
 
@@ -723,8 +717,9 @@ drifts). It asks the official tools and reads the answer:
 - the **compiler dumps a full AST** — tokens, scopes, every call site, with exact
   positions; that dump is the source of truth;
 - **hbmk2** resolves the project — flags, includes, `.hbc` packages, containers and
-  multi-target builds; the tool uses the *already-resolved* command, so it never
-  guesses a flag;
+  multi-target builds; the tool **asks** it (`hbmk2 --hbproject`) and reads the answer
+  as data, so it never guesses a flag — and never has to build your project just to
+  learn what it is made of;
 - every edit is **proven** — recompile, compare the binary byte-for-byte, roll back on
   any difference;
 - under `-kt`, the runtime **checks types by name** on the live object — reaching
@@ -827,8 +822,6 @@ stock compiler.
   callers live outside the project).
 - In a chained call (`oM:Soma(1):Soma(2)`) the label stays `confirmed`, not
   `guaranteed`, even under `-kt`.
-- Two modules with the same filename under a multi-target `.hbp` can get confused in
-  fine analysis (ownership works).
 - A switch-off only frees a name when it sits **in the module's own file**. If the
   `#uncommand` arrives from an included header, the tool does not decide — it cannot see
   from the compiler in what order your headers reached that module — and the refusal
@@ -916,6 +909,9 @@ stock Harbour.
 - **Never excludes by guess:** a homonym is only excluded when the receiver's type is
   known *and* the whole inheritance chain is declared in your project — otherwise it
   stays an honest `possible`.
+- **Never mixes up two modules that share a base name** — if a multi-target `.hbp`
+  builds `subA/util.prg` and `subB/util.prg`, the tool refuses by name, shows you both
+  paths, and tells you to rename one. It does not pick one and answer. Fail-closed.
 - **Never keeps an edit that changes your program** — proven byte-for-byte, or undone.
 - **Never edits without you asking** — `annotate` needs `--apply`, and the extension
   confirms first.

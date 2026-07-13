@@ -26,25 +26,17 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
   `-traceonly`; o **`CmdTokens` morreu**; o **caso 124** trava a recusa de projeto com fontes
   de **basename homônimo**. Zero drift.
 
-**FALTA (as duas precisam DELE):**
-1. **Commit de dois arquivos de doc** — `docs/handoff.md` e `docs/cicatrizes.md` (a § 3.7,
-   escrita depois do commit do código). Estão na árvore, sem commit.
-2. **O delta do `docs/manual.md`** — proposto e **NÃO aplicado** (invariante da
-   `/update-manual`: aprovação site a site). Detalhe abaixo.
-
-**Ponteiros de baseline:** o do `CHANGELOG.md` está em `hbrefactor@304cfa8` e o do `NEWS.md`
-em `harbour-core@8092e33a0b` — **os dois precisam avançar** para `ef6f1e3` e `f8b2c9ab31`
-(padrão do repo: um commit próprio de docs, como o `176083dbb8` do core).
+**A doc alcançou o código (commit `9251a1c` + árvore).** O delta do manual foi aplicado (o
+`--hbproject` no lugar do *"already-resolved command"*; o homônimo de basename saiu de *Still
+rough* e virou recusa permanente em *What it never does*), a página seguiu, e os ponteiros de
+baseline avançaram: `CHANGELOG.md` → `hbrefactor@9251a1c`, `NEWS.md` → `harbour-core@f8b2c9ab31`.
 
 **As entradas de changelog JÁ ESTÃO ESCRITAS e commitadas** (a recusa nova no `CHANGELOG.md`;
 o `--hbproject` no `NEWS.md`) — não duplicar.
 
-**O delta do manual, PENDENTE DE OK.** Dois sítios:
-(1) *"the tool uses the already-resolved command"* → passa a *"asks hbmk2 (`--hbproject`) and
-reads the answer as data"*; (2) o limite *"two modules with the same filename … can get
-confused"*, hoje em **Still rough**, é **falso** — vira recusa deliberada e **permanente** em
-*What it never does*. Aplicado o manual, a `site/index.html` do hbrefactor se regenera (é
-derivação mecânica, não pede segunda aprovação).
+**FALTA commit** (autorização por-commit, e o do core é repo separado): a árvore do hbrefactor
+carrega o manual, a página, os oito exemplos novos de `tests/site/` e o gerador; a do core,
+só o ponteiro de baseline do `NEWS.md`.
 
 **Recomendação registrada:** o `--hbproject` deve ser **PR SEPARADO** do PR da AST (B6) — é
 pequeno, não-controverso e vale sozinho; é o mesmo argumento do `-ge2` (fase A.4). A landing
@@ -105,11 +97,16 @@ meu erro de apresentá-lo como duas decisões simétricas ao Diego:
 ele **antes** de escrever a primeira linha. Critério de pronto:
 [spec-a-oraculo-para-agentes.md](spec-a-oraculo-para-agentes.md) § 2.
 
-**1.1 — Migrar os quatro transcripts colados à mão da página para `tests/site/`.**
-As seções profundas (rename de `DATA`, genealogia de regra, tempo de vida de diretiva,
-sequestro por abreviação) ainda têm saída **digitada** — corretas hoje, mas **FORA do portão**
-do `make site-check`, e é exatamente assim que as anteriores apodreceram (uma chegou a exibir
-mensagem em português depois que a CLI virou inglês, e nenhum teste acusou).
+**1.1 — FEITO (2026-07-13).** Os quatro transcripts colados à mão viraram os exemplos
+**11-18** em `tests/site/`, sob o `make site-check`. Eles **já estavam apodrecendo**: o bloco
+do rename de `DATA` mostrava uma classe com o membro `nSaldo` e, embaixo, a saída de um
+comando que renomeava `nLimite`; o da genealogia exibia uma regra cujo corpo não era o da
+fixture que produzira aquela saída. **Sobraram dois blocos de uma linha**, ambos ilustrações:
+o `confirmed send` da seção `INLINE` (só precisa de fixture) e o aborto de `-kt` (que é erro
+de *runtime* — o portão roda a ferramenta e compara fonte, não executa o programa do usuário;
+esse pede porta nova). Registrado em `tests/site/README.md`.
+*(No caminho, a página ainda anunciava o comando `unused-locals`, removido no `1141943` —
+removido dela e do manual.)*
 
 **1.2 — P12 + P13 (exploração; destravam-se mutuamente — rode JUNTOS).**
 O `ast-16` entregou o **tempo de vida da diretiva** (o dump diz que uma regra foi removida, e

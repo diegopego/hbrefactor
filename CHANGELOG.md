@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@304cfa8 -->
+<!-- changelog-baseline: hbrefactor@9251a1c -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log 304cfa8..HEAD   (see § Maintaining this file, at the end).
 
