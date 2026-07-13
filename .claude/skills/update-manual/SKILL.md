@@ -64,8 +64,11 @@ escrever, o ponteiro avança.
    da casca.
 8. **O manual manda sobre a página.** Divergência = a página cede. Nunca claim
    na página sem lastro (com proveniência) no manual.
-9. **Língua.** `CHANGELOG.md` do hbrefactor: português (é a voz do Diego para o
-   usuário). `NEWS.md` do core: **INGLÊS** — o harbour-core é o projeto Harbour
+9. **Língua — o PRODUTO é em INGLÊS (Diego, 2026-07-13; REVOGA o "CHANGELOG em
+   português" que estava aqui).** A régua é QUEM LÊ: superfície lida pelo USUÁRIO é
+   inglês — `CHANGELOG.md` do hbrefactor, `docs/manual.md`, `site/index.html`, as
+   mensagens da CLI e toda string que a extensão VSCode mostra. Português fica para a
+   CONVERSA (roadmap, specs, CLAUDE.md, comentário de fonte). `NEWS.md` do core: **INGLÊS** — o harbour-core é o projeto Harbour
    internacional e este branch é upstreamável; **tudo lá é em inglês**, inclusive
    mensagem de commit. Manual e página: inglês (público).
 10. **PÚBLICO-ALVO: o programador Harbour, NUNCA o contribuidor** (Diego,

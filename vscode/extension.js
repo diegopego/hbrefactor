@@ -39,7 +39,7 @@ async function projectSpec(forFile) {
       const pick = pickerChoices(disc.candidates, disc.owners);
       if (pick.auto) return pick.auto;
       if (disc.owners.length === 0 && disc.candidates.length === 1) return disc.candidates[0];
-      return await askProject(pick.ask, 'Projeto (.hbp/.hbc) - mais próximo primeiro');
+      return await askProject(pick.ask, 'Project (.hbp/.hbc) - nearest first');
     }
     // disc null (CLI/hbmk2 indisponível) ou nada perto do arquivo: cai para
     // a varredura do workspace abaixo
@@ -48,7 +48,7 @@ async function projectSpec(forFile) {
   const files = dedupFsPaths(await vscode.workspace.findFiles(
     '**/*.{hbp,hbc}', '**/{node_modules,.git,.hbmk}/**'));
   if (files.length === 0) {
-    vscode.window.showErrorMessage('hbrefactor: nenhum .hbp/.hbc no workspace (configure hbrefactor.project).');
+    vscode.window.showErrorMessage('hbrefactor: no .hbp/.hbc in the workspace (set hbrefactor.project).');
     return null;
   }
   if (files.length === 1) return files[0];
@@ -90,7 +90,7 @@ async function ownerOf(file) {
 async function askProject(specs, placeHolder) {
   const items = specs.map(s => ({ label: path.basename(s), description: path.dirname(s), spec: s }));
   const chosen = await vscode.window.showQuickPick(items,
-    { placeHolder: placeHolder || 'Projeto (.hbp/.hbc)' });
+    { placeHolder: placeHolder || 'Project (.hbp/.hbc)' });
   return chosen ? chosen.spec : null;
 }
 
@@ -146,13 +146,13 @@ function report(title, res) {
   ch.appendLine('--- ' + title);
   if (res.stdout) ch.append(res.stdout);
   if (res.stderr) ch.append(res.stderr);
-  if (res.error && !res.stdout && !res.stderr) ch.appendLine('[erro] ' + res.error);
+  if (res.error && !res.stdout && !res.stderr) ch.appendLine('[error] ' + res.error);
   ch.show(true);
   if (res.code !== 0) {
     // a mensagem do CLI (stderr/stdout) explica; sem ela, o erro do execFile
     // (ex.: "spawn hbrefactor ENOENT" = binário não encontrado) é o que ajuda
-    const first = (res.stderr || res.stdout || res.error || 'falhou')
-      .split('\n').find(l => l.trim()) || res.error || 'falhou';
+    const first = (res.stderr || res.stdout || res.error || 'failed')
+      .split('\n').find(l => l.trim()) || res.error || 'failed';
     vscode.window.showWarningMessage('hbrefactor: ' + first.trim());
   }
 }
@@ -269,7 +269,7 @@ async function cmdRename() {
   const word = wordAt(c.editor);
   if (!word) return;
   const novo = await vscode.window.showInputBox({
-    prompt: `Novo nome para "${word}" sob o cursor (o kind vem do fato: local/param/static/memvar/função/método/dsl/marker)` });
+    prompt: `New name for "${word}" under the cursor (the kind comes from the fact: local/param/static/memvar/function/method/dsl/marker)` });
   if (!novo) return;
   await saveAll();
   const pos = c.editor.selection.active;
@@ -278,21 +278,21 @@ async function cmdRename() {
   let res = await run(['rename', c.spec, at, novo], c.cwd);
   // o nome é citado DENTRO de regra de pp: --edit-rules edita as diretivas junto
   if (res.code !== 0 && /--edit-rules/.test(res.stderr + res.stdout)) {
-    report(`rename @ ${at} -> ${novo} (citado em regra de pp)`, res);
+    report(`rename @ ${at} -> ${novo} (named in a pp rule)`, res);
     const go = await vscode.window.showWarningMessage(
-      'O nome é citado DENTRO de regra(s) de pp (diretivas nomeadas na saída). Editar as diretivas junto?',
-      'Prosseguir (--edit-rules)', 'Cancelar');
-    if (go !== 'Prosseguir (--edit-rules)') return;
+      'The name is used INSIDE preprocessor rule(s) (the directives are named in the output). Edit the directives too?',
+      'Proceed (--edit-rules)', 'Cancelar');
+    if (go !== 'Proceed (--edit-rules)') return;
     flags.push('--edit-rules');
     res = await run(['rename', c.spec, at, novo, ...flags], c.cwd);
   }
   // strings/HB_FUNC iguais ao nome NÃO são editadas: o CLI pede --force
   if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
-    report(`rename @ ${at} -> ${novo} (referências textuais)`, res);
+    report(`rename @ ${at} -> ${novo} (textual references)`, res);
     const go = await vscode.window.showWarningMessage(
-      'Há referências textuais (strings/HB_FUNC) que NÃO serão alteradas. Prosseguir mesmo assim?',
-      'Prosseguir (--force)', 'Cancelar');
-    if (go !== 'Prosseguir (--force)') return;
+      'There are textual references (strings/HB_FUNC) that will NOT be changed. Proceed anyway?',
+      'Proceed (--force)', 'Cancelar');
+    if (go !== 'Proceed (--force)') return;
     flags.push('--force');
     res = await run(['rename', c.spec, at, novo, ...flags], c.cwd);
   }
@@ -305,7 +305,7 @@ async function cmdReorderParams() {
   const word = wordAt(c.editor) || enclosingFunction(c.editor.document, c.editor.selection.active.line);
   if (!word) return;
   const ordem = await vscode.window.showInputBox({
-    prompt: `Nova ordem dos parâmetros de ${word} (nomes separados por vírgula)` });
+    prompt: `New parameter order for ${word} (names separated by commas)` });
   if (!ordem) return;
   await saveAll();
   const res = await run(['reorder-params', c.spec, word, ordem], c.cwd);
@@ -317,12 +317,12 @@ async function cmdExtractFunction() {
   if (!c) return;
   const sel = c.editor.selection;
   if (sel.isEmpty) {
-    vscode.window.showErrorMessage('hbrefactor: selecione as linhas a extrair.');
+    vscode.window.showErrorMessage('hbrefactor: select the lines to extract.');
     return;
   }
   const first = sel.start.line + 1;
   const last = sel.end.character === 0 ? sel.end.line : sel.end.line + 1;
-  const nome = await vscode.window.showInputBox({ prompt: `Nome da nova função (linhas ${first}-${last})` });
+  const nome = await vscode.window.showInputBox({ prompt: `Name of the new function (lines ${first}-${last})` });
   if (!nome) return;
   await saveAll();
   const res = await run(['extract-function', c.spec, c.file, `${first}-${last}`, nome], c.cwd);
@@ -369,10 +369,10 @@ async function cmdAnnotateApply() {
   const c = await ctx();
   if (!c) return;
   const ok = await vscode.window.showWarningMessage(
-    `hbrefactor: materializar anotações em ${c.file}? Escreve DECLAREs + AS CLASS ` +
-    `(verificação padrão-ouro; rollback automático em qualquer falha).`,
-    { modal: true }, 'Materializar');
-  if (ok !== 'Materializar') return;
+    `hbrefactor: materialize annotations in ${c.file}? It writes DECLAREs + AS CLASS ` +
+    `(gold-standard verification; automatic rollback on any failure).`,
+    { modal: true }, 'Materialize');
+  if (ok !== 'Materialize') return;
   await saveAll();
   report('annotate --apply ' + c.file, await run(['annotate', c.spec, c.file, '--apply'], c.cwd));
 }
@@ -385,11 +385,11 @@ async function cmdExecRegistry() {
   const c = await projCtx();
   if (!c) return;
   const ok = await vscode.window.showWarningMessage(
-    `hbrefactor: EXECUTAR as funções de registro de classes de ${c.spec} em sandbox? ` +
-    `Roda código do projeto (INITs + registradores) com timeout e grava o retrato ` +
-    `da tabela viva (.astr.json). Nenhum fonte é editado.`,
-    { modal: true }, 'Executar registro');
-  if (ok !== 'Executar registro') return;
+    `hbrefactor: RUN the class-registration functions of ${c.spec} in a sandbox? ` +
+    `It runs your project's code (INITs + registrars) with a timeout and records the ` +
+    `live table snapshot (.astr.json). No source file is edited.`,
+    { modal: true }, 'Run registration');
+  if (ok !== 'Run registration') return;
   await saveAll();
   report('exec-registry', await run(['exec-registry', c.spec], c.cwd));
 }

@@ -1,7 +1,7 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@7021c89 · harbour-core@a465e85bd1 (feature/compiler-ast-dump)
+  baseline: hbrefactor@8893796 · harbour-core@a465e85bd1 (feature/compiler-ast-dump)
     — this round the CORE moved three schema steps (ast-14, ast-15, ast-16), and two of
       them changed what the tool can promise the user:
       * NEW SECTION "A directive can be switched off — and the rename follows it there"
@@ -497,6 +497,25 @@ tool could only have gone looking for the text `#undef` in your source — which
 blind to the abbreviated spellings, to the six forms the removal takes, and to a
 directive that arrives from an included header. The fact was the whole problem.
 
+And it reads that lifetime in the **other direction** too. Once a rule has been switched
+off, its word is an ordinary word again — so a name that word had made *un-renameable*
+becomes free:
+
+```harbour
+#include "lib.ch"                       // defines  #xcommand TRAVA <x> => ...
+#xuncommand TRAVA <x> => Cinta( <x> )   // ...and here it dies
+
+PROCEDURE Dead()
+   LOCAL nVal                           // rename it to TRAVA:
+   ...                                  // before: "collides with a preprocessor rule"
+                                        // now:    it just works — nothing here captures TRAVA
+```
+
+**The honest limit:** it only frees the name when the switch-off comes **before any line
+of code in that module**. If there is code above it, the rule was alive over that code,
+and the refusal stays — a rule switched off on line 100 still captures on line 50, and
+the tool will not pretend to know where your name will land.
+
 ### "Would this new name collide?" — it asks the preprocessor instead of guessing
 
 <!-- prov: phase P/P11, hbrefactor c391408 (the live pp as an oracle: __pp_init +
@@ -742,13 +761,12 @@ does** — never build a guess inside the tool.
      library openness). -->
 
 hbrefactor is an **active, living experiment** — pre-1.0 (CLI `0.5.0`, VSCode extension
-`0.13.0`; they version independently). The behavior contract is a suite of **105 cases /
-825 checks**, all green, byte-identical in parallel and sequential runs. Being honest
+`0.13.0`; they version independently). The behavior contract is a suite of **115 cases /
+942 checks**, all green, byte-identical in parallel and sequential runs. Being honest
 about the rough edges is part of the product.
 
 The big caveat: it needs a **custom branch of Harbour** (the AST-dump fork), not the
-stock compiler. And today the CLI and its docs are in **Portuguese** (the author's
-language); English is on the roadmap.
+stock compiler.
 
 **Still rough**
 
@@ -764,6 +782,11 @@ language); English is on the roadmap.
   `guaranteed`, even under `-kt`.
 - Two modules with the same filename under a multi-target `.hbp` can get confused in
   fine analysis (ownership works).
+- Renaming a **DSL word** does not yet read a directive's lifetime when checking its
+  *own* collisions — there, a rule that has already been switched off can still produce
+  a false refusal. (Variables, functions and methods do read it.)
+- An **orphan** switch-off — a `#uncommand` that ends a rule which does not exist — is
+  dead code the tool cannot point at yet.
 - The per-call `-kt` check has a cost in very hot loops (so it's opt-in), and it doesn't
   cover pass-by-reference (`@x`) or legacy `PARAMETERS x AS ...` — those sites are never
   labeled `guaranteed`.
@@ -809,7 +832,7 @@ stock Harbour.
    git clone https://github.com/diegopego/hbrefactor
    cd hbrefactor
    make build        # produces bin/hbrefactor
-   make test         # optional: the behavior suite (105 cases)
+   make test         # optional: the behavior suite (115 cases)
    ```
 3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.
@@ -822,6 +845,9 @@ stock Harbour.
      sandbox case 101; exclusion honesty commit 6df5c50 + CHANGELOG 2026-07-10. -->
 
 - **Never touches strings, comments, or data** — only code the compiler can verify.
+- **Never edits an include that is not yours** — the boundary is the directory of your
+  `.hbp`, not the directory you happen to have run the command from. A shared `.ch` that
+  lives outside your project is refused by name.
 - **Never guesses:** no fact → it reports `possible` or refuses, and rolls back.
 - **Never excludes by guess:** a homonym is only excluded when the receiver's type is
   known *and* the whole inheritance chain is declared in your project — otherwise it

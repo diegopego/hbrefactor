@@ -181,6 +181,18 @@ docs/roadmap.md, docs/ast-schema.md e o Makefile — LER antes de codar.
   escopo + critério de pronto ANTES de executá-las; concluída uma fase,
   atualizar o status na mesma sessão; trabalho novo entra como fase/item.
   Decisões de produto e autorizações continuam com o Diego.
+- **O PRODUTO É EM INGLÊS; a CONVERSA é em português (Diego, 2026-07-13 — REVOGA o
+  "CHANGELOG.md em português" que esta seção mandava)**. A régua não é o repositório,
+  é **quem lê**: se a superfície é lida pelo USUÁRIO, ela é inglês — mensagens da CLI,
+  `docs/manual.md`, `site/index.html`, `CHANGELOG.md` e **toda string que a extensão
+  VSCode mostra** (modais, placeholders, erros; os títulos da paleta já eram). Se a
+  superfície é a nossa conversa e o nosso raciocínio, ela é português — `CLAUDE.md`,
+  `docs/roadmap.md`, specs, `tests/*/README.md`, comentários do fonte, e a mensagem de
+  commit **do hbrefactor**. *(No `harbour-core` tudo é inglês, inclusive a mensagem de
+  commit — regra separada, abaixo: aquele branch é upstreamável.)* **O erro que gerou a
+  regra:** eu traduzi a CLI e deixei o CHANGELOG e quatro strings da extensão em
+  português — o produto ficou bilíngue no meio, e o manual chegou a AFIRMAR que "a CLI
+  está em português" depois de ela já falar inglês.
 - **DOIS changelogs de USUÁRIO, um por repositório — e o público é o PROGRAMADOR
   HARBOUR, nunca o contribuidor (Diego, 2026-07-12)**. Aqui é o `CHANGELOG.md`; no
   core é o **`NEWS.md`** — nome diferente de propósito: o Harbour já tem um

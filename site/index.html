@@ -1247,7 +1247,9 @@ rename-dsl: LACRA -&gt; SELA
   un.ch:6:11
 <span class="ok">verified</span>: 1 application site(s) + 2 directive occurrence(s); .ppo and .hrb byte-identical</code></pre>
     </div>
-    <p>Three sites, two files: the call, the <span class="mono">#xcommand</span> that creates the rule, and the <span class="mono">#xuncommand</span> that retires it. The rule still ends exactly where you said it ends. This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#xuncommand</span> in your source — blind to the abbreviated spellings, to the several forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
+    <p>Three sites, two files: the call, the <span class="mono">#xcommand</span> that creates the rule, and the <span class="mono">#xuncommand</span> that retires it. The rule still ends exactly where you said it ends.</p>
+    <p>And it reads that lifetime in the <strong>other direction</strong> too. Once a rule is switched off, its word is an ordinary word again — so a name that word had made <em>un-renameable</em> becomes free. Renaming a local to <span class="mono">TRAVA</span>, below the line where <span class="mono">TRAVA</span> was switched off, used to be refused forever; now it simply works, because nothing there captures it. <strong>The honest limit:</strong> it only frees the name when the switch-off comes <em>before any line of code in that module</em> — a rule switched off on line 100 still captures on line 50, and the tool won't pretend to know where your name will land.</p>
+    <p> This works because the compiler now <strong>says</strong> that a directive was removed, and <em>which</em> one it removed. Before, the preprocessor performed the removal and reported nothing; the tool could only have gone hunting for the text <span class="mono">#xuncommand</span> in your source — blind to the abbreviated spellings, to the several forms the removal takes, and to a directive arriving from an included header. The fact was the whole problem.</p>
   </div>
 </section>
 
@@ -1457,7 +1459,7 @@ Eval( bPaga )
     <p class="sec-eyebrow">Honest status</p>
     <h2>Where it stands <span class="pill">pre-1.0</span></h2>
     <p>hbrefactor is an <strong>active, living experiment</strong> — CLI <span class="mono">0.5.0</span>, VSCode extension <span class="mono">0.13.0</span> (they version independently). The behavior contract is a suite of <strong><span data-metric="suite-cases">115</span> cases / <span data-metric="suite-checks">942</span> checks</strong>, all green, byte-identical in parallel and sequential runs. Being honest about the rough edges is part of the product.</p>
-    <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler. And today the CLI and its docs are in <strong>Portuguese</strong> (the author's language); English is on the roadmap.</p>
+    <p>The big one: it needs that <strong>custom branch of Harbour</strong>, not the stock compiler.</p>
     <div class="grid-2">
       <div>
         <h3>Still rough</h3>
@@ -1467,6 +1469,8 @@ Eval( bPaga )
           <li>Some "maybe" is <b>irreducible</b>: a receiver whose class depends on runtime input honestly stays <em>possible</em> — the nature of the problem, not a bug. Library code keeps more <em>possible</em> than a closed program.</li>
           <li>In a chained call (<span class="mono">oM:Soma(1):Soma(2)</span>) the label stays <em>confirmed</em>, not <em>guaranteed</em>, even under <span class="mono">-kt</span>.</li>
           <li>Two modules with the <b>same filename</b> under a multi-target <span class="mono">.hbp</span> can get confused in fine analysis (ownership works).</li>
+          <li>Renaming a <b>DSL word</b> doesn't yet read a directive's lifetime when checking its <em>own</em> collisions — there, a rule that has already been switched off can still produce a false refusal. (Variables, functions and methods do read it.)</li>
+          <li>An <b>orphan</b> switch-off — a <span class="mono">#uncommand</span> that ends a rule which doesn't exist — is dead code the tool can't point at yet.</li>
           <li>The per-call <span class="mono">-kt</span> check has a cost in very hot loops (so it's opt-in), and it doesn't cover pass-by-reference (<span class="mono">@x</span>) or legacy <span class="mono">PARAMETERS x AS ...</span> — those sites are never labeled <em>guaranteed</em>.</li>
         </ul>
       </div>
@@ -1526,6 +1530,7 @@ make test         <span class="c"># optional: the behavior suite (<span data-met
     <h2>What it never does</h2>
     <ul class="clean never">
       <li><b>Never touches strings, comments, or data</b> — only code the compiler can verify.</li>
+      <li><b>Never edits an include that is not yours</b> — the boundary is the directory of your <span class="mono">.hbp</span>, not the directory you happen to have run the command from. A shared <span class="mono">.ch</span> living outside your project is refused by name.</li>
       <li><b>Never guesses:</b> no fact → it reports "possible" or refuses, and rolls back.</li>
       <li><b>Never excludes by guess:</b> a homonym is only excluded when the receiver's type is known <em>and</em> the whole inheritance chain is declared in your project — otherwise it stays an honest "possible".</li>
       <li><b>Never keeps an edit that changes your program</b> — proven byte-for-byte, or undone.</li>
