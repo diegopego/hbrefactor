@@ -89,9 +89,13 @@ para não me perder e para não repetir erro.
 | **PP como ENGENHO DE BUSCA** | *(plano — P12)* | casar para **ACHAR**, não para transformar: busca estrutural, lint e codemod na linguagem que o usuário já sabe | [pp-as-search.md](pp-as-search.md) |
 | **ESCOPO DE DIRETIVA** | ppcore.c:6394 | `#uncommand`/`#xuntranslate`: a regra tem **tempo de vida**. Um BUG e uma LACUNA (`ast-16`) já provados | [directive-scope.md](directive-scope.md) |
 | **STRDUMP** | std.ch:255 | o **`#<x>`**: o NOME escrito vira string que o programa USA em runtime (`ReadVar`, memvar). Derrubou um veredito do corpus; BUG aberto | [strdump.md](strdump.md) |
+| **DEFINE DINÂMICO** | ppcore.c:7253 | `__FILE__`/`__LINE__`, o mkind **`dynval`**: o valor depende de ONDE o código está. Mover código MUDA o programa — e está certo | [dynval.md](dynval.md) |
 | **TEXT/ENDTEXT** | std.ch:221 | a maquinaria de **STREAM**: o fonte vira DADO. A fronteira entre editar e **relatar** — e a lacuna que virou `ast-17` | [text-stream.md](text-stream.md) |
 
-Planejadas (ver [ROADMAP.md](ROADMAP.md)): `#define` dinâmico
-(`__FILE__`/`__LINE__`, o `dynval`, o único mkind ainda com recusa documentada).
-**O `hbct` saiu da lista**: medido, ele não tem UMA diretiva de comando — é
-biblioteca de funções (só `#define` de constante).
+**A lista de famílias acabou; a exploração NÃO** *(Diego, 2026-07-13)*. As três que
+restavam foram fechadas (`strdump`, `TEXT/ENDTEXT`, `dynval`) e o `hbct` **saiu da
+lista** (medido: não tem UMA diretiva de comando — é biblioteca de funções). Mas o
+que se estudou até aqui foram as **diretivas** (a definição, nas `.ch`). Falta o
+outro lado, e é onde o conhecimento real está: **os casos de USO reais no próprio
+fonte do Harbour** — como o core *escreve* código com o pp, no dia a dia dele.
+Próximas famílias saem **da medição dos sítios de uso**, não de uma lista minha.

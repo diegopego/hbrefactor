@@ -161,6 +161,7 @@ exploração + experimento no core, imediatamente**).
 | **PP como INSTRUMENTO** | os canais do core: o que cada um dá e o que DESTRÓI | [pp-as-instrument.md](pp-as-instrument.md) |
 | **STRDUMP** | o `#<x>`: o nome vira STRING VIVA (runtime). Derrubou um veredito | [strdump.md](strdump.md) |
 | **TEXT/ENDTEXT** | o stream: o fonte vira DADO. LACUNA REAL → **`ast-17`** (a linha do bloco chega posicionada) | [text-stream.md](text-stream.md) |
+| **DEFINE DINÂMICO** | `dynval`: o valor depende da POSIÇÃO. A recusa do P4/P5 que SOBREVIVEU à medição | [dynval.md](dynval.md) |
 
 ## Fatias da fase P (roadmap principal: [../roadmap.md](../roadmap.md) § P)
 
@@ -214,8 +215,16 @@ exploração + experimento no core, imediatamente**).
   família [strdump.md](strdump.md). Massa real de pp, para quem for medir de novo:
   `gtwvg/wvtwin.ch` (2.323), `std.ch` (293), `dbinfo.ch` (284), `hbsqlit3` (233),
   `xhb/hbcompat.ch` (191). *(`wvt2wvw.ch` NÃO dumpa: tem código, não só diretiva.)*
-- Diretivas com **`#define` dinâmico** (`__FILE__`/`__LINE__`) — o `dynval`, agora o
-  **único** mkind com recusa documentada de pé.
+**A lista acabou — a exploração não** *(direção do Diego, 2026-07-13, ao me ver
+querer sair para as fatias de consumo cedo demais)*. As três últimas famílias foram
+entregues (`strdump`, `TEXT/ENDTEXT`, `dynval`) e o `hbct` foi medido e descartado.
+**O que se estudou até aqui foi a DEFINIÇÃO** — a diretiva, dentro das `.ch`.
+**Falta o USO**: o fonte do Harbour é um corpus enorme de código REAL escrito com o
+pp, e é lá que o conhecimento que importa está. Próximo passo: **medir os sítios de
+uso** (`ppApplications` sobre o corpus do core em `work/`) e deixar as próximas
+famílias saírem do que o core de fato FAZ — frequência, formas estranhas, o que a
+ferramenta ainda não sabe ler. As fatias de CONSUMO (P15, P16) e o P12 seguem
+esperando; **não são a próxima coisa**.
 
 ## Critério de "fase P exaurida"
 

@@ -379,6 +379,47 @@ PYEOF
    check "o local segue com 2 tokens (decl + leitura): o texto do bloco NAO e' simbolo" $?
 }
 
+# --------------------------------------------------------------------------
+# Familia DEFINE DINAMICO - o mkind `dynval` (ppcore.c:7253): __FILE__ e
+# __LINE__, as UNICAS duas regras dele, e ambas BUILTIN do pp. O assunto e' a
+# sensibilidade a POSICAO. (docs/pp-corpus/dynval.md)
+# --------------------------------------------------------------------------
+corpus_dyn() {
+   echo "corpus: familia DEFINE DINAMICO - __FILE__/__LINE__ (sensibilidade a POSICAO)"
+   ( cd "$HERE/ppc-dyn" && "$HB" dyn.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+   check "ppc-dyn/dyn.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
+   local D; D=$(gen4 ppc-dyn dyn.prg)
+   # .ppo: o __LINE__ vira a LINHA CORRENTE, computada do fonte (nunca na mao)
+   local L; L=$(python3 -c "
+import sys
+src = open('$HERE/ppc-dyn/dyn.prg').read().split(chr(10))
+print([i + 1 for i, l in enumerate(src) if 'log:' in l][0])")
+   grep -q "QOut( \"log:\", $L )" "$D/dyn.ppo"
+   check ".ppo: __LINE__ expande para a LINHA CORRENTE ($L) - o valor SEGUE a posicao" $?
+   grep -q 'cOnde   := "dyn.prg"' "$D/dyn.ppo"
+   check ".ppo: __FILE__ expande para o nome do arquivo" $?
+   # o dump EXPORTA as duas regras builtin, e SO' elas tem mkind dynval
+   python3 - "$D/dyn.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+dyn = sorted(r.get("head") for r in d["ppRules"]
+             if any(m.get("mkind") == "dynval" for m in (r.get("result") or [])))
+sys.exit(0 if dyn == ["__FILE__", "__LINE__"] else 1)
+PYEOF
+   check "ast-5: dynval existe em DUAS regras, as builtin __FILE__/__LINE__ - e SO'" $?
+   # e cada expansao vem REGISTRADA com a linha: e' o fato que permite AVISAR
+   # que o modulo e' sensivel a posicao (nenhuma regra do usuario e' dynval:
+   # a recusa 'nao escrivivel' sobrevive a medicao - 0 em 4.582 regras reais)
+   python3 - "$D/dyn.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+apps = [a["line"] for a in d["ppApplications"]
+        if d["ppRules"][a["rule"]].get("head") == "__LINE__"]
+sys.exit(0 if len(apps) == 2 else 1)
+PYEOF
+   check "ppApplications: cada expansao de __LINE__ vem com a LINHA (da' para AVISAR)" $?
+}
+
 corpus_pplive
 corpus_set
 corpus_say
@@ -392,6 +433,7 @@ corpus_abbrev
 corpus_instrument
 corpus_strdump
 corpus_text
+corpus_dyn
 
 echo
 echo "ppcorpus: passed: $PASS  failed: $FAIL"

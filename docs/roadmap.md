@@ -369,12 +369,29 @@ e `prov: "s"`. Expansão intacta — `make test` **990/0**, `make ppcorpus` **53
 `corpus_text`; conhecimento: [pp-corpus/text-stream.md](pp-corpus/text-stream.md).
 *(Commit do core pendente de autorização.)*
 
-### P16 — o relato da ocorrência em DADO *(aberto 2026-07-13; **consumo do `ast-17`; A RESOLVER**)*
+**Família DEFINE DINÂMICO ✅ (2026-07-13) — a última recusa de mkind, agora MEDIDA.** O `dynval`
+**sobreviveu** à medição que matou a do `strdump`: **0 em 4.582 regras** reais; as únicas duas
+são builtin do pp (`__FILE__`/`__LINE__`, `ppcore.c:7253`), e o dump **as exporta**, com cada
+aplicação e a sua linha. *(Correção de fato: o `ast-schema` listava `__DATE__` como dinâmico —
+não é; dinâmicos são dois, e só dois.)* **O achado é a SENSIBILIDADE A POSIÇÃO**: `__LINE__`
+vale a linha corrente, logo **todo verbo que desloca linhas muda o programa** — verificado, o
+`extract-function` mudou o valor de 12 para 11. **E isso NÃO é bug**: o statement mudou de linha
+mesmo, e a ferramenta não alegou preservação (o verbo cria função nova; identidade de pcode
+nunca esteve na mesa). O que falta é o **aviso**. Guarda: `corpus_dyn` (`make ppcorpus` 58/0);
+conhecimento: [pp-corpus/dynval.md](pp-corpus/dynval.md).
 
-**Escopo**: o `usages` (e o relatório do `rename`) passam a **RELATAR** — nunca editar — a
-ocorrência de um nome dentro de conteúdo não-verificável que agora tem posição: a linha de
-bloco de stream (`ast-17`). Hoje o fato existe e **nenhum verbo o usa**: renomeia-se `cSaldo`,
-a ferramenta edita certo e verifica certo, e o `TEXT` segue imprimindo `cSaldo` sem uma palavra.
+### P16 — o relato do NÃO-VERIFICÁVEL *(aberto 2026-07-13; **consumo do `ast-17` + `dynval`; A RESOLVER**)*
+
+**Escopo**: o `usages` (e o relatório dos verbos de edição) passam a **RELATAR** — nunca editar —
+o que a ferramenta enxerga e hoje cala. **Duas fontes, o mesmo dever** (§1 do CLAUDE.md:
+*detecção e relato preciso, jamais edição automática*):
+- **(a) ocorrência em DADO** — o nome dentro de bloco de stream, que ganhou posição no `ast-17`.
+  Hoje: renomeia-se `cSaldo`, a ferramenta edita certo e verifica certo, e o `TEXT` segue
+  imprimindo `cSaldo` **sem uma palavra**.
+- **(b) módulo SENSÍVEL A POSIÇÃO** — o que expande `__LINE__` (fato: as aplicações, com linha).
+  Um verbo que desloca linhas deve dizer *"este módulo expande `__LINE__` em N sítios; o valor
+  deles muda com esta edição"*. **Não congelar o valor** — o valor novo é o certo; o produto é
+  o aviso.
 **A régua do §1 é dura e vale inteira**: detecção e relato preciso, **jamais** edição automática
 — nem com opt-in. O relato é aviso ao humano/agente, não sugestão de edição.
 **Critério de pronto (mecânico)**: caso novo — `usages cSaldo` lista a ocorrência do bloco
