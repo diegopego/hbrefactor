@@ -339,11 +339,53 @@ Bateria que casa diretivas REAIS do Harbour com seus `.ppo` e `.ppt`, explicando
 o **programador Harbour** — fonte de conhecimento do pp para o Diego, para o usuário e para
 as próprias fatias. Método = os QUATRO oráculos (`.ppo` + `.ppt` + dump + fixture
 COMPILÁVEL); suíte SEPARADA do contrato (`make ppcorpus`, não `make test`).
-**Famílias 1-4 entregues** (SET EXACT, @…SAY, STORE, hbclass). **Próxima família na ordem: um
-contrib (medição).** Regra dura do Diego: cada **LACUNA real PAUSA a exploração e vira
-experimento de core imediato** (foi assim que nasceu o rename-DATA). Spec:
-[spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
+**Famílias 1-4 entregues** (SET EXACT, @…SAY, STORE, hbclass) + as do eixo P (markers, `<@>`,
+regra-que-gera-regra, derivação, estrutura, abreviação, instrumento, escopo). Regra dura do
+Diego: cada **LACUNA real PAUSA a exploração e vira experimento de core imediato** (foi assim
+que nasceu o rename-DATA). Spec: [spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
 [pp-corpus/README.md](pp-corpus/README.md).
+
+**Família de MEDIÇÃO ✅ (2026-07-13) — e o veredito que ela derrubou.** O alvo previsto (o
+`hbct` como "contrib rico") **não existe**: medido, o hbct não declara **uma** diretiva de
+comando. A medição foi feita onde as diretivas de fato estão — dump do core sobre os **33
+headers do ecossistema que declaram diretiva**, **4.582 regras distintas** — e derrubou uma
+**recusa documentada do P4/P5**: o mkind `strdump` *"não existe em regra"* é **FALSO**. Ele é o
+**`#<x>`** (`ppcore.c:4262`), **31 regras** o emitem e **6 estão no `std.ch`** — auto-incluído
+em todo programa Harbour (`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, `JOIN`). Placar
+real dos mkinds: **14 consumidos, 1 recusado** (só o `dynval`). Guarda: `corpus_strdump`
+(`make ppcorpus` 47/0); conhecimento: [pp-corpus/strdump.md](pp-corpus/strdump.md).
+
+### P15 — o rename através do `#<x>`: um BUG e uma decisão *(aberto 2026-07-13; **A RESOLVER**)*
+
+**(1) BUG — VERIFICADO, sem decisão pendente.** Num `MENU TO nEscolha` (Harbour puro, zero
+include), o `usages --at` no sítio da diretiva devolve **1 resultado** e chama o `nEscolha` de
+*"marker name (no identifiable owner)"* — **perde a declaração e a leitura do LOCAL**. O
+`rename` daí edita só o sítio da DSL; o verificador vê a contagem de símbolos mudar e reverte
+(fonte intacto, mas **recusa falsa por resolução errada**). Causa:
+[src/hbrefactor.prg:2106](../src/hbrefactor.prg#L2106) — `generates` *"vence QUALQUER binding
+homônimo"*, regra escrita para o local que a **expansão fabrica** e que não separa esse caso do
+local que a diretiva apenas **referencia** (gatilho §1.2/3: *"se não é X, então é Y"* sem fato
+que separe). **O fato que separa JÁ ESTÁ NO DUMP**, em dois eixos, os dois verificados: (i) o
+recheio só é símbolo se a derivação tiver **`clone`** (`from[].op`) — só-`stringify` é DADO, e
+esse eixo a ferramenta **já respeita** (renomear o local não toca um `LAVRA nLastro` homônimo:
+guarda `corpus_strdump`); (ii) o dono do símbolo sai de `declarations[].nameLine`/`nameCol`, que
+**coincide** com o recheio no local FABRICADO pela expansão e **não coincide** no local do
+programador — e é este eixo que falta. Identidade posicional contra `ppApplications[]`, zero
+texto. É **consumo**, não core.
+**Critério de pronto (mecânico)**: caso novo na suíte com `MENU TO` do `std.ch` — `usages` no
+sítio da DSL lista **as 3** posições do local; o `rename` a partir do sítio da DSL resolve
+`rename-local` (não `rename-pp-marker`); o caso do local FABRICADO (`<n> => LOCAL <n>`) segue
+resolvendo o marker, byte-idêntico; `make test` verde.
+
+**(2) DECISÃO DE PRODUTO — do Diego, NÃO implementar antes da ordem.** Resolvido o bug, o
+rename edita as 3 posições e o `.hrb` **muda de verdade**: a string derivada é outra. E ela é
+**viva em runtime** — o `__MenuTo` (`src/rtl/menuto.prg`) faz `__mvPublic( cVariable )` (cria um
+memvar com aquele NOME) e `ReadVar( Upper( cVariable ) )`, que qualquer bloco de `SET KEY` pode
+ler. Logo **não existe rename preservador** aqui, e a reversão do verificador está **certa**.
+A pergunta é: rename cuja mudança de comportamento é **derivada, prevista e exibida** (a
+ferramenta já imprime `predicted string: "nEscolha" -> "nOpcao"`) é **recusa honesta** ou
+**opt-in explícito**? O §1 do CLAUDE.md manda relatar e nunca editar o não-verificável — mas
+isto **não é** não-verificável: a derivação é FATO do ast-12.
 
 ## Rename de DATA/VAR member — fatia 2
 

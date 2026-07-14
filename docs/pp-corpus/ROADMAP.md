@@ -109,6 +109,20 @@ e o corpus ficou vazio. O Diego percebeu ("estou ficando confuso").
 tema) · canal → **ast-schema** · veredito de fatia → **spec-p** (1 parágrafo + link)
 · regra durável → **CLAUDE.md**. **Não duplicar.** Se o spec-p crescer, é sintoma.
 
+### ⓬ RECUSA DOCUMENTADA envelhece — e só a MEDIÇÃO a mantém honesta (2026-07-13)
+**Erro (duplo).** (a) O P4/P5 fechou os 15 mkinds com *"`strdump` não existe em
+regra — só na maquinaria de stream"*. Escrito por RACIOCÍNIO (o `%s` do stream é
+mesmo stream), nunca medido. A verdade: `strdump` é o **`#<x>`**, e **31 regras** do
+ecossistema o emitem — **6 no `std.ch`**, o header auto-incluído em TODO programa
+(`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, `JOIN`). A afirmação falsa
+espalhou-se por 4 docs e 3 comentários de teste, e o próprio repo já a contradizia
+desde a B4g (`tests/fixb4g/forja.ch:25`). (b) O plano desta fase mandava medir no
+**hbct** como "contrib rico" — o hbct **não tem uma diretiva de comando sequer**.
+**Regra** (é o CLAUDE.md §1.3 aplicado ao corpus): *recusa é afirmação sobre o core
+e exige varredura* — e **no corpus a varredura é MEDIR, não ler**. Corolário: quando
+a premissa do plano cai (o hbct vazio), isso é o plano dizendo que está VELHO —
+**pare e reporte**, não siga executando o plano morto.
+
 ### ❼bis Drift em teste PRÉ-EXISTENTE → apresentar ANTES de re-baselinar
 Regra que já existia no CLAUDE.md e vale reforçar aqui: quando uma mudança faz um
 teste antigo divergir, **apresentar o drift site a site** e deixar o Diego decidir
@@ -145,6 +159,7 @@ exploração + experimento no core, imediatamente**).
 | **ESTRUTURA da regra** | sem cabeça · opcionais fora de ordem · multi-passe | [rule-structure.md](rule-structure.md) |
 | **ABREVIAÇÃO dBase** | keyword pela metade; `ast-15`/`ruletok` | [abbreviation.md](abbreviation.md) |
 | **PP como INSTRUMENTO** | os canais do core: o que cada um dá e o que DESTRÓI | [pp-as-instrument.md](pp-as-instrument.md) |
+| **STRDUMP** | o `#<x>`: o nome vira STRING VIVA (runtime). Derrubou um veredito | [strdump.md](strdump.md) |
 
 ## Fatias da fase P (roadmap principal: [../roadmap.md](../roadmap.md) § P)
 
@@ -191,11 +206,18 @@ exploração + experimento no core, imediatamente**).
 
 ## Famílias planejadas para o corpus
 
-- Um **contrib** rico (hbct/Clipper Tools) — MEDIÇÃO, não capacidade (nuance xhb do
-  CLAUDE.md: número vindo só de lá não justifica capacidade).
-- `TEXT … ENDTEXT` — a maquinaria de **stream** (`#pragma __text`), onde o
-  `strdump`/`%s` de fato vive.
-- Diretivas com **`#define` dinâmico** (`__FILE__`/`__LINE__`) — o `dynval`.
+- ~~Um **contrib** rico (hbct/Clipper Tools)~~ — **MEDIDO E DESCARTADO (2026-07-13)**:
+  o hbct não declara **nenhuma** diretiva de comando (só `#define` de constante) — é
+  biblioteca de FUNÇÕES. A medição que ele deveria fornecer foi feita sobre os **33
+  headers do ecossistema que declaram diretiva** (4.582 regras distintas) e virou a
+  família [strdump.md](strdump.md). Massa real de pp, para quem for medir de novo:
+  `gtwvg/wvtwin.ch` (2.323), `std.ch` (293), `dbinfo.ch` (284), `hbsqlit3` (233),
+  `xhb/hbcompat.ch` (191). *(`wvt2wvw.ch` NÃO dumpa: tem código, não só diretiva.)*
+- `TEXT … ENDTEXT` — a maquinaria de **stream** (`#pragma __text`), onde vive o
+  **`%s`** — o *outro* caminho para o mkind `strdump` (o primeiro é o `#<x>`, já
+  coberto).
+- Diretivas com **`#define` dinâmico** (`__FILE__`/`__LINE__`) — o `dynval`, agora o
+  **único** mkind com recusa documentada de pé.
 
 ## Critério de "fase P exaurida"
 

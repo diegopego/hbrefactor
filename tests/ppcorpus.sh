@@ -126,7 +126,8 @@ corpus_class() {
 # --------------------------------------------------------------------------
 # Familia MARKERS (hbpp.h/ppcore.c) - os 15 tipos de <x>. Fixture tests/fixmk
 # (a mesma do caso 111): exercita os 6 match-mkinds e os 7 result-mkinds
-# escriviveis. strdump e dynval tem RECUSA DOCUMENTADA (nao existem em regra).
+# escriviveis. (O strdump tem familia propria - corpus_strdump: a recusa dele era
+# FALSA. Segue recusado so' o dynval, canal interno do pp.)
 # --------------------------------------------------------------------------
 corpus_markers() {
    echo "corpus: familia MARKERS - os 15 tipos de <x> do pp"
@@ -279,6 +280,63 @@ corpus_pplive() {
    check "o pp COME o comentario da LINHA alimentada -> alimente o SPAN, nunca a linha" $?
 }
 
+# --------------------------------------------------------------------------
+# Familia STRDUMP - o `#<x>`, o mkind que o corpus dava como INEXISTENTE em
+# regra (docs/pp-corpus/strdump.md). Prova nos DOIS lados: a DSL inventada
+# (nao-espelho) e a diretiva REAL do core (hbclass.ch:576, ASSOCIATE).
+# --------------------------------------------------------------------------
+corpus_strdump() {
+   echo "corpus: familia STRDUMP - o #<x> (o mkind dado como inexistente em regra)"
+   ( cd "$HERE/ppc-strdump" && "$HB" sd.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+   check "ppc-strdump/sd.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
+   local D; D=$(gen4 ppc-strdump sd.prg -I"$HERE/ppc-strdump")
+   # .ppo: o #<x> estringifica o NOME escrito - sobre simbolo E sobre texto cru
+   grep -q 'nLastro := sd_Afere( "nLastro" )' "$D/sd.ppo" && \
+      grep -q 'sd_Lavra( "fundo de reserva" )' "$D/sd.ppo"
+   check ".ppo: #<x> vira STRING do que foi escrito (sobre simbolo e sobre texto cru)" $?
+   # ast-5: o strdump EXISTE no result[] de regra (a recusa documentada era FALSA)
+   grep -q '"mkind": "strdump"' "$D/sd.ast.json"
+   check "ast-5: strdump EXISTE no result[] de regra (nao e' so' maquinaria de stream)" $?
+   # ast-12: o recheio que alimenta o stringify vem marcado como GERADOR
+   python3 - "$D/sd.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+ok = any(t.get("generates") and t.get("text") == "nLastro"
+         for a in d["ppApplications"] for t in a["tokens"])
+sys.exit(0 if ok else 1)
+PYEOF
+   check "ast-12: o recheio do #<v> vem com generates:true (o nome GERA a string)" $?
+   # O CERNE da familia: `generates` SOZINHO nao diz se o recheio e' simbolo ou
+   # texto - `SELO nLastro` e `LAVRA nLastro` chegam IGUAIS (mesmo texto, mesmo
+   # generates). Quem separa e' a OP: clone+stringify (e' o LOCAL) x stringify
+   # apenas (e' texto que so' PARECE o nome). Se isto quebrar, a ferramenta
+   # passou a poder editar por COINCIDENCIA DE NOME.
+   python3 - "$D/sd.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+fills = [t for a in d["ppApplications"] for t in a["tokens"]
+         if t.get("text") == "nLastro" and t.get("marker", 0) >= 1
+         and t.get("generates")]
+if len(fills) != 2:                   # SELO e LAVRA: dois recheios GERADORES,
+    sys.exit(1)                       # de texto igual e fato igual - ambiguos
+ops = {}
+for t in d["tokens"]:
+    if t.get("text") == "nLastro" and t.get("from"):
+        ops.setdefault(t["line"], set()).update(f["op"] for f in t["from"])
+selo = [ln for ln, o in ops.items() if o == {"clone", "stringify"}]
+lavra = [ln for ln, o in ops.items() if o == {"stringify"}]
+sys.exit(0 if len(selo) == 1 and len(lavra) == 1 else 1)
+PYEOF
+   check "o que SEPARA nao e' o generates: clone+stringify (LOCAL) x stringify-so' (TEXTO)" $?
+   # e o .ppo confirma o efeito: a colisao de nome vira STRING, nao variavel
+   grep -q 'sd_Lavra( "nLastro" )' "$D/sd.ppo"
+   check ".ppo: 'LAVRA nLastro' vira a STRING \"nLastro\" - a palavra nunca vira simbolo" $?
+   # a prova que NAO depende da minha DSL: a diretiva REAL do core
+   local C; C=$(gen4 ppc-class clsx.prg -I"$HB_INC")
+   python3 "$HERE/ppc-strdump.py" "$C/clsx.ast.json" "hbclass.ch" ASSOCIATE > /dev/null
+   check "strdump em diretiva REAL do core: hbclass.ch:576 (ASSOCIATE ... #<type>)" $?
+}
+
 corpus_pplive
 corpus_set
 corpus_say
@@ -290,6 +348,7 @@ corpus_gen
 corpus_rulestruct
 corpus_abbrev
 corpus_instrument
+corpus_strdump
 
 echo
 echo "ppcorpus: passed: $PASS  failed: $FAIL"

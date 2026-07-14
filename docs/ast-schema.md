@@ -456,7 +456,7 @@ ADR-001.
   | `logical` | `<.x.>` | emite `.T.`/`.F.` — **o VALOR não é emitido**: o recheio é consumido e DESCARTADO (relato honesto, nunca edição) |
   | `nul` | `<-x->` | não emite nada — recheio DESCARTADO (idem) |
   | `reference` | `<@>` | **guarda anti-recursão**: token significativo para o pp e INVISÍVEL ao compilador, que carrega o padrão de match da regra e impede uma regra circular de re-casar a própria saída (ChangeLog do core 2010-08-19; uso real: `hbfoxpro.ch:63`). Sem nome e sem posição (`text: "~"`, `col: null`) → nada a renomear; a ferramenta o **preserva por construção** (edita regra por posição de byte, e o guarda não tem posição). |
-  | `strdump` | `%s` | **RECUSA DOCUMENTADA**: não existe em `match[]`/`result[]` de regra — vive na maquinaria de STREAM (`#pragma __text`, o `TEXT…ENDTEXT`). Nada a consumir numa regra. |
+  | `strdump` | `#<x>` (e `%s`) | o **NOME ESCRITO** virado string (`ppcore.c:4262`, ramo `fDump`; o `%s` do stream é o outro caminho para o mesmo mkind, `ppcore.c:3215`). Alimenta o `generates` do ast-12 (`ppcore.c:5414` registra o `'s'`). **CORREÇÃO 2026-07-13**: até aqui esta linha dizia "RECUSA DOCUMENTADA — não existe em regra", e era FALSO: 31 regras do ecossistema o emitem, **6 delas no `std.ch`** (`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, `JOIN`) — ver [pp-corpus/strdump.md](pp-corpus/strdump.md). |
   | `dynval` | — | **RECUSA DOCUMENTADA**: não é escrivível pelo usuário — é o canal INTERNO do pp para os `#define` dinâmicos (`__FILE__`, `__LINE__`, `__DATE__`…; ppcore.c:5209/7190). Nenhum `#xcommand` pode produzi-lo. |
 - **Posições**: `line`/`col`/`len`/`prov` como em `tokens[]`, com UMA
   diferença deliberada: **col é emitida também para token de include**

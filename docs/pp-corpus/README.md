@@ -88,7 +88,10 @@ para não me perder e para não repetir erro.
 | **PP como INSTRUMENTO** | hbpptest.prg | os **canais do core** (`.ppo`/`.ppt`/`-u`/`-gd`/`-x`/`__pp_process`): o que cada um dá e o que **destrói** | [pp-as-instrument.md](pp-as-instrument.md) |
 | **PP como ENGENHO DE BUSCA** | *(plano — P12)* | casar para **ACHAR**, não para transformar: busca estrutural, lint e codemod na linguagem que o usuário já sabe | [pp-as-search.md](pp-as-search.md) |
 | **ESCOPO DE DIRETIVA** | ppcore.c:6394 | `#uncommand`/`#xuntranslate`: a regra tem **tempo de vida**. Um BUG e uma LACUNA (`ast-16`) já provados | [directive-scope.md](directive-scope.md) |
+| **STRDUMP** | std.ch:255 | o **`#<x>`**: o NOME escrito vira string que o programa USA em runtime (`ReadVar`, memvar). Derrubou um veredito do corpus; BUG aberto | [strdump.md](strdump.md) |
 
-Planejadas (ver [ROADMAP.md](ROADMAP.md)): um contrib rico (hbct) para MEDIÇÃO;
-`TEXT … ENDTEXT` (a maquinaria de *stream*, onde o `strdump`/`%s` vive de fato);
-`#define` dinâmico (`__FILE__`/`__LINE__`, o `dynval`).
+Planejadas (ver [ROADMAP.md](ROADMAP.md)): `TEXT … ENDTEXT` (a maquinaria de
+*stream* — o `%s`, o **outro** caminho do `strdump`); `#define` dinâmico
+(`__FILE__`/`__LINE__`, o `dynval`, o único mkind ainda com recusa documentada).
+**O `hbct` saiu da lista**: medido, ele não tem UMA diretiva de comando — é
+biblioteca de funções (só `#define` de constante).

@@ -3614,8 +3614,9 @@ check "A->B->A round-trip byte-exact" $?
 unit_111() {
 echo "case 111: P4+P5 - os 15 mkinds do pp: consumo provado OU recusa documentada"
 # fixture fixmk (DSL inventada nao-espelho): exercita os 6 match-mkinds e os 7
-# result-mkinds escriviveis. strdump (so em stream `#pragma __text`) e dynval
-# (interno do pp: __FILE__/__LINE__) tem RECUSA DOCUMENTADA no ast-schema.
+# result-mkinds escriviveis. O strdump (o `#<x>`) tem familia PROPRIA no corpus
+# (make ppcorpus, corpus_strdump): a "recusa documentada" dele era FALSA e caiu em
+# 2026-07-13. Segue com recusa so' o dynval (interno do pp: __FILE__/__LINE__).
 # ast-14: TODO marker de match e numerado no core (gated), entao o recheio de um
 # marker que o result NAO usa deixa de se confundir com palavra da regra - o
 # fato substitui a adivinhacao por texto.

@@ -2174,8 +2174,9 @@ suíte (responde ao critério de matar do adr-003).
   P2 ✅ marker que gera E passa adiante (adr-003:87-90, veredito estrutural,
   caso 109); **P4 ✅ + P5 ✅ os 15 mkinds EXAURIDOS (2026-07-12, caso 111,
   fixture fixmk)**: sintaxe de cada um tirada do PARSER; 13 com consumo provado,
-  2 com recusa documentada (`strdump` só em stream `#pragma __text`; `dynval`
-  interno do pp); `<@>` (reference) desvendado — é o GUARDA ANTI-RECURSÃO de
+  2 com recusa documentada — **a do `strdump` caiu em 2026-07-13** (é o `#<x>`, e o
+  `std.ch` o usa em 6 regras; placar real: 14 consumidos, 1 recusado — só o `dynval`.
+  Ver `pp-corpus/strdump.md`); `<@>` (reference) desvendado — é o GUARDA ANTI-RECURSÃO de
   regras circulares (ChangeLog do core 2010; uso real hbfoxpro.ch:63) e a
   ferramenta o preserva por construção. TRÊS consumos: `restrict` VALIDADO
   (recusa antes de editar, nomeando as alternativas — re-baseline do caso 82),

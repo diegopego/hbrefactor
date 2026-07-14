@@ -30,7 +30,7 @@ Sintaxe tirada do PARSER do core (`hb_pp_matchMarkerNew` / `hb_pp_resultMarkerNe
 | `<.x.>` | `logical` | `.T.`/`.F.` — se o marker casou. **O VALOR não é emitido** |
 | `<-x->` | `nul` | **nada** — o valor é descartado |
 | `<@>` | `reference` | o guarda anti-recursão → [reference-guard.md](reference-guard.md) |
-| `%s` | `strdump` | **não existe em regra** — só na maquinaria de stream (`#pragma __text`, o `TEXT…ENDTEXT`) |
+| `#<x>` | `strdump` | o **NOME ESCRITO** virado string (não o valor) — e o `%s` do stream (`#pragma __text`) é o outro caminho para o mesmo mkind → [strdump.md](strdump.md) |
 | — | `dynval` | **não escrivível** — canal interno do pp para `__FILE__`/`__LINE__` (ppcore.c:5209/7190) |
 
 ## A fixture (`tests/fixmk/`) — compila limpo sob `-w3 -es2`
@@ -110,8 +110,13 @@ do seu app.
   incoerente em silêncio.
 - **`block`/`strstd`/`strsmart`/`regular`/`extexp`/`name`/`list`**: o valor É
   emitido → é símbolo ligado de verdade, renomeável pelo fato normal.
+- **`strdump` (`#<x>`)**: o NOME vira string que o **programa usa em runtime** (o
+  `MENU TO` do `std.ch` cria um memvar com aquele nome e o expõe em `ReadVar()`).
+  Renomear MUDA o comportamento — família própria, com o limite e um BUG aberto:
+  [strdump.md](strdump.md).
 
-Provas: **caso 111** (suíte, fixture `fixmk`) + [ast-schema § mkind](../ast-schema.md).
+Provas: **caso 111** (suíte, fixture `fixmk`) + `corpus_strdump` +
+[ast-schema § mkind](../ast-schema.md).
 
 ## Lacunas (o que os oráculos NÃO mostram)
 

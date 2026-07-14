@@ -1,7 +1,9 @@
 // fixmk (fase P, P4+P5): DSL inventada nao-espelho que exercita TODOS os mkinds
-// escriviveis do pp - 6 de match e 7 de result (strdump so existe em stream
-// `#pragma __text`; dynval e interno do pp: `__FILE__`/`__LINE__` - os dois com
-// RECUSA DOCUMENTADA no ast-schema). Regua do caso 64: nenhuma palavra daqui
+// escriviveis do pp - 6 de match e 7 de result. (O strdump, o `#<x>`, tem
+// familia PROPRIA no corpus - ppc-strdump/, docs/pp-corpus/strdump.md: ate
+// 2026-07-13 esta fixture o dava como "so' em stream", e era FALSO. So' o
+// dynval - `__FILE__`/`__LINE__`, interno do pp - segue com recusa documentada
+// no ast-schema.) Regua do caso 64: nenhuma palavra daqui
 // aparece em src/hbrefactor.prg.
 
 // --- MATCH mkinds ---

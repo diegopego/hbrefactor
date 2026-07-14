@@ -65,9 +65,11 @@ homônimo do seu código voltavam no MESMO blob. Agora estreita pelo papel. Zero
 (o fato já estava no dump). Caso 112. Resíduo: artefatos derivados como `Location`
 no `--json`. Conhecimento: [derivation.md](pp-corpus/derivation.md).
 
-### P4 + P5 ✅ os 15 mkinds EXAURIDOS (2026-07-12)
-13 com consumo provado, 2 com recusa documentada (`strdump` vive na maquinaria de
-STREAM; `dynval` é canal interno do pp). O `<@>` desvendado: é o **guarda
+### P4 + P5 ✅ os 15 mkinds EXAURIDOS (2026-07-12) — **um veredito CAIU (2026-07-13)**
+13 com consumo provado, 2 com recusa documentada. **A recusa do `strdump` era FALSA**
+(ele é o `#<x>`, e 31 regras do ecossistema o emitem — 6 no próprio `std.ch`): placar
+corrigido para **14 consumidos, 1 recusado** (só o `dynval`, canal interno do pp).
+Derrubada pela MEDIÇÃO, não por leitura — ver [pp-corpus/strdump.md](pp-corpus/strdump.md). O `<@>` desvendado: é o **guarda
 anti-recursão**. Três consumos: `restrict` validado, `logical`/`nul` relatados, e
 `wild`/marker-não-usado separado de palavra-de-regra **por FATO** — canal novo
 **`ast-14`** no core, que **matou uma heurística de texto minha que o Diego pegou**.
