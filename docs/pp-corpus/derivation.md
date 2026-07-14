@@ -1,3 +1,4 @@
+<!-- guarda: corpus_deriv -->
 # Família DERIVAÇÃO — `clone` × `paste` × `stringify` (o que a diretiva FAZ com o nome)
 
 Índice: [README.md](README.md). Ensina: **o que um nome SIGNIFICA depende do que a

@@ -1,3 +1,4 @@
+<!-- guarda: NENHUMA (plano da fase P12, nao e' fato ainda) -->
 # Família O PP COMO ENGENHO DE BUSCA — casar para ACHAR, não para transformar
 
 Índice: [README.md](README.md). Fatia **P12** do roadmap. **Ideia do Diego

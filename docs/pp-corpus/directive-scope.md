@@ -1,3 +1,4 @@
+<!-- guarda: PENDENTE (hoje so' o contrato prova, caso 117/fixun) -->
 # Família ESCOPO DE DIRETIVA — `#uncommand`/`#xuntranslate` e o tempo de vida da regra
 
 Índice: [README.md](README.md). Fatia **P13**. **Ideia do Diego (2026-07-12)**:

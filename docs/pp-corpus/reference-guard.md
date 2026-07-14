@@ -1,3 +1,4 @@
+<!-- guarda: corpus_ref -->
 # Família `<@>` — o guarda anti-recursão (o marker mais obscuro do pp)
 
 Índice: [README.md](README.md). Ensina: **como uma regra pode emitir a PRÓPRIA

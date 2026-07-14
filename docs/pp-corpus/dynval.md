@@ -1,3 +1,4 @@
+<!-- guarda: corpus_dyn -->
 # Família DEFINE DINÂMICO (`dynval`) — o valor que depende de ONDE o código está
 
 Índice: [README.md](README.md). Ensina: existem duas constantes cujo valor **não

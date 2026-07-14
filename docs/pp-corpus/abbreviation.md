@@ -1,3 +1,4 @@
+<!-- guarda: corpus_abbrev -->
 # Família ABREVIAÇÃO dBase — a keyword pela metade (e o fato `ruletok`)
 
 Índice: [README.md](README.md). Ensina: **em `#command`/`#translate` (as famílias
@@ -10,7 +11,7 @@ nascido daqui: **`ast-15`** (`ruletok`).
 
 ## A regra, tirada do CORE (não de memória)
 
-`ppcore.c:2533`, em `hb_pp_tokenEqual()`:
+`ppcore.c:2725`, em `hb_pp_tokenEqual()`:
 
 ```c
 ( pToken->len == pMatch->len ||

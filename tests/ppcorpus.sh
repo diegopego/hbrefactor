@@ -191,7 +191,7 @@ corpus_rulestruct() {
    ( cd "$HERE/fixp6" && "$HB" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
    check "fixp6/p6.prg compila limpo sob -w3 -es2" $?
    local D; D=$(gen4 fixp6 p6.prg -I"$HERE/fixp6")
-   # regra SEM CABECA: o match comeca com um MARKER -> head null (ppcore.c:1161)
+   # regra SEM CABECA: o match comeca com um MARKER -> head null (ppcore.c:1284)
    grep -q '"head": null' "$D/p6.ast.json"
    check "ast dump: regra SEM CABECA existe e vem com head null" $?
    # opcionais FORA DE ORDEM: o valor cai no slot certo mesmo invertido
@@ -215,7 +215,7 @@ corpus_abbrev() {
    local D; D=$(gen4 fixabr abr.prg -I"$HERE/fixabr")
    # o pp ACEITA a keyword abreviada (>= 4 letras) nas familias SEM 'x'
    grep -q 'zz_( 3, 0 )' "$D/abr.ppo"
-   check ".ppo: #command casa a keyword ABREVIADA (APAG -> APAGAR, ppcore.c:2533)" $?
+   check ".ppo: #command casa a keyword ABREVIADA (APAG -> APAGAR, ppcore.c:2725)" $?
    # ast-15: o dump diz QUAL literal da regra cada token casou
    grep -q '"ruletok"' "$D/abr.ast.json"
    check "ast dump: ast-15 exporta ruletok (QUAL literal da regra o site casou)" $?
@@ -235,10 +235,14 @@ corpus_instrument() {
    rm -rf "$D"; mkdir -p "$D/inc"
    cp "$HERE/ppc-instr/far.ch" "$D/inc/"
    cp "$HERE/ppc-instr/m.prg" "$D/"
-   ( cd "$D" && "$HB" m.prg -n -q0 -p -u -s -Iinc > /dev/null 2>&1 )
+   ( cd "$D" && "$HB" m.prg -n -q0 -p -p+ -u -s -Iinc > /dev/null 2>&1 )
    # -u ISOLA: aplica so as regras do usuario; o resto da linguagem passa intacto
-   grep -q "MODERNO Alfa VALOR nX" "$D/m.ppo" && grep -q '? "oi"' "$D/m.ppo"
+   # (o alvo da migracao e' CODIGO -- far_Migrado --, porque fixture TEM de compilar;
+   #  o passo INTERMEDIARIO da migracao vive no .ppt, o oraculo do multi-passe)
+   grep -q 'far_Migrado( "Alfa", nX )' "$D/m.ppo" && grep -q '? "oi"' "$D/m.ppo"
    check "-u: o pp aplica so as MINHAS regras (o '?' NAO vira QOut)" $?
+   grep -q "MODERNO Alfa VALOR nX" "$D/m.ppt"
+   check ".ppt: o passo INTERMEDIARIO da migracao (DSL velha -> DSL nova) e' visivel" $?
    # ...mas o .ppo DESTROI tudo que nao e codigo -> nao pode ser FONTE (recusa do P7)
    [ "$(grep -c '//' "$D/m.ppo")" = "0" ] && ! grep -q '#include' "$D/m.ppo"
    check ".ppo DESTROI comentarios e #include - nao serve como FONTE (recusa do P7)" $?
@@ -259,8 +263,10 @@ corpus_pplive() {
    cp "$HERE/ppc-live/live.prg" "$D/"
    cp "$HERE/ppc-instr/far.ch" "$D/inc/"
    cp "$HERE/ppc-instr/m.prg" "$D/"
-   # o pp do BUILD: expande o site via .ppo (canal de arquivo, com -u)
-   ( cd "$D" && "$HB" m.prg -n -q0 -p -u -s -Iinc > /dev/null 2>&1 )
+   # o pp do BUILD: expande o site (canal de arquivo, com -u). A comparacao com o pp
+   # VIVO se faz no .ppt: o pp vivo tem SO' a regra ANTIGO registrada, entao ele para
+   # em `MODERNO Alfa VALOR nX` -- que e' exatamente o passo que o .ppt do build mostra
+   ( cd "$D" && "$HB" m.prg -n -q0 -p -p+ -u -s -Iinc > /dev/null 2>&1 )
    # o pp VIVO: mesma regra, mesmo site, em processo
    ( cd "$D" && "$HB_BIN/hbmk2" live.prg -o"$D/live" -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
    ( cd "$D" && ./live > live.out 2>&1 )
@@ -268,8 +274,8 @@ corpus_pplive() {
    # (1) EQUIVALENCIA: o pp vivo produz o MESMO texto que o pp do build
    grep -q "SPAN=\[MODERNO Alfa VALOR nX\]" "$D/live.out"
    check "pp VIVO expande o site igual ao pp do BUILD (.ppo): 'MODERNO Alfa VALOR nX'" $?
-   grep -q "MODERNO Alfa VALOR nX" "$D/m.ppo"
-   check "  ...e o .ppo do build concorda (a equivalencia e com o MESMO fato)" $?
+   grep -q "MODERNO Alfa VALOR nX" "$D/m.ppt"
+   check "  ...e o pp do BUILD concorda, no .ppt (a equivalencia e com o MESMO fato)" $?
 
    # (2) O LIMITE HONESTO: o pp COME o comentario da linha que voce alimenta.
    # A destruicao NAO e privilegio do canal de arquivo - e do que se ALIMENTA.
@@ -287,9 +293,27 @@ corpus_pplive() {
 # --------------------------------------------------------------------------
 corpus_strdump() {
    echo "corpus: familia STRDUMP - o #<x> (o mkind dado como inexistente em regra)"
-   ( cd "$HERE/ppc-strdump" && "$HB" sd.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-strdump-run"
+   # (0) a metade EXECUTAVEL: o .prg RODA e se AFIRMA (hbtest + pp vivo) - virada
+   #     de metodo 2026-07-14: comentario sem assert e' opiniao
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-strdump/sdrun.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" sdrun.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -osdrun -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-strdump/sdrun.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./sdrun > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 5 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "sdrun.prg RODA: os asserts passam (0 falhas) - o #<x> estringifica o NOME" $?
+   ( cd "$HERE/ppc-strdump" && "$HB" sd.prg -n -q0 -w3 -es2 -s -I. -I"$CORE/contrib/hbtest" > /dev/null 2>&1 )
    check "ppc-strdump/sd.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-strdump sd.prg -I"$HERE/ppc-strdump")
+   # o sd.prg tambem RODA: os asserts provam que a linha da colisao e' DADO (a funcao
+   # recebe a string "nLastro", nao o valor 7 da variavel homonima)
+   cp "$HERE/ppc-strdump/sd.ch" "$R"/ 2>/dev/null
+   cp "$HERE/ppc-strdump/sd.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" sd.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -osd -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 && ./sd > runsd.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/runsd.txt")" -ge 3 ] && ! grep -q '^ *!' "$R/runsd.txt"
+   check "sd.prg RODA: o assert prova que 'LAVRA nLastro' entrega a STRING, nao o valor" $?
+   local D; D=$(gen4 ppc-strdump sd.prg -I"$HERE/ppc-strdump" -I"$CORE/contrib/hbtest")
    # .ppo: o #<x> estringifica o NOME escrito - sobre simbolo E sobre texto cru
    grep -q 'nLastro := sd_Afere( "nLastro" )' "$D/sd.ppo" && \
       grep -q 'sd_Lavra( "fundo de reserva" )' "$D/sd.ppo"
@@ -298,39 +322,16 @@ corpus_strdump() {
    grep -q '"mkind": "strdump"' "$D/sd.ast.json"
    check "ast-5: strdump EXISTE no result[] de regra (nao e' so' maquinaria de stream)" $?
    # ast-12: o recheio que alimenta o stringify vem marcado como GERADOR
-   python3 - "$D/sd.ast.json" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-ok = any(t.get("generates") and t.get("text") == "nLastro"
-         for a in d["ppApplications"] for t in a["tokens"])
-sys.exit(0 if ok else 1)
-PYEOF
-   check "ast-12: o recheio do #<v> vem com generates:true (o nome GERA a string)" $?
-   # O CERNE da familia: `generates` SOZINHO nao diz se o recheio e' simbolo ou
-   # texto - `SELO nLastro` e `LAVRA nLastro` chegam IGUAIS (mesmo texto, mesmo
-   # generates). Quem separa e' a OP: clone+stringify (e' o LOCAL) x stringify
-   # apenas (e' texto que so' PARECE o nome). Se isto quebrar, a ferramenta
-   # passou a poder editar por COINCIDENCIA DE NOME.
-   python3 - "$D/sd.ast.json" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-fills = [t for a in d["ppApplications"] for t in a["tokens"]
-         if t.get("text") == "nLastro" and t.get("marker", 0) >= 1
-         and t.get("generates")]
-if len(fills) != 2:                   # SELO e LAVRA: dois recheios GERADORES,
-    sys.exit(1)                       # de texto igual e fato igual - ambiguos
-ops = {}
-for t in d["tokens"]:
-    if t.get("text") == "nLastro" and t.get("from"):
-        ops.setdefault(t["line"], set()).update(f["op"] for f in t["from"])
-selo = [ln for ln, o in ops.items() if o == {"clone", "stringify"}]
-lavra = [ln for ln, o in ops.items() if o == {"stringify"}]
-sys.exit(0 if len(selo) == 1 and len(lavra) == 1 else 1)
-PYEOF
-   check "o que SEPARA nao e' o generates: clone+stringify (LOCAL) x stringify-so' (TEXTO)" $?
+   python3 "$HERE/ppc-strdump-sep.py" "$D/sd.ast.json" "$HERE/ppc-strdump/sd.prg"
+   check "o que SEPARA nao e' o generates (true nos DOIS) e sim a OP: clone x stringify" $?
    # e o .ppo confirma o efeito: a colisao de nome vira STRING, nao variavel
    grep -q 'sd_Lavra( "nLastro" )' "$D/sd.ppo"
    check ".ppo: 'LAVRA nLastro' vira a STRING \"nLastro\" - a palavra nunca vira simbolo" $?
+   # ...e o .ppt mostra QUAL regra consumiu cada um (o oraculo do CAMINHO, que o
+   # comentario da fixture cola: se o traco mudar, a doc quebra junto)
+   grep -q '#xcommand >nLastro := sd_Afere( "nLastro" )<' "$D/sd.ppt" && \
+      grep -q '#xcommand >sd_Lavra( "nLastro" )<' "$D/sd.ppt"
+   check ".ppt: o traco mostra as DUAS regras consumindo o MESMO texto de forma oposta" $?
    # a prova que NAO depende da minha DSL: a diretiva REAL do core
    local C; C=$(gen4 ppc-class clsx.prg -I"$HB_INC")
    python3 "$HERE/ppc-strdump.py" "$C/clsx.ast.json" "hbclass.ch" ASSOCIATE > /dev/null
@@ -339,44 +340,30 @@ PYEOF
 
 # --------------------------------------------------------------------------
 # Familia TEXT/ENDTEXT (std.ch:221) - a maquinaria de STREAM do pp: cada linha
-# crua vira uma STRING (o pp FABRICA um marker strdump, ppcore.c:5806).
+# crua vira uma STRING (o pp FABRICA um marker strdump, ppcore.c:5821).
 # O assunto e' a colisao DADO x SIMBOLO, e o canal ast-17 que a torna
 # RELATAVEL. (docs/pp-corpus/text-stream.md)
 # --------------------------------------------------------------------------
 corpus_text() {
    echo "corpus: familia TEXT/ENDTEXT - a maquinaria de stream (dado x simbolo)"
-   ( cd "$HERE/ppc-text" && "$HB" txt.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-text/txt.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-text txt.prg)
-   # .ppo: cada linha do bloco vira uma chamada com a linha CRUA como string
-   grep -q 'QOut( "   Relatorio mensal" )' "$D/txt.ppo" && \
-      grep -q 'QOut( "   cSaldo apurado no periodo" )' "$D/txt.ppo"
-   check ".ppo: cada linha do TEXT vira QOut( \"<a linha crua>\" ) - virou DADO" $?
-   # ast-17: a linha do bloco carrega a POSICAO de onde veio (antes: line 0/col null)
-   python3 - "$D/txt.ast.json" "$HERE/ppc-text/txt.prg" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-# a linha ESPERADA se COMPUTA do fonte no estado corrente - nunca se conta na mao
-src = open(sys.argv[2]).read().split("\n")
-want = [i + 1 for i, l in enumerate(src) if "cSaldo apurado" in l]
-# a string do bloco que COLIDE com o nome do local
-s = [t for t in d["tokens"]
-     if t.get("type") == 41 and "cSaldo apurado" in str(t.get("text", ""))]
-if len(s) != 1 or len(want) != 1:
-    sys.exit(1)
-t = s[0]
-# tem de vir POSICIONADA e como FONTE ('s'), na linha DELA - nao na do TEXT
-sys.exit(0 if t.get("line") == want[0] and t.get("prov") == "s" else 1)
-PYEOF
-   check "ast-17: a linha do bloco chega POSICIONADA (line 7, prov s) - da' para RELATAR" $?
-   # e o `cSaldo` DADO nao e' o `cSaldo` SIMBOLO: o local tem seus proprios tokens
-   python3 - "$D/txt.ast.json" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-sym = [t for t in d["tokens"] if t.get("text") == "cSaldo" and t.get("type") == 21]
-sys.exit(0 if len(sym) == 2 else 1)   # a declaracao e a leitura - e SO' elas
-PYEOF
-   check "o local segue com 2 tokens (decl + leitura): o texto do bloco NAO e' simbolo" $?
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-text-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-text/txt.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" txt.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -otxt -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-text/txt.prg compila (hbtest)" $?
+   ( cd "$R" && ./txt > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "txt.prg RODA: o bloco entrega TEXTO cru (a palavra homonima nao virou valor)" $?
+
+   local D; D=$(gen4 ppc-text txt.prg -I"$CORE/contrib/hbtest")
+   # .ppo: a linha crua vira argumento de chamada -- e as chamadas que o PP fabricou
+   # foram re-escaneadas pelas regras (a nossa regra QOut() as capturou)
+   grep -q 'tx_Cap( "   Relatorio mensal" )' "$D/txt.ppo" && \
+      grep -q 'tx_Cap( "   cSaldo apurado no periodo" )' "$D/txt.ppo"
+   check ".ppo: cada linha do bloco vira UMA chamada, com a linha CRUA (margem inclusa)" $?
+   # ast-17: a string do bloco carrega a linha de onde veio (antes: line 0/col null)
+   python3 "$HERE/ppc-text-pos.py" "$D/txt.ast.json" "$HERE/ppc-text/txt.prg"
+   check "ast-17: a linha do bloco chega POSICIONADA (da' para RELATAR, nunca editar)" $?
 }
 
 # --------------------------------------------------------------------------
@@ -420,6 +407,293 @@ PYEOF
    check "ppApplications: cada expansao de __LINE__ vem com a LINHA (da' para AVISAR)" $?
 }
 
+# --------------------------------------------------------------------------
+# GUARDA DAS CITACOES DO CORE (tests/corerefs.txt) - o corpus cita `arquivo:linha`
+# do fonte do Harbour o tempo todo, e TODA edicao minha no core faz essas linhas
+# andarem, EM SILENCIO. Aqui elas berram. (2026-07-13: o ast-17 apodreceu 6
+# citacoes no mesmo dia, e uma antiga ja' apontava para codigo sem relacao.)
+# --------------------------------------------------------------------------
+corpus_refs() {
+   echo "corpus: as CITACOES do core (docs apontam arquivo:linha - elas ainda batem?)"
+   local CORE="${HB_BIN%/bin/*}" bad=0 ref txt f l
+   while IFS=$'\t' read -r ref txt; do
+      case "$ref" in ''|'#'*) continue ;; esac
+      f="${ref%:*}"; l="${ref##*:}"
+      if ! sed -n "${l}p" "$CORE/$f" 2>/dev/null | grep -qF "$txt"; then
+         bad=$((bad+1))
+         note "     PODRE: $f:$l nao contem '$txt'"
+         note "     ->  a linha VERDADEIRA hoje: $(grep -nF "$txt" "$CORE/$f" | head -1 | cut -d: -f1)"
+      fi
+   done < "$HERE/corerefs.txt"
+   [ "$bad" -eq 0 ]
+   check "toda citacao arquivo:linha do core ainda aponta para o codigo que a doc diz" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia OS QUATRO ESTRINGIFICADORES - <z> x <"z"> x <(z)> x #<z>, e o MACRO
+# (docs/pp-corpus/stringify-family.md). Assunto vindo do teste do PROPRIO pp
+# (harbour/tests/pp.prg), indicado pelo Diego.
+# --------------------------------------------------------------------------
+corpus_strfam() {
+   echo "corpus: OS QUATRO ESTRINGIFICADORES - e o que cada um faz com um MACRO"
+   local CORE="${HB_BIN%/bin/*}" D="$HERE/tmp/.ppcorpus/ppc-strfam"
+   rm -rf "$D"; mkdir -p "$D"; cp "$HERE/ppc-strfam"/*.prg "$D"/
+
+   # (1) o CORPUS de verdade: o .prg RODA e se AFIRMA (hbtest do core, 20 asserts;
+   #     camada A = o pp VIVO diz o que a diretiva VIRA; camada B = o valor que ela VALE)
+   ( cd "$D" && "$HB_BIN/hbmk2" sf.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -osf -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-strfam/sf.prg compila (hbtest + pp vivo)" $?
+   ( cd "$D" && ./sf > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$D/run.txt")" -ge 20 ] && ! grep -q '^ *!' "$D/run.txt"
+   check "sf.prg RODA: os 20 asserts do hbtest passam (0 falhas) - a prova e' EXECUTADA" $?
+
+   # (2) o que nao se ve em runtime: os oraculos, na fixture irma (sem #require)
+   ( cd "$D" && "$HB" sfdump.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+   check "ppc-strfam/sfdump.prg compila limpo sob -w3 -es2" $?
+   ( cd "$D" && "$HB" sfdump.prg -n -q0 -p > /dev/null 2>&1 )
+   ( cd "$D" && "$HB" sfdump.prg -n -q0 -xsfdump.ast.json > /dev/null 2>&1 )
+   ( cd "$D" && "$HB" sfdump.prg -n -q0 -p+ > /dev/null 2>&1 )
+   grep -q 'sf_( cAlvo )' "$D/sfdump.ppo"
+   check ".ppo: o strstd sobre MACRO desfaz o & e emite o SIMBOLO (nao a string)" $?
+   # o .ppt e' o oraculo do PASSO A PASSO (Diego: "tem que analisar os oraculos,
+   # incluindo o ppt") - aqui ele mostra a REGRA que casou e o texto que ela emitiu
+   grep -q '#xtranslate >sf_( cAlvo )<' "$D/sfdump.ppt"
+   check ".ppt: o traco mostra a regra casando e emitindo o simbolo (nao a string)" $?
+   python3 - "$D/sfdump.ast.json" <<'PYEOF2'
+import json, sys
+d = json.load(open(sys.argv[1]))
+ok = any(t.get("text", "").upper() == "CALVO" and
+         any(f["op"] == "clone" for f in (t.get("from") or []))
+         for t in d["tokens"])
+sys.exit(0 if ok else 1)
+PYEOF2
+   check "ast-3: o simbolo que saiu de dentro do macro chega como CLONE (e' simbolo)" $?
+   python3 - "$D/sfdump.ast.json" <<'PYEOF3'
+import json, sys
+d = json.load(open(sys.argv[1]))
+fill = [t for a in d["ppApplications"] for t in a["tokens"]
+        if str(t.get("text", "")).startswith("&")]
+emitted = [t for t in d["tokens"]
+           if t.get("text", "").upper() == "CALVO" and t.get("from")
+           and t.get("col") is None]
+sys.exit(0 if fill and fill[0].get("col") is not None and emitted else 1)
+PYEOF3
+   check "P18 (LACUNA VIVA): o recheio '&x' TEM posicao; o simbolo emitido NAO" $?
+}
+
+# --------------------------------------------------------------------------
+# GUARDA UNIVERSAL: TODO .prg do corpus COMPILA. Sem excecao, sem "esqueci de
+# rodar esse". Cada fixture e' compilada com o toolchain CERTO:
+#   - tem `#require "hbtest"`  -> hbmk2 + contrib/hbtest/hbtest.hbc  (o harbour cru
+#     NAO resolve #require: e' esperado, e esta' escrito no cabecalho do arquivo)
+#   - nao tem                  -> harbour -w3 -es2 -s (regua do caso 0)
+# (ordem do Diego, 2026-07-14: "tem e' que garantir que vai compilar todos os
+# exemplos" -- um .prg do corpus que nao compila e' conhecimento podre.)
+# --------------------------------------------------------------------------
+corpus_compile_all() {
+   echo "corpus: TODO .prg do corpus COMPILA (guarda universal)"
+   local CORE="${HB_BIN%/bin/*}" D="$HERE/tmp/.ppcorpus/compile-all" bad=0 f dir
+   rm -rf "$D"; mkdir -p "$D"
+   for f in "$HERE"/ppc-*/*.prg; do
+      dir="$(dirname "$f")"
+      if grep -q '#include "hbtest.ch"' "$f"; then
+         ( cd "$D" && "$HB_BIN/hbmk2" "$f" "$CORE/contrib/hbtest/hbtest.hbc" \
+              -o"$D/$(basename "${f%.prg}")" -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 ) \
+            || { bad=$((bad+1)); note "     NAO COMPILA (hbmk2+hbtest): ${f#"$HERE"/}"; }
+         ( cd "$dir" && "$HB" "$(basename "$f")" -n -q0 -w3 -es2 -s \
+              -I. -I"$HB_INC" -I"$CORE/contrib/hbtest" > /dev/null 2>&1 ) \
+            || { bad=$((bad+1)); note "     NAO COMPILA no harbour CRU (o IDE vai marcar vermelho): ${f#"$HERE"/}"; }
+      else
+         ( cd "$dir" && "$HB" "$(basename "$f")" -n -q0 -w3 -es2 -s \
+              -I. -I"$HB_INC" -I"$CORE/contrib/hbtest" > /dev/null 2>&1 ) \
+            || { bad=$((bad+1)); note "     NAO COMPILA (harbour -w3 -es2): ${f#"$HERE"/}"; }
+      fi
+   done
+   [ "$bad" -eq 0 ]
+   check "todos os .prg de tests/ppc-*/ compilam com o toolchain do branch" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia CICLO DO PP - o pp esgota o comando antes de avancar (ppcore.c:6587)
+# (docs/pp-corpus/pass-cycle.md)
+# --------------------------------------------------------------------------
+corpus_cycle() {
+   echo "corpus: CICLO DO PP - a linha e' reprocessada ate' ninguem casar (e o teto)"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-cycle-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-cycle/cyc.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" cyc.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -ocyc -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-cycle/cyc.prg compila (a cadeia de 4 regras se resolve)" $?
+   ( cd "$R" && ./cyc > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 2 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "cyc.prg RODA: E1 chegou ao compilador ja' como cy_Marca (cadeia esgotada)" $?
+
+   # .ppt: a MESMA linha aparece quatro vezes, e so' depois vem a proxima
+   local D; D=$(gen4 ppc-cycle cyc.prg -I"$CORE/contrib/hbtest")
+   python3 "$HERE/ppc-cycle-ppt.py" "$D/cyc.ppt" "$HERE/ppc-cycle/cyc.prg"
+   check ".ppt: os 4 passes acontecem NA MESMA linha, antes de o pp avancar" $?
+
+   # o TETO: a mesma cadeia com #pragma RECURSELEVEL=2 NAO compila -- o pp acusa
+   # circularidade (E0022) e deixa o token por expandir. O arquivo do teto e' gerado
+   # aqui (o repo so' guarda .prg que COMPILAM - guarda corpus_compile_all)
+   sed 's|^#include "hbtest.ch"|#include "hbtest.ch"\n#pragma RECURSELEVEL=2|' \
+      "$HERE/ppc-cycle/cyc.prg" > "$R/teto.prg"
+   ( cd "$R" && "$HB" teto.prg -n -q0 -s -I"$CORE/contrib/hbtest" > teto.err 2>&1 )
+   grep -q "E0022" "$R/teto.err"
+   check "#pragma RECURSELEVEL=2: a mesma cadeia ESTOURA o teto (E0022 circularidade)" $?
+}
+
+# --------------------------------------------------------------------------
+# O PLACAR DA REVISAO. O corpus esta' migrando para o METODO V2 (docs/pp-corpus/
+# METODO.md): o conhecimento mora no .prg, o comentario INTERPRETA o oraculo, e o
+# que ele afirma esta' provado por assert (hbtest) ou pelo dump.
+# Fixture revisada carrega o selo `METODO-V2(<data>)` no cabecalho. Esta guarda
+# NAO reprova as pendentes -- ela as NOMEIA, para a fila nao sumir de vista
+# (ordem do Diego, 2026-07-14: "precisa dar um jeito de marcar os testes que esta'
+# revisando... porque todo o resto do corpus precisa de revisao tambem").
+# O que ela REPROVA: selo mentiroso -- arquivo selado que nao prova nada (sem
+# HBTEST proprio e sem irmao com HBTEST na mesma familia).
+# --------------------------------------------------------------------------
+corpus_metodo() {
+   echo "corpus: PLACAR DA REVISAO (metodo v2: assert + interpretacao do oraculo)"
+   local f dir v2=0 pend=0 mentira=0 lista=""
+   # conta TUDO que o corpus usa -- inclusive as fixtures de tests/fix*, que sao
+   # compartilhadas com o contrato (revisar ali mexe no `make test`: apresentar o
+   # drift antes, CLAUDE.md §3)
+   for f in "$HERE"/ppc-*/*.prg "$HERE"/fixmk/mk.prg "$HERE"/fixp6/p6.prg "$HERE"/fixabr/abr.prg; do
+      dir="$(dirname "$f")"
+      if grep -q "METODO-V2" "$f"; then
+         v2=$((v2+1))
+         # selo so' vale se o arquivo prova: HBTEST nele ou num irmao da familia
+         grep -lq "HBTEST" "$dir"/*.prg 2>/dev/null || {
+            mentira=$((mentira+1)); note "     SELO SEM PROVA: ${f#"$HERE"/}"; }
+      else
+         pend=$((pend+1)); lista="$lista ${f#"$HERE"/}"
+      fi
+   done
+   note "  revisadas (v2): $v2    PENDENTES: $pend"
+   [ "$pend" -gt 0 ] && note "  fila:$lista"
+   [ "$mentira" -eq 0 ]
+   check "nenhum selo METODO-V2 sem prova (assert na fixture ou na familia)" $?
+}
+
+# --------------------------------------------------------------------------
+# MARKDOWN SEM TESTE nao entra. Cada .md de familia declara, na primeira linha,
+# qual guarda o prova:  <!-- guarda: corpus_xxx -->
+# ...ou por que nao tem (PENDENTE / NENHUMA, com o motivo). Esta guarda reprova
+# o .md sem declaracao e o que aponta para guarda inexistente; e NOMEIA os que
+# estao sem prova. (Ordem do Diego, 2026-07-14: "tem muito markdown no pp-corpus
+# que esta' sem testes".)
+# --------------------------------------------------------------------------
+corpus_docs() {
+   echo "corpus: MARKDOWN x GUARDA (nenhuma familia sem prova, e nenhuma sem declaracao)"
+   local m b tag bad=0 semprova=0 lista=""
+   for m in "$HERE"/../docs/pp-corpus/*.md; do
+      b="$(basename "$m" .md)"
+      case "$b" in README|ROADMAP|METODO) continue ;; esac
+      tag="$(sed -n '1s|<!-- guarda: \(.*\) -->|\1|p' "$m")"
+      if [ -z "$tag" ]; then
+         bad=$((bad+1)); note "     SEM DECLARACAO: docs/pp-corpus/$b.md (falta <!-- guarda: ... -->)"
+      elif [ "${tag#corpus_}" != "$tag" ]; then
+         grep -q "^${tag}()" "$HERE/ppcorpus.sh" || {
+            bad=$((bad+1)); note "     GUARDA INEXISTENTE: $b.md aponta '$tag'"; }
+      else
+         semprova=$((semprova+1)); lista="$lista $b"
+      fi
+   done
+   [ "$semprova" -gt 0 ] && note "  familias SEM PROVA no corpus ($semprova):$lista"
+   [ "$bad" -eq 0 ]
+   check "todo .md de familia declara a sua guarda, e a guarda existe" $?
+}
+
+# --------------------------------------------------------------------------
+# O ast-schema.md sob GUARDA. Ele e' o unico markdown de FATO fora do pp-corpus --
+# e o que mais mentiu (dizia que `strdump` nao existia em regra; que `__DATE__` era
+# dinamico). A tabela de mkinds passa a ser conferida contra os dumps do corpus, nos
+# DOIS sentidos: documentado-sem-aparecer e aparecendo-sem-documentacao.
+# --------------------------------------------------------------------------
+corpus_schema() {
+   echo "corpus: o CONTRATO (ast-schema.md) x os dumps -- a tabela de mkinds bate?"
+   python3 "$HERE/ppc-schema.py" "$HERE/../docs/ast-schema.md" "$HERE/tmp/.ppcorpus"
+   check "todo mkind documentado aparece em dump (ou traz RECUSA); e vice-versa" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia DERIVACAO - clone x paste x stringify (docs/pp-corpus/derivation.md).
+# Era markdown SEM TESTE, e e' a espinha de metade do corpus.
+# --------------------------------------------------------------------------
+corpus_deriv() {
+   echo "corpus: DERIVACAO - as tres OPs (clone/paste/stringify) e o elo com offset"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-deriv-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-deriv/dv.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" dv.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -odv -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-deriv/dv.prg compila (a diretiva FORJA cria a funcao fj_Alfa)" $?
+   ( cd "$R" && ./dv > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "dv.prg RODA: as 3 ops provadas nas DUAS camadas (texto do pp vivo + valor)" $?
+   local D; D=$(gen4 ppc-deriv dv.prg -I"$CORE/contrib/hbtest")
+   python3 "$HERE/ppc-deriv-ops.py" "$D/dv.ast.json" "$HERE/ppc-deriv/dv.prg"
+   check "ast-3: clone chega POSICIONADO; paste/stringify vem sem posicao, ligados pelo 'from'" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia PP VIVO / API - __pp_Init/AddRule/Process/Reset (docs/pp-corpus/pp-api.md)
+# --------------------------------------------------------------------------
+corpus_ppapi() {
+   echo "corpus: a API do pp VIVO - contextos, aninhamento, reset e o mundo separado"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-ppapi-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-ppapi/pa.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" pa.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -opa -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-ppapi/pa.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./pa > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 10 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "pa.prg RODA: estados independentes, reset preserva as padrao, e o pp de runtime NAO ve o arquivo" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia O QUE O PP *NAO* FAZ - ele nao avalia codigo, e nao acumula estado por
+# passada (docs/pp-corpus/no-eval.md). Existe porque e' o erro de raciocinio mais
+# comum sobre preprocessador -- e um raciocinio errado aqui contamina tudo.
+# --------------------------------------------------------------------------
+corpus_noeval() {
+   echo "corpus: O QUE O PP NAO FAZ - substitui TEXTO; nao avalia (menos a condicao do #if)"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-eval-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-eval/ev.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" ev.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -oev -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-eval/ev.prg compila" $?
+   ( cd "$R" && ./ev > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 12 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "ev.prg RODA: sem avaliacao (N*2=8); e o UNICO estado que atravessa e' a tabela de regras" $?
+   # o .ppo mostra o que o compilador REALMENTE recebeu: `2 + 3 * 2`, nao `5 * 2`
+   local D; D=$(gen4 ppc-eval ev.prg -I"$CORE/contrib/hbtest")
+   grep -q "2 + 3 \* 2" "$D/ev.ppo"
+   check ".ppo: o compilador recebeu '2 + 3 * 2' -- o pp NAO somou nada" $?
+}
+
+# --------------------------------------------------------------------------
+# Familia ORDEM DAS REGRAS - a ULTIMA declarada vence (LIFO), nao a mais especifica
+# (docs/pp-corpus/rule-order.md). Pergunta do Diego; e' o que faz o hbclass funcionar.
+# --------------------------------------------------------------------------
+corpus_order() {
+   echo "corpus: ORDEM DAS REGRAS - quem vence quando duas casam o mesmo texto"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-order-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-order/od.prg" "$R"/
+   ( cd "$R" && "$HB_BIN/hbmk2" od.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -ood -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-order/od.prg compila" $?
+   ( cd "$R" && ./od > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 10 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "od.prg RODA: vence a ULTIMA declarada (LIFO) - e a regra GERADA bate a generica" $?
+}
+
+corpus_refs
+corpus_docs
+corpus_metodo
+corpus_compile_all
 corpus_pplive
 corpus_set
 corpus_say
@@ -434,6 +708,13 @@ corpus_instrument
 corpus_strdump
 corpus_text
 corpus_dyn
+corpus_strfam
+corpus_cycle
+corpus_deriv
+corpus_ppapi
+corpus_noeval
+corpus_order
+corpus_schema
 
 echo
 echo "ppcorpus: passed: $PASS  failed: $FAIL"

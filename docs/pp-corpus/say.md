@@ -1,3 +1,4 @@
+<!-- guarda: corpus_say -->
 # Família `@ … SAY` (std.ch)
 
 Índice: [README.md](README.md). Ensina: grupos OPCIONAIS (`opt-open`/`opt-close`)

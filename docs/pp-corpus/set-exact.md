@@ -1,3 +1,4 @@
+<!-- guarda: corpus_set -->
 # Família SET — `SET EXACT` (std.ch)
 
 Índice: [README.md](README.md). Ensina: marker **restrict** no match + result

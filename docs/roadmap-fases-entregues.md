@@ -2217,7 +2217,7 @@ suíte (responde ao critério de matar do adr-003).
   **P6 ✅ ESTRUTURA da regra ENTREGUE (2026-07-12, caso 113, fixture
   `fixp6` não-espelho)**: o miolo "regra-em-expansão" já caíra na P1
   (ast-13); os três restantes têm veredito. (a) **Regra sem cabeça**
-  (`head: null`, match começa com marker — `ppcore.c:1161`): funciona
+  (`head: null`, match começa com marker — `ppcore.c:1284`): funciona
   **por CONSTRUÇÃO**, zero código novo — a ferramenta nunca chaveou no
   `head`, só em `marker == 0` e nas posições de `match[]`/`result[]`;
   resolve, lista e RENOMEIA (uso + regra no `.ch`, round-trip byte-exato).
@@ -2431,7 +2431,7 @@ zero heurística nova na ferramenta, e três erros meus registrados com nome.
 - **P-AUDIT — 1º achado ENTREGUE: `ast-15` (2026-07-12, caso 115)**. A varredura
   achou de cara **réplica de gramática + RECUSA FALSA**, o mesmo formato do bug do
   P5. `AbbrevClash` reescreve à mão a abreviação dBase do pp (regra real:
-  `ppcore.c:2533`), e o `RenameDsl` a usava para **adivinhar por prefixo** se um
+  `ppcore.c:2725`), e o `RenameDsl` a usava para **adivinhar por prefixo** se um
   literal consumido era "a minha palavra abreviada" — porque o dump só dizia
   `marker: 0` ("é literal"), nunca QUAL literal. Furo provado em 6 linhas: numa
   regra cuja keyword SECUNDÁRIA é prefixo de 4+ letras da CABEÇA, a secundária
@@ -2464,7 +2464,7 @@ zero heurística nova na ferramenta, e três erros meus registrados com nome.
   4); hoje inofensivo porque o dump já traz o caminho RESOLVIDO, mas é cópia
   degradada por design: ou morre, ou passa a consumir `harbour -gd`.
   (ii) ~~Resíduo do `AbbrevClash`~~ — **MORTO (P11, `c391408`)**. Ele reescrevia a
-  aritmética de abreviação do `ppcore.c:2533` para prever casamento FUTURO ("o nome
+  aritmética de abreviação do `ppcore.c:2725` para prever casamento FUTURO ("o nome
   NOVO colidiria com outra cabeça?"). O `HeadClashWitness` agora sobe um **pp vivo**
   (`__pp_init`/`__pp_process`) e deixa o próprio preprocessador responder. Zero
   ocorrências de `AbbrevClash` no fonte — conferido, não lembrado.

@@ -1,3 +1,4 @@
+<!-- guarda: corpus_rulestruct -->
 # Família ESTRUTURA DA REGRA — cabeça, grupos opcionais e multi-passe
 
 Índice: [README.md](README.md). Ensina: **a forma de uma diretiva tem mais graus
@@ -18,7 +19,7 @@ Uma diretiva não precisa começar por uma palavra:
 
 `nTotal := nQtd ZORBADO` → `( nTotal := nQtd * 2 )`.
 
-**Fato do core:** `ppcore.c:1161` grava `szHead = NULL` quando o primeiro token de
+**Fato do core:** `ppcore.c:1284` grava `szHead = NULL` quando o primeiro token de
 match é um marker (`HB_PP_TOKEN_ISMATCH`), e o dump traz `"head": null`.
 
 **O que isso ensina para um refatorador:** a cabeça **não é a identidade** da

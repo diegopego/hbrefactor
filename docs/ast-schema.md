@@ -186,7 +186,7 @@ Garantias e limites (provados na fixture de tortura e no lexdiff):
   (col null) — filtrar por prov ao mapear para o módulo.
 - **`ast-17`: a linha de STREAM (`TEXT…ENDTEXT`, `#pragma __text|__stream|
   __cstream`) chega POSICIONADA.** Cada linha crua do bloco vira uma STRING (o pp
-  fabrica um marker `strdump`, `ppcore.c:5806`) e, **até o ast-17, essa string vinha
+  fabrica um marker `strdump`, `ppcore.c:5821`) e, **até o ast-17, essa string vinha
   com `line: 0`, `col: null`, `prov: "n"` — sem origem nenhuma**, embora o pp a
   tivesse lido de uma linha concreta do arquivo do usuário. Agora ela vem com a
   linha de onde veio, `col: 0` e `prov: "s"` (`hb_pp_tokenAddStreamFunc`, gated por
@@ -336,7 +336,7 @@ no pp, ganchos de 1 linha gated por `fTrackPos`): registro no funil
                            // podia ADIVINHAR o literal pelo TEXTO - e a
                            // adivinhação QUEBRA na abreviação dBase: família sem
                            // `x` casa keyword abreviada em >= 4 letras
-                           // (ppcore.c:2533), então uma keyword SECUNDÁRIA que
+                           // (ppcore.c:2725), então uma keyword SECUNDÁRIA que
                            // seja prefixo de 4+ letras da CABEÇA, escrita por
                            // extenso, é indistinguível de uma cabeça abreviada.
                            // Furo real: o rename da cabeça dava RECUSA FALSA
@@ -464,13 +464,13 @@ ADR-001.
   | mkind | sintaxe | veredito |
   |---|---|---|
   | `regular` | `<x>` | emite o valor → recheio é símbolo ligado |
-  | `strstd` | `<"x">` | stringify sempre → gera artefato (`generates`) |
-  | `strsmart` | `<(x)>` | smart-quote: bareword vira string, expressão passa crua |
+  | `strstd` | `<"x">` | stringify → gera artefato (`generates`). **MENOS sobre MACRO puro**: aí o pp DESFAZ o `&` e emite o SÍMBOLO, como código (`ppcore.c:5254-5256`, derivação `clone`). *"Vira string sempre" era FALSO — corrigido 2026-07-14, provado em `tests/ppc-strfam/sf.prg`.* |
+  | `strsmart` | `<(x)>` | smart-quote: bareword vira string; **STRING passa crua** (expressão TAMBÉM vira string!); e **MACRO vira código**. *"Expressão passa crua" era FALSO — corrigido 2026-07-14, provado em `tests/ppc-strfam/sf.prg`.* |
   | `block` | `<{x}>` | embrulha o valor num codeblock; o valor É emitido |
   | `logical` | `<.x.>` | emite `.T.`/`.F.` — **o VALOR não é emitido**: o recheio é consumido e DESCARTADO (relato honesto, nunca edição) |
   | `nul` | `<-x->` | não emite nada — recheio DESCARTADO (idem) |
   | `reference` | `<@>` | **guarda anti-recursão**: token significativo para o pp e INVISÍVEL ao compilador, que carrega o padrão de match da regra e impede uma regra circular de re-casar a própria saída (ChangeLog do core 2010-08-19; uso real: `hbfoxpro.ch:63`). Sem nome e sem posição (`text: "~"`, `col: null`) → nada a renomear; a ferramenta o **preserva por construção** (edita regra por posição de byte, e o guarda não tem posição). |
-  | `strdump` | `#<x>` (e `%s`) | o **NOME ESCRITO** virado string (`ppcore.c:4262`, ramo `fDump`; o `%s` do stream é o outro caminho para o mesmo mkind, `ppcore.c:3215`). Alimenta o `generates` do ast-12 (`ppcore.c:5414` registra o `'s'`). **CORREÇÃO 2026-07-13**: até aqui esta linha dizia "RECUSA DOCUMENTADA — não existe em regra", e era FALSO: 31 regras do ecossistema o emitem, **6 delas no `std.ch`** (`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, `JOIN`) — ver [pp-corpus/strdump.md](pp-corpus/strdump.md). |
+  | `strdump` | `#<x>` (e `%s`) | o **NOME ESCRITO** virado string (`ppcore.c:4277`, ramo `fDump`; o `%s` do stream é o outro caminho para o mesmo mkind, `ppcore.c:3230`). Alimenta o `generates` do ast-12 (`ppcore.c:5429` registra o `'s'`). **CORREÇÃO 2026-07-13**: até aqui esta linha dizia "RECUSA DOCUMENTADA — não existe em regra", e era FALSO: 31 regras do ecossistema o emitem, **6 delas no `std.ch`** (`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, `JOIN`) — ver [pp-corpus/strdump.md](pp-corpus/strdump.md). |
   | `dynval` | — | **RECUSA DOCUMENTADA — e MEDIDA** (2026-07-13: 0 em 4.582 regras reais; é o ÚLTIMO mkind com recusa de pé): não é escrivível pelo usuário — o pp cria o token por dentro. São **DUAS** regras, builtin e só elas: `__FILE__` e `__LINE__` (`ppcore.c:7253-7254`), e o dump **as exporta** (com as aplicações, cada uma com a sua linha). *(O `__DATE__` e companhia NÃO são dynval: são `#define` de valor fixo.)* Consequência: módulo com `__LINE__` é **sensível a POSIÇÃO** — ver [pp-corpus/dynval.md](pp-corpus/dynval.md). |
 - **Posições**: `line`/`col`/`len`/`prov` como em `tokens[]`, com UMA
   diferença deliberada: **col é emitida também para token de include**

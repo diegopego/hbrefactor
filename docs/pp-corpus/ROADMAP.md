@@ -8,6 +8,10 @@ e o Diego teve que pegar. Ler ANTES de retomar a exploração.
 
 ---
 
+> **O PROCESSO do estudo (os 10 passos, com exemplo real em cada) vive no
+> [METODO.md](METODO.md)** — cole-o inteiro ao retomar. Aqui fica o ESTADO (onde a
+> exploração está) e a NARRATIVA dos erros. Não duplique um no outro.
+
 # PARTE 1 — O CHECKLIST ANTI-ERRO (ler primeiro, sempre)
 
 > Erros meus nesta fase, cada um virou uma regra. Nenhum foi por falta de
@@ -86,7 +90,7 @@ linha** — a destruição era do canal de ARQUIVO, não do pp.
 É o irmão do ❷ (silêncio de busca minha ≠ ausência de fato).
 
 ### ❾ Réplica de gramática = bug esperando (2026-07-12)
-**Erro:** `AbbrevClash` reescrevia à mão a abreviação dBase (`ppcore.c:2533`) e o
+**Erro:** `AbbrevClash` reescrevia à mão a abreviação dBase (`ppcore.c:2725`) e o
 rename **adivinhava por prefixo** qual literal um site casou. Furo: keyword
 secundária que é prefixo da cabeça → **RECUSA FALSA** → cabeça da DSL
 **irrenomeável**. → `ast-15` (`ruletok`). Ver [abbreviation.md](abbreviation.md).
@@ -108,6 +112,30 @@ e o corpus ficou vazio. O Diego percebeu ("estou ficando confuso").
 **Regra (organização, ordem do Diego):** fato de **pp** → **corpus** (1 arquivo por
 tema) · canal → **ast-schema** · veredito de fatia → **spec-p** (1 parágrafo + link)
 · regra durável → **CLAUDE.md**. **Não duplicar.** Se o spec-p crescer, é sintoma.
+
+### ⓮ COMENTÁRIO que afirma MAIS do que o assert prova (2026-07-14)
+**Erro:** no `sdrun.prg` escrevi *"o nome aparece duas vezes na expansão: **como variável**
+e como string"* (o pp não sabe o que é variável — ele copia ou cita; quem decide é o
+compilador) e *"o texto colide com um `nLastro` de verdade **três linhas acima**"* — dentro
+da camada em que o `__pp_Init()` é um pp **isolado** processando uma **string**, sem ver
+programa nenhum. **Duas afirmações com um teste verde ao lado**, o que é pior que um
+comentário solto: tem aparência de prova. O Diego pegou os dois: *"esta documentação é
+séria"*.
+**Regra (METODO § 4b):** toda frase é (a) provada pelo assert ao lado, (b) provada por outra
+guarda **nomeada**, ou (c) citada do core com `arquivo:linha`. **Nomeie o sujeito** (pp ×
+compilador × VM × ferramenta) e **não misture camadas**. Nada de posição relativa.
+
+### ⓭ CITAÇÃO `arquivo:linha` do CORE apodrece a cada edição minha — e CALADA (2026-07-13)
+**Erro:** o `ast-17` inseriu 16 linhas no `ppcore.c` e **todas** as citações posteriores
+das docs passaram a apontar para o vazio — inclusive 6 que eu tinha escrito **naquele
+mesmo dia**. Pior: uma citação **antiga** (a abreviação dBase, repetida em 10 lugares)
+já apontava, havia sessões, para `pState->fDirective = HB_FALSE;` — código sem nenhuma
+relação com o assunto. Ninguém percebeu porque **nada quebra**: a doc simplesmente mente.
+**Regra:** citou `arquivo:linha` do core → **entra em `tests/corerefs.txt`** (linha +
+trecho que TEM de estar nela). A guarda `corpus_refs` (em `make ppcorpus`) confere e,
+ao falhar, imprime a linha VERDADEIRA. **Dívida aberta:** ~20 citações das famílias
+antigas ainda não foram ancoradas (não sei, sem reler cada uma, o que elas pretendiam
+apontar) — cada família que for revisitada ancora as suas.
 
 ### ⓬ RECUSA DOCUMENTADA envelhece — e só a MEDIÇÃO a mantém honesta (2026-07-13)
 **Erro (duplo).** (a) O P4/P5 fechou os 15 mkinds com *"`strdump` não existe em

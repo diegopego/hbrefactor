@@ -1,5 +1,7 @@
 {
     "workbench.colorCustomizations": {
+        "statusBar.noFolderBackground": "#410A56",
+        "statusBar.noFolderForeground": "#FEFBFF",
         "activityBar.background": "#410A56",
         "titleBar.activeBackground": "#5A0E78",
         "titleBar.activeForeground": "#FEFBFF",
@@ -8,8 +10,12 @@
         "statusBar.background": "#410A56",
         "statusBar.foreground": "#FEFBFF",
         "statusBar.debuggingBackground": "#410A56",
-        "statusBar.debuggingForeground": "#FEFBFF",
-        "statusBar.noFolderBackground": "#410A56",
-        "statusBar.noFolderForeground": "#FEFBFF"
-    }
+        "statusBar.debuggingForeground": "#FEFBFF"
+    },
+    "harbour.compilerExecutable": "/home/diego/devel/harbour-core/harbour/bin/linux/gcc/harbour",
+    "harbour.extraIncludePaths": [
+        "/home/diego/devel/harbour-core/harbour/include",
+        "/home/diego/devel/harbour-core/harbour/contrib/hbtest"
+    ],
+    "harbour.warningLevel": 3
 }

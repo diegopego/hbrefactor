@@ -6,3 +6,6 @@ PROCEDURE Main()
    ANTIGO Alfa COM nX   // o site a migrar
    ? "oi"               // '?' e #command do std.ch - o -u NAO deve toca-lo
    RETURN
+
+STATIC FUNCTION far_Migrado( cNome, xValor )
+   RETURN cNome + hb_ntos( xValor )

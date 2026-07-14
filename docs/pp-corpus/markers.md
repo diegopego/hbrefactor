@@ -1,3 +1,4 @@
+<!-- guarda: corpus_markers -->
 # Família MARKERS — os 15 tipos de `<x>` do pp
 
 Índice: [README.md](README.md). Ensina: **um `<x>` de diretiva não é uma coisa
@@ -24,14 +25,14 @@ Sintaxe tirada do PARSER do core (`hb_pp_matchMarkerNew` / `hb_pp_resultMarkerNe
 | sintaxe | mkind | o que emite |
 |---|---|---|
 | `<x>` | `regular` | o valor, como veio |
-| `<"x">` | `strstd` | o valor virado STRING, sempre |
-| `<(x)>` | `strsmart` | *smart-quote*: palavra nua vira string; expressão passa crua |
+| `<"x">` | `strstd` | o valor virado STRING — **menos sobre MACRO**, onde ele DESFAZ o `&` e emite CÓDIGO → [stringify-family.md](stringify-family.md) |
+| `<(x)>` | `strsmart` | *smart-quote*: palavra nua vira string; **STRING** passa crua (expressão TAMBÉM vira string!); e **MACRO vira código** → [stringify-family.md](stringify-family.md) |
 | `<{x}>` | `block` | o valor **embrulhado num codeblock** |
 | `<.x.>` | `logical` | `.T.`/`.F.` — se o marker casou. **O VALOR não é emitido** |
 | `<-x->` | `nul` | **nada** — o valor é descartado |
 | `<@>` | `reference` | o guarda anti-recursão → [reference-guard.md](reference-guard.md) |
 | `#<x>` | `strdump` | o **NOME ESCRITO** virado string (não o valor) — e o `%s` do stream (`#pragma __text`) é o outro caminho para o mesmo mkind → [strdump.md](strdump.md) |
-| — | `dynval` | **não escrivível** — canal interno do pp para `__FILE__`/`__LINE__` (ppcore.c:5209/7190) |
+| — | `dynval` | **não escrivível** — canal interno do pp para `__FILE__`/`__LINE__` (ppcore.c:5501/7253) |
 
 ## A fixture (`tests/fixmk/`) — compila limpo sob `-w3 -es2`
 

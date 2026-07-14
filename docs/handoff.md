@@ -12,7 +12,55 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-## 0. O ESTADO EXATO (2026-07-13, fim da sessão)
+## 0. O ESTADO EXATO (2026-07-14, fim da sessão) — **LEIA ISTO PRIMEIRO**
+
+**A frente ativa é o CORPUS DO PP, e ele mudou de MÉTODO.** Retomando o estudo do pp?
+**Cole `docs/pp-corpus/METODO.md` inteiro** — é o prompt, e ele carrega o **modelo mental**
+(o que o pp NÃO faz), os 10 passos e as armadilhas, cada um com exemplo real.
+
+**A virada (Diego, 2026-07-14):** *"estes textos markdown vão apodrecer… o melhor dos mundos:
+uma explicação em linguagem natural e comprovação via asserts, juntas, em `.prg`s"*. Logo:
+- **o conhecimento mora no `.prg`**, que **compila, RODA e se afirma** (`hbtest` do core);
+- o `.md` virou **índice + decisão** (curto);
+- o comentário **INTERPRETA** o oráculo (não transcreve, não vira ensaio), e **cada afirmação
+  tem assert que PASSA PELA DIRETIVA** — *se apagar a linha da diretiva e o assert continuar
+  passando, o assert é decorativo*;
+- **duas camadas**: o **texto** que a diretiva vira (pp vivo, `__pp_Process`) e o **valor** que
+  ela vale (`hbtest`). Elas **discordam** — e é aí que mora o achado.
+
+**Três placares MECÂNICOS rodam a cada `make ppcorpus`** (88/0 hoje; `make test` 990/0):
+| guarda | cobra | estado |
+|---|---|---|
+| `corpus_compile_all` | **todo `.prg` compila** | 0 quebrados |
+| `corpus_metodo` | selo `METODO-V2` nas revisadas; **selo sem prova reprova** | **10 revisadas · 13 pendentes** (nomeadas) |
+| `corpus_docs` | **todo `.md` declara a guarda que o prova** | 3 famílias sem prova: `directive-scope` (vira teste), `uses-core` (censo) e `pp-as-search` (plano) |
+| `corpus_refs` | citação `arquivo:linha` do core ainda aponta o que a doc diz | verde |
+| `corpus_schema` | a tabela de mkinds do `ast-schema.md` × os dumps | verde |
+
+**A fila (fase P-REV no roadmap):** revisar 13 fixtures — as 3 de `tests/fix*` são
+**compartilhadas com o contrato** (casos 111/113/115): apresentar o drift ANTES. E `derivation`
+já virou teste; falta `directive-scope`.
+
+**Cinco famílias NOVAS nesta sessão** (todas com asserts): `pass-cycle` (o pp esgota o comando
+antes de avançar; teto de 4096 passes, `#pragma RECURSELEVEL`), `derivation` (clone × paste ×
+stringify, e o `from` com offset), `pp-api` (`__pp_Init` — contextos independentes, sem close, o
+pp de runtime **não vê** as diretivas do arquivo), `no-eval` (**o pp não avalia**; o único estado
+que atravessa uma cadeia é a **tabela de regras**) e `rule-order` (**vence a ÚLTIMA declarada**,
+LIFO — é o que faz o `hbclass` funcionar).
+
+**Duas afirmações do corpus caíram, medindo:** o `strdump` "não existe em regra" (existe em 31
+regras, 6 no `std.ch`) e o `#xtranslate` gerado "não registra" (registra e casa; o limite real é
+a **cabeça colada**, e o mecanismo é o pp desviar para o ramo de diretiva **antes** de concatenar
+keywords → a regra nasce com a cabeça em **dois tokens**).
+
+**Lacunas marcadas, não consertadas** (regra PROVE-MARQUE-SIGA): **P15** (rename pelo sítio da
+diretiva perde o LOCAL), **P16** (relato do não-verificável: dado em stream, `__LINE__`,
+string-macro), **P17** (`#ifdef` esconde diretiva e o `rename` **quebra o código** anunciando
+sucesso), **P18** (símbolo dentro do macro chega sem posição).
+
+---
+
+## 0-old. O ESTADO EXATO (2026-07-13, fim da sessão)
 
 **Suíte 990/0.** O código está COMMITADO nos dois repos; sobram duas coisas, ambas do Diego.
 
@@ -146,7 +194,8 @@ Prompt para colar:
 > varredura que sustenta a recusa), e o que isso habilita no hbrefactor. **Não construa verbo
 > novo** — isso é portão do Diego (D-P5).
 
-**1.3 — P-DOC**: a lista de famílias do pp acabou (o `hbct` foi medido e descartado: não tem
+**1.3 — P-DOC** *(retomando o estudo do pp? **cole o `docs/pp-corpus/METODO.md`** — os 10
+passos, com exemplo real em cada)*: a lista de famílias do pp acabou (o `hbct` foi medido e descartado: não tem
 UMA diretiva de comando). **A exploração NÃO acabou** *(Diego, 2026-07-13)*: até aqui se estudou
 a **DEFINIÇÃO** (a diretiva, nas `.ch`); falta o **USO** — o fonte do Harbour é um corpus de
 código real escrito com o pp, e as próximas famílias saem da **medição dos sítios de uso**.

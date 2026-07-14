@@ -1,3 +1,4 @@
+<!-- guarda: corpus_store -->
 # Família STORE (std.ch)
 
 Índice: [README.md](README.md). Ensina: grupo opcional que REPETE

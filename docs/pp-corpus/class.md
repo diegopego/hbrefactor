@@ -1,3 +1,4 @@
+<!-- guarda: corpus_class -->
 # Família hbclass — `CLASS`/`VAR`/`METHOD` (hbclass.ch)
 
 Índice: [README.md](README.md). Ensina: o dialeto OO INTEIRO é diretiva de pp —

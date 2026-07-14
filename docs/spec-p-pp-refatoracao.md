@@ -117,7 +117,7 @@ Caso 114. Conhecimento: [pp-as-instrument.md](pp-corpus/pp-as-instrument.md) § 
 ## P-AUDIT — varredura anti-heurística
 
 ### 1º achado ✅ `ast-15` — e era um BUG (2026-07-12)
-`AbbrevClash` **replicava a gramática** (abreviação dBase, `ppcore.c:2533`) e o
+`AbbrevClash` **replicava a gramática** (abreviação dBase, `ppcore.c:2725`) e o
 `RenameDsl` a usava para **adivinhar por prefixo** qual literal um site casou —
 porque o dump só dizia `marker: 0`, nunca QUAL literal. Furo provado: keyword
 secundária que é prefixo da cabeça → **recusa FALSA** → cabeça da DSL

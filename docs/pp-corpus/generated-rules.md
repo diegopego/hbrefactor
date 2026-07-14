@@ -1,3 +1,4 @@
+<!-- guarda: corpus_gen -->
 # Família REGRA QUE GERA REGRA — a diretiva que cria outra diretiva
 
 Índice: [README.md](README.md). Ensina: uma diretiva pode **CRIAR outra diretiva**
@@ -72,8 +73,22 @@ Provas: **caso 108** (fixture `fixgen`) + [spec-p § P1](../spec-p-pp-refatoraca
 
 > Classificação por FATO (VERIFICADO rodando). Regra em [README.md](README.md).
 
-- **[Recusa documentada — VERIFICADO] `#xtranslate` gerado não registra.** Não é
-  lacuna da ferramenta nem do dump: é **limite do pp** (provado: o nome sai
-  literal, `W0001`). Nada a consumir — a construção simplesmente não existe.
-- **[Recusa documentada — VERIFICADO] Comando gerado com keyword COLADA não casa**
-  (`E0020`). Idem: limite do pp, não do dump.
+- **[FALSA — derrubada em 2026-07-14] ~~`#xtranslate` gerado não registra~~.** É **falso**:
+  um `#xtranslate` gerado **registra e casa** normalmente. Provado —
+  `#xcommand DEF_C <n> => #xtranslate C <n>( \<v> ) => Marca( \<v> )` seguido de
+  `? C Beta( 2 )` produz `QOut( Marca( 2 ) )`. *(A afirmação nasceu de um caso que falhava por
+  OUTRO motivo — o de baixo — e foi generalizada sem teste. A fixture `ppc-gen` só exercitava
+  `#xcommand`.)*
+- **[VERDADEIRA, e agora com MECANISMO] Regra gerada com a cabeça COLADA não casa** — e o
+  motivo é este: o laço do pp **desvia para o ramo de diretiva ANTES** de rodar a concatenação
+  de keywords (`ppcore.c`, o `hb_pp_concatenateKeywords` fica **depois** do teste
+  `ISDIRECTIVE`). Então a regra nasce com a cabeça em **DOIS tokens** (`B_` + `Beta`), enquanto
+  o sítio de uso tem **um** (`B_Beta`) — e por isso não casa.
+  **Prova executável do mecanismo:** com a regra gerada por `#xcommand DEF_B <n> => #xtranslate
+  B_<n>( \<v> ) => Marca( \<v> )`, o uso `? B_Beta( 2 )` **não casa**, e o uso `? B_ Beta( 3 )`
+  — com **espaço**, dois tokens — **casa**, produzindo `QOut( Marca( 3 ) )`.
+  *(A mesma cabeça `B_Beta` escrita DIRETO numa regra casa sem problema: o defeito não é o nome
+  colado, é a colagem **dentro de uma diretiva gerada**.)*
+- **[Fato de uso] Marker dentro de regra gerada precisa de ESCAPE** (`\<v>`), senão a regra de
+  FORA o consome — e o erro aparece já na definição (`E0008 Unknown result marker`). É o que a
+  `xhb/cstruct.ch` faz em código real.

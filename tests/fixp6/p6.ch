@@ -3,7 +3,7 @@
 // (regua do caso 64): tudo que a ferramenta faz aqui sai dos FATOS do dump.
 
 // (1) regra SEM CABECA - o match comeca com um MARKER, nao com uma palavra
-//     ("head": null no dump; ppcore.c:1161 szHead = NULL quando o 1o token de
+//     ("head": null no dump; ppcore.c:1284 szHead = NULL quando o 1o token de
 //     match e marker). O backlog pedia "fixture de RELATO"; o fato e que a
 //     ferramenta ja resolve/renomeia por CONSTRUCAO - nunca chaveia no head,
 //     so em marker-0 (literal da regra) e nas posicoes de match[]/result[]

@@ -1,3 +1,4 @@
+<!-- guarda: corpus_instrument -->
 # Família O PP COMO INSTRUMENTO — os canais do core, e o que cada um dá
 
 Índice: [README.md](README.md). Ensina: **o pp não é só uma fonte de fato — é um

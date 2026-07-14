@@ -309,6 +309,128 @@ Plano, usos candidatos e limites: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-
 > agente por excelência. A fase A não executa a P12; ela responde a pergunta que a P12 deixava
 > no ar (*"quem consome isto?"*).
 
+## P14 — TIPOS DECLARADOS COM ALCANCE, e o cursor que os consome *(situação levantada pelo Diego, 2026-07-13; **EXPLORATÓRIA — NADA PROVADO AINDA**)*
+
+Plano completo: **[plano-tipos-com-alcance.md](plano-tipos-com-alcance.md)** — **o arquivo é
+plano, não registro.**
+
+**O pedido**: com três classes homônimas (todas com `METHOD Brilho()`), a COLUNA do cursor tem
+de selecionar qual símbolo está em jogo em `oF:Brilho()` — cursor em `oF` dá os usos **daquele**
+`oF`; cursor em `Brilho` dá declaração + definição do método **de Farol** e só os envios que
+atingem Farol. A mesma máquina alimenta um **go to definition** (o `rename` já senta nela).
+
+**Dois achados que reordenaram o trabalho:**
+
+1. **A ferramenta JÁ resolve o receptor** — `tests/fixhom/m1.prg` é, letra por letra, o exemplo;
+   `run.sh:1978-1981` já assere `confirmed send (receiver class TOTEM...)` / `excluded send
+   (dispatches to FAROL:BRILHO)` para a consulta **por NOME**. **O buraco é o CURSOR**:
+   `ResolveAtQuery` camada 4 (src:1924-1945) vê o `:` e devolve a consulta **NUA**, sem nunca
+   perguntar o receptor. E **`run.sh:2347` fossilizou o bug como CONTRATO** (exige
+   `query: Brilho`, sob o rótulo *"consulta crua honesta"* — era verdade quando foi escrito).
+2. **O Harbour já tem um sistema de tipos declarados COMPLETO — e SEM ALCANCE**: a linguagem de
+   anotação (`AS CLASS`), a tabela (`DECLARE`/`_HB_CLASS`/`_HB_MEMBER`/`_HB_SUPER`) e — neste
+   branch — o **EXECUTOR** (`-kt`, que impõe as anotações em runtime via `__HB_CHKTYPE`).
+
+> **O REENQUADRAMENTO que governa a fase:** *as paredes não são "não dá para inferir" — são **"o
+> programador não tem como DIZER, e onde ele diz, o compilador JOGA FORA"***. Estender o Harbour
+> aqui **não é ensinar o compilador a adivinhar**: é dar **alcance** às anotações e deixar o `-kt`
+> executá-las. Toda parede cai **por DECLARAÇÃO**, jamais por inferência — é o **oposto** de
+> heurística: em vez de *deduzir* fato, **fabrica-se fato declarado e verificado**.
+
+**Os quatro fatos que o core descarta hoje** (cada um é um experimento):
+**E1** `FUNCTION F() AS CLASS Farol` **não compila** (`harbour.y:329-335`) — e
+`hb_compChkTypeRetWrap` (`hbmain.c:2845`) **já existe para impor o retorno declarado e não tem o
+que impor**. É a parede do `oX := AlgumaFabrica()`, e é a **maior alavanca do sistema**.
+**E2** o cast `AS CLASS` em expressão é parseado e **descartado** (`harbour.y:845-875`) — honrá-lo
+dá a **saída de emergência universal**. **E3** `_HB_SUPER` é parseado e a **ação da gramática está
+VAZIA** (`:1277-1278`) — o core nunca liga o pai. **E4** parâmetro já aceita `AS CLASS` e o `-kt`
+já o confere: `F( @oF )` declarado **já é fato**, e a ferramenta envenena sem olhar.
+A **única** parede que fica de pé é a do **macro** — e **deve** ficar: recusa honesta é produto.
+
+**A LINHA entre FATO e PALPITE** *(decidida na sessão; é a contribuição conceitual)*: o motor
+interprocedural **já existe** e está desligado (`hInter := NIL`, src:563 — portão RE.3). O
+desligamento em bloco foi **certo no efeito e GROSSO na causa**. **Dedução FECHADA** (fontes
+enumeráveis por construção — *todos os `RETURN` de F estão no corpo de F*) é **FATO** e pode
+julgar. **Dedução ABERTA** (exige enumerar o inenumerável — *"todos os chamadores passam um
+Farol"*) é **PALPITE** e só sugere: **`B7ParamType` fica desligado no veredito PARA SEMPRE**.
+*Corolário: a diferença entre "a ferramenta infere" e "o core infere" **não é o repositório onde o
+código mora** — o que legitima é **exaustividade + colapso-para-desconhecido**, e só isso.*
+
+**Não é caminho — o preprocessador** *(tiro no escuro do Diego, respondido)*: ele varre todas as
+linhas, mas vê **TOKENS, não PROGRAMA**. Dar-lhe tipos = **segundo parser dentro do core**
+(réplica de gramática, §1.2/#2) — heurística **vestindo a autoridade do core**. E ele **já faz o
+papel certo**: é ele que **DECLARA**; o compilador é quem **RESOLVE**. Os fatos já vêm dele —
+morrem **depois**, sem leitor.
+
+**Escopo** — três fases, nesta ordem (**decisão do Diego: experimentos PRIMEIRO**):
+- **Fase 0 — SONDAR AS PAREDES** *(ordem do Diego: "sondar antes de decidir")*. **Zero linha de
+  core**: script em `tools/` (instrumento, **não** verbo da CLI) que roda no corpus do CORE
+  (`work/`) e emite o histograma dos sends por veredito e, nos desconhecidos, **o bucket do
+  PORQUÊ** (`macro-message` / `funcall-no-rettype` / `cast-discarded` / `member-not-declared` /
+  `param-byref-poison` / `param-untyped`). **É o portão que ORDENA a Fase 1** — se 90% for
+  macro-dispatch, E1/E2 são decoração; se for retorno de fábrica, **E1 é o jogo inteiro**.
+- **Fase 1 — trilha de linguagem**: E1 → E2 → E3 → E4, **na ordem da alavancagem MEDIDA**, cada um
+  gateado pelo que já existe (`fAst` / `-kt`) → **sintaxe nova nunca quebra código velho**. Fecha
+  com **E5**: re-medir e decidir **com prova** o que vai ao PR da B6.
+- **Fase 2 — o cursor**: coluna exata da mensagem no sítio de envio + classe do receptor **por
+  sítio** vindas do core (`comptype.c` novo, `ast-17`); `ResolveAtQuery` passa a **perguntar o
+  receptor**; `usages` ganha **recorte por escopo** (reusando o `FuncAtLine` que o `rename` já
+  usa — hoje o `usages` **vaza homônimos de outras funções**); verbo novo **`definition`** +
+  **`DefinitionProvider`** na extensão VSCode.
+
+**Critério de pronto (mecânico)**:
+- Fase 0: o histograma roda no corpus e **cada experimento da Fase 1 tem um NÚMERO atrás dele**.
+  **Nenhum experimento sobe sem esse número.** *(Número vive aqui e na spec — **nunca em página**,
+  §4.)*
+- Fase 1: por experimento — contagem de conflitos do bison **INALTERADA**; pcode **byte-idêntico**
+  sem as flags; e, sob `-kt`, a **anotação mentirosa ESTOURA** com o sítio nomeado.
+- Fase 2: cursor em `oF` lista só o `oF` daquela função; cursor em `Brilho` dá
+  `query: Farol:Brilho` com `oT`/`oI` **excluded**; `definition` sai **1 com motivo ACIONÁVEL** no
+  receptor desconhecido (**nada de lista de candidatos — isso é TRIAGEM**); casos 72/73/74/84/85/86
+  **byte-idênticos** (divergência = **BUG**, não contrato); régua adversarial do caso 64
+  **estendida ao `comptype.c` do core**.
+
+> ⚠️ **DRIFT PRÉ-EXISTENTE, a submeter ao Diego ANTES de re-baselinar** (§3): `run.sh:2347`
+> (o assert que **codifica o bug como contrato**), o `rename` a partir de um send (passa a
+> **não** renomear homônimos — é conserto), e o `TokenCols()` que casa por TEXTO e aponta
+> **todas** as colunas da linha (muda `Location[]` existente).
+
+> **W0026 fica FORA** (`hbgenerr.c:114-150`, **zero emissores**): o `comptype.c` **é** a máquina que
+> falta a ele, mas ligá-lo mudaria a saída do `harbour -w3` **STOCK**. Fase própria, **depois do
+> B6**, atrás de flag opt-in — e **só depois de E3**.
+
+## P15 — o PROFILER do core, e a pergunta da COBERTURA *(pista do Diego, 2026-07-13; **EXPLORATÓRIA — NADA EXPLORADO AINDA**)*
+
+**O arquivo a abrir**: `~/devel/harbour-core/harbour/tests/profiler.prg` — o driver; a camada
+de relatório é `src/rtl/profiler.prg` (classes `HBProfile*`, `CREATE CLASS`), e o canal do VM é
+`__SetProfiler( <lLiga> )` (hvm.c:12343). **A pista do Diego**: *"ele pode até ser ou ajudar a
+criar cobertura de código"*.
+
+**O que o canal dá HOJE** *(lido no fonte, não suposto)*: contadores no VM — por **função**
+(símbolo, via `__dynsGetPrf()`), por **método** (classes.c) e por **opcode** (globais
+`hb_ulOpcodesCalls`/`hb_ulOpcodesTime`, hvm.c:1342-1357), cada um com **chamadas + ticks**. O
+opcode é **agregado no processo inteiro**, não por site. Build gated por `HB_NO_PROFILER`.
+
+**Logo, a leitura honesta antes de sonhar**: a granularidade nativa é
+**função/método chamado ≥ 1 vez** — isso é *alcançabilidade de símbolo*, **não** cobertura de
+linha, de site nem de ramo. A pergunta da exploração é a de sempre (§1.2): **o core passa a
+contar por SITE/LINHA?** (o pcode já carrega `HB_P_LINE`; um contador por linha/por site de
+chamada é **hipótese plausível, não fato**) — e a resposta certa, se ele não conta, é
+**estender o core**, nunca inferir cobertura na ferramenta.
+
+**Consumos a avaliar** (nenhum aprovado):
+- **Cobertura da nossa própria suíte** — ferramenta de PROCESSO nosso, fora do produto: qual
+  código de `src/hbrefactor.prg` os 120+ casos nunca executam. É o uso de menor risco e o que
+  não precisa passar pelo portão da Fase D.
+- **Cobertura como fato do PROJETO DO USUÁRIO** — aí sim é produto, e cai direto no portão
+  abaixo.
+
+> ⚠️ **PORTÃO HERDADO — leia a Fase D antes de escrever uma linha**: evidência de execução como
+> camada que *prioriza conferência manual* é **TRIAGEM, e triagem não é produto** (fechado pelo
+> Diego, 2026-07-08). Cobertura só volta com **consumo 100% fato** (ex.: alimentar cheque
+> imposto/verificação, não "olhe aqui primeiro"). **Um fato de execução não vira veredito
+> sozinho**: "nunca executado" ≠ "morto" (`possible` continua `possible`).
+
 ## P-AUDIT — fila remanescente da varredura anti-heurística
 
 A varredura de 2026-07-12 fechou A1-A4 (todos entregues). **Sobra na fila:**
@@ -355,7 +477,7 @@ hora — urgência de aviso ≠ urgência de conserto.)* Régua completa:
 comando. A medição foi feita onde as diretivas de fato estão — dump do core sobre os **33
 headers do ecossistema que declaram diretiva**, **4.582 regras distintas** — e derrubou uma
 **recusa documentada do P4/P5**: o mkind `strdump` *"não existe em regra"* é **FALSO**. Ele é o
-**`#<x>`** (`ppcore.c:4262`), **31 regras** o emitem e **6 estão no `std.ch`** — auto-incluído
+**`#<x>`** (`ppcore.c:4277`), **31 regras** o emitem e **6 estão no `std.ch`** — auto-incluído
 em todo programa Harbour (`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, `JOIN`). Placar
 real dos mkinds: **14 consumidos, 1 recusado** (só o `dynval`). Guarda: `corpus_strdump`
 (`make ppcorpus` 47/0); conhecimento: [pp-corpus/strdump.md](pp-corpus/strdump.md).
@@ -363,7 +485,7 @@ real dos mkinds: **14 consumidos, 1 recusado** (só o `dynval`). Guarda: `corpus
 **Família TEXT/ENDTEXT ✅ (2026-07-13) — LACUNA REAL achada e FECHADA no core (`ast-17`).** Num
 bloco de stream (`TEXT…ENDTEXT`, `#pragma __text|__stream|__cstream`) o fonte do programador
 **vira DADO**: cada linha crua sai como string (o pp FABRICA um marker `strdump`,
-`ppcore.c:5806`). E essas strings chegavam ao dump com **`line: 0`, `col: null`, `prov: "n"`** —
+`ppcore.c:5821`). E essas strings chegavam ao dump com **`line: 0`, `col: null`, `prov: "n"`** —
 **sem origem nenhuma** —, enquanto uma string comum do fonte vem posicionada. Não era regra de
 string: era a maquinaria de stream **descartando** a linha que ela acabara de ler.
 **Por que é correção**: o conteúdo é dado e a ferramenta **não o edita nem com opt-in** (§1) —
@@ -397,12 +519,82 @@ o que a ferramenta enxerga e hoje cala. **Duas fontes, o mesmo dever** (§1 do C
   Um verbo que desloca linhas deve dizer *"este módulo expande `__LINE__` em N sítios; o valor
   deles muda com esta edição"*. **Não congelar o valor** — o valor novo é o certo; o produto é
   o aviso.
+- **(c) STRING que é MACRO VIVO** *(fonte nova, 2026-07-14, descoberta por assert)* — uma string
+  literal que contém `&nome` é **reavaliada em runtime** e vale o **valor do memvar**. Renomear um
+  memvar muda o comportamento de toda string que o mencione. O `usages` já relata *"possible
+  reference in string"* — o que falta é o **rename** dizer o mesmo, e dizer **por quê** (hoje o
+  usuário lê "possible" sem saber que é executável). Fato no dump: `usesMacro` + a string com
+  posição. Prova: [`tests/ppc-strfam/sf.prg`](../../tests/ppc-strfam/sf.prg).
 **A régua do §1 é dura e vale inteira**: detecção e relato preciso, **jamais** edição automática
 — nem com opt-in. O relato é aviso ao humano/agente, não sugestão de edição.
 **Critério de pronto (mecânico)**: caso novo — `usages cSaldo` lista a ocorrência do bloco
 marcada como **DADO** (com arquivo:linha), separada das ocorrências de símbolo; o `rename` a
 reporta e **não a edita** (fonte do bloco byte a byte intacto, verificação byte-idêntica);
 nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make test` verde.
+
+### P-REV — a REVISÃO do corpus para o método v2 *(aberta 2026-07-14; **EM CURSO**)*
+
+**Por que existe:** o corpus antigo nasceu no método velho — conhecimento no markdown, prova por
+`grep` no `.ppo`. O Diego pegou, num único arquivo, **três frases falsas** e um comentário que
+**afirmava mais do que o teste provava**. *"Esta documentação é séria"* — e ela vai **treinar o
+Claude do futuro**: o que estiver torto aqui vira erro herdado.
+
+**O método v2** (régua completa: [pp-corpus/METODO.md](pp-corpus/METODO.md) § 4b): o
+conhecimento mora no **`.prg`**, que **compila, RODA e se afirma** (`hbtest`); o comentário
+**INTERPRETA** o oráculo (não o transcreve, não vira ensaio); e nada se afirma sem (a) assert,
+(b) oráculo, ou (c) citação do core com `arquivo:linha`.
+
+**Marcação MECÂNICA** *(ordem do Diego)*: fixture revisada leva o selo `METODO-V2(<data>)` no
+cabeçalho, e a guarda **`corpus_metodo`** (em `make ppcorpus`) **imprime o placar e NOMEIA a
+fila** a cada execução — a pendência não some de vista. Ela **reprova selo mentiroso** (arquivo
+selado sem assert próprio nem irmão que asserte).
+
+**Placar em 2026-07-14: 6 revisadas · 10 pendentes.**
+- ✅ `ppc-strdump` (sd + sdrun) · `ppc-strfam` (sf + sfdump) · `ppc-text` · `ppc-cycle`
+- ⏳ `ppc-set` · `ppc-say` · `ppc-store` · `ppc-class` · `ppc-ref` · `ppc-gen` · `ppc-instr` ·
+  `ppc-live` · `ppc-dyn` · `ppc-pragma`
+- ⚠️ **Cuidado à parte**: as famílias `markers`, `rule-structure` e `abbreviation` usam fixtures
+  de `tests/fix*` **compartilhadas com o contrato** (`make test`, casos 111/113/115) — revisar
+  ali mexe no contrato e exige apresentar o drift antes (CLAUDE.md §3).
+
+**Critério de pronto (mecânico)**: `corpus_metodo` acusa **0 pendentes**; toda família tem
+guarda que **RODA** o `.prg` (não só `grep`); todo `.md` de família cabe em índice + lacunas.
+
+### P-NOVOS — continuar avançando nos casos do core *(a fila que a revisão não substitui)*
+
+O combinado com o Diego: **revisar o que existe E seguir achando o que falta**. A fila de
+espécimes está em [pp-corpus/uses-core.md](pp-corpus/uses-core.md), e a ordem de estudo dos
+testes do próprio pp está em [pp-corpus/METODO.md](pp-corpus/METODO.md) § 2b —
+`tests/pragma.prg` (a superfície do `#pragma`, **começada e estacionada**), `tests/ppapi.prg` e
+`tests/hbpp/` (o pp vivo, caminho do P12). Achado recente que virou família:
+[pass-cycle.md](pp-corpus/pass-cycle.md) — *o pp esgota o comando antes de avançar de linha*
+(levantado pelo Diego, provado no fonte e nos três oráculos).
+
+### P18 — o símbolo DENTRO do macro chega SEM POSIÇÃO *(aberto 2026-07-13; **A RESOLVER**)*
+
+**Achado do estudo de `harbour/tests/pp.prg`** (o teste que os autores do pp escreveram para
+o pp — indicação do Diego). Diante de um **macro puro**, o `<"z">`/`<(z)>` **não estringificam**:
+o pp **desfaz o `&`** e emite o identificador como **código** (`ppcore.c:5250-5262`, `value + 1`,
+derivação registrada como **`clone`**). É a semântica Clipper (`USE &cArquivo` tem de virar a
+variável). **Logo o nome dentro do macro é SÍMBOLO DE VERDADE** — o compilador o lê, e
+`occurrences[]` o registra.
+
+**O buraco:** o recheio consumido (`&cAlvo`) **tem posição** (linha, col, len); o símbolo
+**emitido não tem** (`col: null`, `prov: "n"`), e o `at` da derivação é **0** — aponta o `&`,
+não o nome. **Verificado:** o `usages` acerta (relata o *read*), mas o `rename` edita **só a
+declaração**, o `.hrb` muda e o verificador reverte — **recusa falsa num rename que seria
+byte-a-byte legítimo**.
+
+**E a ferramenta NÃO pode se virar sozinha:** deduzir *"pule 1 caractere (2 se terminar em
+ponto)"* é **réplica de gramática do core** (§1.2, gatilho 2). O core **acabou de calcular**
+`value + 1` — e não conta a ninguém. **LACUNA REAL → experimento de core.**
+*(Cuidado com a intuição fácil: **isto NÃO é a parede do macro**. Não há macro em runtime — o
+pp o desfez em tempo de compilação. Tratar todo `&` como opaco é heurística por aparência.)*
+
+**Critério de pronto (mecânico)**: o token emitido pelo macro-unwrap chega com `line`/`col`
+apontando o **NOME** (não o `&`) e `prov: "s"`, e o `at` da derivação bate; o `rename` do
+símbolo passa a editar `&cAlvo` → `&cNovo` e **verifica byte-idêntico**; a guarda
+`corpus_strfam` (que hoje assere a LACUNA) inverte de sinal; `lexdiff` 0; `make test` verde.
 
 ### P17 — a COMPILAÇÃO CONDICIONAL esconde diretiva, e a ferramenta QUEBRA O CÓDIGO *(aberto 2026-07-13; **A RESOLVER — o mais grave em aberto**)*
 
@@ -569,6 +761,8 @@ manual) é **TRIAGEM — e triagem não é produto** (REGRA DO FATO). A spec fic
 dos fatos re-auditados (o funil real é `hb_objGetMethod`, classes.c:1802):
 [spec-d-evidencia-execucao.md](spec-d-evidencia-execucao.md). **Evidência de execução só
 volta se tiver consumo 100% fato** (ex.: alimentar cheques impostos) — decisão do Diego.
+**Canal candidato levantado depois** (o profiler do VM, `__SetProfiler`): **P15** — ele passa
+por ESTE portão, não por um novo.
 
 ## B8 — Macros — **EM ESPERA (rebaixada pela M-cov, 2026-07-08)**
 

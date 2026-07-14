@@ -3701,7 +3701,7 @@ check "usages <nome> sem --at continua agregando tudo (comportamento antigo inta
 unit_113() {
 echo "case 113: P6 - ESTRUTURA da regra: sem cabeca, opcionais FORA DE ORDEM, multi-passe, e a guarda de orfao por FATO"
 # fixture fixp6 (DSL inventada NAO-espelho): (1) regra SEM CABECA (match comeca
-# com marker -> "head": null no dump, ppcore.c:1161); (2) dois grupos OPCIONAIS
+# com marker -> "head": null no dump, ppcore.c:1284); (2) dois grupos OPCIONAIS
 # que o pp casa em QUALQUER ORDEM; (3) MULTI-PASSE (GLIMER expande em VULK, que
 # e reaplicada sobre o resultado); (4) a guarda de orfao passa a ler o FATO da
 # op de derivacao (ast-12) em vez de "token sem from".

@@ -1,0 +1,33 @@
+# tests/corerefs.txt - as citacoes arquivo:linha do CORE que as docs do corpus fazem.
+#
+# POR QUE ISTO EXISTE: toda vez que EU edito o core, as linhas andam -- e cada
+# `ppcore.c:NNN` escrito nas docs passa a apontar para o vazio, EM SILENCIO. Nao e'
+# hipotese: em 2026-07-13 o `ast-17` (16 linhas novas) apodreceu 6 citacoes minhas do
+# mesmo dia, e uma citacao ANTIGA (a abreviacao dBase) ja' apontava, ha' sessoes, para
+# `pState->fDirective = HB_FALSE;` -- codigo que nao tem nada a ver com o assunto.
+#
+# Formato:  <arquivo relativo ao core> : <linha> <TAB> <trecho que TEM de estar nela>
+# A guarda (corpus_refs em ppcorpus.sh) confere linha a linha e, quando falha, IMPRIME
+# a linha verdadeira -- o conserto vira um sed.
+#
+# REGRA: citou arquivo:linha do core numa doc do corpus? Entra aqui. Sem excecao.
+
+src/pp/ppcore.c:1284	HB_PP_TOKEN_ISMATCH( pMatch ) ? NULL
+src/pp/ppcore.c:2725	HB_PP_CMP_DBASE && pToken->len >= 4
+src/pp/ppcore.c:3230	replace %s with HB_PP_RMARKER_STRDUMP
+src/pp/ppcore.c:4277	fDump ? HB_PP_RMARKER_STRDUMP
+src/pp/ppcore.c:5429	hb_pp_drvAdd1( pState, pStr, pMatch->index, 's' )
+src/pp/ppcore.c:5501	HB_PP_RMARKER_DYNVAL
+src/pp/ppcore.c:5803	hb_pp_tokenValueCmp( *pFirstPtr, "TEXT"
+src/pp/ppcore.c:5821	HB_PP_RMARKER_STRDUMP | HB_PP_TOKEN_STATIC
+src/pp/ppcore.c:7253	hb_pp_addDefine( pState, "__FILE__", &s_pp_dynamicResult )
+include/std.ch:221	#command TEXT
+include/std.ch:255	#command MENU TO <v>
+include/hbclass.ch:576	#<type>
+src/rtl/menuto.prg:84	__mvPublic( cVariable )
+src/pp/ppcore.c:5254	HB_PP_TOKEN_MACROVAR
+src/pp/ppcore.c:5256	pToken->value + 1
+tests/pp.prg:9	#command _REGULAR_(<z>)
+tests/pp.prg:12	#command _DUMB_(<z>)
+src/pp/ppcore.c:6587	pState->iCycle = 0;
+include/hbpp.h:412	#define HB_PP_MAX_CYCLES
