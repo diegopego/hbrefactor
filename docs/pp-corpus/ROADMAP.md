@@ -160,6 +160,7 @@ exploração + experimento no core, imediatamente**).
 | **ABREVIAÇÃO dBase** | keyword pela metade; `ast-15`/`ruletok` | [abbreviation.md](abbreviation.md) |
 | **PP como INSTRUMENTO** | os canais do core: o que cada um dá e o que DESTRÓI | [pp-as-instrument.md](pp-as-instrument.md) |
 | **STRDUMP** | o `#<x>`: o nome vira STRING VIVA (runtime). Derrubou um veredito | [strdump.md](strdump.md) |
+| **TEXT/ENDTEXT** | o stream: o fonte vira DADO. LACUNA REAL → **`ast-17`** (a linha do bloco chega posicionada) | [text-stream.md](text-stream.md) |
 
 ## Fatias da fase P (roadmap principal: [../roadmap.md](../roadmap.md) § P)
 
@@ -213,9 +214,6 @@ exploração + experimento no core, imediatamente**).
   família [strdump.md](strdump.md). Massa real de pp, para quem for medir de novo:
   `gtwvg/wvtwin.ch` (2.323), `std.ch` (293), `dbinfo.ch` (284), `hbsqlit3` (233),
   `xhb/hbcompat.ch` (191). *(`wvt2wvw.ch` NÃO dumpa: tem código, não só diretiva.)*
-- `TEXT … ENDTEXT` — a maquinaria de **stream** (`#pragma __text`), onde vive o
-  **`%s`** — o *outro* caminho para o mkind `strdump` (o primeiro é o `#<x>`, já
-  coberto).
 - Diretivas com **`#define` dinâmico** (`__FILE__`/`__LINE__`) — o `dynval`, agora o
   **único** mkind com recusa documentada de pé.
 

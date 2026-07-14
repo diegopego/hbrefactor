@@ -355,6 +355,33 @@ em todo programa Harbour (`MENU TO`, `SET COLOR TO`, `RELEASE ALL LIKE`, `RUN`, 
 real dos mkinds: **14 consumidos, 1 recusado** (só o `dynval`). Guarda: `corpus_strdump`
 (`make ppcorpus` 47/0); conhecimento: [pp-corpus/strdump.md](pp-corpus/strdump.md).
 
+**Família TEXT/ENDTEXT ✅ (2026-07-13) — LACUNA REAL achada e FECHADA no core (`ast-17`).** Num
+bloco de stream (`TEXT…ENDTEXT`, `#pragma __text|__stream|__cstream`) o fonte do programador
+**vira DADO**: cada linha crua sai como string (o pp FABRICA um marker `strdump`,
+`ppcore.c:5806`). E essas strings chegavam ao dump com **`line: 0`, `col: null`, `prov: "n"`** —
+**sem origem nenhuma** —, enquanto uma string comum do fonte vem posicionada. Não era regra de
+string: era a maquinaria de stream **descartando** a linha que ela acabara de ler.
+**Por que é correção**: o conteúdo é dado e a ferramenta **não o edita nem com opt-in** (§1) —
+mas sem posição ela não podia sequer **RELATAR**. Renomear um símbolo homônimo deixava o bloco
+dizendo a coisa antiga **em silêncio**, e nada no mundo podia avisar. **`ast-17`** (em
+`hb_pp_tokenAddStreamFunc`, gated por `fTrackPos`): a linha do bloco chega com a sua linha-fonte
+e `prov: "s"`. Expansão intacta — `make test` **990/0**, `make ppcorpus` **53/0**. Guarda:
+`corpus_text`; conhecimento: [pp-corpus/text-stream.md](pp-corpus/text-stream.md).
+*(Commit do core pendente de autorização.)*
+
+### P16 — o relato da ocorrência em DADO *(aberto 2026-07-13; **consumo do `ast-17`; A RESOLVER**)*
+
+**Escopo**: o `usages` (e o relatório do `rename`) passam a **RELATAR** — nunca editar — a
+ocorrência de um nome dentro de conteúdo não-verificável que agora tem posição: a linha de
+bloco de stream (`ast-17`). Hoje o fato existe e **nenhum verbo o usa**: renomeia-se `cSaldo`,
+a ferramenta edita certo e verifica certo, e o `TEXT` segue imprimindo `cSaldo` sem uma palavra.
+**A régua do §1 é dura e vale inteira**: detecção e relato preciso, **jamais** edição automática
+— nem com opt-in. O relato é aviso ao humano/agente, não sugestão de edição.
+**Critério de pronto (mecânico)**: caso novo — `usages cSaldo` lista a ocorrência do bloco
+marcada como **DADO** (com arquivo:linha), separada das ocorrências de símbolo; o `rename` a
+reporta e **não a edita** (fonte do bloco byte a byte intacto, verificação byte-idêntica);
+nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make test` verde.
+
 ### P15 — o rename através do `#<x>`: um BUG e uma decisão *(aberto 2026-07-13; **A RESOLVER**)*
 
 **(1) BUG — VERIFICADO, sem decisão pendente.** Num `MENU TO nEscolha` (Harbour puro, zero

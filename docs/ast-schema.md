@@ -184,6 +184,20 @@ Garantias e limites (provados na fixture de tortura e no lexdiff):
   parser (o pp as consome) — sem tokens.
 - Tokens de `#include` aparecem com prov 'i' e line do ARQUIVO INCLUÍDO
   (col null) — filtrar por prov ao mapear para o módulo.
+- **`ast-17`: a linha de STREAM (`TEXT…ENDTEXT`, `#pragma __text|__stream|
+  __cstream`) chega POSICIONADA.** Cada linha crua do bloco vira uma STRING (o pp
+  fabrica um marker `strdump`, `ppcore.c:5806`) e, **até o ast-17, essa string vinha
+  com `line: 0`, `col: null`, `prov: "n"` — sem origem nenhuma**, embora o pp a
+  tivesse lido de uma linha concreta do arquivo do usuário. Agora ela vem com a
+  linha de onde veio, `col: 0` e `prov: "s"` (`hb_pp_tokenAddStreamFunc`, gated por
+  `fTrackPos`; expansão inalterada, `lexdiff` 0). **Por que é correção e não
+  enfeite**: o conteúdo do bloco é **DADO** — a ferramenta não o edita nem com
+  opt-in (§1 do CLAUDE.md) —, mas sem posição ela não conseguia nem **RELATAR** que
+  um nome também aparece ali; renomear um símbolo homônimo deixava o bloco dizendo
+  a coisa antiga, **em silêncio**. No modo linha-a-linha (o `TEXT` do Cl*pper) a
+  posição é a da linha; nos modos que JUNTAM o bloco numa string só
+  (`__stream`/`__cstream`) é a do terminador. Prova: `corpus_text`
+  ([pp-corpus/text-stream.md](pp-corpus/text-stream.md)).
 
 ### Campo `from` — rastro de derivação do token sintetizado (ast-3)
 

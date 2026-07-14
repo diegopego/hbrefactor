@@ -337,6 +337,48 @@ PYEOF
    check "strdump em diretiva REAL do core: hbclass.ch:576 (ASSOCIATE ... #<type>)" $?
 }
 
+# --------------------------------------------------------------------------
+# Familia TEXT/ENDTEXT (std.ch:221) - a maquinaria de STREAM do pp: cada linha
+# crua vira uma STRING (o pp FABRICA um marker strdump, ppcore.c:5806).
+# O assunto e' a colisao DADO x SIMBOLO, e o canal ast-17 que a torna
+# RELATAVEL. (docs/pp-corpus/text-stream.md)
+# --------------------------------------------------------------------------
+corpus_text() {
+   echo "corpus: familia TEXT/ENDTEXT - a maquinaria de stream (dado x simbolo)"
+   ( cd "$HERE/ppc-text" && "$HB" txt.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
+   check "ppc-text/txt.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
+   local D; D=$(gen4 ppc-text txt.prg)
+   # .ppo: cada linha do bloco vira uma chamada com a linha CRUA como string
+   grep -q 'QOut( "   Relatorio mensal" )' "$D/txt.ppo" && \
+      grep -q 'QOut( "   cSaldo apurado no periodo" )' "$D/txt.ppo"
+   check ".ppo: cada linha do TEXT vira QOut( \"<a linha crua>\" ) - virou DADO" $?
+   # ast-17: a linha do bloco carrega a POSICAO de onde veio (antes: line 0/col null)
+   python3 - "$D/txt.ast.json" "$HERE/ppc-text/txt.prg" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+# a linha ESPERADA se COMPUTA do fonte no estado corrente - nunca se conta na mao
+src = open(sys.argv[2]).read().split("\n")
+want = [i + 1 for i, l in enumerate(src) if "cSaldo apurado" in l]
+# a string do bloco que COLIDE com o nome do local
+s = [t for t in d["tokens"]
+     if t.get("type") == 41 and "cSaldo apurado" in str(t.get("text", ""))]
+if len(s) != 1 or len(want) != 1:
+    sys.exit(1)
+t = s[0]
+# tem de vir POSICIONADA e como FONTE ('s'), na linha DELA - nao na do TEXT
+sys.exit(0 if t.get("line") == want[0] and t.get("prov") == "s" else 1)
+PYEOF
+   check "ast-17: a linha do bloco chega POSICIONADA (line 7, prov s) - da' para RELATAR" $?
+   # e o `cSaldo` DADO nao e' o `cSaldo` SIMBOLO: o local tem seus proprios tokens
+   python3 - "$D/txt.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+sym = [t for t in d["tokens"] if t.get("text") == "cSaldo" and t.get("type") == 21]
+sys.exit(0 if len(sym) == 2 else 1)   # a declaracao e a leitura - e SO' elas
+PYEOF
+   check "o local segue com 2 tokens (decl + leitura): o texto do bloco NAO e' simbolo" $?
+}
+
 corpus_pplive
 corpus_set
 corpus_say
@@ -349,6 +391,7 @@ corpus_rulestruct
 corpus_abbrev
 corpus_instrument
 corpus_strdump
+corpus_text
 
 echo
 echo "ppcorpus: passed: $PASS  failed: $FAIL"
