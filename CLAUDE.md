@@ -212,6 +212,18 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
   como régua de valor de fase nem alvo de entrega. *(Nuance da **xhb**: braço xHarbour,
   não-mantido — vale como corpus de MEDIÇÃO, mas número vindo só dela não justifica
   capacidade sozinho.)*
+- **ESTUDAR CLASSE: os dois pontos de partida** *(Diego, 2026-07-13)* — vale para qualquer
+  frente que toque OOP (tipo de receiver, rename de DATA/método, dispatch, herança):
+  - `~/devel/harbour-core/harbour/include/hbclass.ch` — a **DSL inteira** (`CREATE CLASS`,
+    `METHOD`, `DATA`, `VAR`, `INLINE`, `DELEGATE`, escopos): é o açúcar que a ferramenta
+    tem de atravessar, escrito em `#command`/`#translate` de verdade.
+  - `~/devel/harbour-core/harbour/utils/hbtest/rt_class.prg` — o **exercício** dela pelo
+    core: as formas todas em uso, compilando, com oráculo executável.
+
+  Continua valendo a régua do corpus: espécime é fonte do core, nunca exemplo que eu
+  invento (§ acima) — e o que eu **entender** aqui não vira gatilho em `src/hbrefactor.prg`
+  (§1: capacidade sobre hbclass só conta como genérica com prova adversarial em DSL
+  inventada).
 
 ---
 
