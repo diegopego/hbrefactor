@@ -128,6 +128,45 @@ que existe, e não é meu.** *(Conferidos em 2026-07-13; caminhos relativos a
 **Ordem sugerida:** `pp.prg` (a definição, no limite) → `pragma.prg` (a superfície que
 ninguém abriu) → `ppapi.prg` + `tests/hbpp/` (o pp vivo, que é o caminho do P12).
 
+### 2c. A PROSA DO AUTOR — o design doc do pp *(indicação do Diego, 2026-07-14; HIPÓTESE, nunca oráculo)*
+
+Dois textos escritos por **Przemyslaw Czerpak (druzus)**, o autor do pp. São o material
+mais RICO em INTENÇÃO e VOCABULÁRIO que existe — o §2b dá o pp **testando a si mesmo**;
+estes dão o autor **explicando o que quis construir** e como nomeia cada peça. Caminhos
+relativos a `~/devel/harbour-core/harbour`.
+
+| arquivo | o que tem lá dentro | por que importa |
+|---|---|---|
+| **`doc/pp.txt`** (682 linhas) | 25 pontos numerados: tokenização, os match/result markers um a um (a ORIGEM de [markers.md](markers.md)), o algoritmo de substituição define→translate→command (a ORIGEM de [pass-cycle.md](pass-cycle.md)), TEXT/ENDTEXT, compilação condicional, diretiva indireta, extensões sugeridas | é o SPEC do autor por trás de famílias que engenhamos a partir do C — dá NOME e INTENÇÃO ao que descobrimos medindo, e aponta cantos que o censo não acha |
+| **`doc/pp_prg.txt`** (103 linhas) | a API `__pp_Init`/`__pp_Reset`/`__pp_AddRule`/`__pp_Process` + um programa que preprocessa um arquivo e roda por macro-compilador | é o SPEC do autor de [pp-api.md](pp-api.md) e do "pp vivo" (camada A do §4) — a régua contra a qual conferir como se usa o `__pp_*` |
+
+**⚠️ A NATUREZA deles é o que os torna PERIGOSOS — é por isso que o Diego mandou "comprove
+tudo".** O `doc/pp.txt` é datado **2006-11-08** e NÃO documenta o pp de hoje. São **notas de
+análise + PLANO**: em parte dissecação do PP do *Clipper*, em parte projeto do PP novo, em
+parte ideias que ele **rejeitou**. Cada frase carrega um TEMPO VERBAL, e o tempo diz que
+oráculo apontar:
+- **passado / "Clipper does…"** → histórico; pode não sobreviver no Harbour.
+- **futuro / "new PP will…"** → intenção; pode ter sido feito assim, pode ter mudado desde então.
+- **condicional / "I suggest / I don't want to replicate…"** → talvez nunca construído.
+
+**Duas provas, dentro do próprio arquivo, de que a cautela não é cerimônia:**
+1. **Ele se contradiz.** O ponto 3 lamenta a re-estringificação por FLEX; o **Update** no fim
+   REVERTE (*"New Harbour lexer… not necessary to convert to strings… works faster"*). O autor
+   discorda do autor — o texto tem camadas de tempo dentro dele.
+2. **O vocabulário dele COLIDE com um fato que já provamos.** O `pp_prg.txt` chama
+   `__DATE__`/`__TIME__` de *"dynamically created #defines"* — mas [dynval.md](dynval.md) provou
+   que **só `__FILE__`/`__LINE__` são o mkind `dynval`**. São coisas DIFERENTES (um `#define`
+   constante fixado no init × um marker que RE-RESOLVE por posição). Transcrever a prosa dele
+   aqui viraria família podre.
+
+**Como usar:** fonte de **HIPÓTESE e de NOME**, jamais de PROVA. Leia `pp.txt` para
+ORIENTAÇÃO e VOCABULÁRIO (ele te ensina *o que perguntar*), e então prove no §2b + nos quatro
+oráculos. **Nenhuma afirmação dele entra numa família sem `HBTEST`/dump que a confirme no
+toolchain de HOJE** — a mesma régua da REGRA DO FATO, aplicada à prosa.
+
+**Ordem sugerida:** `pp.txt` (a intenção e o mapa, lido com ceticismo) → §2b (o pp testando a
+si mesmo, executável) → prove.
+
 ## 3. LER A DIRETIVA NO FONTE — e colá-la com arquivo:linha
 
 Nada de parafrasear. A diretiva real, como está escrita.
