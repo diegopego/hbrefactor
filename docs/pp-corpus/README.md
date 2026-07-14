@@ -26,12 +26,28 @@ oráculos NÃO mostram que um refatorador iria querer?* Toda família tem uma se
 
 1. **Consumo futuro** — o fato JÁ existe no dump/oráculos (derivável), só falta a
    ferramenta consumi-lo. NÃO pede mudança de core; vira item das fatias P3-P8.
-2. **LACUNA real** — a informação NÃO está nos oráculos (nem derivável). Aqui vale
-   a regra dura do Diego: **a lacuna PAUSA a exploração**. Ao detectá-la: (a) crie
-   um todo imediatamente; (b) faça o EXPERIMENTO já — tente resolver ESTENDENDO o
-   fonte do Harbour (`.ppt`/`.ppo`/dump mais ricos, permissão #7 do adr-004);
-   (c) só siga a exploração após a tentativa. Vira `ast-N` + caso se destravar,
-   ou recusa documentada se a prova mostrar que não compensa.
+2. **LACUNA real** — a informação NÃO está nos oráculos (nem derivável). Ao
+   detectá-la: **PROVE, MARQUE e SIGA** *(regra nova do Diego, 2026-07-13 —
+   substitui a anterior, que mandava PAUSAR a exploração e fazer o experimento de
+   core na hora)*:
+   **(a) PROVE** — repro executável, mínimo, colado (nada de "acho que"; a
+   classificação é afirmação de fato e vale a régua do parágrafo abaixo);
+   **(b) MARQUE** — vira **fase no `docs/roadmap.md`**, com o repro, a
+   classificação (core × consumo) e **critério de pronto mecânico**;
+   **(c) SIGA explorando** — o conserto é **fatia própria, sob autorização do
+   Diego**, na ordem que ele decidir.
+
+   **Por que a regra mudou** *(e a antiga não era boba — nasceu quando lacuna era
+   rara, e foi ela que pariu o rename-DATA)*: a exploração dos **usos reais** produz
+   lacuna mais rápido do que se conserta, e parar a cada uma **mata a exploração** —
+   perde-se o mapa, que é o produto desta fase. Pior: consertar no calor do achado é
+   exatamente como eu pulo o portão (implementar antes de pedir). **A ordem de
+   conserto é decisão do Diego, e só se decide com o mapa na mão.**
+
+   **Nada se perde: o que segura é a MARCA, não a pausa.** Lacuna marcada sem repro
+   e sem critério de pronto é lacuna esquecida — aí sim o pecado. E **achado que a
+   ferramenta usa para QUEBRAR código do usuário sobe na hora** (relato imediato ao
+   Diego, ainda que a exploração continue): urgência de aviso ≠ urgência de conserto.
 
 **A classificação em si tem de ser PROVADA, não afirmada** (lição de 2026-07-12, o
 Diego pegou): dizer "[Consumo futuro] — é derivável do `ppApplications`" SEM rodar

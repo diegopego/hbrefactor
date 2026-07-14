@@ -2603,9 +2603,10 @@ ast dump + fixture COMPILÁVEL); suíte SEPARADA do contrato (`make ppcorpus`, n
 `make test`) porque é exploratória E o core será estendido para gerar mais
 informação durante a fase (permissão do Diego). **Organização (ordem do Diego):**
 diretório `docs/pp-corpus/` — índice + UM ARQUIVO POR FAMÍLIA (o Claude do futuro
-carrega só o que precisa; monolito estoura contexto). **Regra dura (Diego):** cada
+carrega só o que precisa; monolito estoura contexto). **Regra dura (Diego) — VIGENTE ATÉ 2026-07-13, hoje SUPERADA:** cada
 LACUNA real (info que os oráculos NÃO dão) PAUSA a exploração e vira experimento
-de core imediato; consumo-futuro (fato derivável) NÃO pausa. **Famílias 1-4
+de core imediato; consumo-futuro (fato derivável) NÃO pausa. *(Substituída por
+PROVE, MARQUE e SIGA — ver `pp-corpus/README.md`; registro histórico mantido aqui.)* **Famílias 1-4
 ENTREGUES (2026-07-11):** SET EXACT (restrict+smart-quote), @…SAY (grupos
 opcionais), STORE (grupo que repete), hbclass (OO é pp: paste + genealogia ast-13
 + `Self AS CLASS`); `make ppcorpus` 16/16, contrato 813/0 intocado. **LACUNA

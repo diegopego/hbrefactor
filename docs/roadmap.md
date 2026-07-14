@@ -340,9 +340,14 @@ o **programador Harbour** — fonte de conhecimento do pp para o Diego, para o u
 as próprias fatias. Método = os QUATRO oráculos (`.ppo` + `.ppt` + dump + fixture
 COMPILÁVEL); suíte SEPARADA do contrato (`make ppcorpus`, não `make test`).
 **Famílias 1-4 entregues** (SET EXACT, @…SAY, STORE, hbclass) + as do eixo P (markers, `<@>`,
-regra-que-gera-regra, derivação, estrutura, abreviação, instrumento, escopo). Regra dura do
-Diego: cada **LACUNA real PAUSA a exploração e vira experimento de core imediato** (foi assim
-que nasceu o rename-DATA). Spec: [spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
+regra-que-gera-regra, derivação, estrutura, abreviação, instrumento, escopo). **Regra de lacuna — TROCADA pelo Diego em 2026-07-13**: era *"a lacuna PAUSA a exploração e vira
+experimento de core imediato"* (foi ela que pariu o rename-DATA); passa a ser **PROVE, MARQUE e
+SIGA** — repro executável + fase no roadmap com critério de pronto, e o conserto vira **fatia
+própria sob autorização**. Motivo: a exploração dos **USOS** produz lacuna mais rápido do que se
+conserta, parar a cada uma mata o mapa (que é o produto da fase), e consertar no calor do achado
+é como se pula o portão. *(Exceção: achado em que a ferramenta QUEBRA código do usuário sobe na
+hora — urgência de aviso ≠ urgência de conserto.)* Régua completa:
+[pp-corpus/README.md](pp-corpus/README.md). Spec: [spec-pdoc-corpus-pp.md](spec-pdoc-corpus-pp.md); corpus vivo:
 [pp-corpus/README.md](pp-corpus/README.md).
 
 **Família de MEDIÇÃO ✅ (2026-07-13) — e o veredito que ela derrubou.** O alvo previsto (o
@@ -398,6 +403,55 @@ o que a ferramenta enxerga e hoje cala. **Duas fontes, o mesmo dever** (§1 do C
 marcada como **DADO** (com arquivo:linha), separada das ocorrências de símbolo; o `rename` a
 reporta e **não a edita** (fonte do bloco byte a byte intacto, verificação byte-idêntica);
 nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make test` verde.
+
+### P17 — a COMPILAÇÃO CONDICIONAL esconde diretiva, e a ferramenta QUEBRA O CÓDIGO *(aberto 2026-07-13; **A RESOLVER — o mais grave em aberto**)*
+
+**Achado da medição de USO** (direção do Diego: estudar o pp no fonte real do Harbour). O core
+declara diretiva **dentro do próprio `.prg`** em **152 dos 419 módulos** do corpus (36%), com
+**1.640 comandos inventados** e 6.528 aplicações. E o padrão campeão — `rddtst.prg`, a DSL de
+teste do RDD, **1.881 usos** — declara **DUAS regras rivais com a MESMA cabeça**, uma em cada
+ramo de um `#ifdef`.
+
+**O dump só enxerga o ramo ATIVO.** As diretivas do ramo desligado não existem em canal nenhum
+(nem `.ppo`, nem `.ppt`, nem dump) — o pp as pula e não deixa rastro.
+
+**Consequência, VERIFICADA (repro mínimo, Harbour puro):**
+
+```harbour
+#ifdef MODO_RASCUNHO
+   #xcommand PINTA <x> => pt_Rascunho( <x> )   // <-- INVISÍVEL a esta compilação
+#else
+   #xcommand PINTA <x> => pt_Final( <x> )
+#endif
+PROCEDURE Main()
+   PINTA 7
+```
+
+`rename PINTA -> COLORE` edita a diretiva do `#else` **e o uso**, deixa o ramo `#ifdef` com
+`PINTA`, e **anuncia sucesso**: *"verified: 1 application site(s) + 1 directive occurrence(s);
+.ppo and .hrb byte-identical"*. E então:
+
+```
+$ harbour m.prg -DMODO_RASCUNHO
+m.prg(9) Error E0030  Syntax error "syntax error at '7'"
+```
+
+**A ferramenta escreveu uma árvore quebrada e disse que estava tudo certo.** É a promessa
+central do produto sendo violada — e em silêncio, porque a rede de verificação (`.ppo`/`.hrb`
+byte-idênticos) é sobre a **configuração que ela viu**, e a outra configuração é **outro
+programa**.
+
+**Classificação: LACUNA REAL** (o fato não está em oráculo nenhum) → **experimento de core**.
+O pp **sabe** que pulou aquelas linhas (`iCondCompile`); ele só não conta.
+
+**A resposta NÃO é editar os dois ramos** — o ramo desligado é **não-verificável** nesta
+compilação, e o §1 é explícito: não se edita o que não se pode provar. A resposta é o **fato que
+permite RECUSAR com motivo**: *"esta cabeça também é declarada em região pulada por compilação
+condicional (linha N) — o rename não pode provar aquele ramo; recusando"*.
+**Critério de pronto (mecânico)**: o dump exporta as diretivas puladas por `#if[n]def`/`#if`
+(posição + cabeça, sem entrar no mérito do ramo); o `rename` de cabeça de DSL **recusa** com
+motivo acionável quando existe declaração homônima em região pulada; o repro acima passa a
+recusar em vez de quebrar; `lexdiff` 0 e `make test` verde.
 
 ### P15 — o rename através do `#<x>`: um BUG e uma decisão *(aberto 2026-07-13; **A RESOLVER**)*
 

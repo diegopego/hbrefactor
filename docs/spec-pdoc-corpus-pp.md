@@ -55,7 +55,9 @@ com, nesta ordem:
 7. **Lacunas** (SER CRÍTICO): o que os oráculos NÃO mostram, cada item
    classificado por FATO em **[Consumo futuro]** (o dado É derivável, só falta a
    ferramenta consumi-lo → P3-P8, sem core) ou **[LACUNA real]** (o dado NÃO está
-   nos oráculos → PAUSA a exploração + experimento estendendo o core). Regra e
+   nos oráculos → **PROVE, MARQUE e SIGA**: repro + fase no roadmap com critério de
+   pronto, e o conserto é fatia própria sob autorização — regra trocada pelo Diego
+   em 2026-07-13, antes era "pausa a exploração + experimento imediato"). Regra e
    distinção detalhadas no [pp-corpus/README.md](pp-corpus/README.md).
 
 ### Os QUATRO oráculos (o método, decisão do Diego 2026-07-11)

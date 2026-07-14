@@ -146,9 +146,14 @@ Prompt para colar:
 > varredura que sustenta a recusa), e o que isso habilita no hbrefactor. **Não construa verbo
 > novo** — isso é portão do Diego (D-P5).
 
-**1.3 — P-DOC**: próxima família do corpus do pp = um contrib (por medição). Famílias 1-4
-entregues. Regra dura do Diego: **lacuna real PAUSA a exploração e vira experimento de core
-imediato**.
+**1.3 — P-DOC**: a lista de famílias do pp acabou (o `hbct` foi medido e descartado: não tem
+UMA diretiva de comando). **A exploração NÃO acabou** *(Diego, 2026-07-13)*: até aqui se estudou
+a **DEFINIÇÃO** (a diretiva, nas `.ch`); falta o **USO** — o fonte do Harbour é um corpus de
+código real escrito com o pp, e as próximas famílias saem da **medição dos sítios de uso**.
+**Regra de lacuna (TROCADA em 2026-07-13)**: era *"pausa a exploração + experimento de core
+imediato"*; agora é **PROVE, MARQUE e SIGA** (repro + fase no roadmap com critério de pronto; o
+conserto é fatia própria sob autorização). Exceção: achado em que a ferramenta QUEBRA código do
+usuário sobe na hora.
 
 ---
 
