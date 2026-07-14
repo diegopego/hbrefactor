@@ -54,7 +54,7 @@ Cada gatilho do CLAUDE.md tem um cadáver embaixo:
 
 1. **Comparação de texto para decidir papel/identidade** — o P5 acima (`ast-14`).
 2. **Constante mágica de gramática** (`>= 4`, `Len() > N`) — a auditoria pegou
-   `AbbrevClash` reescrevendo a regra de `ppcore.c:2533` na ferramenta. Resultado:
+   `AbbrevClash` reescrevendo a regra de `ppcore.c:2725` na ferramenta. Resultado:
    **RECUSA FALSA** — cabeça de DSL declarada irrenomeável sem motivo (`ast-15`).
 3. **"se não é X, então é Y" sem fato que separe** — a guarda de órfão do P6 ("grafia
    manual = token sem `from`") era cega para todo site dentro de um comando.
