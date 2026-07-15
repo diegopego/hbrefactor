@@ -12,17 +12,20 @@ Diretiva real ([include/std.ch:78](../../../harbour-core/harbour/include/std.ch)
 
 A multi-atribuição do Clipper. Um grupo opcional só — mas que **repete**.
 
-## A fixture (`tests/ppc-store/storex.prg`) — compila limpo sob `-w3 -es2`
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
 
-```harbour
-PROCEDURE Main()
-   LOCAL a, b, c
-   STORE 0 TO a
-   ? a
-   STORE 9 TO a, b, c
-   ? a, b, c
-   RETURN
-```
+Duas camadas, em dois arquivos:
+
+- **`tests/ppc-store/storex.prg`** (`hbtest` + pp vivo) —
+  - camada A (o TEXTO): `__pp_Process` mostra `STORE 0 TO a` → `a := 0` e
+    `STORE 9 TO a, b, c` → `a := b := c := 9`. Como `STORE` é comando de linguagem
+    (`std.ch`), o estado **padrão** do pp já o conhece — nenhum `__pp_AddRule`
+    (contraste com a família `<@>`, cuja regra era do arquivo);
+  - camada B (o VALOR): `STORE 9 TO a, b, c` atribui o **mesmo** 9 às três
+    variáveis — a cadeia, não três comandos.
+- **`tests/ppc-store/storexdump.prg`** (raw-dumpável) — os fatos do dump: o `.ppo`
+  com a cadeia, e o `[,<vN>]` como grupo opcional (`opt-open`/`opt-close`), `<vN>`
+  **regular** dentro dele (não `mkind: "list"`).
 
 ## `.ppo` / `.ppt` (o grupo opcional casa UMA VEZ POR variável extra)
 

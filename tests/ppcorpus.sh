@@ -87,14 +87,25 @@ corpus_say() {
 # --------------------------------------------------------------------------
 corpus_store() {
    echo "corpus: familia STORE (std.ch) - grupo opcional que REPETE (multi-atribuicao)"
-   ( cd "$HERE/ppc-store" && "$HB" storex.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-store/storex.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-store storex.prg)
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-store-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-store/storex.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada A (pp vivo: o texto que a cadeia VIRA) + camada B
+   #     (o valor: STORE 9 TO a,b,c atribui o MESMO 9 as tres)
+   ( cd "$R" && "$HB_BIN/hbmk2" storex.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -ostorex -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-store/storex.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./storex > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 6 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "storex.prg RODA: 6 asserts (STORE 0 -> a=0; STORE 9 -> cadeia) - 0 falhas" $?
+
+   # (2) o que so' o dump/oraculo mostra, na irma raw-dumpavel (sem #require)
+   local D; D=$(gen4 ppc-store storexdump.prg)
    # .ppo: uma variavel -> um :=; tres variaveis -> cadeia (grupo opcional repetiu)
-   grep -q 'a := 0' "$D/storex.ppo" && grep -q 'a := b := c := 9' "$D/storex.ppo"
+   grep -q 'a := 0' "$D/storexdump.ppo" && grep -q 'a := b := c := 9' "$D/storexdump.ppo"
    check ".ppo: STORE 9 TO a,b,c -> a := b := c := 9 (grupo opcional repetido)" $?
    # ast dump: o marker da lista e REGULAR dentro de opt-open/opt-close (nao e mkind list)
-   grep -q '"role": "opt-open"' "$D/storex.ast.json"
+   grep -q '"role": "opt-open"' "$D/storexdump.ast.json"
    check "ast-5 dump: o [,<vN>] e grupo opcional (opt-open/opt-close), vN regular" $?
 }
 
