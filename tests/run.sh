@@ -3624,31 +3624,31 @@ echo "case 111: P4+P5 - os 15 mkinds do pp: consumo provado OU recusa documentad
 check "fixmk/mk.prg clean under -w3 -es2"  $?
 D=$(freshmk case111)
 # --- P5 restrict: o rename VALIDA contra as alternativas (fato ast-5)
-( cd "$D" && "$BIN" rename mk.hbp mk.prg:6:10 zzz > rst.log 2>&1 )
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:17:10 zzz > rst.log 2>&1 )
 RC=$?
 check "restrict: novo nome fora das alternativas recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "is not one of the alternatives of the rule's RESTRICTED marker" "$D/rst.log" && grep -q "LIGA, DESLIGA" "$D/rst.log"
 check "recusa NOMEIA as alternativas, antes de recompilar" $?
 cmp -s "$D/mk.prg" "$HERE/fixmk/mk.prg"
 check "fonte intacto (nem chegou a editar)" $?
-( cd "$D" && "$BIN" rename mk.hbp mk.prg:6:10 DESLIGA --dry-run > ok.log 2>&1 )
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:17:10 DESLIGA --dry-run > ok.log 2>&1 )
 grep -q "^rename-pp-marker: LIGA -> DESLIGA" "$D/ok.log"
 check "restrict: alternativa VALIDA passa" $?
 # --- P5 wild (ast-14): conteudo engolido por marker nao-usado != palavra da regra
-( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 7 10 > w1.log 2>&1 )
+( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 18 10 > w1.log 2>&1 )
 grep -q "consumed and DISCARDED by directive" "$D/w1.log"
 check "wild: recheio de marker nao-usado e conteudo DESCARTADO, nao palavra de regra" $?
-( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 7 4 > w2.log 2>&1 )
+( cd "$D" && "$BIN" resolve-at mk.hbp mk.prg 18 4 > w2.log 2>&1 )
 grep -q "pp rule word" "$D/w2.log"
 check "wild: a palavra da regra DE VERDADE segue sendo palavra de regra" $?
-( cd "$D" && "$BIN" rename mk.hbp mk.prg:7:10 outra > w3.log 2>&1 )
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:18:10 outra > w3.log 2>&1 )
 RC=$?
 check "wild: rename do conteudo descartado recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 # --- P4 logical/nul: o valor NAO e emitido -> rename do local RELATA o descarte
-( cd "$D" && "$BIN" rename mk.hbp mk.prg:3:10 zzz --dry-run > loc.log 2>&1 )
-grep -q "mk.prg:12:10: 'n' is consumed and DISCARDED" "$D/loc.log" &&    grep -q "mk.prg:13:10: 'n' is consumed and DISCARDED" "$D/loc.log"
+( cd "$D" && "$BIN" rename mk.hbp mk.prg:14:10 zzz --dry-run > loc.log 2>&1 )
+grep -q "mk.prg:23:10: 'n' is consumed and DISCARDED" "$D/loc.log" &&    grep -q "mk.prg:24:10: 'n' is consumed and DISCARDED" "$D/loc.log"
 check "logical/nul: rename do local RELATA as ocorrencias descartadas (nao as edita)" $?
-grep -q "mk.prg:11:10" "$D/loc.log" && grep -q "mk.prg:8:12" "$D/loc.log"
+grep -q "mk.prg:22:10" "$D/loc.log" && grep -q "mk.prg:19:12" "$D/loc.log"
 check "block/extexp: o valor E emitido, entao esses sitios SAO editados" $?
 }
 
@@ -3710,45 +3710,45 @@ check "fixp6/p6.prg clean under -w3 -es2"  $?
 D=$(freshp6 case113)
 # --- (1) REGRA SEM CABECA: fecha o item 3 do backlog (o dump ja registrava;
 #     a ferramenta a resolve/renomeia por CONSTRUCAO - nunca chaveia no head)
-( cd "$D" && "$BIN" resolve-at p6.hbp p6.prg 11 17 > hl.log 2>&1 )
+( cd "$D" && "$BIN" resolve-at p6.hbp p6.prg 17 17 > hl.log 2>&1 )
 grep -q "pp rule word (#xtranslate <headless>, p6.ch:10)" "$D/hl.log"
 check "sem cabeca: o site resolve como palavra de regra, rotulado <sem cabeça>" $?
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:11:17 TRIPLADO > hr.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:17:17 TRIPLADO > hr.log 2>&1 )
 check "sem cabeca: rename-dsl exit 0" $?
 grep -q "^rename-dsl: ZORBADO -> TRIPLADO" "$D/hr.log" && \
-   grep -q "p6.prg:11:17" "$D/hr.log" && grep -q "p6.ch:10:17" "$D/hr.log"
+   grep -q "p6.prg:17:17" "$D/hr.log" && grep -q "p6.ch:10:17" "$D/hr.log"
 check "sem cabeca: edita o USO e a REGRA no .ch (as duas posicoes)" $?
 ( cd "$D" && "$HB_BIN/harbour" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
 check "sem cabeca: modulo editado segue limpo" $?
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:11:17 ZORBADO > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:17:17 ZORBADO > /dev/null 2>&1 )
 cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg" && cmp -s "$D/p6.ch" "$HERE/fixp6/p6.ch"
 check "sem cabeca: A->B->A byte-exato (fonte E regra)" $?
 # --- (2) OPCIONAIS FORA DE ORDEM: a keyword renomeada A PARTIR da linha fora de
 #     ordem pega as DUAS ordens (17 declarada, 18 invertida) + a regra
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:11 CARGA --dry-run > kw.log 2>&1 )
-grep -q "^rename-dsl: PLIX -> CARGA" "$D/kw.log" && grep -q "p6.prg:17:24" "$D/kw.log" && \
-   grep -q "p6.prg:18:11" "$D/kw.log" && grep -q "p6.ch:13:38" "$D/kw.log"
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:24:11 CARGA --dry-run > kw.log 2>&1 )
+grep -q "^rename-dsl: PLIX -> CARGA" "$D/kw.log" && grep -q "p6.prg:23:24" "$D/kw.log" && \
+   grep -q "p6.prg:24:11" "$D/kw.log" && grep -q "p6.ch:13:38" "$D/kw.log"
 check "opcionais fora de ordem: a keyword pega AS DUAS ordens + a regra" $?
 # clone/pass-through: um LOCAL de verdade DENTRO do grupo fora de ordem - a
 # posicao do site sobrevive a reordenacao (o binding vence, nao vira pp-marker)
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:13:30 cPote --dry-run > cl.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:30 cPote --dry-run > cl.log 2>&1 )
 grep -q "^rename-local: cVaso -> cPote in MAIN" "$D/cl.log" && \
-   grep -q "p6.prg:8:10" "$D/cl.log" && grep -q "p6.prg:13:30" "$D/cl.log"
+   grep -q "p6.prg:14:10" "$D/cl.log" && grep -q "p6.prg:19:30" "$D/cl.log"
 check "opcionais fora de ordem: LOCAL que ATRAVESSA o grupo resolve rename-local" $?
 # o marker GERADOR na linha fora de ordem: rename real + recompila + round-trip
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:6 Capacete > mk.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:24:6 Capacete > mk.log 2>&1 )
 check "opcionais fora de ordem: rename do marker gerador exit 0" $?
 grep -q "predicted: VK_ELMO -> VK_CAPACETE" "$D/mk.log" && \
    grep -q 'predicted string: "Elmo" -> "Capacete"' "$D/mk.log"
 check "opcionais fora de ordem: paste E stringify previstos do site invertido" $?
 ( cd "$D" && "$HB_BIN/harbour" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
 check "opcionais fora de ordem: modulo editado segue limpo" $?
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:6 Elmo > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:24:6 Elmo > /dev/null 2>&1 )
 cmp -s "$D/p6.prg" "$HERE/fixp6/p6.prg"
 check "opcionais fora de ordem: A->B->A byte-exato" $?
 # --- (3) MULTI-PASSE: Broquel entra por GLIMER e a VULK e reaplicada sobre o
 #     RESULTADO - o fecho de derivacao atravessa as duas passadas
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:20:8 Pavise --dry-run > mp.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:26:8 Pavise --dry-run > mp.log 2>&1 )
 grep -q "^rename-pp-marker: Broquel -> Pavise" "$D/mp.log" && \
    grep -q "predicted: VK_BROQUEL -> VK_PAVISE" "$D/mp.log" && \
    grep -q 'predicted string: "Broquel" -> "Pavise"' "$D/mp.log"
@@ -3756,7 +3756,7 @@ check "multi-passe: o artefato nascido da 2a passada (GLIMER->VULK) e previsto" 
 # LIMITE HONESTO do multi-passe: a keyword KRAN tambem e EMITIDA no result da
 # GLIMER - aquela ocorrencia NAO tem posicao no fonte (foi fabricada), entao
 # nao ha o que editar: a ferramenta RECUSA em vez de corromper
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:18:18 LIGA > kr.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:24:18 LIGA > kr.log 2>&1 )
 RC=$?
 check "multi-passe: keyword emitida por OUTRA regra recusa (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 grep -q "no source position" "$D/kr.log"
@@ -3769,13 +3769,13 @@ check "multi-passe: fontes intactos apos a recusa" $?
 #     from" = grafia manual) ficava CEGO: o --dry-run APROVAVA e o apply real
 #     desfazia tarde, com "contagem de simbolos mudou". Agora recusa ANTES,
 #     nomeando o site - e dry-run e apply CONCORDAM
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:6 Pavesado --dry-run > o1.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:25:6 Pavesado --dry-run > o1.log 2>&1 )
 RC=$?
 check "orfao: --dry-run recusa (exit != 0) - nao aprova mais o que o apply desfaz" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "the source spells out the generated name 'vk_Escudo' (p6.prg:14)" "$D/o1.log" && \
+grep -q "the source spells out the generated name 'vk_Escudo' (p6.prg:20)" "$D/o1.log" && \
    grep -q "would orphan it" "$D/o1.log"
 check "orfao: a recusa NOMEIA o nome gerado e o site exato da grafia manual" $?
-( cd "$D" && "$BIN" rename p6.hbp p6.prg:19:6 Pavesado > o2.log 2>&1 )
+( cd "$D" && "$BIN" rename p6.hbp p6.prg:25:6 Pavesado > o2.log 2>&1 )
 RC=$?
 check "orfao: o apply real recusa igual ao --dry-run (concordam)" $([ $RC -ne 0 ] && echo 0 || echo 1)
 ! grep -qi "rollback" "$D/o2.log"
@@ -3805,7 +3805,7 @@ echo "case 115: P-AUDIT - ast-15: QUAL literal da regra o site casou (mata a adi
 check "fixabr/abr.prg clean under -w3 -es2" $?
 D=$(freshabr case115)
 # (1) O FURO: renomear a CABECA quando a regra tem keyword-prefixo dela
-( cd "$D" && "$BIN" rename abr.hbp abr.prg:5:4 SALVAR > g.log 2>&1 )
+( cd "$D" && "$BIN" rename abr.hbp abr.prg:14:4 SALVAR > g.log 2>&1 )
 check "rename da cabeca GRAVAR: exit 0 (antes: recusa FALSA por 'uso abreviado')" $?
 grep -q "^rename-dsl: GRAVAR -> SALVAR" "$D/g.log" &&    grep -q "\.ppo and \.hrb byte-identical" "$D/g.log"
 check "editado e verificado (.ppo/.hrb byte-identicos)" $?

@@ -175,8 +175,22 @@ corpus_class() {
 # --------------------------------------------------------------------------
 corpus_markers() {
    echo "corpus: familia MARKERS - os 15 tipos de <x> do pp"
+   local CORE="${HB_BIN%/bin/*}"
    ( cd "$HERE/fixmk" && "$HB" mk.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
    check "fixmk/mk.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
+
+   # camada A (o TEXTO): o que cada mkind FAZ com o mesmo token, pelo pp VIVO. O irmao
+   # mkrun.prg RODA e afirma: regular COPIA (QOut( n )), name CITA (QOut( "Fulano" )),
+   # wild DESCARTA (QOut( "wild" )), block EMBRULHA (QOut( Eval( {|| n + 1} ) ))
+   local B="$HERE/tmp/.ppcorpus/fixmk-run"; rm -rf "$B"; mkdir -p "$B"
+   cp "$HERE/fixmk/mkrun.prg" "$B/"
+   ( cd "$B" && "$HB_BIN/hbmk2" mkrun.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -omkrun -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "fixmk/mkrun.prg compila (hbtest + pp vivo)" $?
+   ( cd "$B" && ./mkrun > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$B/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$B/run.txt"
+   check "mkrun.prg RODA: regular copia, name cita, wild descarta, block embrulha - 0 falhas" $?
+
    local D; D=$(gen4 fixmk mk.prg -I"$HERE/fixmk")
    # .ppo: cada mkind se revela na expansao
    grep -q 'QOut( "LIGA" )' "$D/mk.ppo" && grep -q 'QOut( Eval( {|| n + 1} ) )' "$D/mk.ppo"
@@ -257,8 +271,22 @@ corpus_gen() {
 # --------------------------------------------------------------------------
 corpus_rulestruct() {
    echo "corpus: familia ESTRUTURA DA REGRA - sem cabeca / opcionais fora de ordem / multi-passe"
+   local CORE="${HB_BIN%/bin/*}"
    ( cd "$HERE/fixp6" && "$HB" p6.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
    check "fixp6/p6.prg compila limpo sob -w3 -es2" $?
+
+   # camada B (o VALOR): as quatro formas compilam e RODAM. O irmao p6run.prg afirma:
+   # regra sem cabeca (nQtd ZORBADO = 42), opcionais FORA DE ORDEM slotados certo
+   # (AGUA->2o, SOL->3o), grupo ausente -> NIL, e multi-passe (GLIMER->VULK, KRAN "base")
+   local B="$HERE/tmp/.ppcorpus/fixp6-run"; rm -rf "$B"; mkdir -p "$B"
+   cp "$HERE/fixp6/p6run.prg" "$HERE/fixp6/p6.ch" "$B/"
+   ( cd "$B" && "$HB_BIN/hbmk2" p6run.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -op6run -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "fixp6/p6run.prg compila (hbtest + p6.ch)" $?
+   ( cd "$B" && ./p6run > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$B/run.txt")" -ge 6 ] && ! grep -q '^ *!' "$B/run.txt"
+   check "p6run.prg RODA: headless=42, opcionais fora de ordem, ausente->NIL, multi-passe - 0 falhas" $?
+
    local D; D=$(gen4 fixp6 p6.prg -I"$HERE/fixp6")
    # regra SEM CABECA: o match comeca com um MARKER -> head null (ppcore.c:1284)
    grep -q '"head": null' "$D/p6.ast.json"
@@ -279,8 +307,22 @@ corpus_rulestruct() {
 # --------------------------------------------------------------------------
 corpus_abbrev() {
    echo "corpus: familia ABREVIACAO dBase - keyword pela metade + ruletok (ast-15)"
+   local CORE="${HB_BIN%/bin/*}"
    ( cd "$HERE/fixabr" && "$HB" abr.prg -n -q0 -w3 -es2 -s -I. > /dev/null 2>&1 )
    check "fixabr/abr.prg compila limpo (inclui uso ABREVIADO: APAG = APAGAR)" $?
+
+   # camada B (o VALOR): os dois usos - por extenso (GRAVAR..GRAV) e abreviado (APAG) -
+   # compilam para chamadas de verdade. O irmao abrrun.prg RODA e afirma: GRAVAR 10 GRAV 5
+   # vale 15, APAG 7 vale 7 (a diretiva #command casa a keyword abreviada e o codigo roda)
+   local B="$HERE/tmp/.ppcorpus/fixabr-run"; rm -rf "$B"; mkdir -p "$B"
+   cp "$HERE/fixabr/abrrun.prg" "$HERE/fixabr/abr.ch" "$B/"
+   ( cd "$B" && "$HB_BIN/hbmk2" abrrun.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -oabrrun -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "fixabr/abrrun.prg compila (hbtest + abr.ch)" $?
+   ( cd "$B" && ./abrrun > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$B/run.txt")" -ge 2 ] && ! grep -q '^ *!' "$B/run.txt"
+   check "abrrun.prg RODA: GRAVAR..GRAV vale 15, APAG (abreviado) vale 7 - 0 falhas" $?
+
    local D; D=$(gen4 fixabr abr.prg -I"$HERE/fixabr")
    # o pp ACEITA a keyword abreviada (>= 4 letras) nas familias SEM 'x'
    grep -q 'zz_( 3, 0 )' "$D/abr.ppo"
@@ -300,10 +342,23 @@ corpus_abbrev() {
 # --------------------------------------------------------------------------
 corpus_instrument() {
    echo "corpus: familia PP COMO INSTRUMENTO - canais do core (.ppo / -u / -gd)"
-   local D="$HERE/tmp/ppc-instr"
+   local CORE="${HB_BIN%/bin/*}" D="$HERE/tmp/ppc-instr"
    rm -rf "$D"; mkdir -p "$D/inc"
    cp "$HERE/ppc-instr/far.ch" "$D/inc/"
    cp "$HERE/ppc-instr/m.prg" "$D/"
+
+   # (0) camada B (o VALOR): a migracao NAO e' so' texto - ela compila e RODA. O irmao
+   #     instr.prg prova que ANTIGO..COM expande para far_Migrado( "Alfa", nX ) e que o
+   #     resultado vale "Alfa1" (#<n> citou o nome, <v> copiou o valor de nX). Em subdir
+   #     PROPRIO: far.ch ao lado de instr.prg nao pode poluir a resolucao de -gd do m.prg
+   local B="$D/instrb"; mkdir -p "$B"
+   cp "$HERE/ppc-instr/instr.prg" "$HERE/ppc-instr/far.ch" "$B/"
+   ( cd "$B" && "$HB_BIN/hbmk2" instr.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -oinstr -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-instr/instr.prg compila (hbtest + far.ch)" $?
+   ( cd "$B" && ./instr > instr.out 2>&1 )
+   [ "$(grep -c 'MAIN(' "$B/instr.out")" -ge 1 ] && ! grep -q '^ *!' "$B/instr.out"
+   check "instr.prg RODA: a migracao vale 'Alfa1' (#<n> cita o nome, <v> copia o valor) - 0 falhas" $?
    ( cd "$D" && "$HB" m.prg -n -q0 -p -p+ -u -s -Iinc > /dev/null 2>&1 )
    # -u ISOLA: aplica so as regras do usuario; o resto da linguagem passa intacto
    # (o alvo da migracao e' CODIGO -- far_Migrado --, porque fixture TEM de compilar;
@@ -327,7 +382,7 @@ corpus_instrument() {
 # --------------------------------------------------------------------------
 corpus_pplive() {
    echo "corpus: familia PP VIVO - __pp_init/__pp_process (o pp em processo, linha a linha)"
-   local D="$HERE/tmp/ppc-live"
+   local CORE="${HB_BIN%/bin/*}" D="$HERE/tmp/ppc-live"
    rm -rf "$D"; mkdir -p "$D/inc"
    cp "$HERE/ppc-live/live.prg" "$D/"
    cp "$HERE/ppc-instr/far.ch" "$D/inc/"
@@ -336,23 +391,21 @@ corpus_pplive() {
    # VIVO se faz no .ppt: o pp vivo tem SO' a regra ANTIGO registrada, entao ele para
    # em `MODERNO Alfa VALOR nX` -- que e' exatamente o passo que o .ppt do build mostra
    ( cd "$D" && "$HB" m.prg -n -q0 -p -p+ -u -s -Iinc > /dev/null 2>&1 )
-   # o pp VIVO: mesma regra, mesmo site, em processo
-   ( cd "$D" && "$HB_BIN/hbmk2" live.prg -o"$D/live" -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+
+   # (1) o pp VIVO: mesma regra, mesmo site, EM PROCESSO. RODA e se AFIRMA (hbtest):
+   #     os DOIS asserts provam que a transformacao vivo == pp do build ('MODERNO Alfa
+   #     VALOR nX'), e que a LINHA inteira come o comentario de fim de linha
+   ( cd "$D" && "$HB_BIN/hbmk2" live.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -o"$D/live" -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-live/live.prg compila (hbtest + pp vivo)" $?
    ( cd "$D" && ./live > live.out 2>&1 )
+   [ "$(grep -c 'MAIN(' "$D/live.out")" -ge 2 ] && ! grep -q '^ *!' "$D/live.out"
+   check "live.prg RODA: pp vivo == pp do BUILD (SPAN e LINHA -> 'MODERNO Alfa VALOR nX') - 0 falhas" $?
 
-   # (1) EQUIVALENCIA: o pp vivo produz o MESMO texto que o pp do build
-   grep -q "SPAN=\[MODERNO Alfa VALOR nX\]" "$D/live.out"
-   check "pp VIVO expande o site igual ao pp do BUILD (.ppo): 'MODERNO Alfa VALOR nX'" $?
+   # (2) EQUIVALENCIA com o MESMO fato: o pp do BUILD concorda, no .ppt. O pp vivo nao
+   #     imita o build -- e' o mesmo motor, provado contra o passo que o .ppt mostra
    grep -q "MODERNO Alfa VALOR nX" "$D/m.ppt"
-   check "  ...e o pp do BUILD concorda, no .ppt (a equivalencia e com o MESMO fato)" $?
-
-   # (2) O LIMITE HONESTO: o pp COME o comentario da linha que voce alimenta.
-   # A destruicao NAO e privilegio do canal de arquivo - e do que se ALIMENTA.
-   # Dai a regra do escritor: alimente o SPAN da statement (posicoes vem do
-   # dump) e grave so o span; o comentario vive FORA do span e nunca passa
-   # pelo pp. E o que separa "pp como escritor" (viavel) do .ppo (recusado).
-   grep -q "LINHA=\[MODERNO Alfa VALOR nX\]" "$D/live.out" && ! grep -q "manter!" "$D/live.out"
-   check "o pp COME o comentario da LINHA alimentada -> alimente o SPAN, nunca a linha" $?
+   check "  ...e o pp do BUILD concorda, no .ppt (a equivalencia e' com o MESMO fato)" $?
 }
 
 # --------------------------------------------------------------------------
@@ -642,6 +695,43 @@ corpus_cycle() {
 }
 
 # --------------------------------------------------------------------------
+# Familia #pragma (docs/pp-corpus/pragma.md, ppc-pragma/pg.prg). O #pragma muda o
+# COMPILADOR no meio do arquivo: o MESMO texto gera pcode DIFERENTE. O pp SUBSTITUI
+# TEXTO (o .ppo dos dois IF e' identico); a mudanca vive no ESTADO do compilador.
+# O .ppt e' o unico oraculo que ve o pragma; o dump NAO o exporta (lacuna P19).
+# --------------------------------------------------------------------------
+corpus_pragma() {
+   echo "corpus: #pragma - o COMPILADOR muda no meio do arquivo (o pp substitui IGUAL)"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-pragma-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-pragma/pg.prg" "$R"/
+
+   # (1) camada B (o VALOR em runtime): o nome MENTE. Shortcut=On => /Z+ => SEM curto-
+   #     circuito => `.F. .AND. Efeito()` CHAMA Efeito() (efeito colateral, =1); Off nao (=0)
+   ( cd "$R" && "$HB_BIN/hbmk2" pg.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -opg -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-pragma/pg.prg compila (hbtest)" $?
+   ( cd "$R" && ./pg > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 2 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "pg.prg RODA: Shortcut=On avaliou o lado direito (1), Off nao (0) - 0 falhas" $?
+
+   # (2) os oraculos DISCORDAM: onde o pragma aparece e onde ele some
+   local D; D=$(gen4 ppc-pragma pg.prg -I"$CORE/contrib/hbtest")
+   # .ppt: o UNICO oraculo que enxerga o pragma - uma linha de trace por sitio
+   grep -qF "#pragma Shortcut set to 'On'" "$D/pg.ppt" && \
+      grep -qF "#pragma Shortcut set to 'Off'" "$D/pg.ppt"
+   check ".ppt: o pragma aparece (trace) - On e Off, um por sitio" $?
+   # .ppo: os DOIS IF chegam com TEXTO identico (modulo o nome do local) - a diferenca
+   # de comportamento NAO esta' no que o compilador recebe como texto, esta' no switch
+   grep -qF 'IF .F. .AND. Efeito( @nComShortcutOn )' "$D/pg.ppo" && \
+      grep -qF 'IF .F. .AND. Efeito( @nComShortcutOff )' "$D/pg.ppo"
+   check ".ppo: os dois IF chegam identicos (modulo o nome) - o pragma nao entra no texto" $?
+   # dump: NENHUM pragma exportado (lacuna P19) - 'pragma' case-sensitive nao aparece
+   # (os hits de 'Shortcut' sao so' os nomes de local nComShortcut*)
+   ! grep -q "pragma" "$D/pg.ast.json"
+   check "dump: nenhum pragma exportado (lacuna P19: a ferramenta nao ve a mudanca de semantica)" $?
+}
+
+# --------------------------------------------------------------------------
 # O PLACAR DA REVISAO. O corpus esta' migrando para o METODO V2 (docs/pp-corpus/
 # METODO.md): o conhecimento mora no .prg, o comentario INTERPRETA o oraculo, e o
 # que ele afirma esta' provado por assert (hbtest) ou pelo dump.
@@ -906,6 +996,7 @@ corpus_text
 corpus_dyn
 corpus_strfam
 corpus_cycle
+corpus_pragma
 corpus_deriv
 corpus_ppapi
 corpus_noeval

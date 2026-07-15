@@ -539,7 +539,7 @@ marcada como **DADO** (com arquivo:linha), separada das ocorrências de símbolo
 reporta e **não a edita** (fonte do bloco byte a byte intacto, verificação byte-idêntica);
 nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make test` verde.
 
-### P-REV — a REVISÃO do corpus para o método v2 *(aberta 2026-07-14; **EM CURSO**)*
+### P-REV — a REVISÃO do corpus para o método v2 *(aberta 2026-07-14; **EIXO DIRETIVA CONCLUÍDO 2026-07-15 — 31 selos, 0 pendentes; segue no eixo COMPLETUDE**)*
 
 **Por que existe:** o corpus antigo nasceu no método velho — conhecimento no markdown, prova por
 `grep` no `.ppo`. O Diego pegou, num único arquivo, **três frases falsas** e um comentário que
@@ -563,8 +563,8 @@ uma diretiva ainda não provada:
 
 | eixo | guarda | o que prova | estado (2026-07-15) |
 |---|---|---|---|
-| **diretiva** | `corpus_metodo` | a diretiva VIRA (texto) e VALE (runtime) | **24 selos** · fila `ppc-instr`·`ppc-live`·`ppc-pragma` + os 3 `fix*` |
-| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | **1** (`ppc-dyn`=`HOLE:P16`) · **14 pendentes** |
+| **diretiva** | `corpus_metodo` | a diretiva VIRA (texto) e VALE (runtime) | ✅ **31 selos · fila VAZIA (0 pendentes)** — `ppc-instr`/`ppc-live`/`ppc-pragma` + os 3 `fix*` fechados 2026-07-15 |
+| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | **1** (`ppc-dyn`=`HOLE:P16`) · **20 pendentes** (as 6 recém-seladas entraram na fila) |
 
 Ambas as filas são **NOMEADAS a cada `make ppcorpus`** (não-bloqueantes; reprovam só selo/veredito
 mentiroso) — não congelar aqui, ler do guarda. Vereditos de completude: `COMPLETE(data)` /
@@ -575,11 +575,15 @@ feito → n/a). Exemplo da forma:
 |---|---|---|
 | `ppc-dyn` | ✅ 07-15 | 🕳 `HOLE=P16` |
 | `ppc-deriv` | ✅ 07-15 | ⏳ (loop não rodou) |
-| `ppc-instr` | ⏳ | — (n/a até V2) |
+| `ppc-instr` | ✅ 07-15 | ⏳ (loop não rodou) |
 
-⚠️ **Cuidado à parte**: `markers`, `rule-structure` e `abbreviation` usam fixtures de `tests/fix*`
-**compartilhadas com o contrato** (`make test`, casos 111/113/115) — revisar ali (ou até **selar**)
-mexe no contrato e exige apresentar o drift antes (CLAUDE.md §3).
+⚠️ **Cuidado à parte — RESOLVIDO 2026-07-15**: `markers`, `rule-structure` e `abbreviation` usam
+fixtures de `tests/fix*` **compartilhadas com o contrato** (`make test`, casos 111/113/115). O
+drift foi apresentado ao Diego (o casos são line-anchored) e a decisão dele foi **re-baseline com
+header no topo**: o selo `METODO-V2` entrou no topo de `mk.prg`/`p6.prg`/`abr.prg` e **todos os
+anchors `.prg` do `run.sh` foram deslocados** pelo offset do header (mk +11, p6 +6, abr +9;
+colunas e refs `.ch` intactas). A camada B de cada uma vive num **irmão inerte** (`mkrun.prg`/
+`p6run.prg`/`abrrun.prg`, fora do `.hbp`, rodado pela guarda). `make test` segue **990/0**.
 
 **Critério de pronto (mecânico) — eixo diretiva**: `corpus_metodo` acusa **0 pendentes**; toda
 família tem guarda que **RODA** o `.prg` (não só `grep`); todo `.md` de família cabe em índice +
@@ -622,6 +626,34 @@ testes do próprio pp está em [pp-corpus/METODO.md](pp-corpus/METODO.md) § 2b 
 `tests/hbpp/` (o pp vivo, caminho do P12). Achado recente que virou família:
 [pass-cycle.md](pp-corpus/pass-cycle.md) — *o pp esgota o comando antes de avançar de linha*
 (levantado pelo Diego, provado no fonte e nos três oráculos).
+
+### P19 — o `#pragma` muda a SEMÂNTICA de uma região, e o dump não conta *(aberto 2026-07-15; **A RESOLVER**)*
+
+**Achado do estudo de `harbour/tests/pragma.prg`** (a superfície `#pragma`, indicada pelo Diego).
+O `#pragma` **não é configuração do build**: ele muda o **compilador no meio do arquivo**. A
+partir da linha em que aparece, o **mesmo texto-fonte** passa a gerar pcode **diferente** — e nada
+no código denuncia isso, só a linha do pragma lá atrás. Cadeia no fonte:
+`src/pp/ppcore.c:3779` (o `SHORTCUT` vira o switch `"z"`) → `src/compiler/ppcomp.c:211` (`z+` **tira**
+o flag `HB_COMPFLAG_SHORTCUTS`, ou seja liga a avaliação dos dois lados do `.AND.`).
+
+**Consequência, VERIFICADA** (`tests/ppc-pragma/pg.prg`, roda e afirma): com `#pragma Shortcut=On`,
+`.F. .AND. Efeito()` **CHAMA** `Efeito()` (efeito colateral acontece); com `Shortcut=Off`, não. O
+código é idêntico letra por letra — e o `.ppo` entrega os **dois `IF` com o mesmo texto** (módulo o
+nome do local): a diferença de comportamento **não está no texto** que o compilador recebe, está no
+switch. **O `.ppt` é o único oráculo que enxerga o pragma** (uma linha de trace por sítio); o **dump
+não exporta pragma nenhum** (`grep pragma` no `.ast.json` = 0; os hits de `Shortcut` são só os nomes
+de local).
+
+**Consequência para o refatorador:** a ferramenta **não sabe** que uma região do arquivo compila com
+outra semântica. Mover código entre regiões — o `extract-function` joga a função nova no **fim** do
+arquivo — pode mudar o pcode do código movido, **em silêncio**.
+
+**Classificação: LACUNA REAL** (o fato não está em oráculo consumível — só no `.ppt`, que a
+ferramenta não lê) → **experimento de core** (o pp **sabe** o estado do switch por região; ele só não
+conta ao dump).
+**Critério de pronto (mecânico)**: o dump exporta as regiões de switch de compilação (posição da
+linha do pragma + switch + valor); o `extract-function`/`move` **recusa com motivo** quando origem e
+destino caem em regiões de switch divergentes; `lexdiff` 0 e `make test` verde.
 
 ### P18 — o símbolo DENTRO do macro chega SEM POSIÇÃO *(aberto 2026-07-13; **A RESOLVER**)*
 

@@ -1,5 +1,11 @@
-// fixture da fase P/P6: estrutura da regra - regra sem cabeca, grupos
-// opcionais FORA DE ORDEM, multi-passe, e a guarda de orfao por FATO
+// METODO-V2(2026-07-15): a prova de VALOR (camada B) vive no irmao p6run.prg (HBTEST),
+// e a prova da ESTRUTURA no dump (head null, match[], multi-passe) na guarda
+// corpus_rulestruct. (regua: docs/pp-corpus/METODO.md § 4b)
+//
+// Familia ESTRUTURA DA REGRA (fase P/P6, docs/pp-corpus/rule-structure.md): DSL inventada
+// NAO-espelho que exercita regra SEM CABECA (o match comeca num marker), grupos opcionais
+// FORA DE ORDEM, multi-passe (uma regra expande na cabeca de outra) e o orfao por FATO.
+// Regua do caso 64: nenhuma palavra desta DSL aparece em src/hbrefactor.prg.
 #include "p6.ch"
 
 PROCEDURE Main()

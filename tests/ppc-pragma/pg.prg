@@ -1,35 +1,39 @@
 /*
+ * METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
+ * provada por assert que passa PELO #pragma, ou pelo oraculo citado ao lado.
+ * (regua: docs/pp-corpus/METODO.md § 4b)
+ *
  * ppc-pragma - O #pragma: o COMPILADOR muda no meio do arquivo
  * ============================================================
- * Corpus do pp: o conhecimento mora no .prg que COMPILA, RODA e se AFIRMA.
- * Asserts do core (contrib/hbtest). Origem: harbour/tests/pragma.prg, indicado
- * pelo Diego -- o teste que os autores do pp escreveram para a superficie #pragma.
+ * Origem: harbour/tests/pragma.prg, indicado pelo Diego -- o teste que os autores
+ * do pp escreveram para a superficie #pragma. Guarda: corpus_pragma. Fase da lacuna
+ * (dump nao ve pragma): docs/roadmap.md § P19.
  *
- * O QUE SE APRENDE:
+ * O SUJEITO CERTO (METODO.md § 4b/5): o pp SUBSTITUI TEXTO; quem muda de
+ * comportamento com o pragma e' o COMPILADOR. Prova pelos oraculos, que DISCORDAM:
  *
- *   1. O #pragma nao e' "configuracao do build": ele muda o COMPILADOR NO MEIO DO
- *      ARQUIVO. A partir da linha em que aparece, o MESMO texto-fonte passa a gerar
- *      pcode DIFERENTE. Nao ha' nada no codigo que denuncie isso -- so' a linha do
- *      pragma, la' atras.
+ *   1. .ppo (o que o compilador recebe como TEXTO): os DOIS `IF` chegam IDENTICOS,
+ *      letra por letra, modulo o nome do local (`@nComShortcutOn` x `...Off`). O
+ *      pragma NAO deixa rastro no texto -- porque o pp nao o "aplica", so' o anota.
+ *   2. .ppt (o traco): e' o UNICO oraculo que enxerga o pragma -- uma linha de
+ *      trace por sitio (`#pragma Shortcut set to 'On'` / `'Off'`). O SENTIDO: a
+ *      mudanca vive no ESTADO do compilador, nao na substituicao.
+ *   3. runtime (o que o PROGRAMA faz): a camada B abaixo. Mesmo texto, comportamento
+ *      OPOSTO -- e so' o assert, executado, revela qual.
  *
- *   2. O NOME MENTE, e este e' o achado. `#pragma Shortcut=On` NAO liga o curto-
- *      circuito: ele liga o SWITCH /Z, e o /Z quer dizer "sem shortcut".
- *      Cadeia, no fonte do core:
- *        ppcore.c:3775  "SHORTCUT" -> hb_pp_setCompilerSwitch( "z", valor )
- *        ppcomp.c:206   case 'z': if( iValue ) supported &= ~HB_COMPFLAG_SHORTCUTS;
- *      Ou seja: Shortcut=On  => /Z+ => o `.AND.` AVALIA os dois lados.
- *               Shortcut=Off => /Z- => o `.AND.` para no primeiro .F. (o normal).
- *      Eu tinha certeza do contrario. So' o assert me corrigiu.
+ * O NOME MENTE, e este e' o achado: `#pragma Shortcut=On` NAO liga o curto-circuito.
+ * Ele liga o switch /Z, e /Z quer dizer "SEM shortcut". Cadeia no fonte do core:
+ *   src/pp/ppcore.c:3779   "SHORTCUT" -> hb_pp_setCompilerSwitch( pState, "z", ... )
+ *   src/compiler/ppcomp.c:211  z+ (On) faz supported &= ~HB_COMPFLAG_SHORTCUTS
+ * Ou seja: Shortcut=On => /Z+ => o `.AND.` AVALIA os dois lados; Shortcut=Off => /Z-
+ * => o `.AND.` para no primeiro `.F.` (o normal). So' o assert me corrigiu.
  *
- *   3. Consequencia semantica REAL: com Shortcut=On, `.F. .AND. f()` CHAMA f().
- *      Se f() tem efeito colateral, o programa muda de comportamento -- e o codigo
- *      e' identico letra por letra.
- *
- * CONSEQUENCIA PARA O REFATORADOR (lacuna marcada, fase P19):
- *   O dump NAO exporta pragma nenhum (verificado: a string "pragma" nao aparece no
- *   .ast.json). Logo a ferramenta nao sabe que uma REGIAO do arquivo compila com
- *   outra semantica. Mover codigo entre regioes (o extract-function joga a funcao
- *   nova no FIM do arquivo) pode mudar o pcode do codigo movido -- em silencio.
+ * CONSEQUENCIA PARA O REFATORADOR (lacuna P19):
+ *   O dump NAO exporta pragma nenhum (verificado: `grep pragma pg.ast.json` = 0; os
+ *   hits de "Shortcut" sao so' os nomes de local). Logo a ferramenta nao sabe que uma
+ *   REGIAO do arquivo compila com outra semantica. Mover codigo entre regioes (o
+ *   extract-function joga a funcao nova no FIM do arquivo) pode mudar o pcode do
+ *   codigo movido -- em silencio.
  */
 
 #include "hbtest.ch"

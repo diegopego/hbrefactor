@@ -1,19 +1,37 @@
-// Familia PP VIVO (P11): o pp do core EM PROCESSO, dirigido por codigo Harbour.
-// Registra a MESMA regra do ppc-instr/far.ch e alimenta o MESMO site do m.prg -
-// a saida e comparada com o .ppo do pp do BUILD (prova de equivalencia).
+// METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta' provada
+// por assert que passa PELO pp vivo. (regua: docs/pp-corpus/METODO.md § 4b)
+//
+// Familia PP VIVO (P11, docs/pp-corpus/pp-as-instrument.md § 4). O pp do core EM
+// PROCESSO, dirigido por codigo Harbour: __pp_Init cria um estado, __pp_Process
+// registra a regra e transforma linha a linha -- SEM compilar, SEM executar o alvo.
+//
+// A prova e' de EQUIVALENCIA (camada A): registra a MESMA regra do far.ch (o ANTIGO)
+// e alimenta o MESMO site do m.prg. O estado aqui tem SO' o ANTIGO -> ele para em
+// `MODERNO Alfa VALOR nX`, que e' exatamente o passo INTERMEDIARIO que o .ppt do pp do
+// BUILD mostra (a guarda corpus_pplive cruza os dois). Mesmo motor, nao uma imitacao.
+//
+// NAO incluir far.ch: se a regra estivesse registrada no COMPILADOR, a string de
+// entrada 'ANTIGO Alfa COM nX' expandiria ANTES de chegar ao __pp_Process em runtime
+// (a armadilha do METODO.md § 4). Aqui ela chega crua, e so' o pp VIVO a transforma.
+//
+// COMO RODAR:  hbmk2 live.prg <core>/contrib/hbtest/hbtest.hbc -w3 -es2 -gtcgi
+
+#include "hbtest.ch"
+
 PROCEDURE Main()
 
-   LOCAL pp := __pp_init( , "", .F. )   // isolado: sem std rules, sem arch defines
+   LOCAL pp := __pp_Init( , "", .F. )   // isolado: sem std rules, sem arch defines
 
-   __pp_process( pp, '#xcommand ANTIGO <n> COM <v> => MODERNO <n> VALOR <v>' )
+   __pp_Process( pp, '#xcommand ANTIGO <n> COM <v> => MODERNO <n> VALOR <v>' )
 
-   // (1) so o SPAN da statement (o que a ferramenta alimentaria: as posicoes
-   //     de byte vem do dump) -> tem de bater com o pp do BUILD
-   OutStd( "SPAN=[" + __pp_process( pp, 'ANTIGO Alfa COM nX' ) + "]" + hb_eol() )
+   // (1) o SPAN da statement: o pp vivo devolve o MESMO texto que o pp do BUILD grava
+   //     no .ppo/.ppt. As posicoes de byte, quando a ferramenta escreve, vem do dump;
+   //     aqui o que importa e' que o TEXTO transformado bate.
+   HBTEST AllTrim( __pp_Process( pp, 'ANTIGO Alfa COM nX' ) ) IS "MODERNO Alfa VALOR nX"
 
-   // (2) a LINHA INTEIRA, com o comentario de fim de linha: o pp COME o
-   //     comentario. A destruicao nao e do canal de arquivo - e do que voce
-   //     ALIMENTA. Por isso o escritor alimenta o span, nunca a linha.
-   OutStd( "LINHA=[" + __pp_process( pp, 'ANTIGO Alfa COM nX   // manter!' ) + "]" + hb_eol() )
+   // (2) o LIMITE HONESTO: alimentando a LINHA INTEIRA (com o comentario de fim de
+   //     linha), o pp COME o comentario. A destruicao NAO e' do canal de arquivo -- e'
+   //     do que voce ALIMENTA. Por isso o escritor alimenta o SPAN, nunca a linha.
+   HBTEST AllTrim( __pp_Process( pp, 'ANTIGO Alfa COM nX   // manter!' ) ) IS "MODERNO Alfa VALOR nX"
 
    RETURN

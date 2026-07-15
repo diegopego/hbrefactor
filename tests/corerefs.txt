@@ -16,6 +16,7 @@ src/pp/ppcore.c:1284	HB_PP_TOKEN_ISMATCH( pMatch ) ? NULL
 src/pp/ppcore.c:2725	HB_PP_CMP_DBASE && pToken->len >= 4
 src/pp/ppcore.c:3230	replace %s with HB_PP_RMARKER_STRDUMP
 src/pp/ppcore.c:4277	fDump ? HB_PP_RMARKER_STRDUMP
+src/pp/ppcore.c:3779	hb_pp_setCompilerSwitch( pState, "z", fValue )
 src/pp/ppcore.c:5429	hb_pp_drvAdd1( pState, pStr, pMatch->index, 's' )
 src/pp/ppcore.c:5501	HB_PP_RMARKER_DYNVAL
 src/pp/ppcore.c:5803	hb_pp_tokenValueCmp( *pFirstPtr, "TEXT"
@@ -35,6 +36,8 @@ tests/pp.prg:9	#command _REGULAR_(<z>)
 tests/pp.prg:12	#command _DUMB_(<z>)
 src/pp/ppcore.c:6587	pState->iCycle = 0;
 include/hbpp.h:412	#define HB_PP_MAX_CYCLES
+# familia #pragma (pragma.md, ppc-pragma/pg.prg; fase P19)
+src/compiler/ppcomp.c:211	HB_COMP_PARAM->supported &= ~HB_COMPFLAG_SHORTCUTS;
 # familia <@> (reference-guard.md, ppc-ref/refx.prg + refxdump.prg)
 contrib/hbfoxpro/hbfoxpro.ch:63	#command PUBLIC <var1>
 contrib/hbfoxpro/hbfoxpro.ch:60	#xtranslate __FP_DIM( <exp> ) => <exp>

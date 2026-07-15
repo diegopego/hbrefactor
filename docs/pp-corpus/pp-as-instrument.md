@@ -6,6 +6,11 @@ motor que já roda em todo build.** Esta família cataloga os canais pelos quais
 core te deixa *usar* o pp, o que cada um entrega e **o que cada um destrói**.
 Registro de fase: [spec-p § P7](../spec-p-pp-refatoracao.md).
 
+Duas fixtures, sob `corpus_instrument` (METODO-V2): **`tests/ppc-instr/m.prg`** é a cobaia
+dos **canais** (`.ppo`/`-u`/`-gd`) — o que cada um destrói; **`tests/ppc-instr/instr.prg`**
+(`hbtest`) é a **camada B** — a migração `ANTIGO..COM` não é só texto, ela compila e roda:
+vale `"Alfa1"` (o `#<n>` cita o nome, o `<v>` copia o valor de `nX`).
+
 > **Aviso de método (a lição mais cara desta fase):** eu **recusei** "o pp como
 > motor de reescrita" olhando só um canal (`.ppo`) e declarei impossibilidade —
 > veredito ERRADO, publicado. O Diego apontou `tests/hbpp/hbpptest.prg` e o
