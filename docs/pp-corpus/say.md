@@ -17,17 +17,22 @@ Diretiva real ([include/std.ch:249](../../../harbour-core/harbour/include/std.ch
 O `@ … SAY` clássico. Duas regras, cinco markers, grupos OPCIONAIS `[…]` no que
 casa E no que emite.
 
-## A fixture (`tests/ppc-say/sayx.prg`) — compila limpo sob `-w3 -es2`
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
 
-```harbour
-PROCEDURE Main()
-   LOCAL nX := 42, cName := "Ana"
-   @ 1, 1 SAY "Ola"
-   @ 2, 1 SAY nX PICTURE "999"
-   @ 3, 1 SAY nX PICTURE "999" COLOR "R/W"
-   @ 4, 1 SAY cName COLOR "W/B"
-   RETURN
-```
+Duas camadas, em dois arquivos — mas aqui **só a camada A cabe**: o `@ … SAY` não
+devolve valor, ele escreve no **dispositivo** (`DevPos`/`DevOut`/`DevOutPict`), e
+sob o GT de teste (`gtcgi`) não há buffer de tela legível. O "valor" é saída, não
+retorno; então não há camada B honesta a assertar.
+
+- **`tests/ppc-say/sayx.prg`** (`hbtest` + pp vivo) — camada A: `__pp_Process` prova
+  as **4 formas** rodando — `@ SAY "Ola"` → `DevOut(...)`, `@ SAY nX PICTURE "999"`
+  → `DevOutPict(...)`, `+COLOR` → 3º arg, `COLOR` sem `PICTURE` → `DevOut` com cor.
+  A presença de cada grupo opcional é o que **seleciona a forma** (qual das duas
+  regras aplica).
+- **`tests/ppc-say/sayxdump.prg`** (raw-dumpável) — os fatos do dump: o `.ppo` das
+  4 formas, e os grupos `[PICTURE]`/`[COLOR]` como `opt-open`/`opt-close`. É o
+  **mesmo** mecanismo do `[,<vN>]` do STORE — só que ali o grupo *repete*, e aqui
+  casa 0 ou 1 vez (presença).
 
 ## `.ppo` / `.ppt` (cada forma expande diferente conforme o que você escreveu)
 

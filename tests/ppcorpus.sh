@@ -65,19 +65,30 @@ corpus_set() {
 # --------------------------------------------------------------------------
 corpus_say() {
    echo "corpus: familia @ ... SAY (std.ch) - grupos opcionais + selecao de forma"
-   ( cd "$HERE/ppc-say" && "$HB" sayx.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-say/sayx.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-say sayx.prg)
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-say-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-say/sayx.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada A (pp vivo: o TEXTO que cada forma VIRA -- a
+   #     familia e' so' camada A, o @ SAY escreve no dispositivo, nao devolve valor)
+   ( cd "$R" && "$HB_BIN/hbmk2" sayx.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -osayx -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-say/sayx.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./sayx > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "sayx.prg RODA: 4 asserts (as 4 formas: DevOut x DevOutPict) - 0 falhas" $?
+
+   # (2) o que so' o dump/oraculo mostra, na irma raw-dumpavel (sem #require)
+   local D; D=$(gen4 ppc-say sayxdump.prg)
    # .ppo: sem PICTURE/COLOR -> DevOut; PICTURE -> DevOutPict; +COLOR -> 3o arg
-   grep -q 'DevPos( 1, 1 ) ; DevOut( "Ola" )' "$D/sayx.ppo" && \
-   grep -q 'DevPos( 2, 1 ) ; DevOutPict( nX, "999" )' "$D/sayx.ppo"
+   grep -q 'DevPos( 1, 1 ) ; DevOut( "Ola" )' "$D/sayxdump.ppo" && \
+   grep -q 'DevPos( 2, 1 ) ; DevOutPict( nX, "999" )' "$D/sayxdump.ppo"
    check ".ppo: sem opcionais -> DevOut; [PICTURE] -> DevOutPict (grupo opcional match)" $?
    # o grupo opcional do RESULT ([, <clr>]) so emite se COLOR casou
-   grep -q 'DevOutPict( nX, "999", "R/W" )' "$D/sayx.ppo" && \
-   grep -q 'DevOut( cName, "W/B" )' "$D/sayx.ppo"
+   grep -q 'DevOutPict( nX, "999", "R/W" )' "$D/sayxdump.ppo" && \
+   grep -q 'DevOut( cName, "W/B" )' "$D/sayxdump.ppo"
    check ".ppo: grupo opcional do result [, <clr>] emite a cor so quando COLOR casa" $?
    # ast dump: a regra carrega os grupos opcionais como roles opt-open/opt-close
-   grep -q '"role": "opt-open"' "$D/sayx.ast.json" && grep -q '"role": "opt-close"' "$D/sayx.ast.json"
+   grep -q '"role": "opt-open"' "$D/sayxdump.ast.json" && grep -q '"role": "opt-close"' "$D/sayxdump.ast.json"
    check "ast-5 dump: grupos opcionais viram roles opt-open/opt-close" $?
 }
 
