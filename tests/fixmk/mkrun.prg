@@ -1,5 +1,11 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta' provada
 // por assert que passa PELA diretiva (pp vivo). (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: o vocabulario de mkinds (wild/restrict/logical/nul/
+//   block) e' exportado no dump -- o marker E' o fato da AST, e ela o carrega inteiro. O
+//   check COMPLETUDE(fixmk=COMPLETE) em corpus_markers le' a AST e afirma essa cobertura.
+//   (O selo mora aqui, no runner INERTE -- nao no mk.prg compartilhado com o contrato --
+//    para nao deslocar os anchors do run.sh; o guarda le os dois .prg da familia.)
 //
 // Familia MARKERS (docs/pp-corpus/markers.md), camada A. O irmao mk.prg e a guarda
 // corpus_markers provam os mkinds no DUMP (o rotulo de cada marker). ESTE arquivo prova

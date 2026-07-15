@@ -1,5 +1,12 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; a afirmacao esta' provada
 // por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: ast-15 (ruletok) diz QUAL literal da regra cada
+//   token casou, entao a ferramenta distingue a cabeca ABREVIADA da keyword secundaria
+//   por FATO -- nunca replicando o casamento dBase (>= 4 letras). O check
+//   COMPLETUDE(fixabr=COMPLETE) em corpus_abbrev le' a AST e afirma isso.
+//   (O selo mora aqui, no runner INERTE -- nao no abr.prg compartilhado com o contrato --
+//    para nao deslocar os anchors do run.sh; o guarda le os dois .prg da familia.)
 //
 // Familia ABREVIACAO dBase (P-AUDIT/ast-15, docs/pp-corpus/abbreviation.md), camada B.
 // O irmao abr.prg e a guarda corpus_abbrev provam o FATO do dump (qual literal casou);

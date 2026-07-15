@@ -203,7 +203,7 @@ corpus_markers() {
    grep -q '"mkind": "wild"' "$D/mk.ast.json" && grep -q '"mkind": "restrict"' "$D/mk.ast.json" && \
       grep -q '"mkind": "logical"' "$D/mk.ast.json" && grep -q '"mkind": "nul"' "$D/mk.ast.json" && \
       grep -q '"mkind": "block"' "$D/mk.ast.json"
-   check "ast dump: os mkinds wild/restrict/logical/nul/block todos exportados" $?
+   check "ast dump COMPLETUDE(fixmk=COMPLETE): os mkinds wild/restrict/logical/nul/block todos exportados - o vocabulario de markers esta' na AST" $?
 }
 
 # --------------------------------------------------------------------------
@@ -290,7 +290,7 @@ corpus_rulestruct() {
    local D; D=$(gen4 fixp6 p6.prg -I"$HERE/fixp6")
    # regra SEM CABECA: o match comeca com um MARKER -> head null (ppcore.c:1284)
    grep -q '"head": null' "$D/p6.ast.json"
-   check "ast dump: regra SEM CABECA existe e vem com head null" $?
+   check "ast dump COMPLETUDE(fixp6=COMPLETE): regra SEM CABECA existe e vem com head null - a estrutura da regra esta' coberta na AST" $?
    # opcionais FORA DE ORDEM: o valor cai no slot certo mesmo invertido
    grep -q 'RETURN { "Elmo", "bronze", 3 }' "$D/p6.ppo"
    check ".ppo: grupos opcionais INVERTIDOS casam e caem no slot certo" $?
@@ -333,7 +333,7 @@ corpus_abbrev() {
    # o furo que o ast-15 matou: a keyword secundaria GRAV, escrita POR EXTENSO,
    # casa o literal #2 do match[] - e NAO a cabeca (indice 0) abreviada
    python3 "$HERE/ppc-ruletok.py" "$D/abr.ast.json"
-   check "ast-15: a keyword secundaria casa o literal #2 - NAO e a cabeca abreviada" $?
+   check "ast-15 COMPLETUDE(fixabr=COMPLETE): a keyword secundaria casa o literal #2 - NAO e a cabeca abreviada; a ferramenta le' o ruletok, nao replica o casamento dBase" $?
 }
 
 # --------------------------------------------------------------------------

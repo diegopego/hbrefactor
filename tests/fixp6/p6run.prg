@@ -1,5 +1,11 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta' provada
 // por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST carrega a estrutura da regra -- a regra SEM
+//   CABECA vem com head null, e o multi-passe fica em ppApplications (como no ppc-cycle).
+//   O check COMPLETUDE(fixp6=COMPLETE) em corpus_rulestruct le' a AST e afirma isso.
+//   (O selo mora aqui, no runner INERTE -- nao no p6.prg compartilhado com o contrato --
+//    para nao deslocar os anchors do run.sh; o guarda le os dois .prg da familia.)
 //
 // Familia ESTRUTURA DA REGRA (fase P/P6), camada B. O irmao p6.prg e a guarda
 // corpus_rulestruct provam a estrutura no DUMP (head null, match[], multi-passe); ESTE

@@ -564,7 +564,7 @@ uma diretiva ainda não provada:
 | eixo | guarda | o que prova | estado (2026-07-15) |
 |---|---|---|---|
 | **diretiva** | `corpus_metodo` | a diretiva VIRA (texto) e VALE (runtime) | ✅ **31 selos · fila VAZIA (0 pendentes)** — `ppc-instr`/`ppc-live`/`ppc-pragma` + os 3 `fix*` fechados 2026-07-15 |
-| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | **1** (`ppc-dyn`=`HOLE:P16`) · **20 pendentes** (as 6 recém-seladas entraram na fila) |
+| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | ✅ **21 vereditos · fila VAZIA (0 pendentes)** — 3 HOLE (`ppc-dyn`=P16, `ppc-strfam`=P18, `ppc-pragma`=P19) + 18 COMPLETE, fechados 2026-07-15 |
 
 Ambas as filas são **NOMEADAS a cada `make ppcorpus`** (não-bloqueantes; reprovam só selo/veredito
 mentiroso) — não congelar aqui, ler do guarda. Vereditos de completude: `COMPLETE(data)` /
@@ -574,8 +574,8 @@ feito → n/a). Exemplo da forma:
 | família | diretiva | completude |
 |---|---|---|
 | `ppc-dyn` | ✅ 07-15 | 🕳 `HOLE=P16` |
-| `ppc-deriv` | ✅ 07-15 | ⏳ (loop não rodou) |
-| `ppc-instr` | ✅ 07-15 | ⏳ (loop não rodou) |
+| `ppc-deriv` | ✅ 07-15 | ✅ `COMPLETE` (espelho do buraco do dynval) |
+| `ppc-instr` | ✅ 07-15 | ✅ `COMPLETE` (o `-u`/`-gd` é instrumento; o resultado está na AST) |
 
 ⚠️ **Cuidado à parte — RESOLVIDO 2026-07-15**: `markers`, `rule-structure` e `abbreviation` usam
 fixtures de `tests/fix*` **compartilhadas com o contrato** (`make test`, casos 111/113/115). O
@@ -584,12 +584,23 @@ header no topo**: o selo `METODO-V2` entrou no topo de `mk.prg`/`p6.prg`/`abr.pr
 anchors `.prg` do `run.sh` foram deslocados** pelo offset do header (mk +11, p6 +6, abr +9;
 colunas e refs `.ch` intactas). A camada B de cada uma vive num **irmão inerte** (`mkrun.prg`/
 `p6run.prg`/`abrrun.prg`, fora do `.hbp`, rodado pela guarda). `make test` segue **990/0**.
+> **O selo de COMPLETUDE das três (2026-07-15) NÃO repetiu o deslocamento**: ele entrou no
+> topo do **runner inerte** (`mkrun`/`p6run`/`abrrun`), que o `run.sh` não ancora e o
+> `corpus_completude` lê junto — zero anchor mexido, `make test` intacto. As três fecharam
+> `COMPLETE` (mkinds no dump; regra `head null` + multi-passe em `ppApplications`; `ruletok`
+> do ast-15 diz qual literal casou, então a ferramenta não replica a abreviação dBase).
 
 **Critério de pronto (mecânico) — eixo diretiva**: `corpus_metodo` acusa **0 pendentes**; toda
 família tem guarda que **RODA** o `.prg` (não só `grep`); todo `.md` de família cabe em índice +
 lacunas.
 
-### P-COMPLETUDE — o LOOP dos oráculos rodou até não sobrar buraco? *(aberta 2026-07-15; **EM CURSO**)*
+### P-COMPLETUDE — o LOOP dos oráculos rodou até não sobrar buraco? *(aberta 2026-07-15; **CRITÉRIO ATINGIDO 2026-07-15 — fila VAZIA, 21/21**)*
+
+> **Estado:** as 21 famílias `METODO-V2` rodaram o loop e registraram veredito — **3 HOLE**
+> (`ppc-dyn`=P16, `ppc-strfam`=P18, `ppc-pragma`=P19) e **18 COMPLETE**, todos com rastro
+> executável de polaridade casada. `corpus_completude` acusa **0 pendentes, 0 mal-formados**;
+> `make test` **990/0**, `make ppcorpus` **117/0**. **O único trabalho VIVO da fase** é o piloto
+> abaixo (fechar o `ppc-dyn` estendendo o core), que segue sob autorização por-commit do Diego.
 
 **Por que existe:** a P-REV provou a **diretiva** de cada família (camadas A/B) mas **nunca rodou o
 loop dos quatro oráculos** — entender via `.ppo`/`.ppt`/dump/fixture, e quando um oráculo **falta
