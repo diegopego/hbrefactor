@@ -442,21 +442,32 @@ corpus_text() {
 # sensibilidade a POSICAO. (docs/pp-corpus/dynval.md)
 # --------------------------------------------------------------------------
 corpus_dyn() {
-   echo "corpus: familia DEFINE DINAMICO - __FILE__/__LINE__ (sensibilidade a POSICAO)"
-   ( cd "$HERE/ppc-dyn" && "$HB" dyn.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-dyn/dyn.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-dyn dyn.prg)
+   echo "corpus: familia DEFINE DINAMICO - __FILE__/__LINE__ (as duas camadas DISCORDAM)"
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-dyn-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-dyn/dynx.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada A (o pp vivo COLAPSA -> __LINE__=1, __FILE__="")
+   #     + camada B (no build o valor SEGUE a posicao -- delta 1, nome do arquivo)
+   ( cd "$R" && "$HB_BIN/hbmk2" dynx.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -odynx -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-dyn/dynx.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./dynx > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "dynx.prg RODA: 4 asserts (pp vivo colapsa; o build segue a posicao) - 0 falhas" $?
+
+   # (2) o que so' o dump/oraculo mostra, na irma raw-dumpavel (sem #require)
+   local D; D=$(gen4 ppc-dyn dynxdump.prg)
    # .ppo: o __LINE__ vira a LINHA CORRENTE, computada do fonte (nunca na mao)
    local L; L=$(python3 -c "
 import sys
-src = open('$HERE/ppc-dyn/dyn.prg').read().split(chr(10))
+src = open('$HERE/ppc-dyn/dynxdump.prg').read().split(chr(10))
 print([i + 1 for i, l in enumerate(src) if 'log:' in l][0])")
-   grep -q "QOut( \"log:\", $L )" "$D/dyn.ppo"
+   grep -q "QOut( \"log:\", $L )" "$D/dynxdump.ppo"
    check ".ppo: __LINE__ expande para a LINHA CORRENTE ($L) - o valor SEGUE a posicao" $?
-   grep -q 'cOnde   := "dyn.prg"' "$D/dyn.ppo"
+   grep -q 'cOnde   := "dynxdump.prg"' "$D/dynxdump.ppo"
    check ".ppo: __FILE__ expande para o nome do arquivo" $?
    # o dump EXPORTA as duas regras builtin, e SO' elas tem mkind dynval
-   python3 - "$D/dyn.ast.json" <<'PYEOF'
+   python3 - "$D/dynxdump.ast.json" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
 dyn = sorted(r.get("head") for r in d["ppRules"]
@@ -467,7 +478,7 @@ PYEOF
    # e cada expansao vem REGISTRADA com a linha: e' o fato que permite AVISAR
    # que o modulo e' sensivel a posicao (nenhuma regra do usuario e' dynval:
    # a recusa 'nao escrivivel' sobrevive a medicao - 0 em 4.582 regras reais)
-   python3 - "$D/dyn.ast.json" <<'PYEOF'
+   python3 - "$D/dynxdump.ast.json" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
 apps = [a["line"] for a in d["ppApplications"]
@@ -475,6 +486,22 @@ apps = [a["line"] for a in d["ppApplications"]
 sys.exit(0 if len(apps) == 2 else 1)
 PYEOF
    check "ppApplications: cada expansao de __LINE__ vem com a LINHA (da' para AVISAR)" $?
+   # COMPLETUDE (a lacuna que o dump MOSTRA): a provenancia do dynval e' SEVERADA na
+   # camada de statement. O literal injetado ('14') chega como NUMERIC comum -- token
+   # marcado prov='n' (sintetico) mas SEM 'from' -> nao ha' link de volta ao __LINE__.
+   # Contraste: clone/paste/stringify (familia derivation) POVOAM 'from'. Logo um verbo
+   # que anda o statement AST e' CEGO a' sensibilidade de posicao; o unico vinculo e'
+   # juntar ppApplications por LINHA -- justo o eixo fragil aqui. (P16 no roadmap.)
+   python3 - "$D/dynxdump.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+main = next(f for f in d["functions"] if f["name"] == "MAIN")
+rhs = main["statements"][0]["expr"]["right"]   # nQuando := __LINE__
+tok = d["tokens"][rhs["tok"]]
+# o valor chega como literal, com prov sintetico, e SEM back-ref 'from' ao dynval
+sys.exit(0 if rhs["et"] == "NUMERIC" and tok["prov"] == "n" and "from" not in tok else 1)
+PYEOF
+   check "ast-16 COMPLETUDE(ppc-dyn=HOLE:P16): o literal do dynval chega ao statement prov='n' mas SEM 'from' - provenancia severada, so' ppApplications (por linha) sabe a origem" $?
 }
 
 # --------------------------------------------------------------------------
@@ -649,6 +676,104 @@ corpus_metodo() {
 }
 
 # --------------------------------------------------------------------------
+# O PLACAR DA COMPLETUDE. O selo METODO-V2 prova a DIRETIVA (camadas A/B); ele NAO
+# testemunha o loop dos 4 oraculos (entender via .ppo/.ppt/ast/fixture -> se um oraculo
+# FALTA info, MELHORAR o oraculo/core -> repetir -- METODO.md §5b/§7).
+#
+# O loop CONVERGE num estado CONCRETO e conferivel, NAO num palpite: o codigo sob teste
+# COMPILA e RODA, e a AST o COBRE -- todo construto MAIS a proveniencia que a ferramenta
+# precisa ali (o buraco do dynval nao era construto faltando: o statement ESTAVA no dump,
+# faltava o `from`). Quem PRODUZ esse estado e' o agente rodando o loop; a EVIDENCIA e' a
+# fixture que roda + a assercao de cobertura no guarda. Dois ganhos de uma vez: o pp
+# documentado E a geracao da AST melhorada.
+#
+# Este portao NAO re-roda o loop (um grep nao re-deriva juizo) -- ele TESTEMUNHA que o
+# veredito da §5b ficou REGISTRADO com RASTRO EXECUTAVEL de polaridade casada, e pega a
+# mentira ESTRUTURAL. E' irmao do corpus_metodo (testemunha o HBTEST, nao se o comentario
+# "interpreta"):
+#   - selo na fixture:  // COMPLETUDE(<data>): COMPLETE   |   // COMPLETUDE(<data>): HOLE=Pxx
+#   - check no guarda:  ...COMPLETUDE(<fam>=COMPLETE)...  |   ...COMPLETUDE(<fam>=HOLE:Pxx)...
+#   - COMPLETE <=> o check e' uma ASSERCAO POSITIVA DE COBERTURA que LE a AST (afirma que o
+#     fato de que a ferramenta precisa ESTA' no dump) -- simetrico ao check NEGATIVO do HOLE.
+#     [o grep so' consegue exigir que o check LEIA a AST; que a assercao seja cobertura DE
+#      VERDADE e' o contrato que o loop cumpre -- limite honesto do portao, nao do metodo.]
+#   - HOLE=Pxx <=> check NEGATIVO (prova o buraco) + um "### Pxx" VIVO no docs/roadmap.md.
+# NAO-bloqueante para a fila: familia com METODO-V2 mas SEM veredito COMPLETUDE e' NOMEADA
+# (padrao do corpus_metodo). REPROVA so' o veredito MAL-FORMADO/mentiroso (selo x check
+# discordam; COMPLETE que nao le a AST; HOLE sem fase). "Nao sobrou buraco" e' um estado do
+# CODIGO (compila + coberto), conferivel -- nao um palpite; a maquina pega a mentira estrutural.
+# Pre-requisito (ordem parcial): so' entra na conta familia ja' com METODO-V2 -- nao se
+# julga a completude da AST de uma diretiva ainda nao provada.
+# --------------------------------------------------------------------------
+corpus_completude() {
+   echo "corpus: PLACAR DA COMPLETUDE (o loop dos 4 oraculos rodou ate' nao sobrar buraco?)"
+   python3 - "$HERE" <<'PYEOF'
+import os, re, glob, sys
+HERE = sys.argv[1]
+sh = open(os.path.join(HERE, "ppcorpus.sh")).read()
+roadmap = open(os.path.join(HERE, "..", "docs", "roadmap.md")).read()
+
+# 1. spans das funcoes corpus_*() -> corpo (para checar "le a AST")
+funcs, cur = {}, None
+for ln in sh.split("\n"):
+    m = re.match(r"^(corpus_\w+)\(\)\s*\{", ln)
+    if m:
+        cur = m.group(1); funcs[cur] = []
+    elif cur is not None:
+        if re.match(r"^\}\s*$", ln): cur = None
+        else: funcs[cur].append(ln)
+
+# 2. tags nos rotulos dos checks: fam -> (verdict, funcname)
+tag_re = re.compile(r"COMPLETUDE\((?P<fam>[\w-]+)=(?P<verdict>COMPLETE|HOLE:P\d+)\)")
+tags = {}
+for name, body in funcs.items():
+    for bl in body:
+        for m in tag_re.finditer(bl):
+            tags[m.group("fam")] = (m.group("verdict"), name)
+
+# 3. familias elegiveis = dir com .prg selado METODO-V2 (pre-requisito)
+dirs = sorted(glob.glob(os.path.join(HERE, "ppc-*")) +
+              [os.path.join(HERE, d) for d in ("fixmk", "fixp6", "fixabr")])
+seal_re = re.compile(r"COMPLETUDE\([^)]*\):\s*(COMPLETE|HOLE=P\d+)")
+verified, pend, lies = [], [], []
+for d in dirs:
+    if not os.path.isdir(d): continue
+    fam = os.path.basename(d)
+    prgs = glob.glob(os.path.join(d, "*.prg"))
+    if not any("METODO-V2" in open(p).read() for p in prgs): continue  # n/a ate' V2
+    seal = None
+    for p in prgs:
+        m = seal_re.search(open(p).read())
+        if m: seal = m.group(1); break
+    tag = tags.get(fam)
+    if seal is None and tag is None:
+        pend.append(fam); continue
+    if seal is None:
+        lies.append((fam, "check COMPLETUDE(%s=...) sem selo na fixture" % fam)); continue
+    if tag is None:
+        lies.append((fam, "selo na fixture sem check COMPLETUDE(%s=...) no guarda" % fam)); continue
+    tverdict, fn = tag
+    if seal.replace("HOLE=", "HOLE:") != tverdict:
+        lies.append((fam, "selo (%s) discorda do check (%s)" % (seal, tverdict))); continue
+    if tverdict == "COMPLETE":
+        if "ast.json" not in "\n".join(funcs.get(fn, [])):
+            lies.append((fam, "COMPLETE mas o guarda %s nao LE a AST (.ast.json)" % fn)); continue
+        verified.append(fam)
+    else:
+        pnum = tverdict.split(":")[1]
+        if not re.search(r"^###\s+%s\b" % re.escape(pnum), roadmap, re.M):
+            lies.append((fam, "HOLE aponta %s, mas nao ha '### %s' vivo no roadmap" % (pnum, pnum))); continue
+        verified.append(fam)
+
+print("  completude (loop rodou): %d    PENDENTES: %d" % (len(verified), len(pend)))
+if pend: print("  fila:" + " ".join(sorted(pend)))
+for fam, msg in lies: print("     SELO MAL-FORMADO: %s -- %s" % (fam, msg))
+sys.exit(1 if lies else 0)
+PYEOF
+   check "nenhum veredito COMPLETUDE mal-formado (COMPLETE le' a AST; HOLE aponta fase viva)" $?
+}
+
+# --------------------------------------------------------------------------
 # MARKDOWN SEM TESTE nao entra. Cada .md de familia declara, na primeira linha,
 # qual guarda o prova:  <!-- guarda: corpus_xxx -->
 # ...ou por que nao tem (PENDENTE / NENHUMA, com o motivo). Esta guarda reprova
@@ -763,6 +888,7 @@ corpus_order() {
 corpus_refs
 corpus_docs
 corpus_metodo
+corpus_completude
 corpus_compile_all
 corpus_pplive
 corpus_set

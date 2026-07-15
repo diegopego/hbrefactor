@@ -518,7 +518,14 @@ o que a ferramenta enxerga e hoje cala. **Duas fontes, o mesmo dever** (§1 do C
 - **(b) módulo SENSÍVEL A POSIÇÃO** — o que expande `__LINE__` (fato: as aplicações, com linha).
   Um verbo que desloca linhas deve dizer *"este módulo expande `__LINE__` em N sítios; o valor
   deles muda com esta edição"*. **Não congelar o valor** — o valor novo é o certo; o produto é
-  o aviso.
+  o aviso. **Lacuna de COMPLETUDE medida (2026-07-15, `corpus_dyn`)**: a provenância do `dynval`
+  é **severada na camada de statement** — o literal injetado chega como `NUMERIC` comum, token
+  `prov:"n"` mas **sem `from`**; a origem só existe em `ppApplications`, ligada ao statement
+  **por linha** (o eixo frágil). Um verbo que anda o statement AST é cego a isso. **Decisão do
+  Diego** (spec antes de código): (a) o consumidor cruza `ppApplications` por linha; **ou** (b)
+  **estende-se o core** para povoar `from` no token expandido do `dynval` — canal que a família
+  `derivation` já usa —, tornando o vínculo independente da linha. É o caminho-padrão do §1.2
+  (estender o core), barrado só pelo portão de commit no core.
 - **(c) STRING que é MACRO VIVO** *(fonte nova, 2026-07-14, descoberta por assert)* — uma string
   literal que contém `&nome` é **reavaliada em runtime** e vale o **valor do memvar**. Renomear um
   memvar muda o comportamento de toda string que o mencione. O `usages` já relata *"possible
@@ -549,16 +556,62 @@ cabeçalho, e a guarda **`corpus_metodo`** (em `make ppcorpus`) **imprime o plac
 fila** a cada execução — a pendência não some de vista. Ela **reprova selo mentiroso** (arquivo
 selado sem assert próprio nem irmão que asserte).
 
-**Placar em 2026-07-14: 6 revisadas · 10 pendentes.**
-- ✅ `ppc-strdump` (sd + sdrun) · `ppc-strfam` (sf + sfdump) · `ppc-text` · `ppc-cycle`
-- ⏳ `ppc-set` · `ppc-say` · `ppc-store` · `ppc-class` · `ppc-ref` · `ppc-gen` · `ppc-instr` ·
-  `ppc-live` · `ppc-dyn` · `ppc-pragma`
-- ⚠️ **Cuidado à parte**: as famílias `markers`, `rule-structure` e `abbreviation` usam fixtures
-  de `tests/fix*` **compartilhadas com o contrato** (`make test`, casos 111/113/115) — revisar
-  ali mexe no contrato e exige apresentar o drift antes (CLAUDE.md §3).
+**DOIS EIXOS, e o segundo depende do primeiro** *(2026-07-15)*. Provar a **diretiva** (camadas
+A/B) não fecha a família: falta provar que o **loop dos quatro oráculos rodou até não sobrar
+buraco** (METODO §5b/§7). São duas provas, ordem parcial — não se julga a completude da AST de
+uma diretiva ainda não provada:
 
-**Critério de pronto (mecânico)**: `corpus_metodo` acusa **0 pendentes**; toda família tem
-guarda que **RODA** o `.prg` (não só `grep`); todo `.md` de família cabe em índice + lacunas.
+| eixo | guarda | o que prova | estado (2026-07-15) |
+|---|---|---|---|
+| **diretiva** | `corpus_metodo` | a diretiva VIRA (texto) e VALE (runtime) | **24 selos** · fila `ppc-instr`·`ppc-live`·`ppc-pragma` + os 3 `fix*` |
+| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | **1** (`ppc-dyn`=`HOLE:P16`) · **14 pendentes** |
+
+Ambas as filas são **NOMEADAS a cada `make ppcorpus`** (não-bloqueantes; reprovam só selo/veredito
+mentiroso) — não congelar aqui, ler do guarda. Vereditos de completude: `COMPLETE(data)` /
+`HOLE=Pxx` (aponta a fase que fecha o buraco) / `⏳` (V2 feito, loop não rodou) / `—` (V2 não
+feito → n/a). Exemplo da forma:
+
+| família | diretiva | completude |
+|---|---|---|
+| `ppc-dyn` | ✅ 07-15 | 🕳 `HOLE=P16` |
+| `ppc-deriv` | ✅ 07-15 | ⏳ (loop não rodou) |
+| `ppc-instr` | ⏳ | — (n/a até V2) |
+
+⚠️ **Cuidado à parte**: `markers`, `rule-structure` e `abbreviation` usam fixtures de `tests/fix*`
+**compartilhadas com o contrato** (`make test`, casos 111/113/115) — revisar ali (ou até **selar**)
+mexe no contrato e exige apresentar o drift antes (CLAUDE.md §3).
+
+**Critério de pronto (mecânico) — eixo diretiva**: `corpus_metodo` acusa **0 pendentes**; toda
+família tem guarda que **RODA** o `.prg` (não só `grep`); todo `.md` de família cabe em índice +
+lacunas.
+
+### P-COMPLETUDE — o LOOP dos oráculos rodou até não sobrar buraco? *(aberta 2026-07-15; **EM CURSO**)*
+
+**Por que existe:** a P-REV provou a **diretiva** de cada família (camadas A/B) mas **nunca rodou o
+loop dos quatro oráculos** — entender via `.ppo`/`.ppt`/dump/fixture, e quando um oráculo **falta
+informação, melhorar o oráculo** (estender o core), até não sobrar buraco (METODO §5b/§7). O buraco
+do `dynval` (o literal do `__LINE__` chega ao statement AST **sem `from`** de volta à origem) foi
+achado **por sorte**, não pelo método. Regra: "regra nova sem portão novo é regra que eu vou violar
+de novo" (CLAUDE.md §1.6).
+
+**A infra (entregue 2026-07-15) — o loop vive no METODO §5b (o passo a passo) e é cobrado pelo
+portão `corpus_completude`.** *(Um skill dedicado foi tentado e DESCARTADO, 2026-07-15: o baseline
+mostrou agentes rodando o loop **sem** ele — o portão + o METODO §5b já bastam. "Se dá para o portão
+cobrar, não é doc: automatize" — writing-skills.)*
+- o **portão `corpus_completude`** cobra, por família, um veredito de **rastro executável de
+  polaridade casada**: selo `// COMPLETUDE(<data>): COMPLETE|HOLE=Pxx` na fixture **casado** com um
+  check tagueado `COMPLETUDE(<fam>=COMPLETE|HOLE:Pxx)` no guarda — `COMPLETE` ⟺ o check **lê a AST**;
+  `HOLE=Pxx` ⟺ check **negativo** + `### Pxx` vivo aqui. Não-bloqueante (nomeia a fila), reprova só
+  a mentira estrutural.
+
+**A fila:** toda família `METODO-V2` roda o loop e registra o veredito. **Primeiro item nomeado —
+o piloto:** `from`-no-dynval (a extensão de core da **P16 (b)**, `src/pp/ppcore.c:5501-5522`) fecha
+o buraco do `ppc-dyn` e faz o veredito transitar `HOLE=P16 → COMPLETE` (a asserção negativa do
+`corpus_dyn` inverte para positiva). É fatia própria, **sob autorização por-commit do Diego** (o
+schema bump move os dois repos juntos — caso 122 vermelho no meio, de propósito).
+
+**Critério de pronto (mecânico):** `corpus_completude` acusa **0 vereditos mal-formados** e a **fila
+vazia** (toda família V2 com um `COMPLETUDE` casado e verificado).
 
 ### P-NOVOS — continuar avançando nos casos do core *(a fila que a revisão não substitui)*
 

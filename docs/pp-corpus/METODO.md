@@ -378,6 +378,21 @@ numerado), `ast-15` (`ruletok`), `ast-16` (tempo de vida da diretiva), `ast-17` 
 stream posicionada) — em **todos**, o pp sabia e a AST calava. **"A AST já dá o que preciso"
 é uma AFIRMAÇÃO DE FATO**: prove olhando o `.ast.json`, não a memória.
 
+**A pergunta não se faz UMA vez — ela é um LOOP** *(Diego, 2026-07-15)*. Entender pelos quatro
+oráculos → se a AST **falta um fato**, **melhorar a AST** (estender o core, passo 7) → rodar de
+novo → entender de novo → **repetir até não sobrar buraco**. O loop **converge num estado
+CONCRETO e conferível, não num palpite**: o código sob teste **compila e RODA**, e a AST o
+**COBRE** — todo construto MAIS a proveniência que a ferramenta precisa (o buraco do `dynval`
+não era construto faltando: o statement estava no dump, faltava o `from`). São **dois ganhos de
+uma vez**: o pp fica **documentado** E a **geração da AST melhora**. A quem produz esse estado é
+o agente rodando o loop; a evidência é a **fixture que roda + a asserção de cobertura**. O
+veredito de convergência (`COMPLETE`) ou de buraco marcado (`HOLE=Pxx`) fica **registrado com
+rastro executável** e o portão **`corpus_completude`** (em `make ppcorpus`) o testemunha — ele
+não re-roda o loop, só pega a mentira estrutural. **`METODO-V2` prova a diretiva; `COMPLETUDE`
+prova que o loop convergiu.** O passo a passo é ESTE § (5b→7); a fila e o contrato do veredito estão
+em `docs/roadmap.md` § P-COMPLETUDE, e o portão que os testemunha é `corpus_completude`
+(`tests/ppcorpus.sh`).
+
 ## 6. QUANDO O ORÁCULO CALA — VÁ AO FONTE C
 
 `src/pp/ppcore.c` · `src/compiler/compast.c` · `include/hbpp.h`. Ache o **mecanismo**;

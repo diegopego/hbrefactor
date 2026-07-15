@@ -21,6 +21,7 @@ src/pp/ppcore.c:5501	HB_PP_RMARKER_DYNVAL
 src/pp/ppcore.c:5803	hb_pp_tokenValueCmp( *pFirstPtr, "TEXT"
 src/pp/ppcore.c:5821	HB_PP_RMARKER_STRDUMP | HB_PP_TOKEN_STATIC
 src/pp/ppcore.c:7253	hb_pp_addDefine( pState, "__FILE__", &s_pp_dynamicResult )
+src/pp/ppcore.c:7254	hb_pp_addDefine( pState, "__LINE__", &s_pp_dynamicResult )
 include/std.ch:78	#command STORE <v> TO
 include/std.ch:121	#command SET EXACT <x:ON,OFF,&>
 include/std.ch:249	#command @ <row>, <col> SAY <exp>

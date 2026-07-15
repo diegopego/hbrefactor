@@ -5,7 +5,26 @@
 está escrito em lugar nenhum** — ele é decidido pela **posição** do código.
 Consequência para o refatorador: **mover código muda o programa**, e essa é a
 única família em que a mudança é *correta* e ainda assim precisa ser dita.
-Guarda: `corpus_dyn`; fixture `tests/ppc-dyn/`.
+Guarda: `corpus_dyn` em `tests/ppcorpus.sh`; fixtures `tests/ppc-dyn/`.
+
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
+
+Duas camadas em dois arquivos — e nesta família elas **discordam**, e a
+discordância É o achado:
+
+- **`tests/ppc-dyn/dynx.prg`** (`hbtest` + pp vivo) —
+  - camada A (o TEXTO, no pp VIVO): `__pp_Process` sobre `x := __LINE__` devolve
+    `x := 1` e sobre `y := __FILE__` devolve `y := ""`. O pp de runtime **não tem
+    arquivo nem posição de linha**, então o sentinela `dynval` não tem o que
+    resolver e **colapsa**. A camada A não reproduz a B — ela a **delimita por
+    baixo** (o valor sem posição);
+  - camada B (o VALOR, no BUILD): duas expansões de `__LINE__` em linhas vizinhas
+    diferem de `1` (o número **segue** a linha corrente), e `__FILE__` é o nome do
+    arquivo (`"dynx.prg"`). Trocar por um literal quebra o assert no dia em que
+    alguém inserir uma linha acima — que é exatamente o acoplamento a nomear.
+- **`tests/ppc-dyn/dynxdump.prg`** (raw-dumpável) — os fatos do dump: o `.ppo` com
+  `__LINE__` virando a linha corrente e `__FILE__` o nome do arquivo, e o `ast`
+  provando que `dynval` existe em **duas** regras builtin e só nelas.
 
 ## As regras (BUILTIN do pp — o usuário não as escreve)
 
@@ -32,9 +51,9 @@ recusa de pé. *(A do irmão `strdump` caiu: [strdump.md](strdump.md).)*
 ## O `.ppo` — o valor SEGUE a posição
 
 ```
-LOCAL nQuando := __LINE__     ->   LOCAL nQuando := 13
-? "log:", __LINE__            ->   QOut( "log:", 24 )
-LOCAL cOnde := __FILE__       ->   LOCAL cOnde := "dyn.prg"
+LOCAL nQuando := __LINE__     ->   LOCAL nQuando := <linha corrente>
+? "log:", __LINE__            ->   QOut( "log:", <linha corrente> )
+LOCAL cOnde := __FILE__       ->   LOCAL cOnde := "dynxdump.prg"
 ```
 
 ## Lente de refatoração — a família em que EDITAR CERTO muda o programa
@@ -67,14 +86,25 @@ O que a família estabelece como **fato duro**:
 
 > Classificação por FATO (VERIFICADO rodando). Regra em [README.md](README.md).
 
+- **[Completude do dump — VERIFICADO rodando] A provenância do `dynval` é SEVERADA na
+  camada de statement.** O literal injetado chega ao statement AST como um `NUMERIC`
+  comum (`nQuando := __LINE__` → `ASSIGN( NQUANDO, NUMERIC 14 )`); o token dele traz
+  `prov:"n"` (sintético, *não* digitado) mas **não** traz `from` — não há link de volta
+  ao `__LINE__`. Contraste medido: a família [derivation.md](derivation.md)
+  (clone/paste/stringify) **povoa** o `from`; o `dynval` não. A origem sobrevive só em
+  `ppApplications`, e o único vínculo com o statement é **por número de linha** — justo
+  o eixo que esta família torna frágil. Consequência: um verbo que anda o statement AST
+  (o caminho natural de refatoração) é **cego** à sensibilidade de posição. *(Assertado
+  na guarda `corpus_dyn`: `prov="n"` e `"from" not in tok`.)*
 - **[Consumo futuro — VERIFICADO] A ferramenta não AVISA que o módulo é sensível a
-  posição.** O fato está no dump (as aplicações de `__LINE__`, com linha —
-  verificado na fixture: duas aplicações, linhas registradas), e nenhum verbo o usa.
-  Um verbo que desloca linhas deveria dizer *"este módulo expande `__LINE__` em N
-  sítios; o valor deles muda com esta edição"* — o mesmo dever de **relato** da
-  família [text-stream.md](text-stream.md), pela mesma razão do §1 do CLAUDE.md.
-  Entra na fase **P16** (o relato do não-verificável), que já existia: é o mesmo
-  verbo, com uma segunda fonte de aviso. **Não implementado** (spec antes de código).
+  posição.** Segue de cima: o fato existe (em `ppApplications`, com linha), mas nenhum
+  verbo o usa, e um verbo que desloca linhas deveria dizer *"este módulo expande
+  `__LINE__` em N sítios; o valor deles muda com esta edição"* — o mesmo dever de
+  **relato** da família [text-stream.md](text-stream.md). Entra na fase **P16**. Duas
+  saídas possíveis, e a escolha é do Diego (spec antes de código): (a) o consumidor
+  cruza `ppApplications` por linha; ou (b) **estende-se o core** para povoar `from` no
+  token expandido do `dynval` — o mesmo canal já usado na `derivation` —, e aí o vínculo
+  deixa de depender da linha. **Não implementado.**
 - **[Não-lacuna, dito por honestidade] O valor novo é o CERTO.** Não há nada a
   consertar na expansão, e seria erro "congelar" o `__LINE__` para preservar pcode —
   isso mentiria sobre onde o código está. O produto aqui é o **aviso**, não a

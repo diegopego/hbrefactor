@@ -28,18 +28,59 @@ uma explicação em linguagem natural e comprovação via asserts, juntas, em `.
 - **duas camadas**: o **texto** que a diretiva vira (pp vivo, `__pp_Process`) e o **valor** que
   ela vale (`hbtest`). Elas **discordam** — e é aí que mora o achado.
 
-**Três placares MECÂNICOS rodam a cada `make ppcorpus`** (88/0 hoje; `make test` 990/0):
+**Placares MECÂNICOS rodam a cada `make ppcorpus`** (98/0 hoje; `make test` 990/0):
 | guarda | cobra | estado |
 |---|---|---|
 | `corpus_compile_all` | **todo `.prg` compila** | 0 quebrados |
-| `corpus_metodo` | selo `METODO-V2` nas revisadas; **selo sem prova reprova** | **22 revisadas · 7 pendentes** (nomeadas; revisadas 2026-07-15: `ppc-ref`, `ppc-store`, `ppc-say`, `ppc-set`, `ppc-class`, `ppc-gen`) |
+| `corpus_metodo` | selo `METODO-V2` (a DIRETIVA, camadas A/B); **selo sem prova reprova** | **24 revisadas · 6 pendentes** (nomeadas; revisadas 2026-07-15: `ppc-ref`, `ppc-store`, `ppc-say`, `ppc-set`, `ppc-class`, `ppc-gen`, `ppc-dyn`) |
+| `corpus_completude` **(NOVO 2026-07-15)** | o **loop dos 4 oráculos** rodou até não sobrar buraco (§5b/§7); selo `COMPLETUDE` casado com check tagueado — **COMPLETE lê a AST, HOLE aponta fase viva** | **1 (`ppc-dyn`=`HOLE:P16`) · 14 pendentes** (nomeadas, não-bloqueante); fase **P-COMPLETUDE** no roadmap |
 | `corpus_docs` | **todo `.md` declara a guarda que o prova** | 3 famílias sem prova: `directive-scope` (vira teste), `uses-core` (censo) e `pp-as-search` (plano) |
 | `corpus_refs` | citação `arquivo:linha` do core ainda aponta o que a doc diz | verde |
 | `corpus_schema` | a tabela de mkinds do `ast-schema.md` × os dumps | verde |
 
-**A fila (fase P-REV no roadmap):** revisar 13 fixtures — as 3 de `tests/fix*` são
-**compartilhadas com o contrato** (casos 111/113/115): apresentar o drift ANTES. E `derivation`
-já virou teste; falta `directive-scope`.
+**A DISCIPLINA NOVA (2026-07-15): o loop dos oráculos virou portão.** `METODO-V2` prova só a
+**diretiva**; ele não testemunhava o loop *"entender pelos 4 oráculos → oráculo falta info → melhorar
+o oráculo (core) → repetir até não sobrar buraco"* (METODO §5b/§7, que eram **prosa sem portão**). Agora:
+o passo a passo vive no **METODO §5b** (carregado inteiro ao retomar), e o **`corpus_completude`** cobra
+o veredito por família (rastro executável de polaridade casada). *(Um skill dedicado foi tentado e
+DESCARTADO: o baseline mostrou agentes rodando o loop **sem** ele — portão + METODO §5b bastam.)*
+**Toda família V2 pendente precisa rodar o loop** (fila P-COMPLETUDE). Piloto nomeado: `from`-no-dynval
+(P16 b) fecha o `ppc-dyn` (`HOLE→COMPLETE`), sob autorização de commit no core.
+
+**A fila (fase P-REV no roadmap):** faltam **6** — 3 livres (`ppc-instr/m`,
+`ppc-live`, `ppc-pragma/pg`) + 3 **compartilhadas com o contrato** (`fixabr`/`fixmk`/`fixp6`,
+casos 111/113/115): **apresentar o drift ao Diego ANTES** de tocar (CLAUDE.md §3), porque revisá-las
+mexe no `make test`.
+
+**O TEMPLATE V2 que emergiu nesta sessão de 6 famílias (2026-07-15) — siga-o, não re-derive:**
+1. **Dois arquivos por família:** `xx.prg` (o principal: `#include "hbtest.ch"` + pp vivo, roda
+   pelo hbmk2) e `xxdump.prg` (a irmã raw-dumpável, sem `#require`, para o que só o `.ppo`/`.ppt`/ast
+   mostra e não tem valor em runtime). Espelho de `sf.prg`/`sfdump.prg`.
+2. **Camada A** = o que a diretiva VIRA, por `__pp_Process` (o texto), assertado com `HBTEST
+   AllTrim(...) IS "..."`. Comando de LINGUAGEM (`std.ch`) → `__pp_Init()` já o conhece, sem
+   `AddRule`; regra do ARQUIVO → `__pp_Init(,"")` virgem + `__pp_AddRule`.
+3. **Camada B** = o que ela VALE, por `HBTEST <expr> IS <valor>`, e o assert TEM de passar pela
+   diretiva (apagá-la quebra o assert). **"Onde couber":** já achei 2 exceções honestas —
+   `@ SAY` é **só camada A** (escreve no dispositivo, `SaveScreen` volta vazio sob `gtcgi`); `hbclass`
+   é **só camada B** (o dialeto são dezenas de regras; pp vivo de uma diretiva isolada não faz sentido —
+   o `.ppt` é a camada A dele). Documente o PORQUÊ da exceção, não force um assert.
+4. **Guarda `corpus_xx`:** builda+roda o principal (`grep -c 'MAIN(' >= N` asserts, `! grep '^ *!'`
+   falhas) e roda os oráculos da irmã via `gen4 ppc-xx xxdump.prg`. Ancore grep do `.ppt` em texto
+   **independente de linha** (a irmã tem cabeçalho maior).
+5. **Cada citação `arquivo:linha` do core → `tests/corerefs.txt`** (senão apodrece calada). Já
+   registrei `std.ch:78/121/249`, `hbfoxpro.ch:60/63`, `ppcore.c:4352/5528/7019`.
+6. Atualize o `.md` da família (o bloco "A fixture" → "a prova é EXECUTÁVEL"), o placar aqui, e
+   **`make ppcorpus` + `make test` verdes**. Commit por família (autorização por-commit do Diego).
+
+**Gotchas desta frente:**
+- **O hook `hbcompile.sh` dá FALSO-POSITIVO em toda fixture com `#include "hbtest.ch"`/`"hbclass.ch"`**
+  — ele compila cru com só `-I<dir>`, sem `contrib/hbtest` nem `core/include`. É **advisório** (a
+  escrita já aconteceu); o contrato REAL é `corpus_compile_all`/hbmk2. **Não persiga o erro do hook.**
+  (Melhoria óbvia, ainda NÃO autorizada pelo Diego: o hook detectar o include e acrescentar o `-I`,
+  como o `corpus_compile_all` já faz.)
+- **Acoplamento entre guardas:** o `corpus_strdump` pegava emprestado o dump cru de `clsx.prg`;
+  ao dividir a fixture, quebrou. Repontei para `clsxdump.prg`. Ao dividir uma fixture, **grep quem
+  mais usa o dump dela** (`grep <fam>.ast.json tests/ppcorpus.sh`).
 
 **Cinco famílias NOVAS nesta sessão** (todas com asserts): `pass-cycle` (o pp esgota o comando
 antes de avançar; teto de 4096 passes, `#pragma RECURSELEVEL`), `derivation` (clone × paste ×
