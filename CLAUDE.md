@@ -145,9 +145,8 @@ vai fazer isso por **substituição de texto** — com confiança, e errado —,
 exatamente o modo de falha que esta ferramenta existe para eliminar**. O agente não é "mais um
 consumidor": é o que **mais precisa** de um oráculo de fato.
 
-- **NÃO-OBJETIVO, e é executável, não retórico:** a ferramenta **não tem modelo, não tem chave
-  de API, não fala com rede, e NUNCA pergunta nada a um LLM**. Régua na suíte, família do caso
-  64: nenhum `anthropic|openai|api[_-]?key|https?://` em `src/hbrefactor.prg`.
+- **NÃO-OBJETIVO:** a ferramenta **não tem modelo, não tem chave de API, não fala com rede, e
+  NUNCA pergunta nada a um LLM**.
 - **Tratar IA como cidadã de primeira classe muda a SUPERFÍCIE, jamais o motor** — saída
   estruturada, código de motivo na recusa, o verificador exposto. Nenhum princípio desta seção
   cede em nome de "ser AI-first"; se ceder, o rótulo virou **cavalo de Troia da heurística**.
