@@ -32,9 +32,11 @@ que emite `PUBLIC` de novo… para sempre. O pp precisaria de um jeito de dizer
 ```
 
 O `<@>` no início do resultado emite um **token especial** que:
-1. **carrega o padrão de match da regra** (ppcore.c:5234 — `pMTokens = pRule->pMatch`),
-   e é isso que permite ao pp saber "esta saída veio desta regra, não a re-aplique";
-2. é **descartado antes do compilador** (ppcore.c:6712) — invisível no código final.
+1. **carrega o padrão de match da regra** (ppcore.c:5528 — `( *pTokenPtr )->pMTokens =
+   pRule->pMatch;`), e é isso que permite ao pp saber "esta saída veio desta regra,
+   não a re-aplique";
+2. é **descartado antes do compilador** (ppcore.c:7019 — o token de tipo
+   `HB_PP_RMARKER_REFERENCE` é liberado do fluxo de saída) — invisível no código final.
 
 Palavras do autor, no ChangeLog do core (2010-08-19, Przemysław Czerpak):
 
@@ -55,18 +57,22 @@ exatamente assim:
 É raro (2 usos em todo o core) — mas é o que torna possível **estender um comando
 existente do Harbour sem quebrá-lo**.
 
-## A fixture (`tests/ppc-ref/refx.prg`) — compila limpo sob `-w3 -es2`
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
 
-```harbour
-#xtranslate __DIM( <exp> ) => <exp>
-#command PUBLIC <var1> [, <varN> ] => ;
-         <@> PUBLIC __DIM( <var1> ) [, __DIM( <varN> ) ]
+Duas camadas, em dois arquivos:
 
-MEMVAR nA, nB
-PROCEDURE Main()
-   PUBLIC nA, nB
-   ...
-```
+- **`tests/ppc-ref/refx.prg`** (`hbtest` + pp vivo) — prova o que o guarda **VIRA** e
+  **VALE**, com asserts que rodam:
+  - camada A (o TEXTO): `AllTrim( __pp_Process( pp, "PUBLIC nA, nB" ) )` devolve
+    `"PUBLIC nA := 7, nB := 7"` — a regra circular **converge**; e a MESMA regra
+    **sem** o `<@>` ergue `E0022 "Circularity detected"` (é este assert que prova que
+    o guarda é necessário, não enfeite);
+  - camada B (o VALOR): o `PUBLIC nA, nB` de escopo de arquivo casou a regra guardada
+    em tempo de compilação → `nA == 7`. Apagar qualquer uma das duas diretivas quebra
+    o assert (a régua do METODO: assert tem de passar PELA diretiva).
+- **`tests/ppc-ref/refxdump.prg`** (raw-dumpável, sem `hbtest`) — os fatos que só o
+  dump mostra: o `.ppo` sem o guarda, o `.ppt` com a reemissão de `PUBLIC` atrás do
+  `<@>`, e o marker `mkind: "reference"`.
 
 ## O `.ppo` — o guarda some antes do compilador
 

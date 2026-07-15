@@ -31,3 +31,9 @@ tests/pp.prg:9	#command _REGULAR_(<z>)
 tests/pp.prg:12	#command _DUMB_(<z>)
 src/pp/ppcore.c:6587	pState->iCycle = 0;
 include/hbpp.h:412	#define HB_PP_MAX_CYCLES
+# familia <@> (reference-guard.md, ppc-ref/refx.prg + refxdump.prg)
+contrib/hbfoxpro/hbfoxpro.ch:63	#command PUBLIC <var1>
+contrib/hbfoxpro/hbfoxpro.ch:60	#xtranslate __FP_DIM( <exp> ) => <exp>
+src/pp/ppcore.c:4352	hb_pp_tokenSetValue( *pTokenPtr, "~", 1 )
+src/pp/ppcore.c:5528	pRule->pMatch;
+src/pp/ppcore.c:7019	HB_PP_RMARKER_REFERENCE

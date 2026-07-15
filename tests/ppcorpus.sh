@@ -153,14 +153,28 @@ corpus_markers() {
 # --------------------------------------------------------------------------
 corpus_ref() {
    echo "corpus: familia <@> - o guarda anti-recursao (regra circular)"
-   ( cd "$HERE/ppc-ref" && "$HB" refx.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-ref/refx.prg compila limpo (o <@> IMPEDIU o loop infinito)" $?
-   local D; D=$(gen4 ppc-ref refx.prg)
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-ref-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-ref/refx.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada A (pp vivo: o que o guarda VIRA, e que a regra
+   #     circular TERMINA; sem <@> ela ergue E0022) + camada B (o valor em runtime)
+   ( cd "$R" && "$HB_BIN/hbmk2" refx.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -orefx -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-ref/refx.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./refx > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "refx.prg RODA: 4 asserts (com <@> TERMINA, sem <@> E0022) - 0 falhas" $?
+
+   # (2) o que so' o dump/oraculo mostra, na irma raw-dumpavel (sem #require)
+   local D; D=$(gen4 ppc-ref refxdump.prg)
    # o guarda e INVISIVEL ao compilador: some da saida expandida
-   grep -q 'PUBLIC nA, nB' "$D/refx.ppo" && ! grep -q '<@>' "$D/refx.ppo"
+   grep -q 'PUBLIC nA, nB' "$D/refxdump.ppo" && ! grep -q '@' "$D/refxdump.ppo"
    check ".ppo: a regra circular expandiu, e o <@> sumiu antes do compilador" $?
-   # mas o dump o EXPORTA (mkind reference), sem nome e sem posicao
-   grep -q '"mkind": "reference"' "$D/refx.ast.json"
+   # o .ppt mostra a regra REEMITINDO PUBLIC atras do <@> - e o PUBLIC emitido nao re-casa
+   grep -q '<@> PUBLIC __DIM' "$D/refxdump.ppt"
+   check ".ppt: a regra reemite PUBLIC atras do <@> (e o PUBLIC emitido nao re-casa)" $?
+   # e o dump o EXPORTA (mkind reference), sem nome e sem posicao
+   grep -q '"mkind": "reference"' "$D/refxdump.ast.json"
    check "ast dump: o guarda vem como mkind 'reference' (sem nome, sem posicao)" $?
 }
 
