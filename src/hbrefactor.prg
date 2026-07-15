@@ -348,16 +348,32 @@ STATIC PROCEDURE SchemaMismatch( cGot )
 
    RETURN
 
+// raiz única de tudo que a ferramenta grava em disco temporário: um só teto
+// ($TMPDIR/hbrefactor) com dois quartos - work/ (efêmero, descartável a
+// qualquer hora) e snap/ (baseline de verify/--rollback). Um só diretório
+// torna a limpeza manual trivial (rm -rf de um lugar) e preserva a distinção
+// lixo x buffer-de-desfazer. hb_DirBuild cria a cadeia e é idempotente.
+STATIC FUNCTION WorkRoot()
+
+   LOCAL cRoot := hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor"
+
+   hb_DirBuild( cRoot )
+
+   RETURN hb_DirSepAdd( cRoot )
+
 // scratch único por invocação (R1 da suíte paralela e de qualquer uso
 // concorrente real - o timestamp de 1 s colidia entre processos no mesmo
 // segundo): mkdir é atômico, então o nome é aleatório e a criação é
-// tentar-até-conseguir; hb_DirCreate devolve 0 só quando criou AGORA
+// tentar-até-conseguir; hb_DirCreate devolve 0 só quando criou AGORA.
+// Fica sob a raiz única, em work/, para a limpeza ser um rm -rf só.
 STATIC FUNCTION WorkDir()
 
-   LOCAL cTmp, nTry := 0
+   LOCAL cBase := WorkRoot() + "work", cTmp, nTry := 0
+
+   hb_DirBuild( cBase )
 
    DO WHILE .T.
-      cTmp := hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor_" + ;
+      cTmp := hb_DirSepAdd( cBase ) + ;
               hb_ntos( hb_RandomInt( 100000000, 999999999 ) )
       IF hb_DirCreate( cTmp ) == 0
          EXIT
@@ -900,8 +916,12 @@ STATIC FUNCTION DumpOnly( aArgs )
 // e a quarta enxergou o snapshot da primeira. É o gatilho de basename do
 // CLAUDE.md, e eu caí nele.)
 STATIC FUNCTION SnapDir( cSpec )
-   RETURN hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor-snap-" + ;
-          hb_MD5( hb_DirSepAdd( hb_cwd() ) + cSpec )
+
+   LOCAL cBase := WorkRoot() + "snap"
+
+   hb_DirBuild( cBase )
+
+   RETURN hb_DirSepAdd( cBase ) + hb_MD5( hb_DirSepAdd( hb_cwd() ) + cSpec )
 
 // os fatos do .hrb de um módulo: o hash do objeto inteiro decide
 // preserved/changed; os símbolos e o pcode POR FUNÇÃO dão o delta

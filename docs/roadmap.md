@@ -750,6 +750,63 @@ getter + setter, mapeia `NOME→novo` E `_NOME→_novo`, e recusa homônimo entr
 - **B5 — critério vivo da extensão:** Diego usa no dia a dia; sem regressão. **Todo comando
   novo do CLI chega à `extension.js` na fase que o entrega** (regra no CLAUDE.md).
 
+## H — HIGIENE DE DIRETÓRIOS TEMPORÁRIOS *(pista do Diego, 2026-07-14; **H.1 e H.2 ENTREGUES 2026-07-14 — suíte 990/0, sem re-baseline**)*
+
+**O problema, medido:** a ferramenta espalha `hbrefactor_<rand>` e `hbrefactor-snap-<md5>`
+**soltos** dentro de `hb_DirTemp()` (`/tmp`), sem teto comum — milhares de dirs acumulados,
+limpeza só com glob perigoso. (O scratchpad do Claude Code — `/tmp/claude-*/…/` — encheu em
+paralelo, 1.7 G numa sessão morta, mas isso é comportamento do harness, não da ferramenta;
+entra só como alvo de medição na H.2.) **Decisão do Diego:** raiz única + aviso determinístico
+sob controle dele — **nada de auto-limpeza** (ação silenciosa é o que ele recusa).
+
+### Fase H.1 — Raiz única sob `$TMPDIR/hbrefactor/{work,snap}`
+
+**Escopo**
+- Nova `STATIC FUNCTION WorkRoot()` → `hb_DirSepAdd( hb_DirTemp() ) + "hbrefactor"`, com
+  `hb_DirBuild` uma vez.
+- `WorkDir()` (o chokepoint do efêmero, hoje em `src/hbrefactor.prg` ~L360) passa a criar sob
+  `WorkRoot() + sep + "work" + sep + <rand>` — preservando o laço anti-colisão do `hb_RandomInt`.
+- `SnapDir()` (`src/hbrefactor.prg:903`) passa a devolver `WorkRoot() + sep + "snap" + sep +
+  hb_MD5( cwd + spec )`.
+- **Nenhum outro site**: os subdirs (`ktwork` L9349, a sonda de regra L3056) já descendem de
+  `WorkDir()`/`cTmp` — descem junto de graça.
+- **Contrato preservado**: o `dump` continua imprimindo `dumps em: <path>` (`src/hbrefactor.prg:862`)
+  — só o *valor* muda, e a suíte lê esse valor da stdout, não uma constante.
+
+**Critério de pronto (mecânico)**
+- `make test` verde **sem re-baseline**: a suíte é agnóstica ao valor do caminho — os casos
+  capturam o path via `sed -n 's/^dumps em: //p'` (`tests/run.sh:1091,1815,2372,…`), não há
+  normalizador para tocar.
+- Após um `dump` + `snapshot` num projeto do corpus: `ls "${TMPDIR:-/tmp}/hbrefactor"` mostra
+  **só** `work/` e `snap/`, e **zero** `hbrefactor_*`/`hbrefactor-snap-*` solto em `$TMPDIR`.
+- Round-trip intacto: `snapshot` → editar quebrando o build → `verify --rollback` restaura byte
+  a byte (o `SnapDir()` é o mesmo dos dois lados, então escrita e leitura continuam alinhadas).
+- Sem superfície de CLI nova → **extensão não afetada** (nada a propagar para `extension.js`).
+
+### Fase H.2 — `make tmp-usage`: aviso determinístico de limite (NUNCA apaga)
+
+**Escopo**
+- `tools/tmp-usage.sh` + target `tmp-usage` no Makefile (a família de `tools/*.sh` de ops do
+  Diego; mensagens em PT, como as demais — não é superfície de produto).
+- Mede `du -s` de **dois alvos, reportados em separado**: (a) `${TMPDIR:-/tmp}/hbrefactor` e
+  (b) o scratchpad do Claude Code deste projeto (`/tmp/claude-*/…hbrefactor*/`).
+- Limite default **500 M**, override por env `HBREFACTOR_TMP_WARN_MB`.
+- Acima do limite: imprime o tamanho, a divisão `work` × `snap`, e **o comando exato de limpeza
+  para colar** — distinguindo o `rm -rf …/hbrefactor/work` (sempre seguro) do
+  `rm -rf …/hbrefactor` (inclui o `snap`, que é o buffer de `--rollback`: aviso no texto).
+- Abaixo: uma linha `OK`. **Nunca deleta.** Exit code: `0` abaixo, `!=0` acima (composável).
+- Gatilho **só manual** (`make tmp-usage`) — sem hook, sem gatilho passivo.
+
+**Critério de pronto (mecânico)**
+- Com `$TMPDIR/hbrefactor` acima de 500 M, `make tmp-usage` sai `!=0`, imprime os comandos, e
+  `ls`/`git status` confirmam que **nada foi apagado**.
+- Vazio ou abaixo do limite → sai `0` com a linha `OK`.
+- `HBREFACTOR_TMP_WARN_MB=1 make tmp-usage` dispara o aviso (prova do override).
+
+**Ao commitar** (fora do escopo de código, via `/update-manual`): entrada de `CHANGELOG.md` no
+registro do programador — *onde a ferramenta passa a escrever seus temporários e como limpar* —,
+já que o local dos `.ast.json`/snapshots muda de forma visível.
+
 ---
 
 # PORTÕES FECHADOS / EM ESPERA

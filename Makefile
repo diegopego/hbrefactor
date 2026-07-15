@@ -12,7 +12,7 @@ HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
-.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-check site-examples help
+.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage help
 
 ## build       compila a ferramenta em bin/hbrefactor (alvo padrão)
 build: hooks $(BIN)
@@ -94,6 +94,10 @@ PORT ?= 8000
 site-serve:
 	@echo "site: http://localhost:$(PORT)/  (servindo $(SITE), Ctrl+C encerra)"
 	@python3 -m http.server $(PORT) --directory $(SITE)
+
+## tmp-usage   AVISA se os temporários passaram do limite (nunca apaga; HBREFACTOR_TMP_WARN_MB=500)
+tmp-usage: tools/tmp-usage.sh
+	@tools/tmp-usage.sh
 
 ## clean       remove bin/
 clean:
