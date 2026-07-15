@@ -6,16 +6,20 @@ em tempo de preprocessamento — é assim que o `hbclass` funciona por dentro �
 pp põe **limites precisos** em quem pode fazer isso. Guarda: `corpus_gen`; fixture
 `tests/ppc-gen/genx.prg`.
 
-## A fixture (`tests/ppc-gen/genx.prg`) — compila limpo sob `-w3 -es2`
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
 
-```harbour
-#xcommand DEFREGRA <n> => #xcommand USA <n> => ? Marca( <"n"> )
+Duas camadas, em dois arquivos:
 
-PROCEDURE Main()
-   DEFREGRA Ponto      // cria, em tempo de pp, a regra `USA Ponto`
-   USA Ponto           // usa a regra que acabou de nascer
-   RETURN
-```
+- **`tests/ppc-gen/genx.prg`** (`hbtest` + pp vivo) —
+  - camada A (o TEXTO, rule-gen no pp VIVO, em dois passos): `__pp_Process(pp,
+    "DEFREGRA Ponto")` devolve **vazio** — ele emitiu uma *diretiva* (`#xcommand USA
+    Ponto`), que o pp **registra** sem imprimir (mudança de estado, não texto); e o
+    passo seguinte `__pp_Process(pp, "USA Ponto")` já casa a regra recém-nascida →
+    `s_xUltimo := Marca( "Ponto" )`. É rule-generates-rule provado no pp vivo;
+  - camada B (o VALOR): `DEFREGRA`/`USA` de escopo de arquivo rodam na compilação e
+    `s_xUltimo` recebe `"Ponto"` (e `"Linha"` — o gerador faz uma regra nova por nome).
+- **`tests/ppc-gen/genxdump.prg`** (raw-dumpável) — o `.ppt` (a regra nasce, é usada
+  na linha seguinte, três passes) e a genealogia ast-13 (`from` → a app criadora).
 
 ## O `.ppt` — a regra nasce e é usada, na mesma compilação
 

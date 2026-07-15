@@ -32,7 +32,7 @@ uma explicação em linguagem natural e comprovação via asserts, juntas, em `.
 | guarda | cobra | estado |
 |---|---|---|
 | `corpus_compile_all` | **todo `.prg` compila** | 0 quebrados |
-| `corpus_metodo` | selo `METODO-V2` nas revisadas; **selo sem prova reprova** | **20 revisadas · 8 pendentes** (nomeadas; revisadas 2026-07-15: `ppc-ref`, `ppc-store`, `ppc-say`, `ppc-set`, `ppc-class`) |
+| `corpus_metodo` | selo `METODO-V2` nas revisadas; **selo sem prova reprova** | **22 revisadas · 7 pendentes** (nomeadas; revisadas 2026-07-15: `ppc-ref`, `ppc-store`, `ppc-say`, `ppc-set`, `ppc-class`, `ppc-gen`) |
 | `corpus_docs` | **todo `.md` declara a guarda que o prova** | 3 famílias sem prova: `directive-scope` (vira teste), `uses-core` (censo) e `pp-as-search` (plano) |
 | `corpus_refs` | citação `arquivo:linha` do core ainda aponta o que a doc diz | verde |
 | `corpus_schema` | a tabela de mkinds do `ast-schema.md` × os dumps | verde |

@@ -227,16 +227,27 @@ corpus_ref() {
 # --------------------------------------------------------------------------
 corpus_gen() {
    echo "corpus: familia REGRA QUE GERA REGRA - diretiva que cria diretiva"
-   ( cd "$HERE/ppc-gen" && "$HB" genx.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-gen/genx.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-gen genx.prg)
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-gen-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-gen/genx.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada A (rule-generates-rule NO pp vivo: DEFREGRA
+   #     REGISTRA a regra USA, saida vazia; a linha seguinte ja casa) + camada B
+   ( cd "$R" && "$HB_BIN/hbmk2" genx.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -ogenx -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-gen/genx.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./genx > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "genx.prg RODA: 4 asserts (a regra nasce e casa no pp vivo; e o valor) - 0 falhas" $?
+
+   # (2) o que so' o .ppt/dump mostra, na irma raw-dumpavel (sem #require)
+   local D; D=$(gen4 ppc-gen genxdump.prg)
    # .ppt: a regra NASCE e ja e USADA na mesma compilacao (multi-passe)
-   grep -q '#xcommand >#xcommand USA Ponto' "$D/genx.ppt"
+   grep -q '#xcommand >#xcommand USA Ponto' "$D/genxdump.ppt"
    check ".ppt: DEFREGRA EMITE uma diretiva nova (#xcommand USA Ponto)" $?
-   grep -q 'genx.prg(9) >USA Ponto<' "$D/genx.ppt" && grep -q 'Marca( "Ponto" )' "$D/genx.ppo"
+   grep -q '>USA Ponto<' "$D/genxdump.ppt" && grep -q 'Marca( "Ponto" )' "$D/genxdump.ppo"
    check ".ppt/.ppo: a regra recem-nascida ja casa na linha seguinte" $?
    # ast-13: a regra gerada carrega a genealogia (from -> a app que a criou)
-   grep -q '"from"' "$D/genx.ast.json"
+   grep -q '"from"' "$D/genxdump.ast.json"
    check "ast-13: a regra gerada carrega genealogia ('from' -> a app criadora)" $?
 }
 
