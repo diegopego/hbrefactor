@@ -1,5 +1,12 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta' provada
 // por assert que passa PELO pp vivo. (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a familia prova live-pp == build-pp, e a AST e' a
+//   SAIDA do build-pp -- o que a ferramenta consome. Ela carrega a migracao completa
+//   com proveniencia (far_Migrado: Alfa=stringify/dado, nX=clone/simbolo posicionado).
+//   Logo o fato ao qual o pp VIVO e' provado equivalente esta' COBERTO na AST: a
+//   ferramenta pode usar qualquer um dos dois motores e obtem o mesmo fato. O check
+//   COMPLETUDE(ppc-live=COMPLETE) em corpus_pplive le' a AST e afirma isso.
 //
 // Familia PP VIVO (P11, docs/pp-corpus/pp-as-instrument.md § 4). O pp do core EM
 // PROCESSO, dirigido por codigo Harbour: __pp_Init cria um estado, __pp_Process

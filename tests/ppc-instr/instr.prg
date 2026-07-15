@@ -1,5 +1,12 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; a afirmacao esta' provada
 // por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: os canais -u/-gd sao o INSTRUMENTO da migracao
+//   (D-P5), mas o RESULTADO que a ferramenta consome esta' na AST. O far_Migrado
+//   gerado chega com a mesma proveniencia de derivacao da familia deriv: #<n>
+//   estringifica o NOME ("Alfa", dado) e <v> clona o token (nX, simbolo POSICIONADO,
+//   o alvo de rename). O -gd (include resolvido) e' canal proprio do core, nao fato de
+//   AST. O check COMPLETUDE(ppc-instr=COMPLETE) em corpus_instrument le' a AST.
 //
 // Familia PP COMO INSTRUMENTO (docs/pp-corpus/pp-as-instrument.md), camada B.
 // O irmao m.prg mostra os CANAIS do core (.ppo/-u/-gd) e o que cada um DESTROI --

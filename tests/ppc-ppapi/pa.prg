@@ -4,6 +4,14 @@
 // Fixture da familia PP VIVO / API (docs/pp-corpus/pp-api.md).
 // Origem: harbour/tests/ppapi.prg e src/pp/pplib.c (indicados pelo Diego).
 //
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST separa as DUAS camadas com correcao. A
+//   diretiva de COMPILACAO (#xcommand ECOA) expande e ppApplications a registra; o pp
+//   de RUNTIME (__pp_Process em string) e' chamada de funcao COMUM na AST -- nao marker,
+//   nao regra. E' o que a familia ensina (o pp de runtime nao ve o da compilacao), e a
+//   AST o reflete: nada de pp-runtime vaza para o eixo de diretivas. O check
+//   COMPLETUDE(ppc-ppapi=COMPLETE) em corpus_ppapi le' a AST e afirma isso.
+//
 // COMO COMPILAR:
 //   sintaxe:  harbour pa.prg -n -q0 -w3 -es2 -s -I$HB_CORE/contrib/hbtest
 //   rodar:    hbmk2  pa.prg $HB_CORE/contrib/hbtest/hbtest.hbc -w3 -es2 -gtcgi

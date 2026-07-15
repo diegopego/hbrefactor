@@ -359,6 +359,22 @@ corpus_instrument() {
    ( cd "$B" && ./instr > instr.out 2>&1 )
    [ "$(grep -c 'MAIN(' "$B/instr.out")" -ge 1 ] && ! grep -q '^ *!' "$B/instr.out"
    check "instr.prg RODA: a migracao vale 'Alfa1' (#<n> cita o nome, <v> copia o valor) - 0 falhas" $?
+   # COMPLETUDE: os canais -u/-gd sao o INSTRUMENTO da migracao (D-P5); o RESULTADO que
+   # a ferramenta consome esta' na AST. O far_Migrado gerado chega com a MESMA proveniencia
+   # de derivacao da familia deriv: #<n> estringifica o NOME -> "Alfa" (dado); <v> clona o
+   # token -> nX (simbolo POSICIONADO, o alvo de rename). O -gd, por sua vez, e' um canal
+   # PROPRIO do core (o include resolvido), nao um fato que a AST deva carregar.
+   ( cd "$B" && "$HB" instr.prg -n -q0 -xinstr.ast.json -I"$CORE/contrib/hbtest" > /dev/null 2>&1 )
+   python3 - "$B/instr.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+name = [t for t in d["tokens"] if t.get("text") == "Alfa"
+        and any(f["op"] == "stringify" for f in (t.get("from") or []))]
+val  = [t for t in d["tokens"] if str(t.get("text","")).upper() == "NX"
+        and any(f["op"] == "clone" for f in (t.get("from") or []))]
+sys.exit(0 if name and val and val[0].get("col") is not None else 1)
+PYEOF
+   check "ast COMPLETUDE(ppc-instr=COMPLETE): o far_Migrado da migracao chega na AST com proveniencia (Alfa=stringify/dado, nX=clone/simbolo posicionado) - o resultado que a ferramenta consome esta' coberto" $?
    ( cd "$D" && "$HB" m.prg -n -q0 -p -p+ -u -s -Iinc > /dev/null 2>&1 )
    # -u ISOLA: aplica so as regras do usuario; o resto da linguagem passa intacto
    # (o alvo da migracao e' CODIGO -- far_Migrado --, porque fixture TEM de compilar;
@@ -406,6 +422,23 @@ corpus_pplive() {
    #     imita o build -- e' o mesmo motor, provado contra o passo que o .ppt mostra
    grep -q "MODERNO Alfa VALOR nX" "$D/m.ppt"
    check "  ...e o pp do BUILD concorda, no .ppt (a equivalencia e' com o MESMO fato)" $?
+   # COMPLETUDE: a familia prova live-pp == build-pp; a AST e' a SAIDA do build-pp, que e'
+   # o que a ferramenta consome. E ela carrega a migracao completa com proveniencia (o
+   # far_Migrado: Alfa=stringify/dado, nX=clone/simbolo posicionado). Logo o fato ao qual
+   # o pp VIVO e' provado equivalente esta' COBERTO na AST -- a ferramenta pode usar
+   # qualquer um dos dois motores e obtem o MESMO fato. (dump sem -u: o -u e' o instrumento
+   # de isolamento, e sob ele o `? "oi"` do std nao expande; a migracao independe disso.)
+   ( cd "$D" && "$HB" m.prg -n -q0 -xm.ast.json -Iinc -I"$CORE/contrib/hbtest" > /dev/null 2>&1 )
+   python3 - "$D/m.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+name = [t for t in d["tokens"] if t.get("text") == "Alfa"
+        and any(f["op"] == "stringify" for f in (t.get("from") or []))]
+val  = [t for t in d["tokens"] if str(t.get("text","")).upper() == "NX"
+        and any(f["op"] == "clone" for f in (t.get("from") or []))]
+sys.exit(0 if name and val and val[0].get("col") is not None else 1)
+PYEOF
+   check "ast COMPLETUDE(ppc-live=COMPLETE): a saida do build-pp (o far_Migrado com proveniencia) esta' na AST - o fato ao qual o pp vivo e' equivalente esta' coberto" $?
 }
 
 # --------------------------------------------------------------------------
@@ -950,6 +983,27 @@ corpus_ppapi() {
    ( cd "$R" && ./pa > run.txt 2>&1 )
    [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 10 ] && ! grep -q '^ *!' "$R/run.txt"
    check "pa.prg RODA: estados independentes, reset preserva as padrao, e o pp de runtime NAO ve o arquivo" $?
+   # COMPLETUDE: a AST separa as DUAS camadas com correcao. A diretiva de COMPILACAO
+   # (#xcommand ECOA) expande e o ppApplications a registra; ja' o pp de RUNTIME
+   # (__pp_Process em string) e' chamada de funcao COMUM na AST -- nao marker, nao regra.
+   # E' exatamente o que a familia ensina (o pp de runtime nao ve o da compilacao), e a
+   # AST o reflete: nada de pp-runtime vaza para o eixo de diretivas.
+   local D; D=$(gen4 ppc-ppapi pa.prg -I"$CORE/contrib/hbtest")
+   python3 - "$D/pa.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+heads = {d["ppRules"][a["rule"]].get("head") for a in d.get("ppApplications", [])}
+def funcalls(n):
+    if isinstance(n, dict):
+        if n.get("et") == "FUNNAME": yield str(n.get("val","")).upper()
+        for v in n.values(): yield from funcalls(v)
+    elif isinstance(n, list):
+        for v in n: yield from funcalls(v)
+calls = set(funcalls(d))
+# ECOA (compilacao) esta' nas aplicacoes; __PP_PROCESS (runtime) e' funcall comum
+sys.exit(0 if "ECOA" in heads and "__PP_PROCESS" in calls else 1)
+PYEOF
+   check "ast COMPLETUDE(ppc-ppapi=COMPLETE): a AST separa a diretiva de compilacao (ECOA em ppApplications) do pp de runtime (__pp_Process = funcall comum) - as duas camadas cobertas com correcao" $?
 }
 
 # --------------------------------------------------------------------------
