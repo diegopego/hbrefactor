@@ -139,20 +139,31 @@ corpus_store() {
 # --------------------------------------------------------------------------
 corpus_class() {
    echo "corpus: familia hbclass (hbclass.ch) - o dialeto OO e diretiva de pp"
-   ( cd "$HERE/ppc-class" && "$HB" clsx.prg -n -q0 -w3 -es2 -s -I"$HB_INC" > /dev/null 2>&1 )
-   check "ppc-class/clsx.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-class clsx.prg -I"$HB_INC")
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-class-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-class/clsx.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada B (o dialeto COMPILA e VALE -- VAR INIT nasce 0,
+   #     METHOD dispara, ::nSaldo acumula, RETURN Self devolve o objeto)
+   ( cd "$R" && "$HB_BIN/hbmk2" clsx.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -oclsx -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-class/clsx.prg compila (hbtest; camada B do dialeto)" $?
+   ( cd "$R" && ./clsx > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 4 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "clsx.prg RODA: 4 asserts (VAR INIT, dispatch, acumula, RETURN Self) - 0 falhas" $?
+
+   # (2) o que VIRA (o .ppt) e a genealogia (ast), na irma raw-dumpavel
+   local D; D=$(gen4 ppc-class clsxdump.prg -I"$HB_INC")
    # .ppt: o PASTE do nome da funcao gerada (Conta_Deposita) via (concatenate)
-   grep -q '(concatenate) >Conta_Deposita<' "$D/clsx.ppt"
+   grep -q '(concatenate) >Conta_Deposita<' "$D/clsxdump.ppt"
    check ".ppt: METHOD cola o nome da funcao gerada (concatenate Conta_Deposita)" $?
    # .ppt: a diretiva que GERA outra diretiva (o #xcommand METHOD ... CLASS Conta)
-   grep -q '#xcommand METHOD .* Deposita CLASS Conta' "$D/clsx.ppt"
+   grep -q '#xcommand METHOD .* Deposita CLASS Conta' "$D/clsxdump.ppt"
    check ".ppt: METHOD (decl) GERA a diretiva da impl (#xcommand ... CLASS Conta)" $?
    # .ppt: a impl nasce com Self tipado - Self AS CLASS Conta := QSelf()
-   grep -q 'local Self AS CLASS Conta := QSelf() AS CLASS Conta' "$D/clsx.ppt"
+   grep -q 'local Self AS CLASS Conta := QSelf() AS CLASS Conta' "$D/clsxdump.ppt"
    check ".ppt: a impl nasce com Self AS CLASS Conta := QSelf() (RD/M-B)" $?
    # ast dump: a regra METHOD gerada carrega genealogia (from) - ast-13
-   grep -q '"from"' "$D/clsx.ast.json"
+   grep -q '"from"' "$D/clsxdump.ast.json"
    check "ast-13: a regra METHOD gerada carrega genealogia ('from')" $?
 }
 
@@ -379,9 +390,10 @@ corpus_strdump() {
    grep -q '#xcommand >nLastro := sd_Afere( "nLastro" )<' "$D/sd.ppt" && \
       grep -q '#xcommand >sd_Lavra( "nLastro" )<' "$D/sd.ppt"
    check ".ppt: o traco mostra as DUAS regras consumindo o MESMO texto de forma oposta" $?
-   # a prova que NAO depende da minha DSL: a diretiva REAL do core
-   local C; C=$(gen4 ppc-class clsx.prg -I"$HB_INC")
-   python3 "$HERE/ppc-strdump.py" "$C/clsx.ast.json" "hbclass.ch" ASSOCIATE > /dev/null
+   # a prova que NAO depende da minha DSL: a diretiva REAL do core (a irma
+   # raw-dumpavel clsxdump.prg -- a clsx.prg agora inclui hbtest e nao dumpa cru)
+   local C; C=$(gen4 ppc-class clsxdump.prg -I"$HB_INC")
+   python3 "$HERE/ppc-strdump.py" "$C/clsxdump.ast.json" "hbclass.ch" ASSOCIATE > /dev/null
    check "strdump em diretiva REAL do core: hbclass.ch:576 (ASSOCIATE ... #<type>)" $?
 }
 

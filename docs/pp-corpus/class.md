@@ -12,20 +12,22 @@ Diretivas reais ([include/hbclass.ch:235+](../../../harbour-core/harbour/include
 `CLASS <!Name!>`, `VAR <!Data!> [INIT <v>]`, `METHOD <Name> …`, `ENDCLASS`, e a
 implementação `METHOD <Name> CLASS <Class>`.
 
-## A fixture (`tests/ppc-class/clsx.prg`) — compila limpo sob `-w3 -es2`
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
 
-```harbour
-#include "hbclass.ch"
+Duas camadas, em dois arquivos. Aqui a camada A (o TEXTO via pp vivo) **não cabe**:
+o dialeto são dezenas de regras entrelaçadas que só fazem sentido com a classe
+inteira em contexto — o "o que VIRA" é provado pelo `.ppt`, não por `__pp_Process`
+de uma diretiva isolada.
 
-CREATE CLASS Conta
-   VAR nSaldo INIT 0
-   METHOD Deposita( nValor )
-ENDCLASS
-
-METHOD Deposita( nValor ) CLASS Conta
-   ::nSaldo += nValor
-   RETURN Self
-```
+- **`tests/ppc-class/clsx.prg`** (`hbclass.ch` + `hbtest`) — camada B: o dialeto
+  **compila e roda**. `Conta()` instancia; `oConta:nSaldo` nasce `0` (o `VAR … INIT
+  0` rodou); `oConta:Deposita( 100 )` dispara o método gerado e o `::nSaldo +=`
+  **acumula** (100, depois 150); `Deposita` devolve **Self** (`== oConta`). Cada
+  valor prova que `VAR`/`METHOD`/`::send` viraram função de verdade.
+- **`tests/ppc-class/clsxdump.prg`** (raw-dumpável, `-I <core>/include`) — os fatos
+  do `.ppt`/dump: o **paste** do nome (`Conta` + `_` + `Deposita` → `Conta_Deposita`),
+  a diretiva que **gera** a regra da impl (genealogia ast-13, `from`), e a impl
+  nascendo com o **Self tipado** (`local Self AS CLASS Conta := QSelf()`).
 
 ## `.ppt` — o traço (curado; o completo tem ~40 passes) revela QUATRO fatos
 
