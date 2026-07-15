@@ -63,8 +63,15 @@ DIR=$(dirname "$FILE")
 #   -s  só sintaxe, não gera código (anti-vazamento)
 #   -n  sem procedure implícita a partir de statements de topo
 #   -q0 silencioso
-#   -I  inclui o diretório do próprio .prg (acha o .ch da fixture)
-OUT=$("$HARBOUR" "$FILE" -n -q0 -w3 -es2 -s -I"$DIR" 2>&1)
+#   -I  inclui o diretório do próprio .prg (acha o .ch da fixture) E o contrib/hbtest:
+#       o corpus METODO-V2 usa `#include "hbtest.ch"`, e sem esse -I o portão dava
+#       FALSO-NEGATIVO ("Can't open #include file 'hbtest.ch'") em toda fixture com
+#       assert. É o mesmo -I que o corpus_compile_all já passa; com -s (sem link) o
+#       hbtest.hbc não é preciso — basta ACHAR o header. So' se o dir existir.
+INCS=(-I"$DIR")
+HBTEST_INC="${HB_BIN%/bin/*}/contrib/hbtest"
+[ -d "$HBTEST_INC" ] && INCS+=(-I"$HBTEST_INC")
+OUT=$("$HARBOUR" "$FILE" -n -q0 -w3 -es2 -s "${INCS[@]}" 2>&1)
 RC=$?
 
 [ $RC -eq 0 ] && exit 0   # compila limpo → silêncio (sucesso não faz barulho)
