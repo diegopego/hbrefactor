@@ -66,7 +66,7 @@ corpus_set() {
    check ".ppt: os dois passes visiveis (#command depois #define _SET_EXACT)" $?
    # ast dump: os mkinds que o corpus cita (a ponte com P4/P5)
    grep -q '"mkind": "restrict"' "$D/setxdump.ast.json" && grep -q '"mkind": "strsmart"' "$D/setxdump.ast.json"
-   check "ast dump: mkinds restrict (match) e strsmart (result)" $?
+   check "ast dump COMPLETUDE(ppc-set=COMPLETE): mkinds restrict (match) e strsmart (result) - a diretiva esta' coberta na AST" $?
 }
 
 # --------------------------------------------------------------------------
@@ -100,7 +100,7 @@ corpus_say() {
    check ".ppo: grupo opcional do result [, <clr>] emite a cor so quando COLOR casa" $?
    # ast dump: a regra carrega os grupos opcionais como roles opt-open/opt-close
    grep -q '"role": "opt-open"' "$D/sayxdump.ast.json" && grep -q '"role": "opt-close"' "$D/sayxdump.ast.json"
-   check "ast-5 dump: grupos opcionais viram roles opt-open/opt-close" $?
+   check "ast-5 dump COMPLETUDE(ppc-say=COMPLETE): grupos opcionais viram roles opt-open/opt-close - a AST cobre a forma" $?
 }
 
 # --------------------------------------------------------------------------
@@ -128,7 +128,7 @@ corpus_store() {
    check ".ppo: STORE 9 TO a,b,c -> a := b := c := 9 (grupo opcional repetido)" $?
    # ast dump: o marker da lista e REGULAR dentro de opt-open/opt-close (nao e mkind list)
    grep -q '"role": "opt-open"' "$D/storexdump.ast.json"
-   check "ast-5 dump: o [,<vN>] e grupo opcional (opt-open/opt-close), vN regular" $?
+   check "ast-5 dump COMPLETUDE(ppc-store=COMPLETE): o [,<vN>] e grupo opcional (opt-open/opt-close), vN regular - coberto na AST" $?
 }
 
 # --------------------------------------------------------------------------
@@ -164,7 +164,7 @@ corpus_class() {
    check ".ppt: a impl nasce com Self AS CLASS Conta := QSelf() (RD/M-B)" $?
    # ast dump: a regra METHOD gerada carrega genealogia (from) - ast-13
    grep -q '"from"' "$D/clsxdump.ast.json"
-   check "ast-13: a regra METHOD gerada carrega genealogia ('from')" $?
+   check "ast-13 COMPLETUDE(ppc-class=COMPLETE): a regra METHOD gerada carrega genealogia ('from') - a AST cobre os construtos da fixture" $?
 }
 
 # --------------------------------------------------------------------------
@@ -233,7 +233,7 @@ corpus_ref() {
    check ".ppt: a regra reemite PUBLIC atras do <@> (e o PUBLIC emitido nao re-casa)" $?
    # e o dump o EXPORTA (mkind reference), sem nome e sem posicao
    grep -q '"mkind": "reference"' "$D/refxdump.ast.json"
-   check "ast dump: o guarda vem como mkind 'reference' (sem nome, sem posicao)" $?
+   check "ast dump COMPLETUDE(ppc-ref=COMPLETE): o guarda vem como mkind 'reference' (sem nome, sem posicao) - maquinaria coberta na AST" $?
 }
 
 # --------------------------------------------------------------------------
@@ -262,7 +262,7 @@ corpus_gen() {
    check ".ppt/.ppo: a regra recem-nascida ja casa na linha seguinte" $?
    # ast-13: a regra gerada carrega a genealogia (from -> a app que a criou)
    grep -q '"from"' "$D/genxdump.ast.json"
-   check "ast-13: a regra gerada carrega genealogia ('from' -> a app criadora)" $?
+   check "ast-13 COMPLETUDE(ppc-gen=COMPLETE): a regra gerada carrega genealogia ('from' -> a app criadora) - coberto na AST" $?
 }
 
 # --------------------------------------------------------------------------
@@ -445,7 +445,7 @@ corpus_strdump() {
    check "ast-5: strdump EXISTE no result[] de regra (nao e' so' maquinaria de stream)" $?
    # ast-12: o recheio que alimenta o stringify vem marcado como GERADOR
    python3 "$HERE/ppc-strdump-sep.py" "$D/sd.ast.json" "$HERE/ppc-strdump/sd.prg"
-   check "o que SEPARA nao e' o generates (true nos DOIS) e sim a OP: clone x stringify" $?
+   check "COMPLETUDE(ppc-strdump=COMPLETE): o que SEPARA nao e' o generates (true nos DOIS) e sim a OP: clone x stringify - o eixo esta' na AST (P15 e' consumo, nao lacuna)" $?
    # e o .ppo confirma o efeito: a colisao de nome vira STRING, nao variavel
    grep -q 'sd_Lavra( "nLastro" )' "$D/sd.ppo"
    check ".ppo: 'LAVRA nLastro' vira a STRING \"nLastro\" - a palavra nunca vira simbolo" $?
@@ -486,7 +486,7 @@ corpus_text() {
    check ".ppo: cada linha do bloco vira UMA chamada, com a linha CRUA (margem inclusa)" $?
    # ast-17: a string do bloco carrega a linha de onde veio (antes: line 0/col null)
    python3 "$HERE/ppc-text-pos.py" "$D/txt.ast.json" "$HERE/ppc-text/txt.prg"
-   check "ast-17: a linha do bloco chega POSICIONADA (da' para RELATAR, nunca editar)" $?
+   check "ast-17 COMPLETUDE(ppc-text=COMPLETE): a linha do bloco chega POSICIONADA (da' para RELATAR, nunca editar) - a AST cobre o que a ferramenta precisa" $?
 }
 
 # --------------------------------------------------------------------------
@@ -629,7 +629,7 @@ emitted = [t for t in d["tokens"]
            and t.get("col") is None]
 sys.exit(0 if fill and fill[0].get("col") is not None and emitted else 1)
 PYEOF3
-   check "P18 (LACUNA VIVA): o recheio '&x' TEM posicao; o simbolo emitido NAO" $?
+   check "COMPLETUDE(ppc-strfam=HOLE:P18) (LACUNA VIVA): o recheio '&x' TEM posicao; o simbolo emitido NAO" $?
 }
 
 # --------------------------------------------------------------------------
@@ -683,6 +683,20 @@ corpus_cycle() {
    local D; D=$(gen4 ppc-cycle cyc.prg -I"$CORE/contrib/hbtest")
    python3 "$HERE/ppc-cycle-ppt.py" "$D/cyc.ppt" "$HERE/ppc-cycle/cyc.prg"
    check ".ppt: os 4 passes acontecem NA MESMA linha, antes de o pp avancar" $?
+   # COMPLETUDE: o que o .ppt mostra, a AST (o que a ferramenta CONSOME) TAMBEM carrega:
+   # ppApplications registra os 4 passes -- E1->E2->E3->E4 -- como sequencia ordenada na
+   # MESMA linha. A ferramenta VE a cascata inteira ate' a exaustao, sem re-executar o ciclo.
+   python3 - "$D/cyc.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+rules = {i: r.get("head") for i, r in enumerate(d.get("ppRules", []))}
+byline = {}
+for a in d.get("ppApplications", []):
+    byline.setdefault(a.get("line"), []).append(rules[a["rule"]])
+# alguma linha carrega a cascata ordenada e completa da cadeia esgotada
+sys.exit(0 if any(hs == ["E1", "E2", "E3", "E4"] for hs in byline.values()) else 1)
+PYEOF
+   check "ast COMPLETUDE(ppc-cycle=COMPLETE): ppApplications registra os 4 passes (E1->E2->E3->E4) na mesma linha - a ferramenta ve a cascata ate' a exaustao na AST" $?
 
    # o TETO: a mesma cadeia com #pragma RECURSELEVEL=2 NAO compila -- o pp acusa
    # circularidade (E0022) e deixa o token por expandir. O arquivo do teto e' gerado
@@ -728,7 +742,7 @@ corpus_pragma() {
    # dump: NENHUM pragma exportado (lacuna P19) - 'pragma' case-sensitive nao aparece
    # (os hits de 'Shortcut' sao so' os nomes de local nComShortcut*)
    ! grep -q "pragma" "$D/pg.ast.json"
-   check "dump: nenhum pragma exportado (lacuna P19: a ferramenta nao ve a mudanca de semantica)" $?
+   check "dump: nenhum pragma exportado -- COMPLETUDE(ppc-pragma=HOLE:P19): a ferramenta nao ve a mudanca de semantica" $?
 }
 
 # --------------------------------------------------------------------------
@@ -920,7 +934,7 @@ corpus_deriv() {
    check "dv.prg RODA: as 3 ops provadas nas DUAS camadas (texto do pp vivo + valor)" $?
    local D; D=$(gen4 ppc-deriv dv.prg -I"$CORE/contrib/hbtest")
    python3 "$HERE/ppc-deriv-ops.py" "$D/dv.ast.json" "$HERE/ppc-deriv/dv.prg"
-   check "ast-3: clone chega POSICIONADO; paste/stringify vem sem posicao, ligados pelo 'from'" $?
+   check "ast-3 COMPLETUDE(ppc-deriv=COMPLETE): clone chega POSICIONADO; paste/stringify vem sem posicao, ligados pelo 'from' - a proveniencia que a ferramenta precisa ESTA' na AST" $?
 }
 
 # --------------------------------------------------------------------------
@@ -957,6 +971,22 @@ corpus_noeval() {
    local D; D=$(gen4 ppc-eval ev.prg -I"$CORE/contrib/hbtest")
    grep -q "2 + 3 \* 2" "$D/ev.ppo"
    check ".ppo: o compilador recebeu '2 + 3 * 2' -- o pp NAO somou nada" $?
+   # COMPLETUDE: a AST (o que a ferramenta CONSOME) carrega o texto JA' COLADO e NAO
+   # avaliado -- o #<x> do HBTEST estringifica a expressao que o compilador recebeu:
+   # "2 + 3 * 2" (nao "5 * 2") e "( 2 + 3 ) * 2". Se o pp avaliasse, a AST traria 8/10.
+   python3 - "$D/ev.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+def strs(n):
+    if isinstance(n, dict):
+        if n.get("et") == "STRING": yield n.get("val")
+        for v in n.values(): yield from strs(v)
+    elif isinstance(n, list):
+        for v in n: yield from strs(v)
+s = set(strs(d))
+sys.exit(0 if {"2 + 3 * 2", "( 2 + 3 ) * 2"} <= s and "8" not in s and "10" not in s else 1)
+PYEOF
+   check "ast COMPLETUDE(ppc-eval=COMPLETE): a AST carrega o texto colado NAO avaliado ('2 + 3 * 2'), nunca 8/10 - o pp substitui, o compilador avalia" $?
 }
 
 # --------------------------------------------------------------------------
@@ -973,6 +1003,19 @@ corpus_order() {
    ( cd "$R" && ./od > run.txt 2>&1 )
    [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 10 ] && ! grep -q '^ *!' "$R/run.txt"
    check "od.prg RODA: vence a ULTIMA declarada (LIFO) - e a regra GERADA bate a generica" $?
+   # COMPLETUDE: a ordem (LIFO) e' RUNTIME (__pp_Process em string); o unico sitio de
+   # COMPILACAO e' `DOIS 11 22`. E a AST NAO obriga a ferramenta a replicar a ordem: o
+   # ppApplications registra, POR SITIO, a regra que DE FATO casou -- a ferramenta le' o
+   # RESULTADO do torneio LIFO (que o pp ja' resolveu), nunca o re-executa (anti-heuristica).
+   local D; D=$(gen4 ppc-order od.prg -I"$CORE/contrib/hbtest")
+   python3 - "$D/od.ast.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+heads = {d["ppRules"][a["rule"]].get("head") for a in d.get("ppApplications", [])}
+# o unico sitio de COMPILACAO (`DOIS ...`) registra em ppApplications a regra que casou
+sys.exit(0 if "DOIS" in heads else 1)
+PYEOF
+   check "ast COMPLETUDE(ppc-order=COMPLETE): ppApplications registra a regra que DE FATO casou no sitio de compilacao (DOIS) - a ferramenta le' o resultado do LIFO, nao o replica" $?
 }
 
 corpus_refs

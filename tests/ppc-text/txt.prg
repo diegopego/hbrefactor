@@ -2,6 +2,15 @@
 // oraculo (nao o transcreve), e o que ele afirma esta' provado por assert ou
 // pelo dump. Prova: o bloco de stream vira DADO, verbatim e posicionado (ast-17).
 // (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu -- e ele FECHOU um buraco no caminho (ast-17). A AST
+//   agora COBRE o que a ferramenta precisa para RELATAR (nunca editar) a ocorrencia em
+//   DADO: a string do bloco chega com a linha-fonte + col 0 + prov 's'; o TEXT consumiu
+//   UM token so' (o bloco nao e' recheio de regra); e o compilador NAO ve simbolo na
+//   linha (e' dado, nao variavel). O consumo disso -- o aviso ao humano/agente -- e' a
+//   fase P16(a), que e' feature do CONSUMIDOR, nao lacuna da AST (contraste: ppc-dyn/
+//   P16(b), onde o `from` do dynval segue SEVERADO). O check COMPLETUDE(ppc-text=COMPLETE)
+//   em corpus_text le' a AST e afirma essa cobertura.
 // Fixture da familia TEXT/ENDTEXT (docs/pp-corpus/text-stream.md).
 // Compila limpo sob -w3 -es2. Diretiva REAL: std.ch:221 -- `#command TEXT => text
 // QOut, QQOut`, que poe o pp em modo de STREAM.

@@ -2,6 +2,14 @@
 // oraculo (nao o transcreve), e o que ele afirma esta' provado por assert ou
 // pelo dump. Prova: os fatos que so' o DUMP tem: a OP da derivacao separa simbolo de dado.
 // (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST COBRE o que a ferramenta precisa para
+//   NAO tratar o recheio de #<x> como simbolo. O eixo que SEPARA dado de simbolo
+//   -- a OP da derivacao (clone x stringify), com `generates` verdadeiro nos DOIS --
+//   esta' na AST (ppc-strdump-sep.py o afirma). A fase P15 NAO e' lacuna da AST: o
+//   proprio texto da fase declara "o fato que separa JA' ESTA' NO DUMP ... e' consumo,
+//   nao core" (declarations[].nameLine/nameCol + ppApplications[], identidade posicional).
+//   O check COMPLETUDE(ppc-strdump=COMPLETE) em corpus_strdump le' a AST e afirma isso.
 // Fixture da familia STRDUMP (docs/pp-corpus/strdump.md). Compila limpo sob -w3 -es2.
 // Aqui se leem os fatos que so' existem no DUMP -- a OP de cada derivacao.
 // (A metade que RODA e se afirma e' o sdrun.prg.)

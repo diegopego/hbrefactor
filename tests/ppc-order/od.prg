@@ -5,6 +5,14 @@
 // Pergunta do Diego (2026-07-14): "tem uma ordem de execucao nestes casos e nao me
 // lembro se e' do primeiro para o ultimo ou o contrario".
 //
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a ordem (LIFO) e' provada em RUNTIME (__pp_Process
+//   em string), e o unico sitio de COMPILACAO e' `DOIS 11 22`. A AST NAO obriga a
+//   ferramenta a replicar a ordem das regras: ppApplications registra, POR SITIO, a
+//   regra que DE FATO casou -- a ferramenta le' o RESULTADO do torneio LIFO que o pp ja'
+//   resolveu, jamais o re-executa (e' o principio anti-heuristica). O check
+//   COMPLETUDE(ppc-order=COMPLETE) em corpus_order le' a AST e afirma isso.
+//
 // COMO COMPILAR:
 //   sintaxe:  harbour od.prg -n -q0 -w3 -es2 -s -I$HB_CORE/contrib/hbtest
 //   rodar:    hbmk2  od.prg $HB_CORE/contrib/hbtest/hbtest.hbc -w3 -es2 -gtcgi

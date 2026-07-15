@@ -1,3 +1,9 @@
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST exporta o guarda <@> como mkind 'reference'.
+//   Ele vem SEM nome e SEM posicao por CORRECAO -- e' maquinaria anti-recursao, nao ha'
+//   simbolo do usuario para renomear. O que a ferramenta precisa saber (que a regra
+//   carrega o guarda no result[]) esta' na AST. O check COMPLETUDE(ppc-ref=COMPLETE)
+//   em corpus_ref le' a AST e afirma isso.
 // METODO-V2(2026-07-14): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //

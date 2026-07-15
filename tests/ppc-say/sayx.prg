@@ -1,3 +1,8 @@
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST carrega os grupos OPCIONAIS como roles
+//   opt-open/opt-close, e os simbolos que o usuario escreve (nX, cName) chegam
+//   posicionados. A selecao de forma (DevOut x DevOutPict) e' derivavel do que casou.
+//   O check COMPLETUDE(ppc-say=COMPLETE) em corpus_say le' a AST e afirma essa cobertura.
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //

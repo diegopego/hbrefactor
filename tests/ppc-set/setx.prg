@@ -1,3 +1,8 @@
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST representa a diretiva SET EXACT com os
+//   mkinds restrict (match) e strsmart (result). A expressao SET EXACT (lFlag) chega
+//   posicionada, e o bareword ON vira string por strsmart -- nao ha' simbolo do
+//   usuario com proveniencia severada. O check COMPLETUDE(ppc-set=COMPLETE) le' a AST.
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //

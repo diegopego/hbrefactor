@@ -9,6 +9,13 @@
  * do pp escreveram para a superficie #pragma. Guarda: corpus_pragma. Fase da lacuna
  * (dump nao ve pragma): docs/roadmap.md § P19.
  *
+ * COMPLETUDE(2026-07-15): HOLE=P19
+ *   O loop dos 4 oraculos rodou ate' o fim: o #pragma muda a SEMANTICA da regiao
+ *   (mesmo texto -> pcode diferente), mas o dump NAO exporta pragma nenhum -- a
+ *   ferramenta e' cega a' mudanca. So' o .ppt enxerga. A fase P19 fecha o buraco.
+ *   O check COMPLETUDE(ppc-pragma=HOLE:P19) em corpus_pragma e' o rastro executavel
+ *   deste veredito (assercao NEGATIVA: nenhum pragma no .ast.json).
+ *
  * O SUJEITO CERTO (METODO.md § 4b/5): o pp SUBSTITUI TEXTO; quem muda de
  * comportamento com o pragma e' o COMPILADOR. Prova pelos oraculos, que DISCORDAM:
  *

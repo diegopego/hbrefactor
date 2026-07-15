@@ -1,3 +1,8 @@
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST carrega o grupo opcional que REPETE
+//   (opt-open/opt-close), e cada variavel da multi-atribuicao e' um marker regular
+//   -- local real, posicionado, renomeavel. O check COMPLETUDE(ppc-store=COMPLETE)
+//   em corpus_store le' a AST e afirma essa cobertura.
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //

@@ -1,6 +1,13 @@
 // METODO-V2(2026-07-14): revisado pelo metodo novo -- comentario INTERPRETA o
 // oraculo, e cada afirmacao esta' provada por assert que PASSA PELA DIRETIVA.
 // (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST COBRE toda derivacao com a proveniencia
+//   que a ferramenta precisa. clone chega POSICIONADO; paste/stringify vem sem posicao
+//   mas com `from` (op + offset at/len dentro do artefato); e o nome ESCRITO -- o alvo
+//   do rename -- tem coluna e `generates`. E' o ESPELHO do buraco do dynval (ppc-dyn,
+//   HOLE=P16), onde justamente o `from` estava severado. O check
+//   COMPLETUDE(ppc-deriv=COMPLETE) em corpus_deriv le' a AST e AFIRMA essa cobertura.
 //
 // Fixture da familia DERIVACAO (docs/pp-corpus/derivation.md) -- ate' 2026-07-14 era
 // markdown SEM TESTE nenhum, e e' a espinha de metade do corpus.

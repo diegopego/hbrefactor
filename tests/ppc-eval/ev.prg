@@ -3,6 +3,13 @@
 //
 // Fixture da familia O QUE O PP *NAO* FAZ (docs/pp-corpus/no-eval.md).
 //
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST -- o que a ferramenta CONSOME -- carrega o
+//   texto JA' COLADO e NAO avaliado. O #<x> do HBTEST estringifica a expressao que o
+//   compilador recebeu ("2 + 3 * 2", nunca "5 * 2"; "( 2 + 3 ) * 2"), e em lugar nenhum
+//   a AST traz 8 ou 10. Se o pp avaliasse, a AST provaria o contrario. O check
+//   COMPLETUDE(ppc-eval=COMPLETE) em corpus_noeval le' a AST e afirma isso.
+//
 // COMO COMPILAR:
 //   sintaxe:  harbour ev.prg -n -q0 -w3 -es2 -s -I$HB_CORE/contrib/hbtest
 //   rodar:    hbmk2  ev.prg $HB_CORE/contrib/hbtest/hbtest.hbc -w3 -es2 -gtcgi

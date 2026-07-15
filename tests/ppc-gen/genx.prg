@@ -1,3 +1,8 @@
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: a AST carrega a genealogia (from -> a app
+//   criadora, ast-13) -- a ferramenta sabe que a regra NASCEU de outra diretiva. E' o
+//   mesmo canal de proveniencia de deriv/class. O check COMPLETUDE(ppc-gen=COMPLETE)
+//   em corpus_gen le' a AST e afirma essa cobertura.
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //

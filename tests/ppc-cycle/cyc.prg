@@ -4,6 +4,13 @@
 // (regua: docs/pp-corpus/METODO.md § 4b)
 // Fixture da familia CICLO DO PP (docs/pp-corpus/pass-cycle.md).
 //
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu: o que o .ppt mostra (os 4 passes na mesma linha),
+//   a AST -- o que a ferramenta CONSOME -- tambem carrega. ppApplications registra a
+//   cascata ORDENADA E1->E2->E3->E4 na mesma linha: a ferramenta ve a cadeia inteira
+//   ate' a exaustao, sem re-executar o ciclo. O check COMPLETUDE(ppc-cycle=COMPLETE)
+//   em corpus_cycle le' a AST e afirma isso.
+//
 // COMO COMPILAR:
 //   sintaxe:  harbour cyc.prg -n -q0 -w3 -es2 -s -I$HB_CORE/contrib/hbtest
 //   rodar:    hbmk2  cyc.prg $HB_CORE/contrib/hbtest/hbtest.hbc -w3 -es2 -gtcgi

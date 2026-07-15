@@ -1,3 +1,9 @@
+// COMPLETUDE(2026-07-15): HOLE=P18
+//   O loop dos 4 oraculos rodou ate' o fim: o simbolo que sai de DENTRO de um macro
+//   (`&x` -> o SIMBOLO) chega ao dump SEM POSICAO (col=null), enquanto o recheio `&x`
+//   do sitio TEM col. A ferramenta nao consegue relatar/renomear a ocorrencia emitida
+//   -> a fase P18 fecha o buraco. O check COMPLETUDE(ppc-strfam=HOLE:P18) em
+//   corpus_strfam e' o rastro executavel deste veredito (assercao NEGATIVA de cobertura).
 // METODO-V2(2026-07-14): revisado pelo metodo novo -- comentario INTERPRETA o
 // oraculo (nao o transcreve), e o que ele afirma esta' provado por assert ou
 // pelo dump. Prova: os 4 estringificadores e o MACRO (pp vivo + runtime).

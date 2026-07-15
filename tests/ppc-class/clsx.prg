@@ -1,5 +1,13 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu para os construtos que ESTA fixture exercita
+//   (VAR INIT, dispatch de METHOD, ::nSaldo, RETURN Self): a AST cobre a genealogia
+//   da regra METHOD gerada (from, ast-13), o paste do nome da funcao (Conta_Deposita)
+//   e o Self tipado (AS CLASS Conta := QSelf()). Os itens em aberto de rename-DATA
+//   fatia 2 (ACCESS/ASSIGN, DATA herdada de superclasse, resolve-at de ::membro) sao
+//   CONSUMO da ferramenta -- o parentesco de superclasse ja' vive no dump (_HB_SUPER,
+//   fase RE) --, nao lacuna da AST. O check COMPLETUDE(ppc-class=COMPLETE) le' a AST.
 //
 // Familia hbclass (docs/pp-corpus/class.md) - o dialeto OO INTEIRO e' diretiva de
 // pp (hbclass.ch), sem UMA linha de gramatica no compilador.
