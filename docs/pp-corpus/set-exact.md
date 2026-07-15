@@ -13,19 +13,21 @@ Diretiva real ([include/std.ch:121](../../../harbour-core/harbour/include/std.ch
 
 Uma linha, e dois mecanismos avançados do pp de uma vez.
 
-## A fixture (`tests/ppc-set/setx.prg`) — compila limpo sob `-w3 -es2`
+## A fixture — a prova é EXECUTÁVEL (METODO-V2)
 
-```harbour
-PROCEDURE Main()
-   LOCAL lFlag := .T.
-   SET EXACT ON
-   SET EXACT OFF
-   SET EXACT (lFlag)
-   RETURN
-```
+Duas camadas, em dois arquivos *(std.ch é AUTO-incluída — incluí-la explícito
+duplicaria os `#define` e cairia em `W0002`/`-es2`)*:
 
-*(std.ch é AUTO-incluída pelo compilador — incluí-la explícito duplicaria os
-`#define` e cairia em `W0002`/`-es2`.)*
+- **`tests/ppc-set/setx.prg`** (`hbtest` + pp vivo) —
+  - camada A (o TEXTO): `__pp_Process` prova o smart-quote — `SET EXACT ON` →
+    `Set( 1, "ON" )` (palavra nua vira string; `_SET_EXACT`→`1` num 2º passe) e
+    `SET EXACT (lFlag)` → `Set( 1, lFlag )` (parênteses passam cru);
+  - camada B (o VALOR): a string `"ON"` que o smart-quote produziu chega ao `Set()`
+    e **liga** o flag — `Set(_SET_EXACT)` lê `.T.`/`.F.`; pela via do parêntese quem
+    manda é o **valor** de `lFlag`. Prova, rodando, que `"ON"` não é decorativo.
+- **`tests/ppc-set/setxdump.prg`** (raw-dumpável) — os fatos do dump: o `.ppt` com os
+  dois passes (`#command` depois `#define`), e os mkinds `restrict` (match) e
+  `strsmart` (result) — a ponte com P4/P5.
 
 ## `.ppo` (o que o compilador REALMENTE compila)
 

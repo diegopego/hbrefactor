@@ -44,17 +44,28 @@ gen4() {   # gen4 <familia-dir> <prg> [flags extra p/ o harbour, ex.: -I<inc>]
 # --------------------------------------------------------------------------
 corpus_set() {
    echo "corpus: familia SET (std.ch) - SET EXACT (restrict + smart-quote)"
-   ( cd "$HERE/ppc-set" && "$HB" setx.prg -n -q0 -w3 -es2 -s > /dev/null 2>&1 )
-   check "ppc-set/setx.prg compila limpo sob -w3 -es2 (codigo comprovado)" $?
-   local D; D=$(gen4 ppc-set setx.prg)
+   local CORE="${HB_BIN%/bin/*}" R="$HERE/tmp/.ppcorpus/ppc-set-run"
+   rm -rf "$R"; mkdir -p "$R"; cp "$HERE/ppc-set/setx.prg" "$R"/
+
+   # (1) o CORPUS que RODA: camada A (pp vivo: o smart-quote e o multi-passe) +
+   #     camada B (o flag corrente SEGUE a diretiva -- "ON" liga, (lFlag) manda)
+   ( cd "$R" && "$HB_BIN/hbmk2" setx.prg "$CORE/contrib/hbtest/hbtest.hbc" \
+        -osetx -q0 -w3 -es2 -gtcgi > /dev/null 2>&1 )
+   check "ppc-set/setx.prg compila (hbtest + pp vivo)" $?
+   ( cd "$R" && ./setx > run.txt 2>&1 )
+   [ "$(grep -c 'MAIN(' "$R/run.txt")" -ge 6 ] && ! grep -q '^ *!' "$R/run.txt"
+   check "setx.prg RODA: 6 asserts (smart-quote no texto; o flag no runtime) - 0 falhas" $?
+
+   # (2) o que so' o dump/oraculo mostra, na irma raw-dumpavel (sem #require)
+   local D; D=$(gen4 ppc-set setxdump.prg)
    # .ppo: smart-quote cita o bareword ON, passa a expressao (lFlag) crua; _SET_EXACT vira 1
-   grep -q 'Set( 1, "ON" )' "$D/setx.ppo" && grep -q 'Set( 1, lFlag )' "$D/setx.ppo"
+   grep -q 'Set( 1, "ON" )' "$D/setxdump.ppo" && grep -q 'Set( 1, lFlag )' "$D/setxdump.ppo"
    check ".ppo: smart-quote cita bareword ON, passa (lFlag) crua, _SET_EXACT->1" $?
    # .ppt: o multi-passe visivel - #command e depois #define
-   grep -q '#command >Set( _SET_EXACT, "ON" )<' "$D/setx.ppt" && grep -q '#define >1<' "$D/setx.ppt"
+   grep -q '#command >Set( _SET_EXACT, "ON" )<' "$D/setxdump.ppt" && grep -q '#define >1<' "$D/setxdump.ppt"
    check ".ppt: os dois passes visiveis (#command depois #define _SET_EXACT)" $?
    # ast dump: os mkinds que o corpus cita (a ponte com P4/P5)
-   grep -q '"mkind": "restrict"' "$D/setx.ast.json" && grep -q '"mkind": "strsmart"' "$D/setx.ast.json"
+   grep -q '"mkind": "restrict"' "$D/setxdump.ast.json" && grep -q '"mkind": "strsmart"' "$D/setxdump.ast.json"
    check "ast dump: mkinds restrict (match) e strsmart (result)" $?
 }
 
