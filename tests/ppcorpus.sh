@@ -572,22 +572,25 @@ apps = [a["line"] for a in d["ppApplications"]
 sys.exit(0 if len(apps) == 2 else 1)
 PYEOF
    check "ppApplications: cada expansao de __LINE__ vem com a LINHA (da' para AVISAR)" $?
-   # COMPLETUDE (a lacuna que o dump MOSTRA): a provenancia do dynval e' SEVERADA na
-   # camada de statement. O literal injetado ('14') chega como NUMERIC comum -- token
-   # marcado prov='n' (sintetico) mas SEM 'from' -> nao ha' link de volta ao __LINE__.
-   # Contraste: clone/paste/stringify (familia derivation) POVOAM 'from'. Logo um verbo
-   # que anda o statement AST e' CEGO a' sensibilidade de posicao; o unico vinculo e'
-   # juntar ppApplications por LINHA -- justo o eixo fragil aqui. (P16 no roadmap.)
+   # COMPLETUDE (a lacuna que o ast-17 FECHOU): antes, a provenancia do dynval era
+   # SEVERADA na camada de statement -- o literal injetado ('14') chegava NUMERIC comum,
+   # prov='n', SEM 'from', e o unico vinculo a' origem era juntar ppApplications por LINHA
+   # (o eixo fragil). Agora o token carrega from com op='dynval': o app liga de volta a'
+   # aplicacao da regra builtin __LINE__/__FILE__, INDEPENDENTE da linha. Um verbo que
+   # desloca linhas ve nisso que o valor e' sensivel a posicao e pode AVISAR (nao editar).
    python3 - "$D/dynxdump.ast.json" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
 main = next(f for f in d["functions"] if f["name"] == "MAIN")
 rhs = main["statements"][0]["expr"]["right"]   # nQuando := __LINE__
 tok = d["tokens"][rhs["tok"]]
-# o valor chega como literal, com prov sintetico, e SEM back-ref 'from' ao dynval
-sys.exit(0 if rhs["et"] == "NUMERIC" and tok["prov"] == "n" and "from" not in tok else 1)
+# o valor chega como literal sintetico E COM back-ref 'from' op='dynval' -> aplicacao
+frm = tok.get("from") or []
+sys.exit(0 if rhs["et"] == "NUMERIC" and tok["prov"] == "n"
+         and any(f.get("op") == "dynval" and f.get("app") is not None for f in frm)
+         else 1)
 PYEOF
-   check "ast-16 COMPLETUDE(ppc-dyn=HOLE:P16): o literal do dynval chega ao statement prov='n' mas SEM 'from' - provenancia severada, so' ppApplications (por linha) sabe a origem" $?
+   check "ast-17 COMPLETUDE(ppc-dyn=COMPLETE): o literal do dynval chega ao statement com from op='dynval' - a provenancia liga de volta a' aplicacao, INDEPENDENTE da linha (P16 b fechado)" $?
 }
 
 # --------------------------------------------------------------------------

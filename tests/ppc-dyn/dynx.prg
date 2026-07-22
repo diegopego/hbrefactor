@@ -1,10 +1,12 @@
 // METODO-V2(2026-07-15): comentario INTERPRETA o oraculo; cada afirmacao esta'
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
-// COMPLETUDE(2026-07-15): HOLE=P16
-//   O loop dos 4 oraculos rodou ate' o fim: a AST NAO representa a provenancia do
-//   dynval na camada de statement (literal sem 'from' de volta ao __LINE__) -> a
-//   fase P16 fecha o buraco (populando 'from', como a familia derivation). O check
-//   COMPLETUDE(ppc-dyn=HOLE:P16) em corpus_dyn e' o rastro executavel deste veredito.
+// COMPLETUDE(2026-07-15): COMPLETE
+//   O loop dos 4 oraculos convergiu -- e FECHOU o buraco no core (ast-17). Antes, a AST
+//   nao representava a provenancia do dynval na camada de statement (literal sem 'from'
+//   de volta ao __LINE__); so' ppApplications, por LINHA, sabia a origem. Agora o token
+//   carrega from com op='dynval': o app liga de volta a' aplicacao da regra builtin
+//   __LINE__/__FILE__, INDEPENDENTE da linha -- como a familia derivation ja' fazia para
+//   clone/paste/stringify. O check COMPLETUDE(ppc-dyn=COMPLETE) em corpus_dyn le' a AST.
 //
 // Familia DEFINE DINAMICO (docs/pp-corpus/dynval.md). As UNICAS duas regras de
 // mkind `dynval` do pp sao BUILTIN -- o usuario nao as escreve:

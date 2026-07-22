@@ -328,7 +328,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-16"
+   RETURN "ast-17"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo

@@ -12,17 +12,17 @@
 #
 # REGRA: citou arquivo:linha do core numa doc do corpus? Entra aqui. Sem excecao.
 
-src/pp/ppcore.c:1284	HB_PP_TOKEN_ISMATCH( pMatch ) ? NULL
-src/pp/ppcore.c:2725	HB_PP_CMP_DBASE && pToken->len >= 4
-src/pp/ppcore.c:3230	replace %s with HB_PP_RMARKER_STRDUMP
-src/pp/ppcore.c:4277	fDump ? HB_PP_RMARKER_STRDUMP
-src/pp/ppcore.c:3779	hb_pp_setCompilerSwitch( pState, "z", fValue )
-src/pp/ppcore.c:5429	hb_pp_drvAdd1( pState, pStr, pMatch->index, 's' )
-src/pp/ppcore.c:5501	HB_PP_RMARKER_DYNVAL
-src/pp/ppcore.c:5803	hb_pp_tokenValueCmp( *pFirstPtr, "TEXT"
-src/pp/ppcore.c:5821	HB_PP_RMARKER_STRDUMP | HB_PP_TOKEN_STATIC
-src/pp/ppcore.c:7253	hb_pp_addDefine( pState, "__FILE__", &s_pp_dynamicResult )
-src/pp/ppcore.c:7254	hb_pp_addDefine( pState, "__LINE__", &s_pp_dynamicResult )
+src/pp/ppcore.c:1305	HB_PP_TOKEN_ISMATCH( pMatch ) ? NULL
+src/pp/ppcore.c:2746	HB_PP_CMP_DBASE && pToken->len >= 4
+src/pp/ppcore.c:3251	replace %s with HB_PP_RMARKER_STRDUMP
+src/pp/ppcore.c:4298	fDump ? HB_PP_RMARKER_STRDUMP
+src/pp/ppcore.c:3800	hb_pp_setCompilerSwitch( pState, "z", fValue )
+src/pp/ppcore.c:5450	hb_pp_drvAdd1( pState, pStr, pMatch->index, 's' )
+src/pp/ppcore.c:5522	HB_PP_RMARKER_DYNVAL
+src/pp/ppcore.c:5828	hb_pp_tokenValueCmp( *pFirstPtr, "TEXT"
+src/pp/ppcore.c:5846	HB_PP_RMARKER_STRDUMP | HB_PP_TOKEN_STATIC
+src/pp/ppcore.c:7278	hb_pp_addDefine( pState, "__FILE__", &s_pp_dynamicResult )
+src/pp/ppcore.c:7279	hb_pp_addDefine( pState, "__LINE__", &s_pp_dynamicResult )
 include/std.ch:78	#command STORE <v> TO
 include/std.ch:121	#command SET EXACT <x:ON,OFF,&>
 include/std.ch:249	#command @ <row>, <col> SAY <exp>
@@ -30,17 +30,17 @@ include/std.ch:221	#command TEXT
 include/std.ch:255	#command MENU TO <v>
 include/hbclass.ch:576	#<type>
 src/rtl/menuto.prg:84	__mvPublic( cVariable )
-src/pp/ppcore.c:5254	HB_PP_TOKEN_MACROVAR
-src/pp/ppcore.c:5256	pToken->value + 1
+src/pp/ppcore.c:5275	HB_PP_TOKEN_MACROVAR
+src/pp/ppcore.c:5277	pToken->value + 1
 tests/pp.prg:9	#command _REGULAR_(<z>)
 tests/pp.prg:12	#command _DUMB_(<z>)
-src/pp/ppcore.c:6587	pState->iCycle = 0;
+src/pp/ppcore.c:6612	pState->iCycle = 0;
 include/hbpp.h:412	#define HB_PP_MAX_CYCLES
 # familia #pragma (pragma.md, ppc-pragma/pg.prg; fase P19)
 src/compiler/ppcomp.c:211	HB_COMP_PARAM->supported &= ~HB_COMPFLAG_SHORTCUTS;
 # familia <@> (reference-guard.md, ppc-ref/refx.prg + refxdump.prg)
 contrib/hbfoxpro/hbfoxpro.ch:63	#command PUBLIC <var1>
 contrib/hbfoxpro/hbfoxpro.ch:60	#xtranslate __FP_DIM( <exp> ) => <exp>
-src/pp/ppcore.c:4352	hb_pp_tokenSetValue( *pTokenPtr, "~", 1 )
-src/pp/ppcore.c:5528	pRule->pMatch;
-src/pp/ppcore.c:7019	HB_PP_RMARKER_REFERENCE
+src/pp/ppcore.c:4373	hb_pp_tokenSetValue( *pTokenPtr, "~", 1 )
+src/pp/ppcore.c:5553	pRule->pMatch;
+src/pp/ppcore.c:7044	HB_PP_RMARKER_REFERENCE

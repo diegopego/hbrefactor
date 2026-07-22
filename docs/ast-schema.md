@@ -1,4 +1,4 @@
-# Schema `ast-16` — o dump AST do compilador (spec)
+# Schema `ast-17` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
@@ -26,6 +26,18 @@ com `-x`.
 > e 23 sítios** de degradação por versão foram **removidos** — e nada na suíte dependia
 > deles. *Ao entregar um canal: versionar o `"schema"` no core, atualizar este documento
 > e o `AstSchema()` — **no mesmo commit**. O **caso 122** fica vermelho se você esquecer.*
+
+O **`ast-17` (fase P-COMPLETUDE) = `ast-16` + a POSIÇÃO DA LINHA DE STREAM + o
+`from` do DYNVAL.** Duas coisas viajam juntas neste bump. **(1)** A linha de
+`TEXT…ENDTEXT`/`#pragma __text|__stream|__cstream` chega POSICIONADA (detalhe na
+seção `tokens[]` abaixo) — o código já existia mas **shipou sob a string
+`ast-16`, sem versionar** (o mesmo esquecimento da P10); o bump de agora **sela**
+esse canal. **(2)** O literal sintetizado por `__LINE__`/`__FILE__` passa a
+carregar `from` com `op: "dynval"` (detalhe na seção `from`), fechando o buraco
+que a P16(b) media: a proveniência do `dynval` era SEVERADA na camada de
+statement. *(A P14 reservava `ast-17` para o `comptype.c`; quando executada, toma
+o próximo número — o número do schema é só um fencepost de drift, não contrato de
+compatibilidade: **não existe suporte a schema antigo**, § 1.5 do CLAUDE.md.)*
 
 O **`ast-16` (fase P-AUDIT / P11) = `ast-15` + TEMPO DE VIDA E FAMÍLIA DA REGRA**
 (o prefixo de modo em `kind` — `""` dBase / `x` exato / `y` exato e
@@ -229,6 +241,15 @@ diretiva já existente ou inventada.
   - `"paste"`: concatenação de keywords do resultado
     (`<Class>_<Method>` => `UWMENU_PAINT`);
   - `"stringify"`: marker despejado numa string (`<"Method">` => `"Paint"`).
+  - `"dynval"` **(ast-17)**: literal SINTETIZADO por um marker dinâmico
+    (`__LINE__`/`__FILE__`, mkind `dynval`) — NÃO vem de um marker casado, e
+    por isso o item tem `marker: 0`. O `app` aponta a aplicação da regra
+    builtin que o produziu, dando ao consumidor o vínculo de volta à origem
+    **sem** cruzar `ppApplications` por linha (o eixo frágil). Um verbo que
+    desloca linhas vê no `from: [{op: "dynval"}]` que aquele valor é
+    **sensível à posição** e pode AVISAR — não editar (o valor novo é o
+    certo). Fica FORA dos pares geradores do ast-12 (o filtro é
+    `marker >= 1 && op ∈ {paste,stringify}`).
 - `at`/`len`: offset e comprimento EM BYTES da faixa dentro do `text` DESTE
   token. O separador LITERAL entre partes coladas (o `_` de `UWMENU_PAINT`,
   o `on_` de `on_Click`) é texto da própria regra e NÃO tem item `from`.

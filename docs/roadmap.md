@@ -524,8 +524,12 @@ o que a ferramenta enxerga e hoje cala. **Duas fontes, o mesmo dever** (§1 do C
   **por linha** (o eixo frágil). Um verbo que anda o statement AST é cego a isso. **Decisão do
   Diego** (spec antes de código): (a) o consumidor cruza `ppApplications` por linha; **ou** (b)
   **estende-se o core** para povoar `from` no token expandido do `dynval` — canal que a família
-  `derivation` já usa —, tornando o vínculo independente da linha. É o caminho-padrão do §1.2
-  (estender o core), barrado só pelo portão de commit no core.
+  `derivation` já usa —, tornando o vínculo independente da linha.
+  ✅ **O lado do FATO está FEITO (2026-07-15, `ast-17`, opção b):** o literal do `dynval` chega ao
+  statement com `from: [{op: "dynval", app: N}]` — o `app` liga de volta à aplicação da regra
+  builtin `__LINE__`/`__FILE__`, independente da linha (`hb_pp_drvAddDyn` em `ppcore.c`, gated por
+  `fTrackPos`; `ppc-dyn` transita `HOLE:P16 → COMPLETE`). **Sobra o lado do CONSUMO:** o `rename`
+  que desloca linhas ainda não AVISA que o valor de um `__LINE__` muda. É o que resta da P16(b).
 - **(c) STRING que é MACRO VIVO** *(fonte nova, 2026-07-14, descoberta por assert)* — uma string
   literal que contém `&nome` é **reavaliada em runtime** e vale o **valor do memvar**. Renomear um
   memvar muda o comportamento de toda string que o mencione. O `usages` já relata *"possible
@@ -564,7 +568,7 @@ uma diretiva ainda não provada:
 | eixo | guarda | o que prova | estado (2026-07-15) |
 |---|---|---|---|
 | **diretiva** | `corpus_metodo` | a diretiva VIRA (texto) e VALE (runtime) | ✅ **31 selos · fila VAZIA (0 pendentes)** — `ppc-instr`/`ppc-live`/`ppc-pragma` + os 3 `fix*` fechados 2026-07-15 |
-| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | ✅ **21 vereditos · fila VAZIA (0 pendentes)** — 3 HOLE (`ppc-dyn`=P16, `ppc-strfam`=P18, `ppc-pragma`=P19) + 18 COMPLETE, fechados 2026-07-15 |
+| **completude** | `corpus_completude` | o loop dos 4 oráculos convergiu (§5b respondida no dump) | ✅ **21 vereditos · fila VAZIA (0 pendentes)** — 2 HOLE (`ppc-strfam`=P18, `ppc-pragma`=P19) + 19 COMPLETE (o `ppc-dyn` transitou `HOLE:P16 → COMPLETE` com o `ast-17`), fechados 2026-07-15 |
 
 Ambas as filas são **NOMEADAS a cada `make ppcorpus`** (não-bloqueantes; reprovam só selo/veredito
 mentiroso) — não congelar aqui, ler do guarda. Vereditos de completude: `COMPLETE(data)` /
@@ -573,7 +577,7 @@ feito → n/a). Exemplo da forma:
 
 | família | diretiva | completude |
 |---|---|---|
-| `ppc-dyn` | ✅ 07-15 | 🕳 `HOLE=P16` |
+| `ppc-dyn` | ✅ 07-15 | ✅ `COMPLETE` (o `ast-17` povoou o `from` do dynval) |
 | `ppc-deriv` | ✅ 07-15 | ✅ `COMPLETE` (espelho do buraco do dynval) |
 | `ppc-instr` | ✅ 07-15 | ✅ `COMPLETE` (o `-u`/`-gd` é instrumento; o resultado está na AST) |
 
@@ -596,11 +600,12 @@ lacunas.
 
 ### P-COMPLETUDE — o LOOP dos oráculos rodou até não sobrar buraco? *(aberta 2026-07-15; **CRITÉRIO ATINGIDO 2026-07-15 — fila VAZIA, 21/21**)*
 
-> **Estado:** as 21 famílias `METODO-V2` rodaram o loop e registraram veredito — **3 HOLE**
-> (`ppc-dyn`=P16, `ppc-strfam`=P18, `ppc-pragma`=P19) e **18 COMPLETE**, todos com rastro
-> executável de polaridade casada. `corpus_completude` acusa **0 pendentes, 0 mal-formados**;
-> `make test` **990/0**, `make ppcorpus` **117/0**. **O único trabalho VIVO da fase** é o piloto
-> abaixo (fechar o `ppc-dyn` estendendo o core), que segue sob autorização por-commit do Diego.
+> **Estado:** as 21 famílias `METODO-V2` rodaram o loop e registraram veredito — **2 HOLE**
+> (`ppc-strfam`=P18, `ppc-pragma`=P19) e **19 COMPLETE**, todos com rastro executável de polaridade
+> casada. `corpus_completude` acusa **0 pendentes, 0 mal-formados**; `make test` **990/0**,
+> `make ppcorpus` **117/0**. **O piloto `from`-no-dynval foi ENTREGUE (2026-07-15, `ast-17`):** o
+> `ppc-dyn` transitou `HOLE:P16 → COMPLETE`. Resta, fora desta fase, o CONSUMO da P16(b) (o `rename`
+> avisar a sensibilidade a posição) e os dois HOLE vivos (P18, P19), cada um sua fatia própria.
 
 **Por que existe:** a P-REV provou a **diretiva** de cada família (camadas A/B) mas **nunca rodou o
 loop dos quatro oráculos** — entender via `.ppo`/`.ppt`/dump/fixture, e quando um oráculo **falta
@@ -619,11 +624,14 @@ cobrar, não é doc: automatize" — writing-skills.)*
   `HOLE=Pxx` ⟺ check **negativo** + `### Pxx` vivo aqui. Não-bloqueante (nomeia a fila), reprova só
   a mentira estrutural.
 
-**A fila:** toda família `METODO-V2` roda o loop e registra o veredito. **Primeiro item nomeado —
-o piloto:** `from`-no-dynval (a extensão de core da **P16 (b)**, `src/pp/ppcore.c:5501-5522`) fecha
-o buraco do `ppc-dyn` e faz o veredito transitar `HOLE=P16 → COMPLETE` (a asserção negativa do
-`corpus_dyn` inverte para positiva). É fatia própria, **sob autorização por-commit do Diego** (o
-schema bump move os dois repos juntos — caso 122 vermelho no meio, de propósito).
+**A fila:** toda família `METODO-V2` roda o loop e registra o veredito. **O piloto — ENTREGUE
+(2026-07-15):** `from`-no-dynval (a extensão de core da **P16 (b)**) fechou o buraco do `ppc-dyn`.
+`hb_pp_drvAddDyn` (`src/pp/ppcore.c`, gated por `fTrackPos`) grava um item `from` com `op: "dynval"`
+no literal sintetizado por `__LINE__`/`__FILE__`, ligando-o à aplicação da regra builtin —
+independente da linha; o emissor `compast.c` mapeia `'d' → "dynval"`; o schema subiu `ast-16 →
+ast-17` nos DOIS repos no mesmo passo (heala o esquecimento do stream, que shipara `ast-17` no doc
+mas `ast-16` na string). A asserção negativa do `corpus_dyn` inverteu para positiva. `make test`
+byte-idêntico (**990/0**, caso 122 verde), `make ppcorpus` **117/0**.
 
 **Critério de pronto (mecânico):** `corpus_completude` acusa **0 vereditos mal-formados** e a **fila
 vazia** (toda família V2 com um `COMPLETUDE` casado e verificado).
