@@ -328,7 +328,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-17"
+   RETURN "ast-18"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -430,7 +430,7 @@ STATIC FUNCTION Usages( aArgs )
    // "ppmarker" - é o único ramo onde ResolveAtQuery de fato o constrói);
    // restringe PpMarkerHits/PpMarkerLift para não misturar OUTRA aplicação
    // independente (regra diferente) que colou o MESMO texto alhures.
-   LOCAL lAtPp, lAtSym, hAtPairs
+   LOCAL lAtPp, lAtSym, hAtPairs, aData
 
    IF Len( aArgs ) < 3
       Usage()
@@ -811,6 +811,7 @@ STATIC FUNCTION Usages( aArgs )
       // registro É o artefato da declaração) não se repetem aqui
       FOR EACH hItem IN hAst[ "tokens" ]
          IF ! lAtPp .AND. hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
+            ! IsDataTok( hAst, hItem ) .AND. ;
             Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
             ( hItem[ "col" ] == NIL .OR. ;
               ! hb_HHasKey( hDone, hb_ntos( hItem[ "line" ] ) + "|" + hb_ntos( hItem[ "col" ] ) ) )
@@ -821,6 +822,20 @@ STATIC FUNCTION Usages( aArgs )
                     ": possible reference in string" + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
          ENDIF
       NEXT
+
+      // P16(a) - ocorrência em DADO: a linha crua de um bloco de stream que
+      // CONTÉM o nome (ast-17; discriminação em IsDataTok). O compilador não
+      // vê símbolo ali - é dado; sai com arquivo:linha, SEPARADO das
+      // ocorrências de símbolo, e JAMAIS entra em edição - nem com opt-in (§1)
+      IF ! lAtPp
+         FOR EACH aData IN DataHits( hAst, cUpMeth )
+            nHits++
+            LocAdd( aLoc, cPath, aData[ 1 ], { aData[ 2 ] }, Len( cMethTok ) )
+            OutStd( cModFile + ":" + hb_ntos( aData[ 1 ] ) + ;
+                    ": possible occurrence in data (raw stream-block line - " + ;
+                    "reported, never edited)" + SrcLine( aSrc, aData[ 1 ] ) + hb_eol() )
+         NEXT
+      ENDIF
 
       // o nome pode ser palavra de DSL de pp (consumida antes do yylex e
       // portanto invisível em tokens[]): diretivas e aplicações (ast-2).
@@ -2435,6 +2450,7 @@ STATIC FUNCTION RenameLocal( aArgs )
    LOCAL hDecl := NIL, aEdits := {}, nSpanEnd := 0, nI
    LOCAL cText, cUpOld, cUpNew, aPrev, cPrevType, nLine, aIdent
    LOCAL aDisc   // P4/P5: ocorrências que a diretiva descarta (relato honesto)
+   LOCAL aDado   // P16(a): ocorrências em DADO (linha de bloco de stream)
 
    IF Len( aArgs ) < 6
       Usage()
@@ -2601,6 +2617,16 @@ STATIC FUNCTION RenameLocal( aArgs )
               hb_ntos( aDisc[ nI ][ 1 ] ) + ":" + hb_ntos( aDisc[ nI ][ 2 ] ) + ": '" + cOld + ;
               "' is consumed and DISCARDED by the directive (" + aDisc[ nI ][ 3 ] + ") - " + ;
               "never reaches the compiler; NOT renamed" + hb_eol() )
+   NEXT
+   // P16(a) - ocorrência em DADO: linha de bloco de stream, dentro da função,
+   // que contém o nome (ast-17; IsDataTok). O conteúdo é dado, não símbolo:
+   // relata-se com posição e JAMAIS se edita - nem com opt-in (§1). Sem o
+   // aviso, o dado seguiria dizendo o nome velho em silêncio
+   FOR EACH aDado IN DataHits( hAst, cUpOld, hFunc[ "line" ], nSpanEnd )
+      OutErr( "warning: " + hb_FNameNameExt( cSrcPath ) + ":" + ;
+              hb_ntos( aDado[ 1 ] ) + ":" + hb_ntos( aDado[ 2 ] ) + ": '" + cOld + ;
+              "' also appears in data (raw stream-block line) - data is " + ;
+              "reported, never edited; that line keeps the old text" + hb_eol() )
    NEXT
    IF lDryRun
       OutStd( "dry run - nothing was written" + hb_eol() )
@@ -3934,6 +3960,10 @@ STATIC FUNCTION ExtractFunction( aArgs )
    IF hTarget[ "usesMacro" ]
       OutStd( "warning: the function uses & macros - review carefully" + hb_eol() )
    ENDIF
+   // P16(b): a extração desloca as linhas do range em diante - se o módulo
+   // expande __LINE__ nessa faixa, os valores expandidos mudam (e o novo é
+   // o certo); avisar, jamais congelar
+   WarnDynLines( hAst, nFirst )
 
    // P2a: o CONTÊINER é método? Nome composto pelo rastro (dona+mensagem);
    // a MENSAGEM é a parte que não nomeia função-de-classe do projeto e a
@@ -4941,6 +4971,153 @@ STATIC FUNCTION StreamHasIdent( hAst, cUp )
    RETURN .F.
 
 // ---------------------------------------------------------------------------
+// P16(a) - ocorrência em DADO. A linha crua de um bloco de stream chega como
+// STRING posicionada e SELADA (ast-18): o item from op "stream" é o FATO
+// declarado pelo pp no instante em que fabricou o token - nenhuma leitura
+// de forma. Uma regra de pp pode re-escanear e CLONAR essa string; o clone
+// aponta a aplicação, e o token que a aplicação consumiu carrega o selo -
+// a cadeia inteira é de fato declarado. O conteúdo é DADO: a ferramenta o
+// relata com posição e JAMAIS o edita - nem com opt-in (§1 do CLAUDE.md).
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION IsDataTok( hAst, hTok )
+
+   LOCAL hFrom, hApp, hTA, cPart
+
+   FOR EACH hFrom IN hb_HGetDef( hTok, "from", {} )
+      IF hFrom[ "op" ] == "stream"
+         RETURN .T.
+      ENDIF
+      IF hFrom[ "op" ] == "clone" .AND. hFrom[ "app" ] != NIL
+         hApp  := hAst[ "ppApplications" ][ hFrom[ "app" ] + 1 ]
+         cPart := SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] )
+         FOR EACH hTA IN hApp[ "tokens" ]
+            IF hb_HGetDef( hTA, "marker", 0 ) == hFrom[ "marker" ] .AND. ;
+               hTA[ "text" ] == cPart .AND. IsDataTok( hAst, hTA )
+               RETURN .T.
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
+// os sites do nome DENTRO do dado: casamento por palavra inteira de
+// identificador, case-insensitive (a régua da linguagem para símbolos) - só
+// para RELATO, nunca decide edição. Devolve { { linha, col 1-based do nome
+// dentro da linha }, ... } - o conteúdo começa na coluna 0 do fonte, então
+// a posição dentro da string É a posição no fonte. nFrom/nTo opcionais
+// recortam por linha [nFrom, nTo); nTo 0 = aberto até o fim
+STATIC FUNCTION DataHits( hAst, cUpName, nFrom, nTo )
+
+   LOCAL aHits := {}, hSeen := { => }, hTok, cUpText, cKey, nAt
+   LOCAL nLen := Len( cUpName )
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. ;
+         IsDataTok( hAst, hTok ) .AND. ;
+         ( nFrom == NIL .OR. hTok[ "line" ] >= nFrom ) .AND. ;
+         ( nTo == NIL .OR. nTo == 0 .OR. hTok[ "line" ] < nTo )
+         // regra de pp pode CLONAR a linha do bloco (re-scan da expansão):
+         // a mesma linha-fonte chega em mais de um token - um relato por linha
+         cKey := hb_ntos( hTok[ "line" ] )
+         IF hb_HHasKey( hSeen, cKey )
+            LOOP
+         ENDIF
+         hSeen[ cKey ] := .T.
+         cUpText := Upper( hTok[ "text" ] )
+         nAt := 0
+         DO WHILE ( nAt := hb_At( cUpName, cUpText, nAt + 1 ) ) > 0
+            IF ! IsIdentByte( cUpText, nAt - 1 ) .AND. ! IsIdentByte( cUpText, nAt + nLen )
+               AAdd( aHits, { hTok[ "line" ], nAt } )
+            ENDIF
+         ENDDO
+      ENDIF
+   NEXT
+
+   RETURN aHits
+
+// o byte na posição 1-based é caractere de identificador? fora da faixa: não
+STATIC FUNCTION IsIdentByte( cText, nPos )
+
+   LOCAL c
+
+   IF nPos < 1 .OR. nPos > hb_BLen( cText )
+      RETURN .F.
+   ENDIF
+   c := hb_BSubStr( cText, nPos, 1 )
+
+   RETURN c == "_" .OR. ( c >= "0" .AND. c <= "9" ) .OR. ;
+      ( c >= "A" .AND. c <= "Z" ) .OR. ( c >= "a" .AND. c <= "z" )
+
+// ---------------------------------------------------------------------------
+// P16(b) - módulo sensível a POSIÇÃO. O valor de um define DINÂMICO de linha
+// não está escrito em lugar nenhum: o pp o resolve pela linha corrente na
+// hora da expansão (mkind `dynval` - builtin do pp, ppcore.c; a regra de
+// linha é a __LINE__ e cada aplicação vem registrada com a linha no dump).
+// Um verbo que DESLOCA linhas muda esses valores - e o valor novo é o CERTO
+// (o código mudou mesmo de linha): nada há para consertar, congelar seria
+// mentir. O produto é o AVISO.
+// ---------------------------------------------------------------------------
+
+// as linhas (únicas, ordenadas) em que um valor dinâmico de LINHA expandiu
+// de nFromLine em diante - as linhas cujo valor expandido MUDA quando a
+// edição desloca. FATO do ast-18: o item from op "dynval" carrega o EIXO
+// que o pp leu ("line"/"file"), gravado no próprio ramo da expansão, e o
+// app liga à aplicação (que traz a linha) - nenhum nome de regra se casa
+// aqui. Varre tokens[] e também os tokens registrados nas aplicações (um
+// literal consumido por regra posterior sobrevive lá, com o mesmo from)
+STATIC FUNCTION DynLineSites( hAst, nFromLine )
+
+   LOCAL aOut := {}, hTok, hApp
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      DynLineScan( hAst, hTok, nFromLine, aOut )
+   NEXT
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      FOR EACH hTok IN hApp[ "tokens" ]
+         DynLineScan( hAst, hTok, nFromLine, aOut )
+      NEXT
+   NEXT
+   ASort( aOut )
+
+   RETURN aOut
+
+STATIC PROCEDURE DynLineScan( hAst, hTok, nFromLine, aOut )
+
+   LOCAL hFrom, nLine
+
+   FOR EACH hFrom IN hb_HGetDef( hTok, "from", {} )
+      IF hFrom[ "op" ] == "dynval" .AND. hFrom[ "app" ] != NIL .AND. ;
+         hb_HGetDef( hFrom, "axis", "" ) == "line"
+         nLine := hAst[ "ppApplications" ][ hFrom[ "app" ] + 1 ][ "line" ]
+         IF nLine >= nFromLine .AND. AScan( aOut, nLine ) == 0
+            AAdd( aOut, nLine )
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN
+
+// o aviso em si, compartilhado pelos verbos que deslocam linhas; muda nada
+// no veredito do verbo (aviso, nunca recusa). Silêncio quando não há sítio
+STATIC PROCEDURE WarnDynLines( hAst, nFromLine )
+
+   LOCAL aSites := DynLineSites( hAst, nFromLine ), cList := "", nLine
+
+   IF ! Empty( aSites )
+      FOR EACH nLine IN aSites
+         cList += iif( Empty( cList ), "", ", " ) + "line " + hb_ntos( nLine )
+      NEXT
+      OutStd( "warning: this module expands __LINE__ at " + hb_ntos( Len( aSites ) ) + ;
+              " site(s) whose lines shift with this edit (" + cList + ") - " + ;
+              "the expanded values follow the new position; the new values are correct " + ;
+              "(the code really moves), review only if they were meant to be stable" + hb_eol() )
+   ENDIF
+
+   RETURN
+
+// ---------------------------------------------------------------------------
 // inline-local - substitui os usos de uma LOCAL pela sua expressão de
 // inicialização e remove a declaração. A expressão é duplicada e reavaliada
 // em cada uso, então a ANÁLISE DE PUREZA é o portão: só folhas literais/
@@ -5165,6 +5342,10 @@ STATIC FUNCTION InlineLocal( aArgs )
               ":" + hb_ntos( aEdits[ nI ][ 2 ] ) + hb_eol() )
    NEXT
    OutStd( "  declaration on line " + hb_ntos( nDeclLine ) + " removed" + hb_eol() )
+   // P16(b): remover a linha da declaração desloca tudo abaixo - se o módulo
+   // expande __LINE__ dali em diante, os valores expandidos mudam (e o novo
+   // é o certo); avisar, jamais congelar
+   WarnDynLines( hAst, nDeclLine )
    IF lDryRun
       OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
@@ -7377,6 +7558,30 @@ STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
 
    RETURN { "funcs" => aFuncs, "holes" => aHoles }
 
+// P16(c) - as strings que são MACRO VIVO do memvar cUpName: cada string
+// literal que macro-referencia o nome ('&' + nome) re-expande em RUNTIME e
+// vale o valor do memvar. FATO do ast-18: o token da string carrega
+// `macrovars` - a lista de memvars que ela re-expande, computada pelo
+// compilador com a MESMA regra do pcode HB_P_MACROTEXT (e vazia sob -kM). A
+// ferramenta só CASA o nome; não lê o texto da string. Devolve
+// { { linha }, ... } (a string é DADO: relato, nunca edição)
+STATIC FUNCTION MacroLiveHits( hAst, cUpName )
+
+   LOCAL aOut := {}, hTok, cVar
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0
+         FOR EACH cVar IN hb_HGetDef( hTok, "macrovars", {} )
+            IF Upper( cVar ) == cUpName
+               AAdd( aOut, { hTok[ "line" ] } )
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   RETURN aOut
+
 // o mapa impresso pelo usages quando o nome tem vida de memvar
 STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
 
@@ -7460,7 +7665,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
    LOCAL cUpOld, cUpNew, hF, hFNew, hIdx, hReach, hInReach, aC, aU, aWarn := {}
    LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
-   LOCAL cWhy := ""
+   LOCAL cWhy := "", aLive
 
    IF Len( aArgs ) < 4
       Usage()
@@ -7540,13 +7745,35 @@ STATIC FUNCTION RenameMemvar( aArgs )
    // alcance dinâmico do criador: fecho dos callees, sem furos
    hIdx := FuncIndex( hProj, hAsts )
    hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
+   // P16(c) - a STRING que é MACRO VIVO: uma string que contém '&' + nome é
+   // macro-expandida em RUNTIME e vale o memvar que ela nomeia (fato do
+   // compilador: a presença dela sozinha liga usesMacro na função - provado
+   // no corpus do pp). Renomear o memvar muda o comportamento dessas
+   // strings; a ferramenta diz ONDE e o PORQUÊ, e jamais as edita. Sai nos
+   // dois caminhos: antes da recusa por furo (é ela que explica o furo) e
+   // como aviso no fecho limpo
+   aLive := {}
+   FOR EACH cPath IN hProj[ "files" ]
+      FOR EACH aU IN MacroLiveHits( hAsts[ cPath ], cUpOld )
+         AAdd( aLive, hb_FNameNameExt( cPath ) + ":" + hb_ntos( aU[ 1 ] ) + ;
+               ": string contains '&" + cOld + "' - macro-expanded at RUN TIME to the " + ;
+               "value of the memvar it names, so its behaviour follows this rename; " + ;
+               "the string is data and will NOT be edited" )
+      NEXT
+   NEXT
    IF ! Empty( hReach[ "holes" ] )
+      FOR nI := 1 TO Len( aLive )
+         OutErr( "warning: " + aLive[ nI ] + hb_eol() )
+      NEXT
       OutErr( "hbrefactor: the dynamic scope of " + aC[ 2 ] + " tem furos:" + hb_eol() )
       FOR EACH cWhy IN hReach[ "holes" ]
          OutErr( "  - " + cWhy + hb_eol() )
       NEXT
       RETURN Refuse( "scope with holes - code outside the static graph may see '" + cOld + "'; refusing" )
    ENDIF
+   FOR nI := 1 TO Len( aLive )
+      AAdd( aWarn, aLive[ nI ] )
+   NEXT
    hInReach := { => }
    FOR EACH aU IN hReach[ "funcs" ]
       hInReach[ aU[ 1 ] + "!" + Upper( aU[ 2 ][ "name" ] ) ] := .T.

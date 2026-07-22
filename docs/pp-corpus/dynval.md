@@ -96,15 +96,13 @@ O que a família estabelece como **fato duro**:
   o eixo que esta família torna frágil. Consequência: um verbo que anda o statement AST
   (o caminho natural de refatoração) é **cego** à sensibilidade de posição. *(Assertado
   na guarda `corpus_dyn`: `prov="n"` e `"from" not in tok`.)*
-- **[Consumo futuro — VERIFICADO] A ferramenta não AVISA que o módulo é sensível a
-  posição.** Segue de cima: o fato existe (em `ppApplications`, com linha), mas nenhum
-  verbo o usa, e um verbo que desloca linhas deveria dizer *"este módulo expande
-  `__LINE__` em N sítios; o valor deles muda com esta edição"* — o mesmo dever de
-  **relato** da família [text-stream.md](text-stream.md). Entra na fase **P16**. Duas
-  saídas possíveis, e a escolha é do Diego (spec antes de código): (a) o consumidor
-  cruza `ppApplications` por linha; ou (b) **estende-se o core** para povoar `from` no
-  token expandido do `dynval` — o mesmo canal já usado na `derivation` —, e aí o vínculo
-  deixa de depender da linha. **Não implementado.**
+- **[FECHADO — P16(b), 2026-07-22] A ferramenta AVISA que o módulo é sensível a posição.**
+  A escolha do Diego foi **estender o core** (não cruzar por linha): o `ast-18` deu ao `from`
+  do `dynval` o campo `axis` (`"line"`/`"file"`), gravado no próprio ramo da expansão. Um verbo
+  que desloca linhas (`extract-function`, `inline-local`) filtra por `axis == "line"` e diz
+  *"this module expands __LINE__ at N site(s)… the new values are correct"* — sem casar o nome
+  `__LINE__` (que seria réplica de gramática). O `rename`, que não desloca linhas, fica mudo.
+  Prova: caso 126 (fixture `fixpos`).
 - **[Não-lacuna, dito por honestidade] O valor novo é o CERTO.** Não há nada a
   consertar na expansão, e seria erro "congelar" o `__LINE__` para preservar pcode —
   isso mentiria sobre onde o código está. O produto aqui é o **aviso**, não a

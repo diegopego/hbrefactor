@@ -39,8 +39,10 @@ que faltava não protegia uma edição; protegia um aviso.** *(Conserto no core:
 
 > Regra: PROVE, MARQUE e SIGA ([README.md](README.md)).
 
-- **[Consumo futuro — VERIFICADO] o `usages` ainda não relata a ocorrência em DADO.** O fato
-  existe (posição + `prov: "s"`) e nenhum verbo o usa → fase **P16**. Não implementado.
+- **[FECHADO — P16(a), 2026-07-22] o `usages` relata a ocorrência em DADO, e o `rename` avisa
+  sem editar.** O `ast-18` SELOU a string do bloco com `from: [{op: "stream", app: null}]` — o
+  fato declarado que a marca como dado, no lugar do discriminador por forma (`col == 0`). Prova:
+  caso 125 (fixture `fixdado`).
 - **[Limite honesto, não-lacuna] `__stream`/`__cstream` juntam o bloco numa string só** — a
   posição é a do terminador, não a de cada linha. O `TEXT` do Cl*pper (o que a linguagem expõe)
   não tem esse problema. Não vale core novo sem consumidor pedindo.

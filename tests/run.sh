@@ -4430,7 +4430,168 @@ grep -q "ALFACALC  \[util.prg\]" "$D/ok.log"
 check "e responde com FATO: ALFACALC resolve para util.prg" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124"
+freshdado() { # freshdado <case-name> -> bloco de stream com palavra homonima de LOCAL (P16 a)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixdado/*.prg "$HERE"/fixdado/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_125() {
+echo "case 125: P16(a) - a ocorrencia em DADO: relatar sempre, editar JAMAIS"
+# O bloco de stream vira DADO: cada linha crua chega como STRING posicionada
+# (ast-17: type 41, prov 's', col 0 - conteudo byte-exato desde a coluna 0;
+# string ESCRITA nunca tem conteudo na coluna 0, o delimitador vem antes).
+# Antes deste caso: renomear o simbolo homonimo editava o CODIGO certo e
+# verificava certo - e o bloco seguia dizendo o nome antigo, EM SILENCIO.
+# P16(a): o usages LISTA a ocorrencia em dado (arquivo:linha, separada das
+# ocorrencias de simbolo) e o rename a RELATA sem tocar - nem com opt-in (§1).
+D=$(freshdado case125)
+# linhas/colunas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
+LDATA=$(grep -n 'apurado no periodo' "$D/dado.prg" | cut -d: -f1)
+LDECL=$(grep -n 'LOCAL cSaldo' "$D/dado.prg" | cut -d: -f1)
+CDECL=$(awk -v n="$LDECL" 'NR==n { print index($0, "cSaldo") }' "$D/dado.prg")
+
+# (1) usages: a ocorrencia em DADO sai LISTADA, com arquivo:linha...
+( cd "$D" && "$BIN" usages dado.hbp cSaldo > us.log 2>&1 )
+check "usages sai com exit 0" $?
+grep -q "dado.prg:$LDATA: possible occurrence in data" "$D/us.log"
+check "a ocorrencia no bloco sai marcada como DADO, com arquivo:linha" $?
+# ... SEPARADA das ocorrencias de simbolo (o compilador nao ve simbolo ali)
+! grep -qE "dado\.prg:$LDATA: (declaration|read|write)" "$D/us.log"
+check "a linha do bloco NAO sai como ocorrencia de simbolo (dado != simbolo)" $?
+# as ocorrencias de simbolo continuam saindo (o relato novo nao engole o velho)
+grep -q "dado.prg:$LDECL: declaration (local)" "$D/us.log"
+check "as ocorrencias de simbolo seguem listadas" $?
+
+# (2) rename: edita o SIMBOLO, RELATA o dado, NAO o toca
+( cd "$D" && "$BIN" rename dado.hbp dado.prg:$LDECL:$CDECL cMontante > rn.log 2>&1 )
+check "rename do simbolo sai com exit 0 (o dado nao barra a edicao provada)" $?
+grep -q "verified" "$D/rn.log"
+check "a verificacao byte-identica PASSOU (o dado nao entrou na edicao)" $?
+grep -q "warning: dado.prg:$LDATA:.*data" "$D/rn.log"
+check "o rename AVISA a ocorrencia em dado (arquivo:linha)" $?
+grep -q "never edited" "$D/rn.log"
+check "o aviso DIZ a regra (dado se relata, jamais se edita)" $?
+grep -q "   cSaldo apurado no periodo" "$D/dado.prg"
+check "a linha do bloco esta BYTE A BYTE intacta" $?
+[ "$(grep -c 'cSaldo' "$D/dado.prg")" -eq 1 ]
+check "fora do dado, nenhum cSaldo sobrou (os sites de simbolo foram editados)" $?
+
+# (3) sem homonimo no dado, nenhum aviso falso
+( cd "$D" && "$BIN" usages dado.hbp cMontante > us2.log 2>&1 )
+! grep -q "in data" "$D/us2.log"
+check "nome que NAO esta no dado: zero relato de dado (sem falso positivo)" $?
+
+# (4) régua do caso 64: nenhuma palavra da fixture na ferramenta - a
+# capacidade é genérica (qualquer bloco de stream), não moldada no exemplo
+! grep -qiE "\bcSaldo\b|\bapurado\b|\bcMontante\b|\bapoio\b" "$HERE/../src/hbrefactor.prg"
+check "régua do caso 64: nenhuma palavra da fixture fixdado na ferramenta" $?
+}
+
+freshpos() { # freshpos <case-name> -> modulo que expande __LINE__ (P16 b - sensibilidade a posicao)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixpos/*.prg "$HERE"/fixpos/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_126() {
+echo "case 126: P16(b) - verbo que DESLOCA LINHAS avisa: o modulo expande __LINE__"
+# O valor de __LINE__ nao esta escrito em lugar nenhum: ele segue a POSICAO
+# do codigo (mkind dynval - builtin do pp; cada aplicacao vem registrada com
+# a linha). Um verbo que desloca linhas muda esses valores - e o valor novo
+# e' o CERTO (o codigo mudou mesmo de linha): nada ha para consertar, e
+# congelar seria mentir. O produto e' o AVISO (docs/pp-corpus/dynval.md).
+D=$(freshpos case126)
+# linhas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
+LINI=$(grep -n '"ini:"' "$D/pos.prg" | cut -d: -f1)
+LLOG=$(grep -n '"log:"' "$D/pos.prg" | cut -d: -f1)
+FF=$(grep -n 'FOR i' "$D/pos.prg" | cut -d: -f1)
+FN=$(grep -n '^   NEXT' "$D/pos.prg" | cut -d: -f1)
+
+# (1) extract-function: desloca as linhas abaixo do range -> avisa
+( cd "$D" && "$BIN" extract-function pos.hbp pos.prg $FF-$FN Junta > ex.log 2>&1 )
+check "extract-function sai com exit 0 (o aviso nao e' recusa)" $?
+grep -q "warning: this module expands __LINE__" "$D/ex.log"
+check "o aviso diz: o modulo expande __LINE__" $?
+grep -q "line $LLOG" "$D/ex.log"
+check "o aviso NOMEIA a linha do sitio que desloca" $?
+! grep -q "line $LINI" "$D/ex.log"
+check "sitio ANTES do range fica de fora (o valor dele NAO muda)" $?
+grep -q "values are correct" "$D/ex.log"
+check "o aviso diz que o valor novo e' o CERTO (aviso, nunca reprovacao)" $?
+
+# (2) inline-local: a linha da declaracao cai -> os dois sitios deslocam
+D=$(freshpos case126b)
+( cd "$D" && "$BIN" inline-local pos.hbp pos.prg Main nPasso > il.log 2>&1 )
+check "inline-local sai com exit 0" $?
+grep -q "warning: this module expands __LINE__" "$D/il.log"
+check "inline-local tambem avisa (remover a declaracao desloca linhas)" $?
+grep -q "line $LINI" "$D/il.log" && grep -q "line $LLOG" "$D/il.log"
+check "os DOIS sitios abaixo da declaracao removida sao nomeados" $?
+
+# (3) verbo que NAO desloca linhas: rename fica mudo (dynval.md: o rename
+#     edita por posicao de byte na mesma linha - o numero nao muda)
+D=$(freshpos case126c)
+LT=$(grep -n 'LOCAL nPasso' "$D/pos.prg" | cut -d: -f1)
+CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
+( cd "$D" && "$BIN" rename pos.hbp pos.prg:$LT:$CT nEtapa > rn.log 2>&1 )
+check "rename no modulo sensivel a posicao segue exit 0" $?
+! grep -q "__LINE__" "$D/rn.log"
+check "rename NAO avisa (nao desloca linhas - aviso so' quando o valor muda)" $?
+
+# (4) régua do caso 64: nenhuma palavra da fixture na ferramenta
+! grep -qiE "\bJunta\b|\bTriplica\b|\bnPasso\b|\bbAcum\b|\bnEtapa\b" "$HERE/../src/hbrefactor.prg"
+check "régua do caso 64: nenhuma palavra da fixture fixpos na ferramenta" $?
+}
+
+freshviv() { # freshviv <case-name> -> string que e' MACRO VIVO (&nome) mencionando um memvar (P16 c)
+   local d="$HERE/tmp/$1"
+   rm -rf "$d"; mkdir -p "$d"
+   cp "$HERE"/fixviv/*.prg "$HERE"/fixviv/*.hbp "$d"/
+   echo "$d"
+}
+
+unit_127() {
+echo "case 127: P16(c) - a string que e' MACRO VIVO: o rename diz ONDE e o PORQUE"
+# Uma string com '&nome' e' macro-expandida em RUNTIME e vale o memvar que
+# nomeia (fato do COMPILADOR: a presenca dela sozinha liga usesMacro na
+# funcao - nenhum '&' fora de string existe na fixture; prova executavel:
+# tests/ppc-strfam/sf.prg, camada B). Renomear o memvar muda o comportamento
+# de toda string que o mencione. Antes deste caso a recusa dizia so' "usa
+# macro '&'" - verdadeira, mas muda: sem posicao e sem porque, o usuario (e
+# o agente - §1.6) nao tem como RELATAR nem revisar.
+D=$(freshviv case127)
+# linhas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
+LSTR=$(grep -n 'modelo:' "$D/viv.prg" | cut -d: -f1)
+LPFX=$(grep -n 'prefixo:' "$D/viv.prg" | cut -d: -f1)
+LOUT=$(grep -n 'outro modulo' "$D/apoiov.prg" | cut -d: -f1)
+LP=$(grep -n 'PRIVATE xCfg' "$D/viv.prg" | cut -d: -f1)
+CP=$(awk -v n="$LP" 'NR==n { print index($0, "xCfg") }' "$D/viv.prg")
+
+( cd "$D" && "$BIN" rename viv.hbp viv.prg:$LP:$CP xTema > rn.log 2>&1 )
+[ $? -ne 0 ]
+check "a recusa conservadora CONTINUA (macro no alcance = fecho aberto)" $?
+grep -q "viv.prg:$LSTR: string contains '&xCfg'" "$D/rn.log"
+check "a string macro-viva sai NOMEADA com arquivo:linha" $?
+grep -q "apoiov.prg:$LOUT: string contains '&xCfg'" "$D/rn.log"
+check "o relato e' de PROJETO (a string do outro modulo tambem sai)" $?
+grep -q "RUN TIME" "$D/rn.log"
+check "o aviso diz o PORQUE (a string re-expande em runtime)" $?
+grep -q "will NOT be edited" "$D/rn.log"
+check "o aviso diz a regra: dado se relata, jamais se edita" $?
+! grep -q "viv.prg:$LPFX:" "$D/rn.log"
+check "'&xCfgLote' (outro nome; fronteira de identificador) NAO e' relatado" $?
+cmp -s "$D/viv.prg" "$HERE/fixviv/viv.prg" && cmp -s "$D/apoiov.prg" "$HERE/fixviv/apoiov.prg"
+check "recusa ANTES de editar: fontes byte a byte intactos" $?
+
+# régua do caso 64: nenhuma palavra da fixture na ferramenta
+! grep -qiE "\bxCfg\b|\bMostra\b|\bxTema\b" "$HERE/../src/hbrefactor.prg"
+check "régua do caso 64: nenhuma palavra da fixture fixviv na ferramenta" $?
+}
+
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

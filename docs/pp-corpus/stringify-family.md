@@ -22,8 +22,10 @@
    em camadas diferentes. Foi o assert que me desmentiu — o `.ppo` sozinho mentia.)*
 5. **Consequência para o produto:** renomear um memvar muda o comportamento de **qualquer
    string** que mencione `&nome`. String é DADO — não se edita (§1) — mas **tem de ser
-   relatada**. É o que o `usages` já faz (*"possible reference in string"*), e agora se sabe
-   por quê.
+   relatada**. **FECHADO — P16(c), 2026-07-22:** o `ast-18` dá ao token da string o campo
+   `macrovars` (a lista de memvars que ela re-expande, extraída pelo compilador com a regra do
+   pcode `HB_P_MACROTEXT`), e o `rename` de memvar nomeia cada string com o **porquê** (*"macro-
+   expanded at RUN TIME… will NOT be edited"*) — sem ler o texto da string. Prova: caso 127.
 
 ## Lacunas
 

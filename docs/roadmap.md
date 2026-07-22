@@ -507,41 +507,43 @@ mesmo, e a ferramenta não alegou preservação (o verbo cria função nova; ide
 nunca esteve na mesa). O que falta é o **aviso**. Guarda: `corpus_dyn` (`make ppcorpus` 58/0);
 conhecimento: [pp-corpus/dynval.md](pp-corpus/dynval.md).
 
-### P16 — o relato do NÃO-VERIFICÁVEL *(aberto 2026-07-13; **consumo do `ast-17` + `dynval`; A RESOLVER**)*
+### P16 — o relato do NÃO-VERIFICÁVEL *(aberto 2026-07-13; **✅ ENTREGUE 2026-07-22, `ast-18`, casos 125/126/127**)*
+
+> **Estado:** as três frentes fecharam, **cada uma sobre um FATO NOVO do core** (`ast-18`), não
+> sobre inferência na ferramenta. A escolha do Diego, quando falta o fato, é **sempre estender o
+> core** (2026-07-22) — foi ela que reescreveu a primeira tentativa desta fase: eu havia posto
+> discriminadores por FORMA (`col == 0` para dado, `head == "__LINE__"` para dynval, varredura de
+> `&nome` na string) e o Diego pegou a heurística. `make test` **1021/0**, `make ppcorpus`
+> **117/0**, `corerefs` reconciliado (as citações de `ppcore.c` andaram +34 e foram corrigidas).
 
 **Escopo**: o `usages` (e o relatório dos verbos de edição) passam a **RELATAR** — nunca editar —
-o que a ferramenta enxerga e hoje cala. **Duas fontes, o mesmo dever** (§1 do CLAUDE.md:
+o que a ferramenta enxerga e hoje cala. **Três fontes, o mesmo dever** (§1 do CLAUDE.md:
 *detecção e relato preciso, jamais edição automática*):
-- **(a) ocorrência em DADO** — o nome dentro de bloco de stream, que ganhou posição no `ast-17`.
-  Hoje: renomeia-se `cSaldo`, a ferramenta edita certo e verifica certo, e o `TEXT` segue
-  imprimindo `cSaldo` **sem uma palavra**.
-- **(b) módulo SENSÍVEL A POSIÇÃO** — o que expande `__LINE__` (fato: as aplicações, com linha).
-  Um verbo que desloca linhas deve dizer *"este módulo expande `__LINE__` em N sítios; o valor
-  deles muda com esta edição"*. **Não congelar o valor** — o valor novo é o certo; o produto é
-  o aviso. **Lacuna de COMPLETUDE medida (2026-07-15, `corpus_dyn`)**: a provenância do `dynval`
-  é **severada na camada de statement** — o literal injetado chega como `NUMERIC` comum, token
-  `prov:"n"` mas **sem `from`**; a origem só existe em `ppApplications`, ligada ao statement
-  **por linha** (o eixo frágil). Um verbo que anda o statement AST é cego a isso. **Decisão do
-  Diego** (spec antes de código): (a) o consumidor cruza `ppApplications` por linha; **ou** (b)
-  **estende-se o core** para povoar `from` no token expandido do `dynval` — canal que a família
-  `derivation` já usa —, tornando o vínculo independente da linha.
-  ✅ **O lado do FATO está FEITO (2026-07-15, `ast-17`, opção b):** o literal do `dynval` chega ao
-  statement com `from: [{op: "dynval", app: N}]` — o `app` liga de volta à aplicação da regra
-  builtin `__LINE__`/`__FILE__`, independente da linha (`hb_pp_drvAddDyn` em `ppcore.c`, gated por
-  `fTrackPos`; `ppc-dyn` transita `HOLE:P16 → COMPLETE`). **Sobra o lado do CONSUMO:** o `rename`
-  que desloca linhas ainda não AVISA que o valor de um `__LINE__` muda. É o que resta da P16(b).
-- **(c) STRING que é MACRO VIVO** *(fonte nova, 2026-07-14, descoberta por assert)* — uma string
-  literal que contém `&nome` é **reavaliada em runtime** e vale o **valor do memvar**. Renomear um
-  memvar muda o comportamento de toda string que o mencione. O `usages` já relata *"possible
-  reference in string"* — o que falta é o **rename** dizer o mesmo, e dizer **por quê** (hoje o
-  usuário lê "possible" sem saber que é executável). Fato no dump: `usesMacro` + a string com
-  posição. Prova: [`tests/ppc-strfam/sf.prg`](../../tests/ppc-strfam/sf.prg).
+- **(a) ocorrência em DADO** ✅ — o nome dentro de bloco de stream. **FATO (`ast-18`):** a string
+  do bloco carrega `from` com `op: "stream"` (`app: null`) — o SELO declarado que a marca como
+  dado (`hb_pp_drvAddStream` em `ppcore.c`, gated por `fTrackPos`). `IsDataTok` consome o selo
+  (segue o `clone` do re-scan até a origem selada); o discriminador por FORMA (`col == 0`) foi
+  **removido**. `usages cSaldo` lista *"possible occurrence in data"* separado do símbolo; o
+  `rename` avisa e não edita (caso 125).
+- **(b) módulo SENSÍVEL A POSIÇÃO** ✅ — o que expande `__LINE__`. **FATO (`ast-18`):** o `from` do
+  `dynval` ganhou `axis` (`"line"`/`"file"`), gravado no próprio ramo da expansão
+  (`hb_pp_drvAddDyn` recebe o eixo). `DynLineSites` filtra por `axis == "line"` — o casamento do
+  nome `__LINE__` foi **removido**. O `extract-function` e o `inline-local` (verbos que deslocam
+  linhas) avisam *"this module expands __LINE__ at N site(s)… the new values are correct"*; o
+  `rename` (não desloca) fica mudo (caso 126). *(O lado do FATO da proveniência do `dynval` — o
+  `from` com `op: "dynval"` — já viera no `ast-17`; o `axis` é o que o CONSUMO pedia.)*
+- **(c) STRING que é MACRO VIVO** ✅ — uma string literal com `&nome` é **reavaliada em runtime** e
+  vale o memvar. **FATO (`ast-18`):** o token da string carrega `macrovars` — a lista de memvars
+  que ela re-expande, extraída pelo compilador com a MESMA regra do pcode `HB_P_MACROTEXT`
+  (`hb_compAstWriteMacroVars`, gated por `HB_SUPPORT_MACROTEXT`; some sob `-kM`). `MacroLiveHits`
+  CASA o nome contra a lista — **sem ler o texto da string** (a varredura de `&nome` foi
+  descartada antes de nascer). O `rename` de memvar nomeia cada string, com arquivo:linha e o
+  **porquê** (*"macro-expanded at RUN TIME… will NOT be edited"*), no projeto inteiro (caso 127).
 **A régua do §1 é dura e vale inteira**: detecção e relato preciso, **jamais** edição automática
 — nem com opt-in. O relato é aviso ao humano/agente, não sugestão de edição.
-**Critério de pronto (mecânico)**: caso novo — `usages cSaldo` lista a ocorrência do bloco
-marcada como **DADO** (com arquivo:linha), separada das ocorrências de símbolo; o `rename` a
-reporta e **não a edita** (fonte do bloco byte a byte intacto, verificação byte-idêntica);
-nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make test` verde.
+**Critério de pronto (mecânico)** ✅: casos 125/126/127 verdes; cada frente consome um FATO do
+`ast-18` (nenhum discriminador por forma sobrevive no fonte); nenhuma palavra de fixture em
+`src/hbrefactor.prg` (régua do caso 64); `make test` verde (1021/0).
 
 ### P-REV — a REVISÃO do corpus para o método v2 *(aberta 2026-07-14; **EIXO DIRETIVA CONCLUÍDO 2026-07-15 — 31 selos, 0 pendentes; segue no eixo COMPLETUDE**)*
 
@@ -604,8 +606,9 @@ lacunas.
 > (`ppc-strfam`=P18, `ppc-pragma`=P19) e **19 COMPLETE**, todos com rastro executável de polaridade
 > casada. `corpus_completude` acusa **0 pendentes, 0 mal-formados**; `make test` **990/0**,
 > `make ppcorpus` **117/0**. **O piloto `from`-no-dynval foi ENTREGUE (2026-07-15, `ast-17`):** o
-> `ppc-dyn` transitou `HOLE:P16 → COMPLETE`. Resta, fora desta fase, o CONSUMO da P16(b) (o `rename`
-> avisar a sensibilidade a posição) e os dois HOLE vivos (P18, P19), cada um sua fatia própria.
+> `ppc-dyn` transitou `HOLE:P16 → COMPLETE`. O CONSUMO da P16 (a/b/c) foi **ENTREGUE em 2026-07-22**
+> (`ast-18`, casos 125/126/127 — ver § P16); restam os dois HOLE vivos (P18, P19), cada um sua
+> fatia própria.
 
 **Por que existe:** a P-REV provou a **diretiva** de cada família (camadas A/B) mas **nunca rodou o
 loop dos quatro oráculos** — entender via `.ppo`/`.ppt`/dump/fixture, e quando um oráculo **falta
