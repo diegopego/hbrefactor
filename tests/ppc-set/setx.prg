@@ -8,7 +8,7 @@
 //
 // Familia SET - SET EXACT (docs/pp-corpus/set-exact.md). Uma linha do std.ch, dois
 // mecanismos do pp: marker RESTRICT no match e result SMART-STRINGIFY.
-// Diretiva real, std.ch:121:
+// Diretiva real, o `#command SET EXACT <x:ON,OFF,&>` do std.ch:
 //   #command SET EXACT <x:ON,OFF,&> => Set( _SET_EXACT, <(x)> )
 //
 // AS DUAS CAMADAS (METODO.md § 4):

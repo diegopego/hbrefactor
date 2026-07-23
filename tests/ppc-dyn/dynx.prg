@@ -10,7 +10,7 @@
 //
 // Familia DEFINE DINAMICO (docs/pp-corpus/dynval.md). As UNICAS duas regras de
 // mkind `dynval` do pp sao BUILTIN -- o usuario nao as escreve:
-//   ppcore.c:7253-7254 -> hb_pp_addDefine( __FILE__ ), hb_pp_addDefine( __LINE__ )
+//   hb_pp_initDynDefines (ppcore.c) -> hb_pp_addDefine( __FILE__ ), hb_pp_addDefine( __LINE__ )
 // O resultado da regra e' um ponteiro sentinela (nao texto); o pp o resolve na
 // expansao para a POSICAO corrente do codigo.
 //

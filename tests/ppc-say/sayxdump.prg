@@ -9,7 +9,7 @@
 //   - .ppo: sem opcionais -> DevOut; [PICTURE] -> DevOutPict; o grupo opcional do
 //     result [, <clr>] so' emite a cor quando COLOR casou;
 //   - ast: os grupos opcionais [PICTURE]/[COLOR] chegam como roles opt-open/opt-close
-//     (std.ch:249). E' o mesmo mecanismo do [,<vN>] do STORE -- so' que ali o grupo
+//     (o `#command @ ... SAY` do std.ch). E' o mesmo mecanismo do [,<vN>] do STORE -- so' que ali o grupo
 //     REPETE, e aqui casa 0 ou 1 vez (presenca).
 PROCEDURE Main()
    LOCAL nX := 42, cName := "Ana"

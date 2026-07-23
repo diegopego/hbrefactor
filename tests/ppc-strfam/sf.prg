@@ -52,7 +52,7 @@
  *
  *   2. Sobre MACRO PURO (`&x`), o <"z"> (strstd) e o <(z)> (strsmart) NAO
  *      estringificam: o pp DESFAZ o macro e emite o SIMBOLO, como codigo
- *      (ppcore.c:5254-5256 -- emite `value + 1`, pulando o `&`, como KEYWORD, e
+ *      (hb_pp_matchResultLstAdd, no ppcore.c -- emite `value + 1`, pulando o `&`, como KEYWORD, e
  *      registra a derivacao como 'c'lone). E' a semantica Clipper: `USE &cArq` tem
  *      de virar a VARIAVEL, nao a string "&cArq".
  *      => o nome dentro do macro e' SIMBOLO DE VERDADE. NAO e' "a parede do macro":

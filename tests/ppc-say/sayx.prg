@@ -7,7 +7,8 @@
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //
 // Familia @ ... SAY (docs/pp-corpus/say.md) - o SAY posicionado do Clipper.
-// Diretiva real, std.ch:249 (DUAS regras, uma com PICTURE, outra sem):
+// Diretiva real, o `#command @ <row>, <col> SAY <exp>` do std.ch (DUAS regras,
+// uma com PICTURE, outra sem):
 //   #command @ <row>, <col> SAY <exp> [PICTURE <pic>] [COLOR <clr>] =>
 //            DevPos( <row>, <col> ) ; DevOutPict( <exp>, <pic> [, <clr>] )
 //   #command @ <row>, <col> SAY <exp> [COLOR <clr>] =>

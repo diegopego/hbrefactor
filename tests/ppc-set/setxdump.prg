@@ -9,7 +9,7 @@
 //
 // O QUE ANCORA (guarda corpus_set):
 //   - .ppt: os DOIS passes por linha -- #command emite Set( _SET_EXACT, "ON" ), e
-//     depois o #define transforma _SET_EXACT em 1 (std.ch:121);
+//     depois o #define transforma _SET_EXACT em 1 (o `#command SET EXACT` do std.ch);
 //   - ast: o match traz o marker mkind 'restrict' (<x:ON,OFF,&>: so' ON/OFF/& casam)
 //     e o result traz mkind 'strsmart' (<(x)>: palavra nua vira string, expressao
 //     entre parenteses passa crua) -- a ponte com P4/P5.

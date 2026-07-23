@@ -2715,7 +2715,7 @@ unit_89() {
 echo "case 89: B9 fatia 2 F2.4 - annotate --apply: materializa e verifica (round-trip)"
 # a escada ESCREVE (spec-b9-fatia2 § Pipeline estágio 2): _HB_MEMBER que
 # COMPLETA o tipo do membro (topologia (g), fato do core desde
-# hbmain.c:1174 - candidato (g) adotado), e AS CLASS nas locais nível 1
+# hb_compMethodAdd no hbmain.c - candidato (g) adotado), e AS CLASS nas locais nível 1
 # pós-recompute. Verificação padrão-ouro POR EDIÇÃO: .hrb byte-idêntico
 # SEM -kt (a anotação é inerte), compila limpo -w3 -es2, e RODA sob -kt.
 # Depois o usages decide por FATO os sends encadeados que a fatia RE.3
@@ -2765,7 +2765,7 @@ echo "case 90: B9 fatia 2 - ROLLBACK PROVOCADO: mentira declarada, -kt pega, fon
 # resíduo 3 da F2.4 (spec § Entregue): o fato DECLARADO mente - o
 # _HB_MEMBER promete que Acha() (método de BAU, pertencimento por
 # POSIÇÃO/pLastClass) DEVOLVE uma MOEDA (o sufixo AS CLASS é o tipo de
-# RETORNO - hbclass.ch:282), mas o runtime devolve N. Promessa de membro
+# RETORNO - o `AS CLASS` do hbclass.ch), mas o runtime devolve N. Promessa de membro
 # NÃO é imposta (fato 6), então o fixture pristino compila E RODA limpo
 # sob -kt: a mentira fica dormente e é INVISÍVEL sem o materializador.
 # A análise decide por fato declarado (honestamente) e escreve a
@@ -2858,7 +2858,7 @@ echo "case 93: B9 fatia 2 - round-trip fixrcv: semente 63 (r2 s:Zap) por FATO; r
 # Rota A da semente 63 (SEMCTOR sem ctor: _HB_MEMBER avulso, probe
 # proba) + a correção que este caso PROVA: local nível 1 cuja classe
 # não está registrada no módulo do site (x AS CLASS CAIXA em r2) vira
-# nível 2 com o registro PURO '_HB_CLASS CAIXA' (harbour.y:1253 -
+# nível 2 com o registro PURO '_HB_CLASS CAIXA' (a regra `Declaration:` do harbour.y -
 # classe sem promessa de membro; antes da correção o --apply escrevia
 # a anotação sem registro e recuava no W0025). Projeto sem Main:
 # passo -kt pulado com relato honesto.
@@ -3094,7 +3094,7 @@ echo "case 100: B9 fatia 3 - generalidade JUNTO: param de bloco da DSL não-espe
 # régua dos casos 64/72-74: a capacidade só conta como genérica provada
 # em DSL inventada NÃO-espelho. O bloco de q2:9 é LITERAL no fonte (a
 # DSL o registra como membro inline); a sugeridora tipa o 1º param como
-# RECEPTOR (fato do VM classes.c:4554, via registro - D3) e o --apply
+# RECEPTOR (fato do VM, msgClassSel no classes.c, via registro - D3) e o --apply
 # escreve a anotação + o registro puro _HB_CLASS (classe de RUNTIME da
 # DSL não é conhecida do -w3 - sem ele, W0025 e o dump perde a classe).
 # oExtra (2º param) não tem fato de dispatch - nunca anotado; o send de
@@ -3701,7 +3701,7 @@ check "usages <nome> sem --at continua agregando tudo (comportamento antigo inta
 unit_113() {
 echo "case 113: P6 - ESTRUTURA da regra: sem cabeca, opcionais FORA DE ORDEM, multi-passe, e a guarda de orfao por FATO"
 # fixture fixp6 (DSL inventada NAO-espelho): (1) regra SEM CABECA (match comeca
-# com marker -> "head": null no dump, ppcore.c:1284); (2) dois grupos OPCIONAIS
+# com marker -> "head": null no dump, hb_pp_trackRuleRec no ppcore.c); (2) dois grupos OPCIONAIS
 # que o pp casa em QUALQUER ORDEM; (3) MULTI-PASSE (GLIMER expande em VULK, que
 # e reaplicada sobre o resultado); (4) a guarda de orfao passa a ler o FATO da
 # op de derivacao (ast-12) em vez de "token sem from".

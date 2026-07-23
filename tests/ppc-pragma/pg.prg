@@ -30,8 +30,8 @@
  *
  * O NOME MENTE, e este e' o achado: `#pragma Shortcut=On` NAO liga o curto-circuito.
  * Ele liga o switch /Z, e /Z quer dizer "SEM shortcut". Cadeia no fonte do core:
- *   src/pp/ppcore.c:3779   "SHORTCUT" -> hb_pp_setCompilerSwitch( pState, "z", ... )
- *   src/compiler/ppcomp.c:211  z+ (On) faz supported &= ~HB_COMPFLAG_SHORTCUTS
+ *   ppcore.c, hb_pp_pragmaNew()       "SHORTCUT" -> hb_pp_setCompilerSwitch( pState, "z", ... )
+ *   ppcomp.c, hb_pp_CompilerSwitch()  z+ (On) faz supported &= ~HB_COMPFLAG_SHORTCUTS
  * Ou seja: Shortcut=On => /Z+ => o `.AND.` AVALIA os dois lados; Shortcut=Off => /Z-
  * => o `.AND.` para no primeiro `.F.` (o normal). So' o assert me corrigiu.
  *

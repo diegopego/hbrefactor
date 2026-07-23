@@ -634,6 +634,30 @@ corpus_refs() {
 }
 
 # --------------------------------------------------------------------------
+# PORTAO DE ENTRADA do numero de linha (fase CIT, 2026-07-23). A guarda acima
+# mantem HONESTO o que esta' registrado; este portao impede o HABITO de voltar.
+# Citar `arquivo.c:NNN` do core e' a causa do rot -- toda edicao no core desloca
+# a linha, EM SILENCIO. Aqui a citacao nova BERRA na hora de nascer.
+#
+# Distingue core de fixture PROPRIA do teste: nenhum fixture nosso e' .c/.y/.h,
+# entao qualquer `<nome>.(c|y|h):NNN` e' core; entre os .ch, so' os do core
+# (std/hbclass/hbpp/hbfoxpro) contam -- `menu.ch:8`, `p6.ch:13` etc. sao SAIDA
+# ESPERADA da ferramenta sobre fixture nossa, e devem continuar.
+# --------------------------------------------------------------------------
+corpus_noline() {
+   echo "corpus: o PORTAO do numero de linha (citacao de core nova nasce ancorada em NOME?)"
+   local hits
+   hits=$(grep -rnE '\b[A-Za-z_][A-Za-z0-9_]*\.(c|y|h):[0-9]+|\b(std|hbclass|hbpp|hbfoxpro)\.ch:[0-9]+' \
+             "$HERE"/ppc-*/*.prg "$HERE"/run.sh "$HERE"/corerefs.txt 2>/dev/null) || true
+   if [ -n "$hits" ]; then
+      printf '%s\n' "$hits" | head -10 | while IFS= read -r h; do note "     LINHA CITADA: $h"; done
+      note "     -> cite o NOME (funcao/macro/diretiva); linha apodrece a cada edicao do core"
+   fi
+   [ -z "$hits" ]
+   check "nenhuma citacao de core por NUMERO DE LINHA em fixture/run.sh/corerefs (so' por nome)" $?
+}
+
+# --------------------------------------------------------------------------
 # Familia OS QUATRO ESTRINGIFICADORES - <z> x <"z"> x <(z)> x #<z>, e o MACRO
 # (docs/pp-corpus/stringify-family.md). Assunto vindo do teste do PROPRIO pp
 # (harbour/tests/pp.prg), indicado pelo Diego.
@@ -1094,6 +1118,7 @@ PYEOF
 }
 
 corpus_refs
+corpus_noline
 corpus_docs
 corpus_metodo
 corpus_completude

@@ -7,7 +7,7 @@
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //
 // Familia STORE (docs/pp-corpus/store.md) - a multi-atribuicao do Clipper.
-// Diretiva real, std.ch:78:
+// Diretiva real, o `#command STORE <v> TO` do std.ch:
 //   #command STORE <v> TO <v1> [,<vN>] => <v1> := [ <vN> :=] <v>
 // Um grupo opcional so' -- [,<vN>] -- mas que REPETE: cada variavel extra e' uma
 // repeticao do grupo, e o result [ <vN> :=] emite um ":=" por repeticao.

@@ -9,7 +9,7 @@
 //     (o grupo opcional [,<vN>] repetiu uma vez por variavel extra);
 //   - ast: o [,<vN>] chega como grupo opcional (role opt-open/opt-close), e o <vN>
 //     e' marker REGULAR dentro dele -- NAO e' mkind 'list'. A "lista" nasce da
-//     REPETICAO do grupo, nao de um marker de lista (std.ch:78).
+//     REPETICAO do grupo, nao de um marker de lista (o `#command STORE <v> TO` do std.ch).
 PROCEDURE Main()
    LOCAL a, b, c
    STORE 0 TO a

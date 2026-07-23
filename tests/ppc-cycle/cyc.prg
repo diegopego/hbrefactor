@@ -18,7 +18,7 @@
 // O ASSUNTO: o pp nao faz "uma passada" pelo arquivo. Ele pega um comando e o
 // reprocessa ATE' NINGUEM MAIS CASAR -- so' entao avanca para o proximo.
 //
-// No fonte do core (ppcore.c:6587) o laco e' explicito:
+// No fonte do core (hb_pp_preprocessToken, no ppcore.c) o laco e' explicito:
 //
 //     pState->iCycle = 0;                              // zera A CADA comando
 //     while( ! ISEOC( pTokenList ) && iCycle <= iMaxCycles ) {
@@ -36,7 +36,7 @@
 //
 //   2. O contador ZERA por comando. O limite nao e' do arquivo: e' de cada linha.
 //
-//   3. O limite existe e e' generoso -- HB_PP_MAX_CYCLES = 4096 (hbpp.h:412) -- e e'
+//   3. O limite existe e e' generoso -- HB_PP_MAX_CYCLES = 4096 (o #define, no hbpp.h) -- e e'
 //      CONFIGURAVEL por `#pragma RECURSELEVEL=<n>`. Estourou, o pp acusa
 //      CIRCULARIDADE (E0022) e deixa o token por expandir. A guarda corpus_cycle
 //      prova isso compilando uma copia desta cadeia com RECURSELEVEL=2: ela FALHA.

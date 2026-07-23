@@ -8,7 +8,7 @@
 // provada por assert que passa PELA diretiva. (regua: docs/pp-corpus/METODO.md § 4b)
 //
 // Familia <@> - o GUARDA ANTI-RECURSAO (docs/pp-corpus/reference-guard.md).
-// Idioma real do core: contrib/hbfoxpro/hbfoxpro.ch:63 estende o PUBLIC do
+// Idioma real do core: o `#command PUBLIC` do contrib/hbfoxpro/hbfoxpro.ch estende o PUBLIC do
 // Harbour REEMITINDO a propria palavra PUBLIC. Isso seria um loop infinito -- a
 // saida comeca por PUBLIC, que casa a mesma regra outra vez. O <@> e' o que
 // impede a reemissao de re-casar a regra.
@@ -30,7 +30,7 @@ REQUEST __pp_StdRules
 
 // A regra circular, no escopo do ARQUIVO (exercita a camada B na compilacao).
 // O __DIM aqui aplica ":= 7" para o efeito da regra ser OBSERVAVEL em runtime; no
-// hbfoxpro o __FP_DIM (identidade para escalar, hbfoxpro.ch:60) dimensiona arrays.
+// hbfoxpro o __FP_DIM (identidade para escalar, o `#xtranslate __FP_DIM` do hbfoxpro.ch) dimensiona arrays.
 #xtranslate __DIM( <exp> ) => <exp> := 7
 #command PUBLIC <var1> [, <varN> ] => ;
          <@> PUBLIC __DIM( <var1> ) [, __DIM( <varN> ) ]
@@ -56,7 +56,7 @@ PROCEDURE Main()
    // arquivo (pp-api.md). __pp_Process reescreve o texto SEM executar. A saida e'
    // `PUBLIC nA := 7, nB := 7`: a regra convergiu, e o <@> nao aparece nela. O
    // guarda e' significativo para o PP e invisivel para quem le a saida (o token
-   // reference e' liberado do fluxo de saida em ppcore.c:7019).
+   // reference e' liberado do fluxo de saida em hb_pp_tokenGet, no ppcore.c).
    __pp_AddRule( pp, "#xtranslate __DIM( <exp> ) => <exp> := 7" )
    __pp_AddRule( pp, "#command PUBLIC <var1> [, <varN> ] => <@> PUBLIC __DIM( <var1> ) [, __DIM( <varN> ) ]" )
    HBTEST AllTrim( __pp_Process( pp, "PUBLIC nA, nB" ) ) IS "PUBLIC nA := 7, nB := 7"

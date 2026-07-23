@@ -580,7 +580,7 @@ nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make te
 >   real; o fato semântico exato (só os nomes que viraram `HB_P_MACROTEXT`) fica como melhoria de
 >   core não-urgente (modo de falha é AVISO sob flag não-padrão, nunca edição errada).
 
-### Fase CIT — citações do core à prova de rot *(aberta 2026-07-23 pela revisão do `ast-18`; **guarda + `corerefs` FEITOS 2026-07-23; resta a varredura das fixtures**)*
+### Fase CIT — citações do core à prova de rot *(aberta 2026-07-23 pela revisão do `ast-18`; **✅ CONCLUÍDA 2026-07-23 — `make test` 1017/0, `make ppcorpus` 118/0**)*
 
 > **✅ FEITO (2026-07-23) — a raiz:** a regra *"citou `arquivo:linha`? registra no `corerefs`"*
 > guardava o SINTOMA — mantinha a citação frágil honesta em vez de matar a fragilidade, e
@@ -592,34 +592,30 @@ nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make te
 > função ou sumiço do trecho — os eventos semânticos que a doc DEVE rastrear. A prescrição do método
 > (`spec-pdoc-corpus-pp.md`) foi virada junto. `make ppcorpus` 117/0.
 
-**Resta — as citações inline em COMENTÁRIO de fixture/`run.sh`.** O `corerefs.txt` guardava só o
-que está registrado nele; as citações soltas em comentário ninguém confere, e a varredura de
-2026-07-23 achou-as **todas podres** (apontam pré-`ast-17`):
-- fixtures do corpus: `ppc-strfam/sf.prg` (`ppcore.c:5254-5256`), `ppc-pragma/pg.prg`
-  (`ppcore.c:3779`), `ppc-cycle/cyc.prg` (`ppcore.c:6587`), `ppc-dyn/dynx.prg`
-  (`ppcore.c:7253-7254`), `ppc-ref/refx.prg` + `refxdump.prg` (`ppcore.c:7019`, `4352`).
-  *(A `ppc-text/txt.prg` já foi convertida na revisão — serve de modelo.)*
-- comentários de `tests/run.sh`: `hbmain.c:1174`, `harbour.y:1253`, `classes.c:4554`,
-  `hbclass.ch:282`, `ppcore.c:1284`.
+**✅ FEITO — as citações inline em COMENTÁRIO.** O `corerefs.txt` guardava só o que está
+registrado nele; as citações soltas em comentário ninguém conferia, e a varredura achou-as **todas
+podres** (apontavam pré-`ast-17`; a de `hbclass.ch` já apontava para **linha vazia**). Convertidas
+para o NOME em **13 fixtures + 5 comentários do `run.sh`**:
+- `ppcore.c` → `hb_pp_matchResultLstAdd`, `hb_pp_pragmaNew`, `hb_pp_preprocessToken`,
+  `hb_pp_initDynDefines`, `hb_pp_tokenGet`, `hb_pp_resultMarkerNew`, `hb_pp_trackRuleRec`;
+  `ppcomp.c` → `hb_pp_CompilerSwitch`; `pplib.c` → `__PP_INIT`, `hb_pp_Destructor`;
+  `hbmain.c` → `hb_compMethodAdd`; `classes.c` → `msgClassSel`; `harbour.y` → a regra
+  `Declaration:`; os `.ch` do core → a diretiva pelo nome (`#command STORE <v> TO`,
+  `#command SET EXACT`, `#command @ … SAY`, `#command PUBLIC`, `#xtranslate __FP_DIM`, `AS CLASS`);
+  `hbpp.h` → o `#define HB_PP_MAX_CYCLES`.
+- Nenhuma entrada nova no `corerefs` foi precisa: as funções citadas **já estavam** lá (o corpus
+  `.md` as citava), então a conversão herdou a guarda.
 
-**Escopo**
-- **Converter** cada citação inline acima para o NOME (função/macro/diretiva) — a `txt.prg` mostra
-  a forma (*"o `#command TEXT` do std.ch (grep a linha, não a decore)"*). Se a citação merece
-  guarda, registrá-la em `corerefs.txt` (já função-ancorado); senão, prosa pelo nome basta.
-  Recompilar cada fixture tocada (`-w3 -es2`) — comentário `//`, cuidar do `*/`.
-- **Portão executável** (§1.6 — regra nova sem portão novo é regra que se viola de novo): um check
-  que REPROVA se um `arquivo.(c|y|ch):NNN` de core aparecer em fixture/`run.sh` — o hábito da linha
-  volta a berrar em vez de crescer calado. (A guarda de conteúdo, `corpus_refs`, já é
-  função-ancorada; este portão fecha a porta de ENTRADA do número de linha.)
+**✅ Portão de entrada** (§1.6 — regra nova sem portão novo é regra que se viola de novo):
+`corpus_noline` em `tests/ppcorpus.sh` REPROVA qualquer citação de core por número de linha em
+fixture/`run.sh`/`corerefs`. **Provado nos dois sentidos**: passa hoje, e ao reintroduzir um
+`ppcore.c:NNN` numa fixture ele berra nomeando arquivo, linha e conteúdo. Distingue core de fixture
+própria — nenhum fixture nosso é `.c`/`.y`/`.h`, e entre os `.ch` só os do core contam (`menu.ch:8`,
+`p6.ch:13` etc. são **saída esperada da ferramenta** sobre fixture nossa, e seguem intactos).
 
-**Critério de pronto (mecânico)**
-- `grep -rnE '\b\w+\.(c|y|ch|h):[0-9]+' tests/ppc-*/*.prg tests/run.sh` não acha nenhuma citação de
-  linha de core.
-- Cada fixture tocada recompila limpo sob `-w3 -es2`; `make ppcorpus`/`make test` verdes.
-- Sem superfície de CLI nova → extensão não afetada.
-
-**Nota de fronteira:** re-baselina comentário de fixture PRÉ-EXISTENTE (fora da P16) — por isso é
-fase própria, com o aval do Diego para o escopo (2026-07-23), não varredura embutida na revisão.
+**Critério de pronto (mecânico)** ✅: `corpus_noline` verde; `corpus_refs` função-ancorado verde;
+`make test` **1017/0**, `make ppcorpus` **118/0** (que recompila todas as fixtures do corpus).
+Sem superfície de CLI nova → extensão não afetada.
 
 ### P-REV — a REVISÃO do corpus para o método v2 *(aberta 2026-07-14; **EIXO DIRETIVA CONCLUÍDO 2026-07-15 — 31 selos, 0 pendentes; segue no eixo COMPLETUDE**)*
 

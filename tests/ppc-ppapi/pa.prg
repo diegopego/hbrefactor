@@ -18,7 +18,7 @@
 //
 // A API (pplib.c):
 //   __pp_Init( [cPath], [cStdCh], [lArchDefs] ) -> um estado NOVO e INDEPENDENTE
-//       cStdCh AUSENTE -> carrega as regras PADRAO da linguagem (pplib.c:180)
+//       cStdCh AUSENTE -> carrega as regras PADRAO da linguagem (__PP_INIT, no pplib.c)
 //       cStdCh = ""    -> nenhuma regra: um pp virgem
 //       cStdCh = arq   -> le' as regras daquele arquivo
 //   __pp_AddRule( pp, "#xcommand ..." )  -> registra regra NAQUELE estado
@@ -26,7 +26,7 @@
 //   __pp_Reset( pp )                     -> derruba as regras que VOCE adicionou
 //   __pp_Path( pp, cPath )               -> caminho de include
 //
-// NAO EXISTE "close". O estado e' um ponteiro sob GC (pplib.c:104, hb_pp_free no
+// NAO EXISTE "close". O estado e' um ponteiro sob GC (hb_pp_Destructor no pplib.c, hb_pp_free no
 // destrutor): ele morre quando a ultima referencia some. Por isso "init/close varias
 // vezes" nao e' o modelo -- o modelo e' "quantos estados eu quiser, vivos ao mesmo
 // tempo, cada um com as suas regras".
