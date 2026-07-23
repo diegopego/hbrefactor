@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@9251a1c -->
+<!-- changelog-baseline: hbrefactor@424ad29 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 304cfa8..HEAD   (see § Maintaining this file, at the end).
+     To resume:  git log 424ad29..HEAD   (see § Maintaining this file, at the end). -->
 
 # Changelog
 
@@ -19,6 +19,121 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-07-22 → 07-23 — what it can see but must never touch, it now tells you about
+
+The rule has never moved: hbrefactor edits only what the compiler can prove, and it does
+not touch strings, comments or data. That rule protects you from a **wrong edit**. It
+does nothing about the other failure — **silence**: a rename that is entirely correct,
+and says nothing about the place in your program where that name lives on, unverifiable,
+still meaning something.
+
+Three of those places now speak up. None of them is edited.
+
+### A string that is really a macro
+
+`"modelo &cLayout do relatorio"` is not text. At run time Harbour expands `&cLayout` to
+the value of the memvar it names — so renaming that memvar changes what the string does,
+while the string itself cannot be edited, because nothing can prove what your program
+will build out of it. Before, the refusal said only that the function "uses a macro":
+true, but with no position and no reason, there was nothing you could review.
+
+```
+$ hbrefactor rename cfg.hbp cfg.prg:5:13 cModelo
+warning: cfg.prg:7: string contains '&cLayout' - macro-expanded at RUN TIME to the
+value of the memvar it names, so its behaviour follows this rename; the string is data
+and will NOT be edited
+```
+
+Every such string, in the whole project — not just the module you pointed at. And the
+match is on the **name**, not on the text: a string mentioning `&cLayoutBase` is not
+reported, because that is a different memvar.
+
+The rename itself is still refused here, and that has not changed: a live macro means the
+name can be reached from outside the static call graph, so the tool cannot promise it
+found everything. What is new is that you now get told *where* and *why*, instead of a
+verdict you had to take on faith.
+
+### Code whose meaning depends on where it sits
+
+`__LINE__` has no value written anywhere — it **is** the position. Extract a function or
+inline a local, and every `__LINE__` below the edit reports a different number afterwards.
+That is correct: the code really did move. It should just not happen behind your back.
+
+```
+$ hbrefactor extract-function relat.hbp relat.prg 6-8 Soma
+warning: this module expands __LINE__ at 1 site(s) whose lines shift with this edit
+(line 10) - the expanded values follow the new position; the new values are correct
+(the code really moves), review only if they were meant to be stable
+extract-function: lines 6-8 of MAIN -> Soma( nTotal ) returning nTotal
+```
+
+It is a **warning, not a refusal** — the edit goes through, because there is nothing wrong
+to fix. And it is precise about what actually moves: a site *above* the edit is not named,
+and neither is `__FILE__`, which shifts down the file just the same but whose value does
+not follow the line. A `rename` stays silent altogether — it moves no lines.
+
+### And the other half of the duty: knowing when to shut up
+
+hbrefactor reports a written string that happens to equal the name you are renaming:
+
+```
+$ hbrefactor usages rel.hbp --at rel.prg:3:10
+rel.prg:3: declaration (local) in MAIN  | LOCAL cSaldo := "1.234,00"
+rel.prg:3: write (local) in MAIN  | LOCAL cSaldo := "1.234,00"
+rel.prg:12: read (local) in MAIN  | QOut( cSaldo )
+rel.prg:5: possible reference in string  | QOut( "cSaldo" )
+4 result(s) for 'cSaldo'
+```
+
+Line 5 is worth telling you about: a written string equal to a name can be a call by name
+(`&()`, `__mvGet`). But this file also has a `TEXT ... ENDTEXT` block whose line 9 reads
+`cSaldo apurado no periodo` — and that line is **not** in the list.
+
+That silence is the feature. Inside a stream block your source stops being code: the
+preprocessor turns each raw line into a string, and a word in there that matches one of
+your variables is a **coincidence**, not an occurrence. There is no mechanism by which it
+could ever name your variable. Reporting it would be noise — and noise you learn to
+ignore is worse than nothing, because one day it will be hiding something real.
+
+The tool does not work this out from the *shape* of the string. The preprocessor now
+stamps a stream line as such, so staying quiet is a **fact it was told**, not a guess.
+
+**The honest limit.** All three of these *report*. None of them edits, and none of them
+ever will: no proof, no edit. What you get is the end of the silent case — the tool no
+longer knows something about your rename and keeps it to itself.
+
+## 2026-07-23 — three messages that were still in Portuguese
+
+The tool was translated to English months ago, but three strings survived the sweep, in
+places rare enough that nobody hit them: the header of a refusal (`the dynamic scope of
+MAIN tem furos:`), the reason line under it (`uses macro` was written `usa macro`), and
+the kind label `usages --at` prints for a plain identifier (`identificador`). They now
+read `has holes:`, `uses macro '&'` and `identifier`.
+
+If you grep the tool's output in a script, those three strings changed.
+
+## 2026-07-14 — every temporary file the tool writes now lives in one place
+
+Every command hands your project to the compiler and works on the result somewhere under
+your system's temp directory. That used to mean a scattering of `hbrefactor_<random>`
+directories — one per command, plus one more per `snapshot` — loose in `/tmp`. After a few
+weeks of use there were thousands, with no common root, and no way to clean them up except
+a wildcard you had to trust.
+
+Now there is one root, `$TMPDIR/hbrefactor/`, and the distinction that matters is kept in
+the structure itself:
+
+- **`work/`** — scratch. Safe to delete at any moment, including while nothing is running:
+  ```
+  rm -rf "${TMPDIR:-/tmp}/hbrefactor/work"
+  ```
+- **`snap/`** — the baseline `snapshot` recorded, and what `verify --rollback` restores
+  from. Deleting this is deleting your undo.
+
+Nothing here deletes anything for you, ever. `make tmp-usage` measures the root, warns when
+it grows past a limit (500 MB by default), and **prints** the command — running it is your
+call.
 
 ## 2026-07-13 — it now refuses a project it cannot read correctly, instead of answering wrongly
 

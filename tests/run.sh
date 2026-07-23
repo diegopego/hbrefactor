@@ -1127,7 +1127,7 @@ grep -q "dynamic shadowing: a PRIVATE shadows the PUBLIC" "$D/map.log"
 check "dynamic-axis shadowing reported" $?
 grep -q "dynamic reach: DEPOSITA$" "$D/map.log"
 check "reach of the PRIVATE is its dynamic extension only" $?
-grep -q "hole in reach: VIAMACRO (b.prg) usa macro" "$D/map.log"
+grep -q "hole in reach: VIAMACRO (b.prg) uses macro" "$D/map.log"
 check "macro hole in the PUBLIC's reach" $?
 grep -q "lexical shadow: COMLOCALHOMONIMO" "$D/map.log"
 check "lexical-axis shadow reported (uses there are NOT the memvar)" $?

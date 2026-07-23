@@ -1495,6 +1495,126 @@ app.prg:5:13: in rule match (#xuncommand CONFERE)
   </div>
 </section>
 
+<!-- §5c what it sees but must not touch (P16 / ast-17 / ast-18) -->
+<section>
+  <div class="narrow">
+    <p class="sec-eyebrow">Going deeper</p>
+    <h2>What it sees but must not touch</h2>
+    <p>"Never edits what it cannot prove" protects you from a <strong>wrong edit</strong>. It says nothing about the other failure — <b class="emph">silence</b>: a rename that is perfectly correct and never mentions the place in your program where that name lives on, unverifiable, still meaning something.</p>
+    <p>A string that macro-expands at run time is one such place. <span class="mono">"modelo &amp;cLayout do relatorio"</span> is not text — Harbour expands <span class="mono">&amp;cLayout</span> to the value of that memvar while your program runs. So renaming the memvar changes what the string <em>does</em>, and the string still cannot be edited, because nothing can prove what your program will build out of it. The rename is refused, as before — but now the refusal shows its work, for every such string in the project, matched on the <strong>name</strong> (note that <span class="mono">&amp;cLayoutBase</span>, a different memvar, is left out):</p>
+<!-- SITE-EX:19-live-macro-string:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">MEMVAR cLayout</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   PRIVATE cLayout := &quot;compacto&quot;</span>
+<span class="l"> </span>
+<span class="l">   Imprime( &quot;modelo &amp;cLayout do relatorio&quot; )</span>
+<span class="l">   Imprime( &quot;arquivo &amp;cLayoutBase nao e&#x27; o mesmo nome&quot; )</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">STATIC PROCEDURE Imprime( cTexto )</span>
+<span class="l"> </span>
+<span class="l">   ? cTexto</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:12 cModelo
+<span class="warn">warning: app.prg:7: string contains &#x27;&amp;cLayout&#x27; - macro-expanded at RUN TIME to the value of the memvar it names, so its behaviour follows this rename; the string is data and will NOT be edited</span>
+<span class="bad">hbrefactor: the dynamic scope of MAIN has holes:</span>
+  - MAIN (app.prg) uses macro &#x27;&amp;&#x27;
+<span class="bad">hbrefactor: scope with holes - code outside the static graph may see &#x27;cLayout&#x27;; refusing</span></code></pre></div>
+  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
+</div>
+<!-- SITE-EX:19-live-macro-string:END -->
+    <p>Code whose meaning depends on <strong>where it sits</strong> is the other. <span class="mono">__LINE__</span> has no value written anywhere — it <em>is</em> the position, so extracting a function moves it:</p>
+<!-- SITE-EX:20-line-sensitive:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal := 0</span>
+<span class="l">   LOCAL i</span>
+<span class="l"> </span>
+<span class="l">   FOR i := 1 TO 3</span>
+<span class="l">      nTotal += i * 10</span>
+<span class="l">   NEXT</span>
+<span class="l"> </span>
+<span class="l">   ? &quot;apurado na linha &quot; + Str( __LINE__ )</span>
+<span class="l">   ? &quot;total: &quot; + Str( nTotal )</span>
+<span class="l">   ? &quot;modulo &quot; + __FILE__</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL nTotal := 0</span>
+<span class="l"> </span>
+<span class="l">   nTotal := Soma( nTotal )</span>
+<span class="l"> </span>
+<span class="l">   ? &quot;apurado na linha &quot; + Str( __LINE__ )</span>
+<span class="l">   ? &quot;total: &quot; + Str( nTotal )</span>
+<span class="l">   ? &quot;modulo &quot; + __FILE__</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">STATIC FUNCTION Soma( nTotal )</span>
+<span class="l"> </span>
+<span class="l">   LOCAL i</span>
+<span class="l"> </span>
+<span class="l">   FOR i := 1 TO 3</span>
+<span class="l">      nTotal += i * 10</span>
+<span class="l">   NEXT</span>
+<span class="l"> </span>
+<span class="l">   RETURN nTotal</span></code></pre></div>
+  </div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> extract-function app.hbp app.prg 6-8 Soma
+<span class="warn">warning: this module expands __LINE__ at 1 site(s) whose lines shift with this edit (line 10) - the expanded values follow the new position; the new values are correct (the code really moves), review only if they were meant to be stable</span>
+extract-function: lines 6-8 of MAIN -&gt; Soma( nTotal ) returning nTotal
+  LOCAL i (line 4) is used only in the selection - moves to Soma
+<span class="ok">verified: symbols preserved (+Soma); run your test suite to confirm behaviour</span></code></pre></div>
+</div>
+<!-- SITE-EX:20-line-sensitive:END -->
+    <p>That is a <strong>warning, not a refusal</strong>: the edit goes through, because nothing is wrong — after the move the new number is the right one. It is precise about what actually shifts, too. A site <em>above</em> the edit is not named, and neither is <span class="mono">__FILE__</span>, which moves down the file exactly the same way but whose value does not follow the line. A <span class="mono">rename</span> says nothing at all: it moves no lines.</p>
+    <p>And the discipline that makes the other two worth reading — <b class="emph">knowing when to say nothing</b>:</p>
+<!-- SITE-EX:21-data-in-stream:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — app.prg</div>
+<pre class="num"><code><span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL cSaldo := &quot;1.234,00&quot;</span>
+<span class="l"> </span>
+<span class="l">   ? &quot;cSaldo&quot;</span>
+<span class="l"> </span>
+<span class="l">   TEXT</span>
+<span class="l">cSaldo apurado no periodo</span>
+<span class="l">   ENDTEXT</span>
+<span class="l"> </span>
+<span class="l">   ? cSaldo</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> usages app.hbp --at app.prg:3:10
+app.prg:3:10: cSaldo - identifier
+query: cSaldo
+app.prg:3: declaration (local) in MAIN  | LOCAL cSaldo := &quot;1.234,00&quot;
+app.prg:3: write (local) in MAIN  | LOCAL cSaldo := &quot;1.234,00&quot;
+app.prg:11: read (local) in MAIN  | ? cSaldo
+app.prg:5: possible reference in string  | ? &quot;cSaldo&quot;
+4 result(s) for &#x27;cSaldo&#x27;</code></pre></div>
+  <p class="ex-note muted">This command only <strong>reads</strong>. It never edits — and the suite fails the build if a single byte of the source moves.</p>
+</div>
+<!-- SITE-EX:21-data-in-stream:END -->
+    <p>The written string on line 5 is worth your attention: a string <em>you</em> wrote whose contents equal a name can be a call by name (<span class="mono">&amp;()</span>, <span class="mono">__mvGet</span>). The <span class="mono">TEXT … ENDTEXT</span> line that reads <span class="mono">cSaldo apurado no periodo</span> is <strong>not</strong> in the list. Inside a stream block your source stops being code: the preprocessor turns each raw line into a string, and a word in there matching one of your variables is a <em>coincidence</em>, with no mechanism by which it could ever name your variable. Reporting it would be noise — and noise you learn to skip is worse than nothing.</p>
+    <p>That silence is not the tool failing to look, and not a rule about how the string <em>looks</em>: the preprocessor stamps a stream line as data, so staying quiet is a fact it was <strong>told</strong>.</p>
+  </div>
+</section>
+
 <!-- §6 fact rule + ladder -->
 <section>
   <div class="narrow">

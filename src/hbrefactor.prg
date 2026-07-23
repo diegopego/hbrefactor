@@ -1961,7 +1961,7 @@ STATIC FUNCTION ResolveAtQuery( hAst, hAsts, nLine, nCol0 )
                cKind  := iif( aPrev != NIL .AND. aPrev[ "type" ] == 58, ;
                               "send site (message; dynamic dispatch)", ;
                          iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, ;
-                              "aliased field", "identificador" ) )
+                              "aliased field", "identifier" ) )
                cRole  := iif( aPrev != NIL .AND. aPrev[ "type" ] == 58, "method", ;
                          iif( aPrev != NIL .AND. aPrev[ "type" ] == 59, "field", ;
                               "ident" ) )
@@ -7471,7 +7471,7 @@ STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
       AAdd( aFuncs, { cPath, hFunc } )
 
       IF hFunc[ "usesMacro" ]
-         AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") usa macro '&'" )
+         AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") uses macro '&'" )
       ENDIF
       IF ! Empty( hFunc[ "sends" ] )
          AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") sends messages (method - dynamic target)" )
@@ -7702,7 +7702,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
       FOR nI := 1 TO Len( aLive )
          OutErr( "warning: " + aLive[ nI ] + hb_eol() )
       NEXT
-      OutErr( "hbrefactor: the dynamic scope of " + aC[ 2 ] + " tem furos:" + hb_eol() )
+      OutErr( "hbrefactor: the dynamic scope of " + aC[ 2 ] + " has holes:" + hb_eol() )
       FOR EACH cWhy IN hReach[ "holes" ]
          OutErr( "  - " + cWhy + hb_eol() )
       NEXT

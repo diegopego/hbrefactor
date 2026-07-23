@@ -1,19 +1,21 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@9251a1c · harbour-core@f8b2c9ab31 (feature/compiler-ast-dump)
-    — this round the tool stopped OBSERVING the builder and started ASKING it:
-      * THE PROJECT IS NOW AN ANSWER, NOT A GUESS. hbmk2 gained a new command,
-        `--hbproject`, that reports in JSON what a project is made of — sources, include
-        paths, compiler flags, one block per target, everything already resolved from
-        your `.hbp`/`.hbc`, and WITHOUT building anything. The tool used to read the
-        build command hbmk2 was about to run, which lists the files it would RECOMPILE —
-        not the files of the target. So it forced a full rebuild of your project just to
-        find out what the project was. That is gone.
-      * A SILENT WRONG ANSWER BECAME A REFUSAL (moved out of "Still rough", into "What it
-        never does"). Two sources with the same base name in a multi-target build used to
-        confuse the tool. It now names both paths and refuses.
-  updated: 2026-07-13
+  baseline: hbrefactor@424ad29 · harbour-core@4c02f40f44 (feature/compiler-ast-dump)
+    — this round closed the gap between "never edits what it cannot prove" and "never
+      keeps quiet about it either":
+      * IT NOW REPORTS THE UNVERIFIABLE THING YOUR EDIT REACHES (new section "What it
+        sees but must not touch"). A string that macro-expands at run time is named, in
+        the whole project, with the reason. A module whose `__LINE__` shifts under an
+        edit gets a warning — and it is a warning, not a refusal, because the new value
+        is the correct one. Neither is ever edited.
+      * AND IT NOW KNOWS WHEN TO SAY NOTHING. A `TEXT ... ENDTEXT` line matching a name
+        is a coincidence, not an occurrence — the preprocessor stamps such a line as
+        data (ast-18), so the silence is a fact it was told, not a guess from shape.
+      * The core grew the facts all of that stands on: ast-17 (a position-built value
+        keeps a link to the rule that made it, independent of the line) and ast-18 (the
+        three seals above).
+  updated: 2026-07-23
 
   This file is the single, current-state, user-facing description of hbrefactor.
   The landing page (site/) is GENERATED FROM this content — iterate the words here,
@@ -585,6 +587,77 @@ The difference is not academic. The earlier version *did* reimplement the rule �
 refused renames that were perfectly safe, because a hand-written copy of a compiler's
 logic is always a worse copy.
 
+### What it sees but must not touch
+
+<!-- prov: cases 125 (data suppression), 126 (__LINE__ axis), 127 (live macro string);
+     commits b1ee6b7 + 5256b35; core facts ast-17 (77a105602d) and ast-18 (f76137f85d),
+     motivation corrected by 4c02f40f44. Outputs below captured live 2026-07-23 against
+     scratch fixtures that compile clean under -w3 -es2. NOTE the asymmetry, it is the
+     point: a WRITTEN string equal to a name is reported (it can be a call by name via
+     &()/__mvGet); a stream-block line is NOT (no such mechanism exists — the match is a
+     coincidence). The tool does not decide that from token shape: the pp seals the
+     stream line. -->
+
+"Never edits what it cannot prove" protects you from a wrong edit. It says nothing about
+the other failure: **silence** — a rename that is perfectly correct and never mentions the
+place in your program where that name lives on, unverifiable, still meaning something.
+
+A string that macro-expands at run time is one such place. `"modelo &cLayout do relatorio"`
+is not text — Harbour expands `&cLayout` to the value of that memvar while your program
+runs, so renaming the memvar changes what the string does, and the string still cannot be
+edited, because nothing can prove what your program will build out of it:
+
+```
+$ hbrefactor rename cfg.hbp cfg.prg:5:13 cModelo
+warning: cfg.prg:7: string contains '&cLayout' - macro-expanded at RUN TIME to the value
+of the memvar it names, so its behaviour follows this rename; the string is data and will
+NOT be edited
+```
+
+Every such string in the project, not just the module you pointed at — and matched on the
+**name**, so a string mentioning `&cLayoutBase` is left out of the report. The rename itself
+is still refused, as it was before: a live macro means the name can be reached from outside
+the static call graph. What is new is that the refusal now shows its work.
+
+Code whose meaning depends on **where it sits** is the other. `__LINE__` has no value
+written anywhere — it *is* the position:
+
+```
+$ hbrefactor extract-function relat.hbp relat.prg 6-8 Soma
+warning: this module expands __LINE__ at 1 site(s) whose lines shift with this edit (line
+10) - the expanded values follow the new position; the new values are correct (the code
+really moves), review only if they were meant to be stable
+extract-function: lines 6-8 of MAIN -> Soma( nTotal ) returning nTotal
+```
+
+A **warning, not a refusal**: the edit goes through, because nothing is wrong — after the
+move the new number is the right one. It is precise about what actually shifts, too. A site
+*above* the edit is not named, and neither is `__FILE__`, which moves down the file exactly
+the same way but whose value does not follow the line. A `rename` says nothing at all: it
+moves no lines.
+
+And the discipline that makes the other two worth reading — **knowing when to say nothing**:
+
+```
+$ hbrefactor usages rel.hbp --at rel.prg:3:10
+rel.prg:3: declaration (local) in MAIN  | LOCAL cSaldo := "1.234,00"
+rel.prg:3: write (local) in MAIN  | LOCAL cSaldo := "1.234,00"
+rel.prg:12: read (local) in MAIN  | QOut( cSaldo )
+rel.prg:5: possible reference in string  | QOut( "cSaldo" )
+4 result(s) for 'cSaldo'
+```
+
+Line 5 is worth your attention: a string **you wrote** whose contents equal a name can be a
+call by name (`&()`, `__mvGet`). That same file has a `TEXT ... ENDTEXT` block whose line 9
+reads `cSaldo apurado no periodo` — and it is **not** in the list. Inside a stream block
+your source stops being code: the preprocessor turns each raw line into a string, and a word
+in there matching one of your variables is a *coincidence*, with no mechanism by which it
+could ever name your variable. Reporting it would be noise, and noise you learn to skip is
+worse than nothing.
+
+That silence is not the tool failing to look, and not a rule about how the string *looks*:
+the preprocessor stamps a stream line as data, so staying quiet is a fact it was **told**.
+
 ### The certainty ladder
 
 <!-- prov: labels from src SendVerdict; layers exercised by cases 61–63, 66, 70, 87,
@@ -732,7 +805,8 @@ drifts). It asks the official tools and reads the answer:
 <!-- prov: git log 0d3b4395..b07fef4060 on feature/compiler-ast-dump (25 commits, ~16
      substantive); schema ladder cross-checked with docs/ast-schema.md; W0019 commit
      b758cf376a; segfault fix in 29eb2aa940 (ast-8); parentage c2c26e5aa3 + b07fef4060;
-     ast-14 c7100f8cdb, ast-15 4d6deca13d, ast-16 611e0c45cc.
+     ast-14 c7100f8cdb, ast-15 4d6deca13d, ast-16 611e0c45cc, ast-17 77a105602d,
+     ast-18 f76137f85d (its guarantees narrowed to what the code does by 4c02f40f44).
      ZERO-IMPACT: this section used to cite "1085/1085 and 112/112 byte-identical",
      taken on faith from the core commits. Neither figure is reproducible - they were
      measured by hand, once, with no script, and they aged in silence. RE-MEASURED
@@ -764,6 +838,8 @@ one fact at a time:
 | `ast-14` | a marker a rule *matches but never uses* is no longer indistinguishable from a word of the rule itself — the preprocessor stopped throwing the binding away |
 | `ast-15` | **which** word of the rule a token matched. `#command` accepts its keywords **abbreviated** (from 4 letters), so `GRAV` may be the rule's own keyword *or* `GRAVAR` cut short — only the preprocessor knows, and now it says so |
 | `ast-16` | a directive has a **lifetime**. `#undef` and `#xuncommand` switch one off partway through a file — the preprocessor did that and told nobody, so a tool renaming the directive left the switch-off behind, pointing at a name that no longer existed, and the directive silently **leaked** past the point where you turned it off |
+| `ast-17` | a value the preprocessor builds out of **position** (`__LINE__`, `__FILE__`) keeps a link back to the rule that made it. It used to arrive looking like a number you typed, and the only tie back to its origin was to match things up *by line* — the one thing that moves the instant an edit happens. The link does not depend on the line |
+| `ast-18` | three seals for what a tool must **report but never edit**: a `TEXT ... ENDTEXT` line is stamped as data (so a name matching its text is provably a coincidence, and silence about it is a fact rather than a guess); a position-built value says **which** axis it follows (the line, or the file); and a string carries the memvar names it re-expands at run time, so a rename matches the name — not the text |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
@@ -793,7 +869,10 @@ does** — never build a guess inside the tool.
 ## Where it stands — honest status
 
 <!-- prov: roadmap.md (delivered table; phase P CLOSED 2026-07-13 with P9/P10; phase V
-     slice 1 delivered; gates B6/B8/D), CLI 0.5.0 / extension 0.13.0, suite 962/0;
+     slice 1 delivered; gates B6/B8/D), CLI 0.5.0 / extension 0.13.0 (the built .vsix on
+     disk; vscode/package.json already says 0.14.0 — the artifact has not been rebuilt,
+     so the install step below deliberately still names the file that exists),
+     suite 1017/0 + ppcorpus 118/0;
      rough edges: cases 88 (@ref, PARAMETERS AS), commit c127b1f (same-basename limit);
      speed item: commits 226eaf6 (measured end to end: xhb 43 modules, 12.35s -> 8.36s)
      + core 1c062d88e6, and phase V slice 1 (where the time goes: dump generation ~58%
@@ -901,7 +980,9 @@ stock Harbour.
 <!-- prov: refusal/rollback cases 2/5/7/11/15/17/36/43/46/48/53/56/90; exec-registry
      sandbox case 101; exclusion honesty commit 6df5c50 + CHANGELOG 2026-07-10. -->
 
-- **Never touches strings, comments, or data** — only code the compiler can verify.
+- **Never touches strings, comments, or data** — only code the compiler can verify. When
+  your edit's meaning reaches one anyway — a string that macro-expands at run time, a
+  module whose `__LINE__` shifts — it says so, names it, and still leaves the text alone.
 - **Never edits an include that is not yours** — the boundary is the directory of your
   `.hbp`, not the directory you happen to have run the command from. A shared `.ch` that
   lives outside your project is refused by name.
