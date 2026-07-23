@@ -1,6 +1,5 @@
-// modulo de apoio - a verificacao do rename exige que os OUTROS modulos
-// saiam byte-identicos; este arquivo e' a prova de que a edicao nao vaza.
+// segundo modulo do projeto (a suite trata toda fixture como PROJETO, >=2 prg).
 
 FUNCTION Apoio()
 
-   RETURN 7
+   RETURN 1

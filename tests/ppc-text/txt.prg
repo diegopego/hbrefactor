@@ -2,18 +2,21 @@
 // oraculo (nao o transcreve), e o que ele afirma esta' provado por assert ou
 // pelo dump. Prova: o bloco de stream vira DADO, verbatim e posicionado (ast-17).
 // (regua: docs/pp-corpus/METODO.md § 4b)
-// COMPLETUDE(2026-07-15): COMPLETE
-//   O loop dos 4 oraculos convergiu -- e ele FECHOU um buraco no caminho (ast-17). A AST
-//   agora COBRE o que a ferramenta precisa para RELATAR (nunca editar) a ocorrencia em
-//   DADO: a string do bloco chega com a linha-fonte + col 0 + prov 's'; o TEXT consumiu
-//   UM token so' (o bloco nao e' recheio de regra); e o compilador NAO ve simbolo na
-//   linha (e' dado, nao variavel). O consumo disso -- o aviso ao humano/agente -- e' a
-//   fase P16(a), que e' feature do CONSUMIDOR, nao lacuna da AST (contraste: ppc-dyn/
-//   P16(b), onde o `from` do dynval segue SEVERADO). O check COMPLETUDE(ppc-text=COMPLETE)
-//   em corpus_text le' a AST e afirma essa cobertura.
+// COMPLETUDE(2026-07-15; revisto 2026-07-22 apos a P16 fechar): COMPLETE
+//   O loop dos 4 oraculos convergiu -- e ele FECHOU um buraco no caminho (ast-17/ast-18).
+//   A AST cobre o que a ferramenta precisa para tratar a linha de bloco como DADO: ela
+//   chega com a linha-fonte + col 0 + prov 's' (ast-17) e SELADA com `from op:"stream"`
+//   (ast-18); o compilador NAO ve simbolo na linha (e' dado, nao variavel). O consumo
+//   disso e' a fase P16(a), feature do CONSUMIDOR -- mas o dever entregue e' SUPRIMIR,
+//   nao relatar: tudo num bloco de stream e' texto, entao uma palavra igual a um nome
+//   ali e' coincidencia de letras, sem mecanismo de chamada-por-nome. O consumidor usa
+//   o selo so' para CALAR (nao confundir o dado com uma referencia), jamais para busca-lo
+//   -- buscar o nome dentro do dado seria gatilho 1 (identidade por texto). O check
+//   COMPLETUDE(ppc-text=COMPLETE) em corpus_text le' a AST e afirma essa cobertura; o
+//   consumo esta' provado no caso 125 (fixture fixdado).
 // Fixture da familia TEXT/ENDTEXT (docs/pp-corpus/text-stream.md).
-// Compila limpo sob -w3 -es2. Diretiva REAL: std.ch:221 -- `#command TEXT => text
-// QOut, QQOut`, que poe o pp em modo de STREAM.
+// Compila limpo sob -w3 -es2. Diretiva REAL: o `#command TEXT => text QOut, QQOut`
+// do std.ch (grep a linha, nao a decore), que poe o pp em modo de STREAM.
 //
 // COMO COMPILAR:
 //   sintaxe:  harbour txt.prg -n -q0 -w3 -es2 -s -I$HB_CORE/contrib/hbtest
@@ -43,8 +46,9 @@ PROCEDURE Main()
    // casaram com nada, nao tem marker, nao sao recheio de coisa nenhuma.
    //
    // Elas viram argumento de chamada: o pp monta `QOut( <a linha crua> )` -- e monta
-   // isso sozinho, fabricando um marker `strdump` (ppcore.c:5821). Ninguem escreveu
-   // `%s` em lugar nenhum.
+   // isso sozinho, fabricando um marker `strdump` (o `HB_PP_RMARKER_STRDUMP` que o pp
+   // monta ao detectar a diretiva TEXT, em ppcore.c). Ninguem escreveu `%s` em lugar
+   // nenhum.
    //
    // No dump, os dois `QOut` emitidos carregam a posicao da linha do TEXT (a chamada
    // pertence a' DIRETIVA), e cada STRING carrega a linha do bloco de onde saiu -- e'
@@ -74,10 +78,12 @@ PROCEDURE Main()
    HBTEST cSaldo IS "1.234,00"
 
    // Consequencia para a ferramenta: renomear `cSaldo` NAO pode tocar a linha do
-   // bloco -- seria editar DADO por coincidencia de nome. Mas, com a posicao que o
-   // ast-17 deu, ela pode RELATAR que o nome tambem aparece ali. Sem isso, o rename
-   // sai limpo, o verificador aprova, e o relatorio do programa continua imprimindo
-   // o nome antigo -- em silencio, para sempre.
+   // bloco -- seria editar DADO por coincidencia de nome. E o selo `op:"stream"`
+   // (ast-18) faz mais: deixa a ferramenta SABER, por fato, que a linha e' dado e
+   // CALAR sobre ela -- nao lista a coincidencia como "possible reference in string"
+   // (o que so' cabe a uma string ESCRITA, candidata a chamada-por-nome). A edicao do
+   // simbolo de verdade (`? cSaldo` abaixo) segue certa e verificada; o dado fica
+   // intacto e silenciado, nao relatado. (Consumo provado no caso 125.)
    ? cSaldo
 
    RETURN

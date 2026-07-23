@@ -594,25 +594,43 @@ PYEOF
 }
 
 # --------------------------------------------------------------------------
-# GUARDA DAS CITACOES DO CORE (tests/corerefs.txt) - o corpus cita `arquivo:linha`
-# do fonte do Harbour o tempo todo, e TODA edicao minha no core faz essas linhas
-# andarem, EM SILENCIO. Aqui elas berram. (2026-07-13: o ast-17 apodreceu 6
-# citacoes no mesmo dia, e uma antiga ja' apontava para codigo sem relacao.)
+# GUARDA DAS CITACOES DO CORE (tests/corerefs.txt) - o corpus cita trecho do fonte
+# do Harbour o tempo todo. Ancorada em NOME DE FUNCAO, nunca em linha: numero de
+# linha anda a cada edicao do core, EM SILENCIO (o ast-17/18 andou +6/+34, e a
+# esteira de reconciliar era paga a mao); nome de funcao so' muda em renomeacao
+# real. A guarda extrai o corpo da funcao nomeada (assinatura em coluna 0 ate' o
+# `}` em coluna 0) e confere que o trecho esta' DENTRO dele. Reprova alta se a
+# funcao sumiu/foi renomeada ou o trecho mudou - jamais por deslocamento de linha.
+# (Regra do Diego, 2026-07-23: "citar as linhas e' fragil; use os nomes das funcoes".)
 # --------------------------------------------------------------------------
 corpus_refs() {
-   echo "corpus: as CITACOES do core (docs apontam arquivo:linha - elas ainda batem?)"
-   local CORE="${HB_BIN%/bin/*}" bad=0 ref txt f l
-   while IFS=$'\t' read -r ref txt; do
-      case "$ref" in ''|'#'*) continue ;; esac
-      f="${ref%:*}"; l="${ref##*:}"
-      if ! sed -n "${l}p" "$CORE/$f" 2>/dev/null | grep -qF "$txt"; then
-         bad=$((bad+1))
-         note "     PODRE: $f:$l nao contem '$txt'"
-         note "     ->  a linha VERDADEIRA hoje: $(grep -nF "$txt" "$CORE/$f" | head -1 | cut -d: -f1)"
+   echo "corpus: as CITACOES do core (ancoradas em FUNCAO - o trecho ainda vive nela?)"
+   local CORE="${HB_BIN%/bin/*}" bad=0 f fn txt
+   while IFS=$'\t' read -r f fn txt; do
+      case "$f" in ''|'#'*) continue ;; esac
+      if [ "$fn" = "-" ]; then
+         # arquivo sem funcao (header, .ch de diretiva): o trecho vive no arquivo
+         if ! grep -qF "$txt" "$CORE/$f" 2>/dev/null; then
+            bad=$((bad+1)); note "     PODRE: $f nao contem mais '$txt'"
+         fi
+      else
+         # o trecho tem de estar DENTRO do corpo da funcao 'fn': da assinatura em
+         # coluna 0 (contendo 'fn(' e nao terminando em ';') ate' o '}' em coluna 0.
+         # awk casa por texto literal (index), imune a caractere especial de regex.
+         if ! awk -v fn="$fn" -v txt="$txt" '
+               BEGIN { sig = "(^|[^A-Za-z0-9_])" fn "[ \t]*\\(" }
+               !inb && /^[^ \t]/ && $0 ~ sig && $0 !~ /;[ \t]*$/ { inb = 1 }
+               inb && index($0, txt) { found = 1; exit }
+               inb && /^}/ { exit }
+               END { exit(found ? 0 : 1) }
+            ' "$CORE/$f" 2>/dev/null; then
+            bad=$((bad+1))
+            note "     PODRE: $f :: $fn() nao contem '$txt' (funcao movida/renomeada ou trecho mudou?)"
+         fi
       fi
    done < "$HERE/corerefs.txt"
    [ "$bad" -eq 0 ]
-   check "toda citacao arquivo:linha do core ainda aponta para o codigo que a doc diz" $?
+   check "toda citacao do core aponta para trecho vivo DENTRO da funcao nomeada (sem numero de linha)" $?
 }
 
 # --------------------------------------------------------------------------

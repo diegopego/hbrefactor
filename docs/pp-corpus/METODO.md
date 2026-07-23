@@ -167,7 +167,7 @@ toolchain de HOJE** — a mesma régua da REGRA DO FATO, aplicada à prosa.
 **Ordem sugerida:** `pp.txt` (a intenção e o mapa, lido com ceticismo) → §2b (o pp testando a
 si mesmo, executável) → prove.
 
-## 3. LER A DIRETIVA NO FONTE — e colá-la com arquivo:linha
+## 3. LER A DIRETIVA NO FONTE — e colá-la citada pelo NOME (nunca por linha)
 
 Nada de parafrasear. A diretiva real, como está escrita.
 
@@ -315,7 +315,8 @@ de fora — e foi exatamente a discordância entre as duas que revelou o macro-v
 4. **Nomeie o sujeito certo.** O **pp** copia ou cita; o **compilador** decide o que é
    variável; a **VM** avalia; a **ferramenta** edita. Trocar o sujeito é o erro mais caro.
 5. Cada frase é (a) o que um oráculo mostra, (b) o que o assert ao lado prova, ou (c) uma
-   citação do core com `arquivo:linha`. **Não há quarta opção.**
+   citação do core pelo **NOME** (função/macro/diretiva, **nunca `arquivo:linha`** — linha
+   apodrece a cada edição do core). **Não há quarta opção.**
 
 **TODO `.prg` do corpus COMPILA — sem exceção** *(ordem do Diego, 2026-07-14: "tem é que
 garantir que vai compilar todos os exemplos")*. A guarda **`corpus_compile_all`** varre
@@ -467,7 +468,8 @@ Não raciocine sobre o que ela faria. **Rode:**
 2. **guarda `corpus_<fam>`** em `tests/ppcorpus.sh` — ela **BUILDA com o `hbtest.hbc`,
    RODA e exige ZERO falhas** (`grep -c '^ *!'`), além de conferir os oráculos;
 3. **canal novo** em `docs/ast-schema.md`, se houve;
-4. **`arquivo:linha` do core citado → `tests/corerefs.txt`** (senão apodrece calado);
+4. **trecho do core citado → `tests/corerefs.txt`**, ancorado no NOME DA FUNÇÃO, nunca em
+   linha (a guarda `corpus_refs` confere que o trecho vive no corpo dela; senão apodrece calado);
 5. **`docs/pp-corpus/<fam>.md` — CURTO**: o que ensina em ~5 linhas, ponteiro para o
    `.prg`, e a seção **Lacunas** (que é decisão, não conhecimento);
 6. **verde nos dois**: `make ppcorpus` e `make test`.
@@ -493,12 +495,13 @@ Não raciocine sobre o que ela faria. **Rode:**
   enganoso *"o projeto não compila"*.
 - **A régua do caso 64 vale para COMENTÁRIO**: nenhuma palavra de DSL de fixture pode
   aparecer em `src/hbrefactor.prg`, nem em comentário.
-- **Citou `arquivo:linha` do core numa doc? ENTRA em `tests/corerefs.txt`.** Toda
-  edição minha no core faz as linhas andarem, e a citação apodrece **em silêncio**.
-  *Custou caro em 2026-07-13: o `ast-17` (16 linhas novas) envenenou 6 citações
-  escritas no mesmo dia, e uma citação antiga já apontava, havia sessões, para código
-  sem nenhuma relação com o assunto. A guarda `corpus_refs` agora berra — e ainda
-  imprime a linha verdadeira, para o conserto ser um `sed`.*
+- **Citou trecho do core numa doc? ENTRA em `tests/corerefs.txt`, ANCORADO NA FUNÇÃO —
+  nunca em linha.** Citar linha é a própria fonte do rot: toda edição no core faz as
+  linhas andarem, **em silêncio** *(o `ast-17`/`ast-18` andou +6/+34, e a esteira de
+  reconciliar número era paga a mão)*. Nome de função só muda em renomeação real — evento
+  semântico, raro e visível. A guarda `corpus_refs` extrai o corpo da função nomeada e
+  confere que o trecho vive nela; reprova em renomeação/sumiço, jamais por deslocamento.
+  *(Regra do Diego, 2026-07-23: "citar as linhas é frágil; use os nomes das funções".)*
 
 # O QUE **NÃO** É O PRODUTO
 

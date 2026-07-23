@@ -4438,54 +4438,48 @@ freshdado() { # freshdado <case-name> -> bloco de stream com palavra homonima de
 }
 
 unit_125() {
-echo "case 125: P16(a) - a ocorrencia em DADO: relatar sempre, editar JAMAIS"
-# O bloco de stream vira DADO: cada linha crua chega como STRING posicionada
-# (ast-17: type 41, prov 's', col 0 - conteudo byte-exato desde a coluna 0;
-# string ESCRITA nunca tem conteudo na coluna 0, o delimitador vem antes).
-# Antes deste caso: renomear o simbolo homonimo editava o CODIGO certo e
-# verificava certo - e o bloco seguia dizendo o nome antigo, EM SILENCIO.
-# P16(a): o usages LISTA a ocorrencia em dado (arquivo:linha, separada das
-# ocorrencias de simbolo) e o rename a RELATA sem tocar - nem com opt-in (§1).
+echo "case 125: P16(a) - op:\"stream\" SUPRIME o dado; a ferramenta NUNCA busca texto no dado"
+# O relato "possible reference in string" existe para um MECANISMO real: uma
+# string ESCRITA igual a um nome pode virar chamada-por-nome (&(), __mvGet), e
+# por isso a ferramenta a relata. A MESMA palavra como linha de um bloco de
+# stream NAO tem esse mecanismo - e' dado impresso, coincidencia de letras. O
+# fato op:"stream" (ast-18) deixa a ferramenta SABER, por FATO, que a linha e'
+# dado, e CALAR sobre ela - sem NUNCA buscar o texto do nome dentro do dado
+# (isso seria gatilho 1: casar TEXTO para afirmar identidade). A heuristica
+# antiga (varrer o dado atras do nome, "occurrence in data") FOI REMOVIDA.
 D=$(freshdado case125)
-# linhas/colunas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
-LDATA=$(grep -n 'apurado no periodo' "$D/dado.prg" | cut -d: -f1)
-LDECL=$(grep -n 'LOCAL cSaldo' "$D/dado.prg" | cut -d: -f1)
-CDECL=$(awk -v n="$LDECL" 'NR==n { print index($0, "cSaldo") }' "$D/dado.prg")
+# linhas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
+LWRITTEN=$(grep -n 'cIsca := "Farol"' "$D/dado.prg" | cut -d: -f1)
+LSTREAM=$(grep -nx 'Farol' "$D/dado.prg" | cut -d: -f1)
 
-# (1) usages: a ocorrencia em DADO sai LISTADA, com arquivo:linha...
-( cd "$D" && "$BIN" usages dado.hbp cSaldo > us.log 2>&1 )
+( cd "$D" && "$BIN" usages dado.hbp Farol > us.log 2>&1 )
 check "usages sai com exit 0" $?
-grep -q "dado.prg:$LDATA: possible occurrence in data" "$D/us.log"
-check "a ocorrencia no bloco sai marcada como DADO, com arquivo:linha" $?
-# ... SEPARADA das ocorrencias de simbolo (o compilador nao ve simbolo ali)
-! grep -qE "dado\.prg:$LDATA: (declaration|read|write)" "$D/us.log"
-check "a linha do bloco NAO sai como ocorrencia de simbolo (dado != simbolo)" $?
-# as ocorrencias de simbolo continuam saindo (o relato novo nao engole o velho)
-grep -q "dado.prg:$LDECL: declaration (local)" "$D/us.log"
-check "as ocorrencias de simbolo seguem listadas" $?
+# a string ESCRITA igual ao nome -> RELATADA (o mecanismo de chamada-por-nome e' real)
+grep -q "dado.prg:$LWRITTEN: possible reference in string" "$D/us.log"
+check "a string ESCRITA igual ao nome sai como 'possible reference in string'" $?
+# a MESMA palavra como linha de bloco de stream -> SILENCIO: o fato op:\"stream\"
+# suprime (dado, sem mecanismo). SEM o fato, a linha (inteira == o nome)
+# dispararia "reference in string" - um falso positivo que o ast-17 abriu.
+! grep -q "dado.prg:$LSTREAM:" "$D/us.log"
+check "a linha do bloco de stream e' SILENCIADA por FATO (op:\"stream\" -> dado, nao referencia)" $?
+# ... e o caminho FUNDO do selo: o eco.prg re-escaneia o que o pp fabricou no
+# modo de stream (`QOut( "<linha>" )` volta para a fila e a regra do modulo o
+# CLONA). Ali o token que chega ao parser carrega SO' op:"clone" - o selo fica
+# UM SALTO ATRAS, no token que a aplicacao consumiu (medido: 0 selos em
+# tokens[], 1 em ppApplications[]). Este check e' o portao da RECURSAO de
+# IsDataTok: amputada a recursao, esta linha volta a sair como referencia.
+LECO=$(grep -nx 'Farol' "$D/eco.prg" | cut -d: -f1)
+! grep -q "eco.prg:$LECO:" "$D/us.log"
+check "a linha de bloco CLONADA por regra tambem e' silenciada (o selo esta' um salto atras - so' a recursao o alcanca)" $?
+# a heuristica antiga NAO existe mais: a ferramenta nao busca texto no dado
+! grep -q "occurrence in data" "$D/us.log"
+check "nenhum 'occurrence in data' (a busca de texto no dado foi REMOVIDA)" $?
+# a definicao e a chamada seguem intactas (o conserto nao come o relato real)
+grep -q "dado.prg:.*definition (function)" "$D/us.log"
+check "a definicao da funcao segue relatada" $?
 
-# (2) rename: edita o SIMBOLO, RELATA o dado, NAO o toca
-( cd "$D" && "$BIN" rename dado.hbp dado.prg:$LDECL:$CDECL cMontante > rn.log 2>&1 )
-check "rename do simbolo sai com exit 0 (o dado nao barra a edicao provada)" $?
-grep -q "verified" "$D/rn.log"
-check "a verificacao byte-identica PASSOU (o dado nao entrou na edicao)" $?
-grep -q "warning: dado.prg:$LDATA:.*data" "$D/rn.log"
-check "o rename AVISA a ocorrencia em dado (arquivo:linha)" $?
-grep -q "never edited" "$D/rn.log"
-check "o aviso DIZ a regra (dado se relata, jamais se edita)" $?
-grep -q "   cSaldo apurado no periodo" "$D/dado.prg"
-check "a linha do bloco esta BYTE A BYTE intacta" $?
-[ "$(grep -c 'cSaldo' "$D/dado.prg")" -eq 1 ]
-check "fora do dado, nenhum cSaldo sobrou (os sites de simbolo foram editados)" $?
-
-# (3) sem homonimo no dado, nenhum aviso falso
-( cd "$D" && "$BIN" usages dado.hbp cMontante > us2.log 2>&1 )
-! grep -q "in data" "$D/us2.log"
-check "nome que NAO esta no dado: zero relato de dado (sem falso positivo)" $?
-
-# (4) régua do caso 64: nenhuma palavra da fixture na ferramenta - a
-# capacidade é genérica (qualquer bloco de stream), não moldada no exemplo
-! grep -qiE "\bcSaldo\b|\bapurado\b|\bcMontante\b|\bapoio\b" "$HERE/../src/hbrefactor.prg"
+# régua do caso 64: nenhuma palavra da fixture na ferramenta
+! grep -qiE "\bFarol\b|\bcIsca\b|\bApoio\b|\bEco\b|\bTrilha\b" "$HERE/../src/hbrefactor.prg"
 check "régua do caso 64: nenhuma palavra da fixture fixdado na ferramenta" $?
 }
 
@@ -4507,6 +4501,7 @@ D=$(freshpos case126)
 # linhas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
 LINI=$(grep -n '"ini:"' "$D/pos.prg" | cut -d: -f1)
 LLOG=$(grep -n '"log:"' "$D/pos.prg" | cut -d: -f1)
+LARQ=$(grep -n '"arq:"' "$D/pos.prg" | cut -d: -f1)
 FF=$(grep -n 'FOR i' "$D/pos.prg" | cut -d: -f1)
 FN=$(grep -n '^   NEXT' "$D/pos.prg" | cut -d: -f1)
 
@@ -4519,6 +4514,12 @@ grep -q "line $LLOG" "$D/ex.log"
 check "o aviso NOMEIA a linha do sitio que desloca" $?
 ! grep -q "line $LINI" "$D/ex.log"
 check "sitio ANTES do range fica de fora (o valor dele NAO muda)" $?
+# o portao do EIXO: o __FILE__ esta' ABAIXO do range e desloca junto, mas o
+# valor dele NAO segue a linha - segue o arquivo. As duas builtins sao mkind
+# `dynval` e chegam com o mesmo `from op:"dynval"`; so' o `axis` (acrescimo do
+# ast-18) as separa. Sem este check o filtro `axis == "line"` seria um no-op.
+! grep -q "line $LARQ" "$D/ex.log"
+check "sitio de eixo FILE (__FILE__) fica de fora mesmo DESLOCANDO (filtra por axis, nao por ser dynval)" $?
 grep -q "values are correct" "$D/ex.log"
 check "o aviso diz que o valor novo e' o CERTO (aviso, nunca reprovacao)" $?
 

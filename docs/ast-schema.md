@@ -27,18 +27,24 @@ com `-x`.
 > deles. *Ao entregar um canal: versionar o `"schema"` no core, atualizar este documento
 > e o `AstSchema()` — **no mesmo commit**. O **caso 122** fica vermelho se você esquecer.*
 
-O **`ast-18` (fase P16, o CONSUMO do não-verificável) = `ast-17` + TRÊS SELOS que
-o CONSUMIDOR precisava para RELATAR o dado (nunca editar).** *(A escolha, quando
+O **`ast-18` (fase P16, o CONSUMO do não-verificável) = `ast-17` + TRÊS FATOS que
+o CONSUMIDOR precisava para não mentir sobre o não-editável.** *(A escolha, quando
 falta um fato, é sempre ESTENDER O CORE — não inferir na ferramenta; Diego,
 2026-07-22.)* **(1)** A string que a maquinaria de STREAM fabrica de uma linha crua
-carrega `from` com `op: "stream"` (`app: null`) — o SELO que a marca como DADO, para
-o consumidor não a distinguir pela FORMA (`col: 0` é gramática, não fato). **(2)** O
-`from` do `dynval` ganha `axis` (`"line"`/`"file"`) — o EIXO de posição que o pp leu,
-para um verbo que desloca linhas AVISAR só os sítios cujo valor muda, sem replicar o
-significado do builtin a partir do nome. **(3)** A string literal que é MACRO VIVO
-(`&<nome>`, `HB_P_MACROTEXT`) carrega `macrovars` — a lista de memvars que ela
-re-expande em runtime, para o `rename` de memvar CASAR o nome sem ler o texto da
-string. Os três detalhados nas seções `tokens[]`/`from` abaixo.
+carrega `from` com `op: "stream"` (`app: null`) — o selo que a marca como DADO. Serve
+para **SUPRIMIR**, não para relatar: uma string ESCRITA igual a um nome pode virar
+chamada-por-nome (`&()`/`__mvGet`) e o `usages` a relata como *"possible reference in
+string"*; uma linha de bloco de stream igual a um nome é dado impresso, sem esse
+mecanismo — o selo deixa o `usages` **calar** sobre ela por FATO, sem inferir data-ness
+pela FORMA (`col: 0` é gramática) nem casar TEXTO para afirmar identidade (gatilho 1).
+*(A ferramenta NUNCA busca o nome dentro do dado — isso seria a heurística que esta
+fase, na primeira tentativa, cometeu e o Diego cortou.)* **(2)** O `from` do `dynval`
+ganha `axis` (`"line"`/`"file"`) — o EIXO de posição que o pp leu, para um verbo que
+desloca linhas AVISAR só os sítios cujo valor muda, sem replicar o significado do
+builtin a partir do nome. **(3)** A string literal que é MACRO VIVO (`&<nome>`,
+`HB_P_MACROTEXT`) carrega `macrovars` — a lista de memvars que ela re-expande em
+runtime, para o `rename` de memvar CASAR o nome sem ler o texto da string. Os três
+detalhados nas seções `tokens[]`/`from` abaixo.
 
 O **`ast-17` (fase P-COMPLETUDE) = `ast-16` + a POSIÇÃO DA LINHA DE STREAM + o
 `from` do DYNVAL.** Duas coisas viajam juntas neste bump. **(1)** A linha de
@@ -217,25 +223,33 @@ Garantias e limites (provados na fixture de tortura e no lexdiff):
   linha de onde veio, `col: 0` e `prov: "s"` (`hb_pp_tokenAddStreamFunc`, gated por
   `fTrackPos`; expansão inalterada, `lexdiff` 0). **Por que é correção e não
   enfeite**: o conteúdo do bloco é **DADO** — a ferramenta não o edita nem com
-  opt-in (§1 do CLAUDE.md) —, mas sem posição ela não conseguia nem **RELATAR** que
-  um nome também aparece ali; renomear um símbolo homônimo deixava o bloco dizendo
-  a coisa antiga, **em silêncio**. No modo linha-a-linha (o `TEXT` do Cl*pper) a
-  posição é a da linha; nos modos que JUNTAM o bloco numa string só
-  (`__stream`/`__cstream`) é a do terminador. Prova: `corpus_text`
-  ([pp-corpus/text-stream.md](pp-corpus/text-stream.md)).
+  opt-in (§1 do CLAUDE.md) —, mas sem posição o `ast-17` colocava a linha do bloco
+  numa faixa onde uma string igual a um nome podia ser confundida com referência.
+  No modo linha-a-linha (o `TEXT` do Cl*pper) a posição é a da linha; nos modos que
+  JUNTAM o bloco numa string só (`__stream`/`__cstream`) é a do terminador. Prova:
+  `corpus_text` ([pp-corpus/text-stream.md](pp-corpus/text-stream.md)).
   **`ast-18`: a string do bloco é SELADA como DADO** — carrega `from` com
   `op: "stream"` (`app: null`, é fabricada por diretiva, não por aplicação de
-  regra). O selo é o FATO DECLARADO que distingue dado de string escrita: sem ele
-  o consumidor teria de inferir pela FORMA (conteúdo em `col: 0`, verdade que é
-  gramática, não fato). Uma regra pode re-escanear e CLONAR a linha; o clone traz
-  `op: "clone"` apontando a aplicação, e o token que a aplicação consumiu carrega o
-  selo — a cadeia é toda de fato (`hb_pp_drvAddStream`, gated por `fTrackPos`).
+  regra). O selo é o FATO DECLARADO que distingue dado de string escrita, e serve
+  para **SUPRIMIR**: uma linha de bloco igual a um nome NÃO é candidata a
+  chamada-por-nome (dado impresso, sem mecanismo), então o `usages` a cala por FATO
+  em vez de inferir data-ness pela FORMA (`col: 0` é gramática) ou de buscar o nome
+  dentro do dado (heurística). Uma regra pode re-escanear e CLONAR a linha; o clone
+  traz `op: "clone"` apontando a aplicação, e o token que a aplicação consumiu
+  carrega o selo — a cadeia é toda de fato (`hb_pp_drvAddStream`, gated por
+  `fTrackPos`).
 - **`ast-18`: a string literal que é MACRO VIVO carrega `macrovars`.** Uma string
   com `&<nome>` é reavaliada em RUNTIME e vale o memvar que nomeia (o compilador
   emite `HB_P_MACROTEXT`). O token da string traz `macrovars: ["NOME", …]` — a
-  lista dos memvars que ela re-expande, extraída pelo compilador com a MESMA regra
-  do pcode (`&` seguido de `[_A-Za-z]`; `&(` e `&` final ignorados; nomes em
-  uppercase). Vem **só quando a substituição está LIGADA** (`-kM` a desliga, e aí
+  lista dos nomes que ela macro-referencia, extraída pelo compilador com a mesma
+  **extração léxica de `&nome`** do pcode (`&` seguido de `[_A-Za-z]`; `&(` e `&`
+  final ignorados; nomes em uppercase). **Limite honesto:** é só a extração do
+  NOME, não o teste de escopo que o compilador faz depois (`hb_compVariableScope`);
+  no modo padrão isso não diverge — `&<local>` é erro de compilação (`E0042`) —,
+  mas sob `-kd` (macros de símbolo declarado) um LOCAL entra na lista como se fosse
+  memvar de runtime. O consumidor trata `macrovars` como candidato a RELATO (nunca
+  edita a string), então o custo do excesso é um aviso a mais, jamais uma edição
+  errada. Vem **só quando a substituição está LIGADA** (`-kM` a desliga, e aí
   o campo some — espelha a decisão do compilador). O consumidor que renomeia um
   memvar CASA o nome contra essa lista — sem ler o texto da string. Emissão em
   `hb_compAstWriteMacroVars` (`compast.c`), gated por `HB_SUPPORT_MACROTEXT`. A
@@ -291,7 +305,9 @@ diretiva já existente ou inventada.
     uma linha crua do fonte (`TEXT…ENDTEXT`, `#pragma __text|__stream|
     __cstream`). `marker: 0` e **`app: null`** — o modo de stream é entrado por
     DIRETIVA, não por aplicação de regra, então não há aplicação a apontar. É o
-    selo que marca a string como DADO (relato, nunca edição).
+    selo que marca a string como DADO, usado para SUPRIMIR o dado dos relatos
+    (o `usages` cala sobre uma linha de bloco igual a um nome), nunca para
+    relatá-lo nem editá-lo.
 - `at`/`len`: offset e comprimento EM BYTES da faixa dentro do `text` DESTE
   token. O separador LITERAL entre partes coladas (o `_` de `UWMENU_PAINT`,
   o `on_` de `on_Click`) é texto da própria regra e NÃO tem item `from`.

@@ -495,6 +495,10 @@ dizendo a coisa antiga **em silêncio**, e nada no mundo podia avisar. **`ast-17
 e `prov: "s"`. Expansão intacta — `make test` **990/0**, `make ppcorpus` **53/0**. Guarda:
 `corpus_text`; conhecimento: [pp-corpus/text-stream.md](pp-corpus/text-stream.md).
 *(Commit do core pendente de autorização.)*
+> **Correção de rumo (P16, 2026-07-22):** a frase "sem posição ela não podia RELATAR" acima era
+> a MOTIVAÇÃO errada. Tudo num bloco de stream é TEXTO — uma palavra igual a um símbolo é
+> coincidência, não ocorrência —, então não há o que RELATAR. A posição da linha do bloco serve
+> para **SUPRIMIR** o dado (não confundi-lo com uma referência), nunca para relatá-lo. Ver § P16.
 
 **Família DEFINE DINÂMICO ✅ (2026-07-13) — a última recusa de mkind, agora MEDIDA.** O `dynval`
 **sobreviveu** à medição que matou a do `strdump`: **0 em 4.582 regras** reais; as únicas duas
@@ -511,20 +515,30 @@ conhecimento: [pp-corpus/dynval.md](pp-corpus/dynval.md).
 
 > **Estado:** as três frentes fecharam, **cada uma sobre um FATO NOVO do core** (`ast-18`), não
 > sobre inferência na ferramenta. A escolha do Diego, quando falta o fato, é **sempre estender o
-> core** (2026-07-22) — foi ela que reescreveu a primeira tentativa desta fase: eu havia posto
-> discriminadores por FORMA (`col == 0` para dado, `head == "__LINE__"` para dynval, varredura de
-> `&nome` na string) e o Diego pegou a heurística. `make test` **1021/0**, `make ppcorpus`
-> **117/0**, `corerefs` reconciliado (as citações de `ppcore.c` andaram +34 e foram corrigidas).
+> core** (2026-07-22) — foi ela que reescreveu a fase: a primeira tentativa punha discriminadores
+> por FORMA (`col == 0` para dado, `head == "__LINE__"` para dynval, varredura de `&nome` na
+> string) e o Diego cortou. Numa **segunda passada** o Diego cortou também a própria PREMISSA da
+> (a): eu havia feito o `usages` *buscar* o nome dentro do dado e relatar *"occurrence in data"* —
+> mas tudo num bloco de stream é TEXTO, e casar as letras do símbolo contra o dado é gatilho 1
+> (identidade por texto). A (a) virou **SUPRESSÃO**: o fato `op:"stream"` serve para o `usages`
+> **calar** sobre o dado, não para relatá-lo. `make test` **1015/0**, `make ppcorpus` **117/0**,
+> `corerefs` reconciliado (as citações de `ppcore.c` andaram +34 e foram corrigidas).
 
-**Escopo**: o `usages` (e o relatório dos verbos de edição) passam a **RELATAR** — nunca editar —
-o que a ferramenta enxerga e hoje cala. **Três fontes, o mesmo dever** (§1 do CLAUDE.md:
-*detecção e relato preciso, jamais edição automática*):
-- **(a) ocorrência em DADO** ✅ — o nome dentro de bloco de stream. **FATO (`ast-18`):** a string
-  do bloco carrega `from` com `op: "stream"` (`app: null`) — o SELO declarado que a marca como
-  dado (`hb_pp_drvAddStream` em `ppcore.c`, gated por `fTrackPos`). `IsDataTok` consome o selo
-  (segue o `clone` do re-scan até a origem selada); o discriminador por FORMA (`col == 0`) foi
-  **removido**. `usages cSaldo` lista *"possible occurrence in data"* separado do símbolo; o
-  `rename` avisa e não edita (caso 125).
+**Escopo**: o `usages` (e o relatório dos verbos de edição) tratam com honestidade o que a
+ferramenta enxerga mas não pode verificar — **suprimindo** o que é dado e **avisando** onde há
+acoplamento real. **Três frentes, o mesmo dever** (§1 do CLAUDE.md: *jamais edição automática do
+não-verificável; a ferramenta consome fato, nunca busca texto*):
+- **(a) DADO de bloco de stream — SUPRESSÃO por fato** ✅. **FATO (`ast-18`):** a string do bloco
+  carrega `from` com `op: "stream"` (`app: null`) — o selo declarado que a marca como dado
+  (`hb_pp_drvAddStream` em `ppcore.c`, gated por `fTrackPos`). **O que o fato faz:** o relato
+  *"possible reference in string"* existe para um mecanismo real (string escrita igual a um nome
+  → chamada-por-nome via `&()`/`__mvGet`); uma linha de bloco igual a um nome NÃO tem esse
+  mecanismo — é dado impresso. O `IsDataTok` (consome o selo, segue o `clone` do re-scan até a
+  origem selada) deixa o `usages` **calar** sobre a linha de dado por FATO, sem inferir data-ness
+  pela FORMA (`col == 0`) nem buscar o nome dentro do dado. **A tentativa anterior — buscar o nome
+  no dado e relatar "occurrence in data" — era heurística (gatilho 1) e foi REMOVIDA** (`DataHits`
+  não existe mais). Caso 125: a string escrita dispara "reference in string"; a mesma palavra no
+  bloco é silenciada pelo fato.
 - **(b) módulo SENSÍVEL A POSIÇÃO** ✅ — o que expande `__LINE__`. **FATO (`ast-18`):** o `from` do
   `dynval` ganhou `axis` (`"line"`/`"file"`), gravado no próprio ramo da expansão
   (`hb_pp_drvAddDyn` recebe o eixo). `DynLineSites` filtra por `axis == "line"` — o casamento do
@@ -533,17 +547,79 @@ o que a ferramenta enxerga e hoje cala. **Três fontes, o mesmo dever** (§1 do 
   `rename` (não desloca) fica mudo (caso 126). *(O lado do FATO da proveniência do `dynval` — o
   `from` com `op: "dynval"` — já viera no `ast-17`; o `axis` é o que o CONSUMO pedia.)*
 - **(c) STRING que é MACRO VIVO** ✅ — uma string literal com `&nome` é **reavaliada em runtime** e
-  vale o memvar. **FATO (`ast-18`):** o token da string carrega `macrovars` — a lista de memvars
-  que ela re-expande, extraída pelo compilador com a MESMA regra do pcode `HB_P_MACROTEXT`
-  (`hb_compAstWriteMacroVars`, gated por `HB_SUPPORT_MACROTEXT`; some sob `-kM`). `MacroLiveHits`
+  vale o memvar. **FATO (`ast-18`):** o token da string carrega `macrovars` — a lista de nomes que
+  ela macro-referencia, extraída pelo compilador com a mesma **extração de `&nome`** do pcode
+  `HB_P_MACROTEXT` (`hb_compAstWriteMacroVars`, gated por `HB_SUPPORT_MACROTEXT`; some sob `-kM`).
+  *Limite honesto: é a extração LÉXICA do nome, não o teste de escopo do compilador — sob `-kd` um
+  LOCAL macro-declarado entra na lista (o modo de falha é um AVISO a mais, nunca edição errada).*
+  `MacroLiveHits`
   CASA o nome contra a lista — **sem ler o texto da string** (a varredura de `&nome` foi
   descartada antes de nascer). O `rename` de memvar nomeia cada string, com arquivo:linha e o
   **porquê** (*"macro-expanded at RUN TIME… will NOT be edited"*), no projeto inteiro (caso 127).
 **A régua do §1 é dura e vale inteira**: detecção e relato preciso, **jamais** edição automática
 — nem com opt-in. O relato é aviso ao humano/agente, não sugestão de edição.
 **Critério de pronto (mecânico)** ✅: casos 125/126/127 verdes; cada frente consome um FATO do
-`ast-18` (nenhum discriminador por forma sobrevive no fonte); nenhuma palavra de fixture em
-`src/hbrefactor.prg` (régua do caso 64); `make test` verde (1021/0).
+`ast-18` (nenhum discriminador por forma, nenhuma busca de texto no dado sobrevive no fonte);
+nenhuma palavra de fixture em `src/hbrefactor.prg` (régua do caso 64); `make test` verde (1015/0).
+
+> **Endurecimento pós-revisão (2026-07-23, `make test` 1017/0):** a revisão dos commits `ast-17`/
+> `ast-18` achou dois FATOS load-bearing **sem portão** — o consumo passava mas nada reprovava se a
+> lógica sumisse. Fechados com portão executável (provado amputando a lógica na ferramenta e vendo
+> o check exato cair):
+> - **caso 125** ganhou `fixdado/eco.prg`: uma regra re-escaneia o bloco de stream e **clona** a
+>   linha; o selo `op:"stream"` fica UM SALTO ATRÁS (medido: 0 em `tokens[]`, 1 em
+>   `ppApplications[]`), então só a **recursão** de `IsDataTok` o alcança — antes, zero cobertura
+>   desse caminho, que é o único vivo quando há regra sobre o stream.
+> - **caso 126** ganhou um `__FILE__` na `fixpos`: as duas builtins são `dynval` e chegam com o
+>   mesmo `from op:"dynval"`; só o `axis` (o ÚNICO acréscimo do `ast-18` nesta frente) as separa —
+>   sem um sítio de eixo `file`, o filtro `axis == "line"` era no-op e a suíte passava sem prová-lo.
+> - **doc-honesto (achado 2):** a frase "extraída com a MESMA regra do pcode" (aqui, no
+>   `ast-schema.md` e no comentário do `compast.c`) era forte demais — o emissor re-deriva o `&nome`
+>   LÉXICO mas **não** faz o teste de escopo do compilador (`hb_compVariableScope`), então sob `-kd`
+>   sobre-lista um LOCAL como se fosse memvar de runtime (provado por sonda). Rebaixada ao limite
+>   real; o fato semântico exato (só os nomes que viraram `HB_P_MACROTEXT`) fica como melhoria de
+>   core não-urgente (modo de falha é AVISO sob flag não-padrão, nunca edição errada).
+
+### Fase CIT — citações do core à prova de rot *(aberta 2026-07-23 pela revisão do `ast-18`; **guarda + `corerefs` FEITOS 2026-07-23; resta a varredura das fixtures**)*
+
+> **✅ FEITO (2026-07-23) — a raiz:** a regra *"citou `arquivo:linha`? registra no `corerefs`"*
+> guardava o SINTOMA — mantinha a citação frágil honesta em vez de matar a fragilidade, e
+> normalizava citar linha (paguei a esteira "+6" nesta própria revisão). Invertida (ordem do Diego):
+> **cita-se o NOME DA FUNÇÃO, nunca a linha.** `tests/corerefs.txt` virou `arquivo <TAB> função
+> <TAB> trecho`; a guarda `corpus_refs` (`tests/ppcorpus.sh`) extrai o corpo da função (assinatura
+> em col 0 até `}` em col 0) e confere o trecho DENTRO dele. **Provado** num mini-core: imune a 80
+> linhas de deslocamento (o antigo acusaria 21 podres), e reprova alto e preciso em renomeação de
+> função ou sumiço do trecho — os eventos semânticos que a doc DEVE rastrear. A prescrição do método
+> (`spec-pdoc-corpus-pp.md`) foi virada junto. `make ppcorpus` 117/0.
+
+**Resta — as citações inline em COMENTÁRIO de fixture/`run.sh`.** O `corerefs.txt` guardava só o
+que está registrado nele; as citações soltas em comentário ninguém confere, e a varredura de
+2026-07-23 achou-as **todas podres** (apontam pré-`ast-17`):
+- fixtures do corpus: `ppc-strfam/sf.prg` (`ppcore.c:5254-5256`), `ppc-pragma/pg.prg`
+  (`ppcore.c:3779`), `ppc-cycle/cyc.prg` (`ppcore.c:6587`), `ppc-dyn/dynx.prg`
+  (`ppcore.c:7253-7254`), `ppc-ref/refx.prg` + `refxdump.prg` (`ppcore.c:7019`, `4352`).
+  *(A `ppc-text/txt.prg` já foi convertida na revisão — serve de modelo.)*
+- comentários de `tests/run.sh`: `hbmain.c:1174`, `harbour.y:1253`, `classes.c:4554`,
+  `hbclass.ch:282`, `ppcore.c:1284`.
+
+**Escopo**
+- **Converter** cada citação inline acima para o NOME (função/macro/diretiva) — a `txt.prg` mostra
+  a forma (*"o `#command TEXT` do std.ch (grep a linha, não a decore)"*). Se a citação merece
+  guarda, registrá-la em `corerefs.txt` (já função-ancorado); senão, prosa pelo nome basta.
+  Recompilar cada fixture tocada (`-w3 -es2`) — comentário `//`, cuidar do `*/`.
+- **Portão executável** (§1.6 — regra nova sem portão novo é regra que se viola de novo): um check
+  que REPROVA se um `arquivo.(c|y|ch):NNN` de core aparecer em fixture/`run.sh` — o hábito da linha
+  volta a berrar em vez de crescer calado. (A guarda de conteúdo, `corpus_refs`, já é
+  função-ancorada; este portão fecha a porta de ENTRADA do número de linha.)
+
+**Critério de pronto (mecânico)**
+- `grep -rnE '\b\w+\.(c|y|ch|h):[0-9]+' tests/ppc-*/*.prg tests/run.sh` não acha nenhuma citação de
+  linha de core.
+- Cada fixture tocada recompila limpo sob `-w3 -es2`; `make ppcorpus`/`make test` verdes.
+- Sem superfície de CLI nova → extensão não afetada.
+
+**Nota de fronteira:** re-baselina comentário de fixture PRÉ-EXISTENTE (fora da P16) — por isso é
+fase própria, com o aval do Diego para o escopo (2026-07-23), não varredura embutida na revisão.
 
 ### P-REV — a REVISÃO do corpus para o método v2 *(aberta 2026-07-14; **EIXO DIRETIVA CONCLUÍDO 2026-07-15 — 31 selos, 0 pendentes; segue no eixo COMPLETUDE**)*
 

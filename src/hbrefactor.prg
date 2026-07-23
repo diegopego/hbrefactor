@@ -430,7 +430,7 @@ STATIC FUNCTION Usages( aArgs )
    // "ppmarker" - é o único ramo onde ResolveAtQuery de fato o constrói);
    // restringe PpMarkerHits/PpMarkerLift para não misturar OUTRA aplicação
    // independente (regra diferente) que colou o MESMO texto alhures.
-   LOCAL lAtPp, lAtSym, hAtPairs, aData
+   LOCAL lAtPp, lAtSym, hAtPairs
 
    IF Len( aArgs ) < 3
       Usage()
@@ -808,11 +808,15 @@ STATIC FUNCTION Usages( aArgs )
       // referências possíveis em strings: tokens tipo 41 cujo conteúdo é
       // exatamente o nome (call-by-name) - do próprio stream do compilador.
       // Posições já respondidas pelo passe de declaração acima (a string de
-      // registro É o artefato da declaração) não se repetem aqui
+      // registro É o artefato da declaração) não se repetem aqui.
+      // O IsDataTok SUPRIME o que é dado de bloco de stream (§ P16(a)); vem
+      // DEPOIS do casamento do nome de propósito - ele pode ter de andar a
+      // cadeia de clone até a origem selada, e só interessa para o token que
+      // já é candidato
       FOR EACH hItem IN hAst[ "tokens" ]
          IF ! lAtPp .AND. hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            ! IsDataTok( hAst, hItem ) .AND. ;
             Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
+            ! IsDataTok( hAst, hItem ) .AND. ;
             ( hItem[ "col" ] == NIL .OR. ;
               ! hb_HHasKey( hDone, hb_ntos( hItem[ "line" ] ) + "|" + hb_ntos( hItem[ "col" ] ) ) )
             nHits++
@@ -822,20 +826,6 @@ STATIC FUNCTION Usages( aArgs )
                     ": possible reference in string" + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
          ENDIF
       NEXT
-
-      // P16(a) - ocorrência em DADO: a linha crua de um bloco de stream que
-      // CONTÉM o nome (ast-17; discriminação em IsDataTok). O compilador não
-      // vê símbolo ali - é dado; sai com arquivo:linha, SEPARADO das
-      // ocorrências de símbolo, e JAMAIS entra em edição - nem com opt-in (§1)
-      IF ! lAtPp
-         FOR EACH aData IN DataHits( hAst, cUpMeth )
-            nHits++
-            LocAdd( aLoc, cPath, aData[ 1 ], { aData[ 2 ] }, Len( cMethTok ) )
-            OutStd( cModFile + ":" + hb_ntos( aData[ 1 ] ) + ;
-                    ": possible occurrence in data (raw stream-block line - " + ;
-                    "reported, never edited)" + SrcLine( aSrc, aData[ 1 ] ) + hb_eol() )
-         NEXT
-      ENDIF
 
       // o nome pode ser palavra de DSL de pp (consumida antes do yylex e
       // portanto invisível em tokens[]): diretivas e aplicações (ast-2).
@@ -2450,7 +2440,6 @@ STATIC FUNCTION RenameLocal( aArgs )
    LOCAL hDecl := NIL, aEdits := {}, nSpanEnd := 0, nI
    LOCAL cText, cUpOld, cUpNew, aPrev, cPrevType, nLine, aIdent
    LOCAL aDisc   // P4/P5: ocorrências que a diretiva descarta (relato honesto)
-   LOCAL aDado   // P16(a): ocorrências em DADO (linha de bloco de stream)
 
    IF Len( aArgs ) < 6
       Usage()
@@ -2617,16 +2606,6 @@ STATIC FUNCTION RenameLocal( aArgs )
               hb_ntos( aDisc[ nI ][ 1 ] ) + ":" + hb_ntos( aDisc[ nI ][ 2 ] ) + ": '" + cOld + ;
               "' is consumed and DISCARDED by the directive (" + aDisc[ nI ][ 3 ] + ") - " + ;
               "never reaches the compiler; NOT renamed" + hb_eol() )
-   NEXT
-   // P16(a) - ocorrência em DADO: linha de bloco de stream, dentro da função,
-   // que contém o nome (ast-17; IsDataTok). O conteúdo é dado, não símbolo:
-   // relata-se com posição e JAMAIS se edita - nem com opt-in (§1). Sem o
-   // aviso, o dado seguiria dizendo o nome velho em silêncio
-   FOR EACH aDado IN DataHits( hAst, cUpOld, hFunc[ "line" ], nSpanEnd )
-      OutErr( "warning: " + hb_FNameNameExt( cSrcPath ) + ":" + ;
-              hb_ntos( aDado[ 1 ] ) + ":" + hb_ntos( aDado[ 2 ] ) + ": '" + cOld + ;
-              "' also appears in data (raw stream-block line) - data is " + ;
-              "reported, never edited; that line keeps the old text" + hb_eol() )
    NEXT
    IF lDryRun
       OutStd( "dry run - nothing was written" + hb_eol() )
@@ -4971,13 +4950,19 @@ STATIC FUNCTION StreamHasIdent( hAst, cUp )
    RETURN .F.
 
 // ---------------------------------------------------------------------------
-// P16(a) - ocorrência em DADO. A linha crua de um bloco de stream chega como
-// STRING posicionada e SELADA (ast-18): o item from op "stream" é o FATO
-// declarado pelo pp no instante em que fabricou o token - nenhuma leitura
-// de forma. Uma regra de pp pode re-escanear e CLONAR essa string; o clone
+// P16(a) - o token é DADO de um bloco de stream? FATO do ast-18: o item from
+// op "stream" é o selo que o pp grava no instante em que fabrica a string a
+// partir de uma linha crua do fonte (TEXT/ENDTEXT, #pragma __text|__stream|
+// __cstream) - nenhuma leitura de FORMA (o `col == 0` seria réplica de
+// gramática). Uma regra de pp pode re-escanear e CLONAR essa string; o clone
 // aponta a aplicação, e o token que a aplicação consumiu carrega o selo -
-// a cadeia inteira é de fato declarado. O conteúdo é DADO: a ferramenta o
-// relata com posição e JAMAIS o edita - nem com opt-in (§1 do CLAUDE.md).
+// a cadeia inteira é de fato declarado.
+//
+// USO: SUPRESSÃO, jamais busca. Uma string ESCRITA igual a um nome pode virar
+// chamada-por-nome (&()/__mvGet) e por isso o usages a relata; uma linha de
+// bloco de stream igual a um nome NÃO tem esse mecanismo - é dado impresso. O
+// selo deixa o usages CALAR sobre o dado por FATO, sem casar TEXTO para
+// afirmar identidade (gatilho 1) e sem inferir data-ness pela coluna.
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION IsDataTok( hAst, hTok )
@@ -5001,54 +4986,6 @@ STATIC FUNCTION IsDataTok( hAst, hTok )
    NEXT
 
    RETURN .F.
-
-// os sites do nome DENTRO do dado: casamento por palavra inteira de
-// identificador, case-insensitive (a régua da linguagem para símbolos) - só
-// para RELATO, nunca decide edição. Devolve { { linha, col 1-based do nome
-// dentro da linha }, ... } - o conteúdo começa na coluna 0 do fonte, então
-// a posição dentro da string É a posição no fonte. nFrom/nTo opcionais
-// recortam por linha [nFrom, nTo); nTo 0 = aberto até o fim
-STATIC FUNCTION DataHits( hAst, cUpName, nFrom, nTo )
-
-   LOCAL aHits := {}, hSeen := { => }, hTok, cUpText, cKey, nAt
-   LOCAL nLen := Len( cUpName )
-
-   FOR EACH hTok IN hAst[ "tokens" ]
-      IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. ;
-         IsDataTok( hAst, hTok ) .AND. ;
-         ( nFrom == NIL .OR. hTok[ "line" ] >= nFrom ) .AND. ;
-         ( nTo == NIL .OR. nTo == 0 .OR. hTok[ "line" ] < nTo )
-         // regra de pp pode CLONAR a linha do bloco (re-scan da expansão):
-         // a mesma linha-fonte chega em mais de um token - um relato por linha
-         cKey := hb_ntos( hTok[ "line" ] )
-         IF hb_HHasKey( hSeen, cKey )
-            LOOP
-         ENDIF
-         hSeen[ cKey ] := .T.
-         cUpText := Upper( hTok[ "text" ] )
-         nAt := 0
-         DO WHILE ( nAt := hb_At( cUpName, cUpText, nAt + 1 ) ) > 0
-            IF ! IsIdentByte( cUpText, nAt - 1 ) .AND. ! IsIdentByte( cUpText, nAt + nLen )
-               AAdd( aHits, { hTok[ "line" ], nAt } )
-            ENDIF
-         ENDDO
-      ENDIF
-   NEXT
-
-   RETURN aHits
-
-// o byte na posição 1-based é caractere de identificador? fora da faixa: não
-STATIC FUNCTION IsIdentByte( cText, nPos )
-
-   LOCAL c
-
-   IF nPos < 1 .OR. nPos > hb_BLen( cText )
-      RETURN .F.
-   ENDIF
-   c := hb_BSubStr( cText, nPos, 1 )
-
-   RETURN c == "_" .OR. ( c >= "0" .AND. c <= "9" ) .OR. ;
-      ( c >= "A" .AND. c <= "Z" ) .OR. ( c >= "a" .AND. c <= "z" )
 
 // ---------------------------------------------------------------------------
 // P16(b) - módulo sensível a POSIÇÃO. O valor de um define DINÂMICO de linha

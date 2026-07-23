@@ -41,7 +41,10 @@ pp) e é o termo interno das specs; nos textos para o programador Harbour usar
 
 Cada família de diretiva vira uma ENTRADA no corpus ([pp-corpus/README.md](pp-corpus/README.md))
 com, nesta ordem:
-1. **A diretiva** (colada do `.ch` real, com arquivo:linha de origem).
+1. **A diretiva** (colada do `.ch` real, citada pelo NOME — arquivo + função/diretiva,
+   **nunca arquivo:linha**: número de linha apodrece a cada edição do core, nome não;
+   citação de core registrada em [../tests/corerefs.txt](../tests/corerefs.txt), guardada
+   por `corpus_refs`).
 2. **A fixture `.prg`** que a exercita (compila LIMPO sob `-w3 -es2` — régua do
    caso 0/64; `.ch` do core é AUTO-incluída, não incluir explícito).
 3. **O `.ppo`** (saída expandida) e **o `.ppt`** (traço passo a passo) REAIS,
@@ -112,7 +115,8 @@ explicação bilíngue. O corpus cresce fatia a fatia; este spec lista o alcanç
 
 ## Critério de pronto ("família entregue")
 
-- [ ] diretiva REAL do core citada com arquivo:linha;
+- [ ] diretiva REAL do core citada pelo NOME (arquivo + função/diretiva, nunca linha)
+      e registrada em `tests/corerefs.txt` (a guarda `corpus_refs` confere que vive);
 - [ ] fixture `.prg` compila limpo sob `-w3 -es2` (régua do caso 0);
 - [ ] `.ppo` + `.ppt` REAIS colados no corpus, e os mkinds do ast-5;
 - [ ] explicação bilíngue (técnico + programador Harbour);

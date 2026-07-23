@@ -39,10 +39,14 @@ que faltava não protegia uma edição; protegia um aviso.** *(Conserto no core:
 
 > Regra: PROVE, MARQUE e SIGA ([README.md](README.md)).
 
-- **[FECHADO — P16(a), 2026-07-22] o `usages` relata a ocorrência em DADO, e o `rename` avisa
-  sem editar.** O `ast-18` SELOU a string do bloco com `from: [{op: "stream", app: null}]` — o
-  fato declarado que a marca como dado, no lugar do discriminador por forma (`col == 0`). Prova:
-  caso 125 (fixture `fixdado`).
+- **[FECHADO — P16(a), 2026-07-22] o fato `op:"stream"` SUPRIME o dado dos relatos — a
+  ferramenta não o relata nem o busca.** Tudo num bloco de stream é TEXTO: uma palavra igual ao
+  nome de um símbolo ali é coincidência de letras, não ocorrência do símbolo. O `ast-18` SELA a
+  string do bloco com `from: [{op: "stream", app: null}]`, e o consumidor usa o selo só para
+  **calar** — uma linha de bloco igual a um nome não é candidata a chamada-por-nome, então o
+  `usages` não a lista como *"possible reference in string"*. *(A tentativa de RELATAR uma
+  "occurrence in data" — buscar o nome dentro do dado — era gatilho 1 e foi cortada pelo Diego;
+  ver roadmap P16.)* Prova: caso 125 (fixture `fixdado`).
 - **[Limite honesto, não-lacuna] `__stream`/`__cstream` juntam o bloco numa string só** — a
   posição é a do terminador, não a de cada linha. O `TEXT` do Cl*pper (o que a linguagem expõe)
   não tem esse problema. Não vale core novo sem consumidor pedindo.

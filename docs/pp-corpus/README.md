@@ -83,8 +83,9 @@ tinha me deixado acreditar no contrário. **Comentário sem assert é opinião.*
 
 **Regra prática por família:**
 1. **`tests/ppc-<fam>/<fam>.prg`** — o corpus de verdade: a diretiva REAL, o comentário
-   que EXPLICA (em português, denso, com o `arquivo:linha` do core), e os **asserts
-   `HBTEST`** que provam cada afirmação do comentário.
+   que EXPLICA (em português, denso, citando o core pelo **NOME da função/diretiva** —
+   nunca `arquivo:linha`, que apodrece a cada edição), e os **asserts `HBTEST`** que
+   provam cada afirmação do comentário.
 2. **`tests/ppcorpus.sh`** — a guarda: compila, **RODA** (nenhuma linha de falha do
    hbtest) e confere os oráculos (`.ppo`/`.ppt`/dump) para o que **não é observável em
    runtime** (posições, mkinds, derivação — aí o dump é o único juiz).
