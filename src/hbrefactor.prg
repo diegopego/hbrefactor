@@ -328,7 +328,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-18"
+   RETURN "ast-19"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -3341,6 +3341,8 @@ STATIC FUNCTION RenameStatic( aArgs )
    OutStd( "rename-static: " + cOld + " -> " + cNew + ;
            iif( lFileWide, " (file-wide)", " in " + hOwner[ "name" ] ) + ;
            " (" + hb_FNameNameExt( cSrcPath ) + ")" + hb_eol() )
+   // P17: um STATIC é local ao ARQUIVO - o alcance a declarar é o dele
+   SayScope( { cSrcPath => hAst }, { "files" => { cSrcPath } }, cUpOld, cOld )
    FOR nI := 1 TO Len( aEdits )
       OutStd( "  " + hb_FNameNameExt( cSrcPath ) + ":" + hb_ntos( aEdits[ nI ][ 1 ] ) + ;
               ":" + hb_ntos( aEdits[ nI ][ 2 ] ) + hb_eol() )
@@ -3669,6 +3671,9 @@ STATIC FUNCTION RenameFunction( aArgs )
       NEXT
    NEXT
    IF lDryRun
+      // P17: o --dry-run é JUSTAMENTE quando se quer saber o alcance - antes
+      // de mexer. Sem isto o aviso só apareceria depois da edição feita.
+      SayScope( hAsts, hProj, cUpOld, cOld )
       OutStd( "dry run - nothing was written" + hb_eol() )
       RETURN EXIT_OK
    ENDIF
@@ -3699,7 +3704,8 @@ STATIC FUNCTION RenameFunction( aArgs )
       ENDIF
    NEXT
 
-   OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed as expected, pcode byte-identical" + hb_eol() )
+   SayScope( hAsts, hProj, cUpOld, cOld )       // P17: o ALCANCE da prova
+   OutStd( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed as expected, pcode byte-identical" + ScopeTag( hAsts, hProj, cUpOld ) + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -5019,6 +5025,87 @@ STATIC FUNCTION DynLineSites( hAst, nFromLine )
    ASort( aOut )
 
    RETURN aOut
+
+// ---------------------------------------------------------------------------
+// P17 - o ALCANCE da prova. A compilação condicional esconde código: um ramo
+// desligado não vira token, não vira erro, não vira nada - e até o ast-19 ele
+// não existia em oráculo nenhum. O verbo então editava o que provava, o
+// verificador confirmava (verdade sobre a configuração compilada) e o veredito
+// saía SEM dizer sobre o que ele valia. Com -DVERSAO_X o projeto passava a
+// chamar um nome que não existe mais.
+//
+// FATO do ast-19: ppSkipped[] traz cada região pulada (arquivo, faixa de
+// linhas, o define testado) e os identificadores que o pp tokenizou ali antes
+// de descartar. A ferramenta casa NOME com NOME - jamais texto dentro de texto
+// (o pós-teste puramente textual foi MEDIDO e reprovado: 2 acertos em 13
+// avisos, porque comentário e ramo desligado são indistinguíveis no texto).
+//
+// RELATO, NUNCA EDIÇÃO: aquele texto não é deste programa e ninguém sabe o que
+// ele é sem compilar o outro - o que seria outro programa. O produto é o
+// veredito honesto sobre o alcance.
+// ---------------------------------------------------------------------------
+
+// os sítios do nome em região pulada: { arquivo, linha, define } ordenados
+STATIC FUNCTION SkippedNameHits( hAsts, hProj, cUpName )
+
+   LOCAL aOut := {}, cPath, hAst, hReg, hTok, cCond, cKey
+   LOCAL hSeen := { => }
+
+   FOR EACH cPath IN hProj[ "files" ]
+      hAst := hAsts[ cPath ]
+      FOR EACH hReg IN hb_HGetDef( hAst, "ppSkipped", {} )    // chave OPCIONAL
+         FOR EACH hTok IN hb_HGetDef( hReg, "tokens", {} )
+            IF Upper( hb_HGetDef( hTok, "text", "" ) ) == cUpName
+               cCond := hb_HGetDef( hReg, "cond", NIL )
+               // uma linha-fonte pode ser relatada uma vez só
+               cKey := cPath + "|" + hb_ntos( hTok[ "line" ] )
+               IF ! hb_HHasKey( hSeen, cKey )
+                  hSeen[ cKey ] := .T.
+                  AAdd( aOut, { cPath, hTok[ "line" ], cCond } )
+               ENDIF
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+
+   RETURN aOut
+
+// o veredito qualificado pelo alcance. Todo verbo que renomeia um nome chama
+// ESTE ponto - o experimento da P17 provou o rot na prática: ligado a um verbo
+// só, o caso da diretiva (outro verbo, outro "verified:") passava batido.
+STATIC PROCEDURE SayScope( hAsts, hProj, cUpName, cOld )
+
+   LOCAL aHits := SkippedNameHits( hAsts, hProj, cUpName )
+   LOCAL aItem, cWhy
+
+   FOR EACH aItem IN aHits
+      cWhy := hb_FNameNameExt( aItem[ 1 ] ) + ":" + hb_ntos( aItem[ 2 ] ) + ;
+              ": '" + cOld + "' also occurs here, in code this build did not" + ;
+              " compile"
+      IF aItem[ 3 ] != NIL
+         cWhy += " (excluded by #ifdef " + aItem[ 3 ] + " - rebuild with -D" + ;
+                 aItem[ 3 ] + " to see it)"
+      ELSE
+         cWhy += " (excluded by conditional compilation)"
+      ENDIF
+      OutErr( "warning: " + cWhy + " - it was NOT renamed" + hb_eol() )
+   NEXT
+   IF ! Empty( aHits )
+      // frase que tem de ser verdadeira TAMBÉM no --dry-run, onde não há prova
+      // nenhuma "abaixo" - só o anúncio de que nada foi escrito
+      OutErr( "warning: this run only ever sees THIS configuration; the other " + ;
+              "one is a different program and was never compiled here" + hb_eol() )
+   ENDIF
+
+   RETURN
+
+// o sufixo que QUALIFICA a linha do veredito. Sem região pulada com o nome,
+// sai vazio - o portão não vira ruído de fundo (36% dos módulos do core têm
+// compilação condicional; avisar em todos seria o mesmo que não avisar)
+STATIC FUNCTION ScopeTag( hAsts, hProj, cUpName )
+
+   RETURN iif( Empty( SkippedNameHits( hAsts, hProj, cUpName ) ), "", ;
+               " (this configuration only)" )
 
 STATIC PROCEDURE DynLineScan( hAst, hTok, nFromLine, aOut )
 
@@ -6866,8 +6953,10 @@ STATIC FUNCTION RenameDsl( aArgs )
       ENDIF
    NEXT
 
+   SayScope( hAsts, hProj, cUpOld, cOld )       // P17: o ALCANCE da prova
    OutStd( "verified: " + hb_ntos( nSites ) + " application site(s) + " + ;
-           hb_ntos( nDirEdits ) + " directive occurrence(s); .ppo and .hrb byte-identical" + hb_eol() )
+           hb_ntos( nDirEdits ) + " directive occurrence(s); .ppo and .hrb byte-identical" + ;
+           ScopeTag( hAsts, hProj, cUpOld ) + hb_eol() )
 
    RETURN EXIT_OK
 
@@ -7108,6 +7197,7 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
 
    OutStd( "rename-rule-marker: <" + cOld + "> -> <" + cNew + "> in " + ;
            RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" + hb_eol() )
+   SayScope( hAsts, hProj, Upper( cOld ), cOld )   // P17: o ALCANCE da prova
    FOR EACH cKey IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cKey ]
          OutStd( "  " + hb_FNameNameExt( cKey ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;
@@ -7811,6 +7901,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    OutStd( "rename-memvar: " + cOld + " -> " + cNew + " (creator " + aC[ 4 ] + " in " + ;
            aC[ 2 ] + ", scope closed and clean)" + hb_eol() )
+   SayScope( hAsts, hProj, cUpOld, cOld )       // P17: o ALCANCE da prova
    FOR EACH cPath IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cPath ]
          OutStd( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ":" + ;

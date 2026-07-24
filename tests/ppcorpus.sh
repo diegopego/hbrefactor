@@ -594,6 +594,58 @@ PYEOF
 }
 
 # --------------------------------------------------------------------------
+# Familia COMPILACAO CONDICIONAL (P17) - o ramo DESLIGADO. O pp LE as linhas do
+# ramo que ele pula (quebra em tokens) e DESCARTA: hoje aquilo some de todos os
+# oraculos, e por isso um rename anuncia "verified" deixando o outro ramo com o
+# nome velho. (docs/roadmap.md, fase P17)
+# --------------------------------------------------------------------------
+corpus_skip() {
+   echo "corpus: familia COMPILACAO CONDICIONAL - o ramo desligado (P17)"
+   local D; D=$(gen4 ppc-skip skipdump.prg)
+
+   # linhas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
+   local LCHAM LREGRA
+   LCHAM=$(python3 -c "
+src = open('$HERE/ppc-skip/skipdump.prg').read().split(chr(10))
+print([i + 1 for i, l in enumerate(src) if 'AvisaLimite( 50 )' in l][0])")
+   LREGRA=$(python3 -c "
+src = open('$HERE/ppc-skip/skipdump.prg').read().split(chr(10))
+print([i + 1 for i, l in enumerate(src) if 'pt_Rascunho' in l][0])")
+
+   # (1) o estado de HOJE, nos dois oraculos textuais - e' o buraco, documentado
+   [ -z "$(sed -n "${LCHAM}p" "$D/skipdump.ppo" | tr -d ' \t\r')" ]
+   check ".ppo: a linha do ramo desligado vira BRANCO (o pp contou a linha e jogou o conteudo fora)" $?
+   ! grep -qi "rascunho\|avisalimite" "$D/skipdump.ppt"
+   check ".ppt: o trace - o oraculo mais falante - nao diz UMA palavra do ramo desligado" $?
+
+   # (2) o FATO NOVO: o dump exporta a REGIAO pulada e os identificadores dentro
+   #     dela. E' o que separa 'linha que o compilador nao viu' de 'comentario' -
+   #     distincao que NENHUMA leitura de texto alcanca (medido: o pos-teste
+   #     puramente textual deu 2 acertos em 13 avisos; ver P17 no roadmap).
+   python3 - "$D/skipdump.ast.json" "$LCHAM" "$LREGRA" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+lcham, lregra = int(sys.argv[2]), int(sys.argv[3])
+sk = d.get("ppSkipped")
+if not sk:
+    sys.exit(1)
+def cobre(n):
+    return [r for r in sk if r["from"] <= n <= r["to"]]
+rc, rr = cobre(lcham), cobre(lregra)
+if not rc or not rr:
+    sys.exit(1)
+# a regiao nomeia o define TESTADO - e' o que permite dizer "reponha -DVERSAO_DEMO"
+if rc[0].get("cond") != "VERSAO_DEMO" or rr[0].get("cond") != "VERSAO_DEMO":
+    sys.exit(1)
+# e carrega os identificadores que o pp tokenizou antes de descartar: a
+# ferramenta compara NOME com NOME, nunca texto dentro de texto
+nomes = {t["text"].upper() for r in sk for t in (r.get("tokens") or [])}
+sys.exit(0 if {"AVISALIMITE", "PT_RASCUNHO", "PINTA"} <= nomes else 1)
+PYEOF
+   check "ast-19 (P17): o dump exporta a REGIAO pulada (from/to + o define testado) e os identificadores dentro dela" $?
+}
+
+# --------------------------------------------------------------------------
 # GUARDA DAS CITACOES DO CORE (tests/corerefs.txt) - o corpus cita trecho do fonte
 # do Harbour o tempo todo. Ancorada em NOME DE FUNCAO, nunca em linha: numero de
 # linha anda a cada edicao do core, EM SILENCIO (o ast-17/18 andou +6/+34, e a
@@ -1137,6 +1189,7 @@ corpus_instrument
 corpus_strdump
 corpus_text
 corpus_dyn
+corpus_skip
 corpus_strfam
 corpus_cycle
 corpus_pragma

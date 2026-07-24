@@ -1,0 +1,5 @@
+rename-function: AvisaLimite -> AvisaCota
+  cond.prg:30:11
+warning: cond.prg:17: 'AvisaLimite' also occurs here, in code this build did not compile (excluded by #ifdef VERSAO_DEMO - rebuild with -DVERSAO_DEMO to see it) - it was NOT renamed
+warning: this run only ever sees THIS configuration; the other one is a different program and was never compiled here
+verified: 1 edit(s); symbol tables renamed as expected, pcode byte-identical (this configuration only)

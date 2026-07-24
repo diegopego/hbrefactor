@@ -775,7 +775,7 @@ apontando o **NOME** (não o `&`) e `prov: "s"`, e o `at` da derivação bate; o
 símbolo passa a editar `&cAlvo` → `&cNovo` e **verifica byte-idêntico**; a guarda
 `corpus_strfam` (que hoje assere a LACUNA) inverte de sinal; `lexdiff` 0; `make test` verde.
 
-### P17 — a COMPILAÇÃO CONDICIONAL esconde diretiva, e a ferramenta QUEBRA O CÓDIGO *(aberto 2026-07-13; **A RESOLVER — o mais grave em aberto**)*
+### P17 — a COMPILAÇÃO CONDICIONAL esconde CÓDIGO, e a ferramenta diz "verified" sobre o que não olhou *(aberto 2026-07-13; **ampliado 2026-07-23**; **A RESOLVER — o mais grave em aberto**)*
 
 **Achado da medição de USO** (direção do Diego: estudar o pp no fonte real do Harbour). O core
 declara diretiva **dentro do próprio `.prg`** em **152 dos 419 módulos** do corpus (36%), com
@@ -816,13 +816,204 @@ programa**.
 O pp **sabe** que pulou aquelas linhas (`iCondCompile`); ele só não conta.
 
 **A resposta NÃO é editar os dois ramos** — o ramo desligado é **não-verificável** nesta
-compilação, e o §1 é explícito: não se edita o que não se pode provar. A resposta é o **fato que
-permite RECUSAR com motivo**: *"esta cabeça também é declarada em região pulada por compilação
-condicional (linha N) — o rename não pode provar aquele ramo; recusando"*.
-**Critério de pronto (mecânico)**: o dump exporta as diretivas puladas por `#if[n]def`/`#if`
-(posição + cabeça, sem entrar no mérito do ramo); o `rename` de cabeça de DSL **recusa** com
-motivo acionável quando existe declaração homônima em região pulada; o repro acima passa a
-recusar em vez de quebrar; `lexdiff` 0 e `make test` verde.
+compilação, e o §1 é explícito: não se edita o que não se pode provar.
+
+---
+
+#### ACHADO AMPLIADO (2026-07-23) — não é sobre diretiva; é sobre QUALQUER NOME
+
+*(Levantado ao abrir a fase; o Diego mandou **marcar como achado importante** antes de decidir
+o desenho. Regra de lacuna do P-DOC: **PROVE, MARQUE e SIGA**.)*
+
+O enquadramento acima ("esconde diretiva") é onde o problema **apareceu**, não o que ele é. O
+mecanismo é o mesmo para código comum, e o modo de falha é idêntico — **segundo repro,
+executado no toolchain corrente**:
+
+```harbour
+PROCEDURE Main()
+#ifdef MODO_RASCUNHO
+   Registra( 1 )        // <-- INVISÍVEL a esta compilação
+#else
+   ? "final"
+#endif
+   Registra( 2 )
+   RETURN
+PROCEDURE Registra( n )
+   ? n
+   RETURN
+```
+
+```
+$ hbrefactor rename n.hbp n.prg:13:11 Anota
+rename-function: Registra -> Anota
+verified: 2 edit(s); symbol tables renamed as expected, pcode byte-identical    <-- exit 0
+
+$ hbmk2 n.hbp -DMODO_RASCUNHO
+hbmk2: Error: Referenced, missing, but unknown function(s): REGISTRA()
+```
+
+**O que os dois repros têm em comum não é a diretiva — é a palavra `verified` sobre um
+programa que a ferramenta nunca olhou.** Ela não falha: ela **afirma sucesso** fora do alcance
+do que verificou. Qualquer desenho que feche só o caso da cabeça de DSL deixa este de pé.
+
+**A VARREDURA do core (§1.3 — registrada aqui porque recusa exige varredura ANTES):**
+- `include/hbpp.h` — a struct de estado expõe `iCondCompile`/`iCondCount`/`pCondStack`, mas
+  **nenhum dos nove callbacks públicos** (`open`, `close`, `error`, `disp`, `dump`, `inline`,
+  `switch`, `inc`, `msg`) reporta região pulada. Não há acessor nem hook.
+- `harbour --help` inteiro — só `-d<id>[=<val>]`; nada que peça ou emita relato de ramo pulado.
+- **`.ppt` (`-p+`): NADA** sobre o ramo desligado (probado, não lembrado) — some até do trace,
+  que é o oráculo mais verboso. `.ppo`: só o ramo ativo. Dump: `ppRules[]` lista **só** a regra
+  do ramo vivo.
+- `ChangeLog.txt` — nada sobre expor compilação condicional.
+
+**O PONTO DE FISGADA (e por que isto NÃO é computação nova):** em `hb_pp_preprocessToken`
+(`src/pp/ppcore.c`) a linha pulada **já chega tokenizada** e é descartada — no ramo de
+diretiva (`else if( pState->iCondCompile )`, comentado *"conditional compilation - other
+preprocessing and output disabled"*) e no de linha comum (`hb_pp_tokenListFreeCmd` sobre a
+`pTokenList`). **O core quebra o ramo desligado em tokens e joga fora.** Pedir que ele conte
+é o padrão do §1.2, não trabalho novo.
+
+**As três formas do fato (trade-off medido pelo que o canal PERMITE DECIDIR):**
+
+| fato exportado | a ferramenta decide por | custo |
+|---|---|---|
+| **(a) todo identificador pulado** (palavra + posição) | **identidade de nome** — zero casamento de texto | aviso/recusa **precisos** (só quando é o SEU nome); canal maior |
+| (b) só cabeça de diretiva (parseada pelo pp, regra não ativada) | identidade de cabeça | cirúrgico, mas deixa o repro do `Registra` de pé |
+| (c) só as faixas de linha puladas | **nada** — decidir exigiria ler o TEXTO daquelas linhas (gatilho 1) | canal mínimo, mas dispara em **36% dos módulos**, sempre: vira ruído |
+
+**Nota sobre a (a), que é a recomendação:** a palavra num ramo desligado é **texto cru, não
+preprocessado** — pode nem ser símbolo (poderia ser cabeça de DSL que viraria outra coisa).
+Logo o fato serve para **RELATAR/RECUSAR, jamais para EDITAR**: a ferramenta nunca "conserta o
+outro ramo".
+
+**CONSIDERADO E POSTO DE LADO — rename multi-configuração** *(o Diego perguntou o custo, e ele
+condena a ideia)*: seria compilar e verificar o projeto **uma vez por configuração**, ou seja
+**linear no número de `-D`** — dobrar a espera que já é a maior queixa da ferramenta (fase V:
+`usages` 12-15 s em 43 módulos). Pior que o tempo: **não existe fato que enumere as
+configurações de um projeto** — os `-D` vêm do `.hbp`, da linha de comando, do hábito da
+equipe. A ferramenta só poderia prometer *"provei as que você nomeou"*, o que é
+**incompleto por natureza**. Volta como fase própria se a demanda aparecer.
+
+**A DIREÇÃO DO DIEGO (2026-07-23):** *"rename somente no branch vivo, seguindo o que o
+compilador vê"* — a edição **não muda**; o que muda é o **VEREDITO**. A ferramenta continua
+agindo sobre uma configuração só e passa a dizer a verdade sobre o **alcance** do que fez.
+
+#### O EXPERIMENTO que fechou o desenho *(2026-07-23, autorizado pelo Diego: "tenta aí vamos ver o que acontece"; revertido depois de medir — não está na árvore)*
+
+**A hipótese testada, do próprio Diego:** *"se peço um rename, o nome velho não deveria mais
+existir"* — um pós-teste de COMPLETUDE, sem tocar no core. Implementado como
+`UnseenNameHits`: ocorrências do nome velho **no texto** MENOS as posições que o compilador
+reportou como token (`col+1` aponta o início do nome, verificado, tanto em identificador
+quanto em string). O que resta é o ponto cego. Ligado ao portão de **referências textuais que
+já existe** (o mesmo `aWarn` + `Refuse` + escape `--force` do `rename-function`).
+
+**Funcionou como detector.** Pegou os dois repros, ficou mudo no caso legítimo (função de
+biblioteca sem chamador), e **achou um caso REAL no corpus que eu não conhecia**:
+`work/xhb/xhbole.prg:248` — o `FUNCTION CreateObject` do OLE, dentro do ramo **Windows** de
+`#ifndef __PLATFORM__WINDOWS` (linhas 48-260). Renomear no Linux deixa a implementação Windows
+com o nome velho, e o build Windows quebra calado. **O P17 está no corpus.**
+
+**E MORREU como recusa, por MEDIÇÃO.** 20 renames reais em `work/xhb`, 13 avisos:
+
+| o que o aviso apontava | n |
+|---|---|
+| **código real em ramo pulado** (`xhbole.prg` 248 e 254) | **2** |
+| comentário (`*`, `//`, `/* */` com código comentado) | 9 |
+| nome dentro de string maior (`" Arguments: ("`) | 2 |
+
+E a suíte deu o veredito final: **3 casos vermelhos**, os três pela MESMA causa — o
+`fixshadow` recusou o rename porque **o comentário de cabeçalho da própria fixture** cita
+`Dobra`. Uma ferramenta que recusa renomear uma função porque um comentário a menciona é
+inutilizável.
+
+**A LIÇÃO, e ela CONTRADIZ o que eu tinha escrito acima:** eu havia concluído que a mudança no
+core viraria *opcional*. **Errado.** Para quem só lê texto, um comentário e um bloco `#ifdef`
+desligado são **a mesma coisa** — linhas que não entraram na compilação. A diferença não está
+no texto, então nenhuma esperteza textual a alcança. **Só o compilador sabe separar**, e é por
+isso que o fato do core é o que faz a coisa funcionar, não o polimento dela.
+
+#### O DESENHO (o que implementar)
+
+**Fatia 1 — o core conta o que pulou** (um hook, no ponto de fisgada já identificado em
+`hb_pp_preprocessToken`, sob o mesmo portão de rastreio de posição do resto):
+- a **região**: arquivo, linha de abertura e de fechamento, e o **nome testado** no
+  `#if[n]def` (é o que permite a mensagem dizer *"reponha `-DVERSAO_DEMO`"*);
+- os **identificadores dentro dela** — que o pp **já tokeniza e descarta**. Isto é o que
+  elimina a busca de texto do lado da ferramenta: ela compara **nome com nome**, como no
+  `macrovars` do `ast-18`. *(Alternativa mais barata: só a região, e a ferramenta busca texto
+  **dentro dela**. Funciona e mata os 9 falsos positivos — mas deixa uma busca de texto na
+  ferramenta, e por isso não é a preferida.)*
+- schema `ast-18 → ast-19` nos DOIS repos no mesmo passo; expansão byte-idêntica.
+
+**Fatia 2 — o verificador para de afirmar fora do alcance**:
+- o veredito declara o **escopo**: em vez de `verified:` seco, dizer que a prova vale para a
+  configuração compilada e que N linhas do módulo ficaram fora dela;
+- o aviso por nome, **preciso** (só o que caiu em região pulada de verdade);
+- **helper COMPARTILHADO**: o experimento mostrou o rot na prática — ligado só ao
+  `rename-function`, o caso da diretiva (`rename-dsl`, outro verbo, outro `verified:`) passou
+  batido. Há ~12 pontos que imprimem `verified:`; a checagem entra **uma vez** e cada verbo
+  chama.
+- comentário e string ficam **fora**: para eles o mecanismo certo já existe (o portão de
+  referências textuais, que só relata o que o compilador VIU).
+
+**A decisão aviso × recusa fica para DEPOIS do fato existir**, e se decide medindo de novo —
+com o aviso preciso, recusar volta a ser viável. O experimento mostrou que decidir isso antes
+seria palpite.
+
+**Critério de pronto (mecânico)**:
+1. ✅ o dump exporta as regiões puladas (arquivo, faixa de linhas, nome testado) e os
+   identificadores dentro delas; `.hrb` byte-idêntico sem os switches;
+2. ✅ **teste em formato fixture-esperada** *(ordem do Diego, 2026-07-23)* — o `.prg` DEPOIS
+   do rename comparado **byte a byte** com o esperado, escrito ANTES do código;
+3. ✅ o caso real do corpus (`xhbole.prg`) produz aviso **nomeando `__PLATFORM__WINDOWS`**;
+4. ✅ **nenhum aviso novo** por comentário ou string — as fixtures que o experimento textual
+   derrubou seguem verdes sem re-baseline;
+5. ✅ régua executável: verbo de rename que **não** chame o helper compartilhado reprova a
+   suíte ([tests/regua-escopo.sh](../tests/regua-escopo.sh));
+6. ✅ `make test` verde e `make ppcorpus` verde.
+
+**ESTADO (2026-07-24) — fatias 1 e 2 ENTREGUES; DUAS pontas abertas.**
+
+- **Fatia 1 ✅** — o core exporta `ppSkipped[]` (região: arquivo, `from`/`to`, o define
+  testado; mais os identificadores que o pp já tokenizava e descartava). Hooks em
+  `hb_pp_preprocessToken` (os dois ramos: linha de diretiva e linha comum), pilha de nomes em
+  passo com a `pCondStack`, API pública aditiva `hb_pp_trackSkip*`. Schema `ast-18 → ast-19`
+  nos dois repos no mesmo passo. **Impacto zero re-medido contra a base CORRETA: 889/889, 0
+  divergentes** (ver a dívida da base, abaixo).
+- **Fatia 2 ✅** — `SkippedNameHits`/`SayScope`/`ScopeTag` consomem o fato **casando NOME com
+  NOME**; `rename-function` e `rename-dsl` avisam e o `verified:` sai **qualificado**:
+
+  ```
+  warning: cond.prg:17: 'AvisaLimite' also occurs here, in code this build did not compile
+  (excluded by #ifdef VERSAO_DEMO - rebuild with -DVERSAO_DEMO to see it) - it was NOT renamed
+  warning: the proof below covers THIS configuration only; the other one is a different
+  program and was never compiled here
+  verified: 1 edit(s); symbol tables renamed as expected, pcode byte-identical (this configuration only)
+  ```
+
+  **Aviso, nunca recusa** (exit 0): a edição provada está certa — o que faltava era o veredito
+  parar de afirmar além do alcance. Módulo sem ramo desligado **não ganha aviso nenhum**.
+
+**A RÉGUA pegou o meu próprio rot, e é a prova de que ela era necessária.** Escrita ANTES de
+tapar os buracos, ela acusou que eu tinha ligado **2 verbos de 6** — faltavam `rename-static`,
+`rename-memvar` e `rename-rule-marker`. Todos ligados; a régua roda na suíte e reprova verbo
+novo sem o aviso. *(Um STATIC é local ao arquivo, então o alcance declarado é o do arquivo
+dele — não o do projeto.)*
+
+**O `xhbole.prg` do corpus fecha o item 3, com a saída real:**
+
+```
+warning: xhbole.prg:248: 'CreateObject' also occurs here, in code this build did not compile
+(excluded by #ifdef __PLATFORM__WINDOWS - rebuild with -D__PLATFORM__WINDOWS to see it) - it was NOT renamed
+```
+
+**Dois defeitos meus que o probe do corpus expôs, ambos consertados:**
+- o **`--dry-run` não avisava** (o retorno antecipado ficava antes do ponto onde liguei o
+  aviso) — e dry-run é JUSTAMENTE quando se quer saber o alcance, antes de mexer;
+- a frase *"the proof below covers THIS configuration"* **mentia no dry-run**, onde não há
+  prova nenhuma abaixo. Trocada por uma que é verdadeira nos dois modos.
+
+## Dívidas e limites conhecidos
 
 ### P15 — o rename através do `#<x>`: um BUG e uma decisão *(aberto 2026-07-13; **A RESOLVER**)*
 
@@ -863,6 +1054,63 @@ getter + setter, mapeia `NOME→novo` E `_NOME→_novo`, e recusa homônimo entr
 `ACCESS`/`ASSIGN` (getter/setter explícitos), DATA herdada de superclasse, e o `resolve-at` de
 `::membro` escopando a classe** (rename a partir do site de USO). Spec:
 [spec-rename-data.md](spec-rename-data.md).
+
+## T — CASO DECLARATIVO: a suíte migra de `grep` em saída para FIXTURE ESPERADA *(ordem do Diego, 2026-07-24; **harness ENTREGUE, migração ABERTA**)*
+
+**O diagnóstico, MEDIDO** (`tests/run.sh` no dia da ordem): 4.692 linhas, 123 casos,
+**1.006 asserções — 637 delas (63%) são `grep -q` em texto de saída**, contra apenas 83
+comparações byte a byte.
+
+**A ordem do Diego:** *"acho que é o run que tem que melhorar. usar fixtures expected para
+cada teste é a solução"* — dita duas vezes; eu tratei a primeira como observação sobre UM
+teste, e era sobre a arquitetura.
+
+**As duas cicatrizes que nasceram na mesma hora, e nenhuma era sobre a ferramenta:**
+- um `grep` que passava por **VACUIDADE** — o padrão (`^verified: [^(]*$`) nunca casaria com
+  a saída real (`1 edit(s)` tem parêntese), então o check era verde sem provar nada;
+- a régua do caso 64 quebrando porque a fixture usava `Conta`, **português comum no fonte**.
+
+**O limite de fundo:** `grep` prova que UM pedaço da saída existe. Ele **nunca** prova o que a
+ferramenta NÃO fez ou NÃO disse — e é exatamente isso que este produto promete.
+
+**O formato** (contrato e porquê em [tests/casedir.sh](../tests/casedir.sh)):
+
+```
+tests/cases/<nome>/
+   before/     o projeto ANTES (.prg, .ch, .hbp)
+   cmd         a linha do hbrefactor, SEM o binário
+   after/      o projeto ESPERADO depois (byte a byte)
+   exit        (opcional) exit esperado; default 0
+   out         (opcional) a saída esperada (stdout+stderr), byte a byte
+```
+
+Três provas por caso, e a terceira é a que o grep nunca deu: exit, fontes byte a byte, e a
+**saída INTEIRA** — aviso a mais reprova. Caso **sem `after/`** é de recusa/relato: o
+`before/` inteiro tem de voltar intacto. Falha mostra **DIFF**, não *"FAIL: um grep não
+casou"*.
+
+É a generalização do que **já está provado** no `tests/site/` (as quatro portas), não um
+formato inventado.
+
+**✅ ENTREGUE (2026-07-24):** o harness (`tests/casedir.sh`, sourced pelo `run.sh`) e o
+**caso 128 nascido nele** — o primeiro. Provado nos DOIS sentidos: verde no estado certo, e
+**vermelho com diff** ao sabotar UMA palavra da saída esperada. `make test` 1022/0 e
+**`JOBS=1` byte-idêntico** (obrigatório: a mudança tocou o runner).
+
+**A migração dos 122 antigos fica ABERTA, por lotes.** Estimativa honesta: **~85%** cabem no
+formato; o resto continua bash por natureza (o caso 122 confere schema contra o compilador,
+outros medem carga de projeto, e a régua do caso 64 é sobre o FONTE DA FERRAMENTA, não sobre
+o caso).
+
+**Custo conhecido, a decidir quando a migração começar:** comparar saída byte a byte é rígido
+nos dois sentidos — mexer numa mensagem quebra dezenas de casos de uma vez. É virtude (o
+alcance real da mudança fica visível) e é atrito (ruído quando a mudança é deliberada). Pede
+um `make test-accept` para re-baselinar — que é **faca de dois gumes** e por isso não entrou
+junto com o harness: aceitar cegamente é o modo de falha que este formato existe para matar.
+
+**Critério de pronto (mecânico) da migração**: nenhum caso migrado perde asserção (conferência
+site a site do que o `grep` cobria e o `cmp` não cobre); `make test` verde e `JOBS=1`
+byte-idêntico a cada lote.
 
 ## Dívidas e limites conhecidos
 
