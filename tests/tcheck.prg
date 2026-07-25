@@ -28,6 +28,7 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "enveq"   ; lOk := EnvEq( cA1, cA2, cA3 )   ; EXIT
    CASE "envhas"  ; lOk := EnvHas( cA1, cA2, cA3 )  ; EXIT
    CASE "envloc"  ; lOk := EnvLoc( cA1, cA2, cA3 )  ; EXIT
+   CASE "envrow"  ; lOk := EnvRow( cA1, cA2, cA3 )  ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
       lOk := .F.
@@ -113,11 +114,13 @@ STATIC FUNCTION EnvHas( cPath, cDot, cSub )
 
 // existe uma location (result.locations OU edits[]) em <arquivo:linha>? A linha
 // é 1-based (o LSP é 0-based). Prova o que o grep "arquivo:linha: papel" dava,
-// mas pelo FATO estruturado (uri + range), não pela frase
-STATIC FUNCTION EnvLoc( cPath, cAt, cKind )
+// mas pelo FATO estruturado (uri + range + kind + owner), não pela frase.
+// O 3o arg espelha a prosa do usages: "<kind> in <owner>" -> separa e confere
+// os DOIS campos; sem " in ", casa só o kind (definição não tem owner).
+STATIC FUNCTION EnvLoc( cPath, cAt, cWhat )
 
    LOCAL x := hb_jsonDecode( hb_MemoRead( cPath ) )
-   LOCAL aLoc, hLoc, nColon, cFile, nLine
+   LOCAL aLoc, hLoc, nColon, cFile, nLine, cKind, cOwner := NIL, nIn
 
    IF ! HB_ISHASH( x )
       RETURN Fail( "envelope invalido" )
@@ -130,16 +133,64 @@ STATIC FUNCTION EnvLoc( cPath, cAt, cKind )
    cFile := Left( cAt, nColon - 1 )
    nLine := Val( SubStr( cAt, nColon + 1 ) )
 
+   cKind := hb_defaultValue( cWhat, "" )
+   IF ( nIn := RAt( " in ", cKind ) ) > 0
+      cOwner := SubStr( cKind, nIn + 4 )
+      cKind  := Left( cKind, nIn - 1 )
+   ENDIF
+
    FOR EACH hLoc IN aLoc
       IF EndsW( hLoc[ "uri" ], cFile ) .AND. ;
          hLoc[ "range" ][ "start" ][ "line" ] + 1 == nLine .AND. ;
-         ( Empty( cKind ) .OR. hb_defaultValue( cKind, "" ) $ hb_HGetDef( hLoc, "kind", "" ) )
+         ( Empty( cKind ) .OR. cKind $ hb_HGetDef( hLoc, "kind", "" ) ) .AND. ;
+         ( cOwner == NIL .OR. cOwner == EnvStr( hb_HGetDef( hLoc, "owner", NIL ) ) )
          RETURN .T.
       ENDIF
    NEXT
 
    RETURN Fail( "nenhuma location em " + cAt + ;
-                iif( Empty( cKind ), "", " com kind ~ '" + cKind + "'" ) )
+                iif( Empty( cKind ), "", " com kind ~ '" + cKind + "'" ) + ;
+                iif( cOwner == NIL, "", " owner '" + cOwner + "'" ) )
+
+// alguma LINHA de um array-de-objetos do result casa TODOS os pares k=v?
+// (`result.<arr>` implícito). Genérico: serve call-graph (edges), find-
+// dynamic-calls (findings), annotate (candidates), location sem linha, etc.
+// Valor casado por SUBSTRING (external=true, in=b.prg, kind=write (memvar)).
+// Pares separados por ';'.  Ex: envrow cg.json edges "caller=MAIN;callee=DUPLA;in=b.prg"
+STATIC FUNCTION EnvRow( cPath, cArr, cSpec )
+
+   LOCAL x := hb_jsonDecode( hb_MemoRead( cPath ) )
+   LOCAL aRows, hRow, cPair, nEq, cK, cV, lAll
+
+   IF HB_ISHASH( x ) .AND. hb_HGetDef( x, "schema", "" ) == "cli-1"
+      x := hb_HGetDef( x, "result", { => } )
+   ENDIF
+   aRows := iif( HB_ISHASH( x ), hb_HGetDef( x, hb_defaultValue( cArr, "" ), {} ), {} )
+   IF ! HB_ISARRAY( aRows )
+      RETURN Fail( "result." + hb_defaultValue( cArr, "" ) + " nao e' array" )
+   ENDIF
+
+   FOR EACH hRow IN aRows
+      IF ! HB_ISHASH( hRow )
+         LOOP
+      ENDIF
+      lAll := .T.
+      FOR EACH cPair IN hb_ATokens( hb_defaultValue( cSpec, "" ), ";" )
+         nEq := At( "=", cPair )
+         cK  := Left( cPair, nEq - 1 )
+         cV  := SubStr( cPair, nEq + 1 )
+         IF ! ( cV $ EnvStr( hb_HGetDef( hRow, cK, NIL ) ) )
+            lAll := .F.
+            EXIT
+         ENDIF
+      NEXT
+      IF lAll
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN Fail( "nenhuma linha em result." + hb_defaultValue( cArr, "" ) + " casa: " + ;
+                hb_defaultValue( cSpec, "" ) )
 
 // A.1: o `--json` passou a emitir UM ENVELOPE em stdout (a forma
 // `--json <arquivo>` morreu - CLAUDE.md §1.5, sem compatibilidade para trás).

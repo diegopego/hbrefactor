@@ -344,15 +344,28 @@ STATIC FUNCTION AstDumps( hProj, cTmp )
    IF hb_processRun( HbMk2Bin() + " " + StrTran( hProj[ "spec" ], ",", " " ) + ;
                      " -hbcmp -rebuild -q '-prgflag=-x" + hb_DirSepAdd( cTmp ) + ;
                      "'",, @cOut, @cErr ) != 0
-      OutErr( ErrLines( cOut + cErr ) )
+      // sob o contrato, o erro do compilador é DADO (diagnostics[]), não texto
+      // cru no stderr - senão o `2>&1` do consumidor mistura ao envelope e o
+      // JSON quebra. Sem --json, o stderr fica byte-idêntico (canal humano)
+      IF s_lJson
+         Diag( "compiler-error", ErrLines( cOut + cErr ), NIL )
+      ELSE
+         OutErr( ErrLines( cOut + cErr ) )
+      ENDIF
       // a falha clássica sem HB_BIN é o hbmk2 do PATH (sem -x) reprovando
       // um projeto que compila - nomear a causa provável evita o
       // diagnóstico enganoso "the project does not compile"
       IF Empty( hb_GetEnv( "HB_BIN" ) )
-         OutErr( "hbrefactor: HB_BIN not set - used the hbmk2 from PATH, " + ;
-                 "which may lack the fork's -x; export " + ;
-                 "HB_BIN=<dir of the binaries with -x> (or set " + ;
-                 "hbrefactor.hbBin in the extension)" + hb_eol() )
+         IF s_lJson
+            Diag( "hb-bin-unset", "HB_BIN not set - used the hbmk2 from PATH, " + ;
+                  "which may lack the fork's -x; export HB_BIN=<dir of the " + ;
+                  "binaries with -x> (or set hbrefactor.hbBin in the extension)", NIL )
+         ELSE
+            OutErr( "hbrefactor: HB_BIN not set - used the hbmk2 from PATH, " + ;
+                    "which may lack the fork's -x; export " + ;
+                    "HB_BIN=<dir of the binaries with -x> (or set " + ;
+                    "hbrefactor.hbBin in the extension)" + hb_eol() )
+         ENDIF
       ENDIF
       RETURN .F.
    ENDIF

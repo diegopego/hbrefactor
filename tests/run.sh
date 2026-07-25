@@ -365,12 +365,12 @@ check "a.prg restored byte-exact"  $?
 unit_8() {
 echo "case 8: usages of a function across modules"
 D=$(fresh case8)
-( cd "$D" && "$BIN" usages fix01.hbp Dupla > out.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "b.prg:5: definition (function)" "$D/out.log"
+"$TCHECK" envloc "$D/out.log" b.prg:5 "definition (function)"
 check "definition found in b.prg"  $?
-grep -q "a.prg:10: call in MAIN" "$D/out.log"
+"$TCHECK" envloc "$D/out.log" a.prg:10 "call in MAIN"
 check "call found in a.prg (Main)" $?
 
 }
@@ -378,14 +378,14 @@ check "call found in a.prg (Main)" $?
 unit_9() {
 echo "case 9: usages of a local variable (scope-aware, incl. codeblock)"
 D=$(fresh case9)
-( cd "$D" && "$BIN" usages fix01.hbp nTotal --func Main > out.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp nTotal --func Main --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "a.prg:5: declaration (local) in MAIN" "$D/out.log"
+"$TCHECK" envloc "$D/out.log" a.prg:5 "declaration (local) in MAIN"
 check "declaration listed"         $?
-grep -q "a.prg:6: ref (detached, codeblock) in MAIN" "$D/out.log"
+"$TCHECK" envloc "$D/out.log" a.prg:6 "ref (detached, codeblock) in MAIN"
 check "detached codeblock capture listed" $?
-grep -q "a.prg:13: read (local) in MAIN" "$D/out.log"
+"$TCHECK" envloc "$D/out.log" a.prg:13 "read (local) in MAIN"
 check "read listed"                $?
 
 }
@@ -393,15 +393,15 @@ check "read listed"                $?
 unit_10() {
 echo "case 10: rename-function across modules + idempotence (A->B->A)"
 D=$(fresh case10)
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
 check "definition renamed (b.prg)" $?
 grep -q "Dobrar( i )" "$D/a.prg"
 check "call renamed (a.prg)"       $?
-grep -q "pcode byte-identical" "$D/out.log"
-check "structural verification"    $?
+"$TCHECK" enveq "$D/out.log" proof pcode-identical
+check "structural verification (proof pcode-identical)" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dupla > out2.log 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg" && cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "idempotence: A->B->A restores sources" $?
@@ -412,13 +412,15 @@ unit_11() {
 echo "case 11: string literal with the function name (refuse without --force)"
 D=$(fresh case11)
 printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --json > out.log 2>&1 )
 RC=$?
 check "exit != 0 without --force"  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "string equal to 'Dupla' - possible call by name" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" reason textual-refs-require-force
+check "refusa por referencia textual (reason)" $?
+"$TCHECK" envhas "$D/out.log" diagnostics "string equal to 'Dupla' - possible call by name"
 check "warning classifies exact-name string" $?
-( cd "$D" && "$BIN" usages fix01.hbp Dupla > usages.log 2>&1 )
-grep -q "possible reference in string" "$D/usages.log"
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > usages.log 2>&1 )
+"$TCHECK" envhas "$D/usages.log" result "possible reference in string"
 check "usages reports the string reference" $?
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --force > out2.log 2>&1 )
 RC=$?
@@ -479,10 +481,10 @@ unit_15() {
 echo "case 15: reorder-params refuses call site with fewer arguments"
 D=$(fresh case15)
 printf '\nFUNCTION ChamaCurta()\n\n   RETURN Sub2( 5 )\n' >> "$D/a.prg"
-( cd "$D" && "$BIN" reorder-params fix01.hbp Sub2 nB,nA > out.log 2>&1 )
+( cd "$D" && "$BIN" reorder-params fix01.hbp Sub2 nB,nA --json > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "implicit NIL would move" "$D/out.log"
+"$TCHECK" envhas "$D/out.log" detail "implicit NIL would move"
 check "reason mentions implicit NIL" $?
 cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "b.prg untouched"            $?
@@ -515,10 +517,10 @@ check "program output identical"   $?
 unit_17() {
 echo "case 17: extract-function refuses a cut FOR/NEXT and RETURN in range"
 D=$(fresh case17)
-( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-10 Metade2 > out.log 2>&1 )
+( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 9-10 Metade2 --json > out.log 2>&1 )
 RC=$?
 check "cut FOR refused"            $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "that closes outside it" "$D/out.log"
+"$TCHECK" envhas "$D/out.log" detail "that closes outside it"
 check "reason mentions open structure" $?
 ( cd "$D" && "$BIN" extract-function fix01.hbp a.prg 13-16 Fim2 > out2.log 2>&1 )
 RC=$?
@@ -549,15 +551,15 @@ check "absolute spec: URI not doubled (extension path)" $?
 unit_20() {
 echo "case 20: call-graph shows cross-module and external calls"
 D=$(fresh case20)
-( cd "$D" && "$BIN" call-graph fix01.hbp > out.log 2>&1 )
+( cd "$D" && "$BIN" call-graph fix01.hbp --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "a.prg: MAIN -> DUPLA  \[b.prg\]" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" edges "file=a.prg;caller=MAIN;callee=DUPLA;in=b.prg"
 check "cross-module edge with module" $?
-grep -q "a.prg: MAIN -> QOUT  \[external\]" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" edges "caller=MAIN;callee=QOUT;external=true"
 check "external callee tagged"     $?
-( cd "$D" && "$BIN" call-graph fix01.hbp Dupla > filt.log 2>&1 )
-grep -q "MAIN -> DUPLA" "$D/filt.log" && ! grep -q "QOUT" "$D/filt.log"
+( cd "$D" && "$BIN" call-graph fix01.hbp Dupla --json > filt.log 2>&1 )
+"$TCHECK" envrow "$D/filt.log" edges "caller=MAIN;callee=DUPLA" && ! "$TCHECK" envrow "$D/filt.log" edges "callee=QOUT"
 check "filter by function works"   $?
 
 }
@@ -565,14 +567,14 @@ check "filter by function works"   $?
 unit_21() {
 echo "case 21: rename-static (file-wide) with byte-identical verification"
 D=$(fresh case21)
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:3:8 s_nSeq > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:3:8 s_nSeq --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "STATIC s_nSeq := 0" "$D/b.prg"
 check "file-wide declaration renamed" $?
 grep -q "RETURN s_nSeq" "$D/b.prg"
 check "use inside function renamed" $?
-grep -q "verified: all 2 module" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" proof pcode-identical
 check "byte-identical verification" $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
@@ -583,12 +585,12 @@ unit_22() {
 echo "case 22: find-dynamic-calls audits strings and macro zones"
 D=$(fresh case22)
 printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n\nFUNCTION Dinamica( cVar )\n\n   RETURN &cVar\n' >> "$D/a.prg"
-( cd "$D" && "$BIN" find-dynamic-calls fix01.hbp > out.log 2>&1 )
+( cd "$D" && "$BIN" find-dynamic-calls fix01.hbp --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "string 'Dupla' names a project function \[b.prg\]" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" findings "kind=string-names-function;string=Dupla;names=b.prg"
 check "string naming function reported" $?
-grep -q "function DINAMICA uses & macros" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" findings "kind=function-uses-macro;function=DINAMICA"
 check "macro zone reported"        $?
 
 }
@@ -596,17 +598,19 @@ check "macro zone reported"        $?
 unit_23() {
 echo "case 23: sends (Eval) and PRIVATE initialization visible"
 D=$(fresh case23)
-( cd "$D" && "$BIN" usages fix01.hbp Eval > eval.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Eval --json > eval.log 2>&1 )
 RC=$?
 check "usages Eval exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "a.prg:10: possible send (dynamic dispatch, receiver unknown) in MAIN" "$D/eval.log"
+# prosa "possible send (dynamic dispatch, receiver unknown) in MAIN" -> os
+# campos: kind=send, certainty=possible (B4f: receptor desconhecido), owner=MAIN
+"$TCHECK" envrow "$D/eval.log" locations "kind=send;certainty=possible;owner=MAIN"
 check "Eval listed as possible send (B4f: receiver unknown)" $?
-( cd "$D" && "$BIN" usages fix01.hbp xCfg > priv.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp xCfg --json > priv.log 2>&1 )
 RC=$?
 check "usages xCfg exit 0"         $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "write (memvar) in COMPRIVADA" "$D/priv.log"
+"$TCHECK" envrow "$D/priv.log" locations "kind=write (memvar);owner=COMPRIVADA"
 check "PRIVATE init write listed"  $?
-grep -q "read (memvar) in COMPRIVADA" "$D/priv.log"
+"$TCHECK" envrow "$D/priv.log" locations "kind=read (memvar);owner=COMPRIVADA"
 check "later read listed"          $?
 
 }
@@ -614,14 +618,14 @@ check "later read listed"          $?
 unit_24() {
 echo "case 24: rename inside a ;-continued statement (token on middle line)"
 D=$(fresh case24)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:41:10 cTexto > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:41:10 cTexto --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "^           cTexto + ;$" "$D/a.prg"
 check "middle continuation line renamed" $?
 grep -q "RETURN cTexto" "$D/a.prg"
 check "last line renamed"          $?
-grep -q "verified: all 2 module" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" proof pcode-identical
 check "byte-identical verification" $?
 
 }
@@ -630,11 +634,11 @@ unit_25() {
 echo "case 25: aliased variables (M-> and alias->) visible in usages"
 D=$(fresh case25)
 printf '\nFUNCTION UsaAlias()\n\n   M->xGlob := 1\n\n   RETURN M->xGlob + CLIENTES->saldo\n' >> "$D/b.prg"
-( cd "$D" && "$BIN" usages fix01.hbp xGlob > mv.log 2>&1 && "$BIN" usages fix01.hbp saldo > fld.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp xGlob --json > mv.log 2>&1 && "$BIN" usages fix01.hbp saldo --json > fld.log 2>&1 )
 check "both usages exit 0"         $?
-grep -q "write (memvar) in USAALIAS" "$D/mv.log"
+"$TCHECK" envrow "$D/mv.log" locations "kind=write (memvar);owner=USAALIAS"
 check "M-> write listed as memvar" $?
-grep -q "read (field) in USAALIAS" "$D/fld.log"
+"$TCHECK" envrow "$D/fld.log" locations "kind=read (field);owner=USAALIAS"
 check "alias-> read listed as field" $?
 
 }
@@ -654,10 +658,10 @@ echo "case 27: rename-function warns about DYNAMIC in .hbx export file"
 D=$(fresh case27)
 printf 'DYNAMIC Dupla\n' > "$D/exports.hbx"
 printf 'exports.hbx\n' >> "$D/fix01.hbp"
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --json > out.log 2>&1 )
 RC=$?
 check "refused without --force"    $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "DYNAMIC DUPLA in the export (.hbx)" "$D/out.log"
+"$TCHECK" envhas "$D/out.log" diagnostics "DYNAMIC DUPLA in the export (.hbx)"
 check "hbx warning listed"         $?
 
 }
@@ -665,12 +669,12 @@ check "hbx warning listed"         $?
 unit_28() {
 echo "case 28: project as a plain list of .prg files (no .hbp)"
 D=$(fresh case28)
-( cd "$D" && "$BIN" usages "a.prg,b.prg" Dupla > out.log 2>&1 )
+( cd "$D" && "$BIN" usages "a.prg,b.prg" Dupla --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "definition (function)" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" locations "kind=definition (function)"
 check "definition found"           $?
-grep -q "call in MAIN" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" locations "kind=call;owner=MAIN"
 check "call found"                 $?
 
 }
@@ -707,20 +711,20 @@ METHOD Deposita( nValor ) CLASS Conta
 EOF
 printf -- '-inc\n-w3 -es2\n${hb_name}.hbx\n\na.prg\nb.prg\nc.prg\n\ndep/dep.hbc\n' > "$D/case29.hbp"
 printf 'DYNAMIC Dupla\n' > "$D/case29.hbx"
-( cd "$D" && "$BIN" usages case29.hbp Deposita > out.log 2>&1 )
+( cd "$D" && "$BIN" usages case29.hbp Deposita --json > out.log 2>&1 )
 RC=$?
 check "usages exit 0 (project compiles)" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "method definition Deposita (class Conta)" "$D/out.log"
+"$TCHECK" envrow "$D/out.log" locations "kind=method definition;owner=Conta"
 check "method definition lifted to source vocabulary (B4)" $?
-( cd "$D" && "$BIN" rename case29.hbp c.prg:14:10 nCalc > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename case29.hbp c.prg:14:10 nCalc --json > ren.log 2>&1 )
 RC=$?
 check "rename-local by method name"  $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "verified: all 3 module" "$D/ren.log"
+"$TCHECK" enveq "$D/ren.log" verdict applied
 check "3 modules verified"           $?
-( cd "$D" && "$BIN" rename case29.hbp b.prg:5:10 Dobrar > hbx.log 2>&1 )
+( cd "$D" && "$BIN" rename case29.hbp b.prg:5:10 Dobrar --json > hbx.log 2>&1 )
 RC=$?
 check "hbx via \${hb_name} refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "DYNAMIC DUPLA in the export (.hbx)" "$D/hbx.log"
+"$TCHECK" envhas "$D/hbx.log" diagnostics "DYNAMIC DUPLA in the export (.hbx)"
 check "hbx warning proves macro expansion" $?
 
 }
@@ -729,17 +733,18 @@ unit_30() {
 echo "case 30: broken build is reported, never silent"
 D=$(fresh case30)
 printf '\nFUNCTION Quebrada()\n\n   RETURN NaoFecha(\n' >> "$D/b.prg"
-( cd "$D" && "$BIN" call-graph fix01.hbp > out.log 2>&1 )
+( cd "$D" && "$BIN" call-graph fix01.hbp --json > out.log 2>&1 )
 RC=$?
 check "call-graph exit != 0"       $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "does not compile" "$D/out.log"
+"$TCHECK" envhas "$D/out.log" detail "does not compile"
 check "refusal names the failure"  $?
-grep -q " Error E" "$D/out.log"
+# o erro do compilador é DADO no envelope (diagnostics), nao texto cru no stderr
+"$TCHECK" envhas "$D/out.log" diagnostics " Error E"
 check "compiler error line shown"  $?
-( cd "$D" && "$BIN" usages fix01.hbp Dupla > usages.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > usages.log 2>&1 )
 RC=$?
 check "usages exit != 0"           $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q " Error E" "$D/usages.log"
+"$TCHECK" envhas "$D/usages.log" diagnostics " Error E"
 check "usages surfaces the error"  $?
 
 }
