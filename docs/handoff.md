@@ -24,31 +24,51 @@ renderizador humano — a prosa (`Prose()`) é arrasto e VAI SER DELETADA. A fla
 some (vira sempre-envelope). `Usage()`/ajuda continua texto puro. *"não importa o tamanho
 das alterações que isso implique."*
 
-**O ESTADO DO CÓDIGO — trabalho GRANDE em andamento, NÃO committado.** `make test` **1034/0**,
-`make ppcorpus` **121/0**, árvore verde. Working tree sujo (o commit `85f2f69` do P17 é o
-último committado; TUDO da A.1 está por commitar):
-- `src/hbrefactor.prg` — o envelope (`EnvHash`/`Ok`/`Refuse`/`Diag`), a flag `--json`
-  global (`TakeJsonFlag`), o canal humano `Prose()` (andaime), o gate de saída única, e o
-  **contrato dos 8 comandos de leitura** — com o **`usages` COMPLETO** (kind/owner/
-  certainty/text em cada location; o flagrante do `Class:Method` está MORTO).
-- `tests/` — `casedir.sh` (formato declarativo), `regua-json.sh` (placar), `regua-canais.sh`,
-  `tcheck.prg` (JLoad desembrulha o envelope), casos 130/131/132, e os 17 sítios de
-  `--json <arquivo>` migrados para `--json > arquivo`.
-- `docs/` — o plano, a spec-a §2.5, a fase A.1 e a fase T no roadmap.
+**O ESTADO DO CÓDIGO — PASSO 1 COMPLETO, NÃO committado.** `make test` **1046/0**,
+`make ppcorpus` **121/0**, `site-check` verde. Working tree sujo (o commit `da3260c` do passo 1
+de leitura é o último committado; o passo 1 dos VERBOS DE EDIÇÃO está por commitar):
+- `src/hbrefactor.prg` — TODOS os 14 comandos no contrato. Novo desde `da3260c`: os 6 verbos
+  de edição. `Ok()` ganhou o 4º arg `aEdits`. Helpers novos: `FileUri`, `LspLoc`, `LspEdit`,
+  `LspEditML`, `WholeDocEdit`, `WorkFromToken`, `WorkFromRange`, `SortWork`, `EditsToLocations`,
+  `ScopeField`, `RenameResult`, `ReorderResult`, `InlineResult`, `ExtractResult`. `SayScope`/
+  `WarnDynLines` calam sob `--json` (viram campo/diagnostic). **O DESENHO está no plano § Passo 1
+  — leia lá, não re-derive.**
+- `tests/` — placar `regua-json.sh` **VAZIO** (14/14); caso 132 reproposto (era o demo do
+  fallback com exec-registry; virou `132-exec-registry-envelope` porque o fallback ficou
+  inalcançável — todos migraram; a propriedade "nenhum comando calado" é agora garantida pela
+  régua-json sobre os 14); casos NOVOS 133-136 (rename dry-run/aplicado, inline, extract);
+  `run.sh` `ALL_UNITS` += 133 134 135 136.
+- `docs/` — plano § Passo 1 (o desenho), roadmap (A.1 passo 1 completo), este handoff.
 
-**A PRÓXIMA sessão começa no PASSO 1 do plano, item ⬜: os verbos de edição.** Modelar
-`edits[]` + veredito de `rename` (e a família), `extract-function`, `inline-local`,
-`reorder-params`, `annotate`, `exec-registry`. Depois: migrar os ~600 asserts (passo 2),
-arrancar prosa+flag (passo 3), extensão (passo 4), landing page (passo 5).
+**A PRÓXIMA sessão começa no PASSO 2 do plano: migrar os ~600 asserts de prosa para o
+ENVELOPE**, comando a comando (o `JLoad` do `tcheck.prg` já desembrulha; casos novos nascem
+no formato declarativo `casedir.sh`). Depois: passo 3 (arrancar `Prose()`/`--json`/o gate de
+`no-machine-contract-yet`/`s_lJson`), passo 4 (extensão: os 4 regexes de prosa → `reason`/
+`action`/`verdict` campos — os códigos `textual-refs-require-force`+`ACT_RETRY` JÁ estão nas
+recusas de `--force`), passo 5 (landing page).
+
+**DÍVIDA CONHECIDA (não bloqueia):** (a) a migração dos ~300 códigos de recusa restantes (hoje
+`unclassified`) é passo 2; só as recusas load-bearing de `--force` ganharam código. (b) `IsJson()`
+virou função morta (W0034; não escala com `-es2`) — apagar num passo de limpeza. (c) o comando
+`describe --json` (manifesto de capacidades, critério de pronto da fase) ainda NÃO existe — item
+próprio, não é passo 1.
 
 **DECISÃO DO DIEGO PENDENTE (passo 5):** a landing page/manual mostram transcrição do CLI
 (prosa). Sem prosa, ou a página mostra a experiência da IDE, ou aceita blocos de JSON. Ele
 autorizou refazer a página ("refaça a landing page se preciso") — mas a FORMA (IDE × JSON)
 é escolha dele.
 
-**Antes de commitar:** o commit deste incremento (contrato do usages + 8 comandos + réguas)
-foi OFERECIDO ao Diego e ele pediu "crie o plano e handoff" — ou seja, **o commit ainda não
-foi autorizado**. Confirmar com ele.
+**DRIFT a sinalizar no commit (§3):** o caso 132 foi **reproposto** (renomeado de
+`132-json-nunca-silencioso` para `132-exec-registry-envelope`). Era o demo do portão
+`no-machine-contract-yet` via exec-registry; como exec-registry migrou, o fallback ficou
+inalcançável por comando real e o demo perdeu o objeto. A propriedade que ele guardava
+("nenhum comando calado") é agora garantida de forma abrangente pela **régua-json** (roda os
+14). É a única alteração de expectativa de teste pré-existente — nasceu na mesma fase A.1
+(commit `da3260c`) e sua obsolescência era antecipada pelo plano (o exec-registry estava no
+placar PENDENTES de propósito).
+
+**Antes de commitar:** commit do passo-1-verbos-de-edição **ainda não autorizado** — pedir ao
+Diego (portão por-commit).
 
 ---
 

@@ -27,7 +27,8 @@ CMDS=$( "$BIN" 2>&1 | sed -n 's/^  hbrefactor \([a-z-]*\) .*/\1/p' | sort -u )
 # PLACAR da migração (A.1): comandos que AINDA não modelam o próprio fato.
 # Encolhe a cada verbo migrado; quando esvaziar, a régua exige contrato de TODOS.
 # Deixar isto EXPLÍCITO é melhor que a régua passar calada sobre o que falta.
-PENDENTES=" annotate exec-registry "
+# VAZIO (passo 1 completo): os 14 comandos - leitura E edição - modelam o fato.
+PENDENTES=" "
 
 falhas=0
 for c in $CMDS; do

@@ -1,0 +1,44 @@
+{
+  "schema": "cli-1",
+  "command": "exec-registry",
+  "status": "ok",
+  "reason": null,
+  "action": null,
+  "detail": "live table snapshot recorded (0 class(es) revealed); the snapshot SUGGESTS, -kt enforces",
+  "diagnostics": [],
+  "result":
+  {
+    "verdict": "recorded",
+    "snapshotPath": "app.astr.json",
+    "summary":
+    {
+      "run": 0,
+      "failed": 0,
+      "classesRevealed": 0,
+      "startup": 0,
+      "vm": 1,
+      "outside": 0
+    },
+    "snapshot":
+    {
+      "schema": "rtr-1",
+      "stamp": "",
+      "project": "app.hbp",
+      "baseline":
+      [
+        "ERROR"
+      ],
+      "vm":
+      [
+        "ERROR"
+      ],
+      "classes": [],
+      "ran": [],
+      "failed": [],
+      "skipped": [],
+      "aborted": ""
+    }
+  },
+  "edits": []
+}
+

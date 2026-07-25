@@ -4617,16 +4617,18 @@ run_casedir "$HERE/cases/131-zero-nao-e-recusa"
 }
 
 unit_132() {
-# A.1 - o PORTÃO do contrato de máquina. Eu introduzi o bug e ele passou pela
-# suíte: ao separar o canal humano (Prose), os comandos ainda NÃO migrados
-# passaram a sair VAZIOS sob --json, com exit 0 - silêncio indistinguível de
-# sucesso, que é o pior modo de falha que esta ferramenta pode ter. O portão
-# vive no ponto ÚNICO de saída, então comando futuro nenhum escapa dele.
-run_casedir "$HERE/cases/132-json-nunca-silencioso"
+# A.1 - exec-registry no CONTRATO: o retrato da tabela viva (schema rtr-1) sai
+# como envelope, aninhado no result, com o resumo estruturado. Foi o ÚLTIMO
+# comando a migrar (com o annotate) - a prova de que a fase alcança TODOS os 14,
+# leitura E edição. O snapshot SUGERE; o -kt é quem impõe (o limite fica no
+# detail, não vira veredito). Ele fecha o placar PENDENTES da régua-json.
+run_casedir "$HERE/cases/132-exec-registry-envelope"
 
 # régua: nenhum comando pode sair calado sob --json. Roda TODOS os comandos que
-# o binário expõe e reprova o que devolver stdout vazio.
-bash "$HERE/regua-json.sh" "$BIN" "$HERE/cases/132-json-nunca-silencioso/before" > "$HERE/tmp/regua-json.log" 2>&1
+# o binário expõe e reprova o que devolver stdout vazio OU cair no fallback
+# `no-machine-contract-yet` (o placar de PENDENTES está VAZIO: os 14 modelam o
+# fato). É este portão que garante a propriedade para comando futuro nenhum.
+bash "$HERE/regua-json.sh" "$BIN" "$HERE/cases/132-exec-registry-envelope/before" > "$HERE/tmp/regua-json.log" 2>&1
 check "régua: NENHUM comando sai calado sob --json" $?
 [ -s "$HERE/tmp/regua-json.log" ] && cat "$HERE/tmp/regua-json.log"
 
@@ -4637,6 +4639,37 @@ bash "$HERE/regua-canais.sh" "$BIN" "$HERE/cases/130-envelope-usages/before" \
      usages app.hbp Dobro > "$HERE/tmp/regua-canais.log" 2>&1
 check "régua: a prosa não mostra fato que o JSON não tem" $?
 [ -s "$HERE/tmp/regua-canais.log" ] && cat "$HERE/tmp/regua-canais.log"
+}
+
+unit_133() {
+# A.1 - os VERBOS DE EDIÇÃO no contrato. rename (dry-run): o WorkspaceEdit LSP
+# em edits[] ({uri,range,newText}), verdict "preview", e as locations no result
+# (o dado é superconjunto da prosa). O --dry-run NÃO escreve: o fonte volta
+# byte a byte (o caso não tem after/).
+run_casedir "$HERE/cases/133-envelope-rename-dryrun"
+}
+
+unit_134() {
+# A.1 - rename APLICADO: verdict "applied", proof "pcode-identical" (a força da
+# verificação vira campo), edits[] VAZIO (a spec: edits só sob --dry-run) e o
+# after/ prova o fonte editado. A mesma frase do humano fica no `detail`.
+run_casedir "$HERE/cases/134-envelope-rename-applied"
+}
+
+unit_135() {
+# A.1 - inline-local (dry-run): a representação de SPAN. edits[] = as
+# substituições da expressão MAIS a remoção da linha da declaração (deleção de
+# linha inteira, com o colapso da linha em branco órfã) - o preview reproduz a
+# forma que a apply produziria.
+run_casedir "$HERE/cases/135-envelope-inline-dryrun"
+}
+
+unit_136() {
+# A.1 - extract-function (dry-run): a cirurgia por linhas vira UM edit de
+# documento inteiro (o texto final reestruturado), honesto e aplicável. O
+# result carrega target/newName/params/returns/movedLocals - tudo que a prosa
+# computava.
+run_casedir "$HERE/cases/136-envelope-extract-dryrun"
 }
 
 unit_128() {
@@ -4668,7 +4701,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

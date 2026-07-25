@@ -1,0 +1,1 @@
+extract-function app.hbp app.prg 7-7 Soma --dry-run

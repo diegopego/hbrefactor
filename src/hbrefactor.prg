@@ -2529,13 +2529,10 @@ STATIC FUNCTION LocationsJson( aLoc )
    LOCAL aOut := {}, aL
 
    // aL[1] pode ser relativo (spec relativo, como no run.sh) OU absoluto
-   // (spec absoluto, como a extensão VSCode sempre passa): hb_PathJoin
-   // devolve o segundo argumento intacto quando já é absoluto - hb_FNameMerge
-   // concatenava e DUPLICAVA o prefixo (URI file:// inválido no editor)
+   // (spec absoluto, como a extensão VSCode sempre passa): FileUri normaliza
    FOR EACH aL IN aLoc
       AAdd( aOut, { ;
-         "uri" => "file://" + hb_PathNormalize( hb_PathJoin( ;
-                     hb_DirSepAdd( hb_cwd() ), aL[ 1 ] ) ), ;
+         "uri" => FileUri( aL[ 1 ] ), ;
          "range" => { ;
             "start" => { "line" => aL[ 2 ] - 1, "character" => aL[ 3 ] }, ;
             "end"   => { "line" => aL[ 2 ] - 1, "character" => aL[ 3 ] + aL[ 4 ] } }, ;
@@ -2546,6 +2543,199 @@ STATIC FUNCTION LocationsJson( aLoc )
    NEXT
 
    RETURN aOut
+
+// o URI file:// ABSOLUTO do formato LSP. aL[1]/cPath pode ser relativo (spec
+// do run.sh) OU absoluto (a extensão VSCode sempre passa assim): hb_PathJoin
+// devolve o segundo argumento intacto quando já é absoluto - hb_FNameMerge
+// concatenava e DUPLICAVA o prefixo (URI inválido no editor)
+STATIC FUNCTION FileUri( cPath )
+   RETURN "file://" + hb_PathNormalize( hb_PathJoin( hb_DirSepAdd( hb_cwd() ), cPath ) )
+
+// ---------------------------------------------------------------------------
+// A.1 - edits[]: o WorkspaceEdit LSP { uri, range, newText } que os verbos de
+// edição emitem SOB --dry-run (a spec §2.2: "o que a ferramenta FARIA"). O
+// mesmo dado serve os dois consumidores - preview nativo na extensão, e o que
+// eu mostro ao humano antes de aplicar. As locations do result (sempre, mesmo
+// aplicado) saem daqui por EditsToLocations - o dado é superconjunto da prosa.
+// ---------------------------------------------------------------------------
+
+// uma location LSP { uri, range } para um diagnostic (coluna CLI 1-based)
+STATIC FUNCTION LspLoc( cPath, nLine1, nCol1, nLen )
+
+   LOCAL nC0 := nCol1 - 1
+
+   RETURN { ;
+      "uri"   => FileUri( cPath ), ;
+      "range" => { ;
+         "start" => { "line" => nLine1 - 1, "character" => nC0 }, ;
+         "end"   => { "line" => nLine1 - 1, ;
+                      "character" => nC0 + hb_defaultValue( nLen, 0 ) } } }
+
+// uma edição LSP numa única linha: coluna 0-based, comprimento do texto velho
+STATIC FUNCTION LspEdit( cPath, nLine1, nCol0, nLenOld, cNewText )
+   RETURN { ;
+      "uri"   => FileUri( cPath ), ;
+      "range" => { ;
+         "start" => { "line" => nLine1 - 1, "character" => nCol0 }, ;
+         "end"   => { "line" => nLine1 - 1, "character" => nCol0 + nLenOld } }, ;
+      "newText" => cNewText }
+
+// uma edição LSP que substitui o DOCUMENTO inteiro. Para o extract-function,
+// que reestrutura o arquivo (move linhas, anexa a função nova, insere o
+// protótipo do método), o WorkspaceEdit honesto é o texto final inteiro - um
+// diff mínimo seria mais código para o mesmo resultado aplicável
+STATIC FUNCTION WholeDocEdit( cPath, cOld, cNewText )
+
+   LOCAL nLines := 0, nI, nLastNl := 0
+
+   FOR nI := 1 TO hb_BLen( cOld )
+      IF hb_BSubStr( cOld, nI, 1 ) == Chr( 10 )
+         nLines++
+         nLastNl := nI
+      ENDIF
+   NEXT
+
+   RETURN LspEditML( cPath, 1, 0, nLines + 1, hb_BLen( cOld ) - nLastNl, cNewText )
+
+// uma edição LSP que cruza linhas (extract-function: troca de faixa, inserção)
+STATIC FUNCTION LspEditML( cPath, nSLine1, nSChar, nELine1, nEChar, cNewText )
+   RETURN { ;
+      "uri"   => FileUri( cPath ), ;
+      "range" => { ;
+         "start" => { "line" => nSLine1 - 1, "character" => nSChar }, ;
+         "end"   => { "line" => nELine1 - 1, "character" => nEChar } }, ;
+      "newText" => cNewText }
+
+// edições de TOKEN (troca uniforme cOld->cNew): hEdits = hash path -> array de
+// { linha 1b, col 1b }. Para verbo single-file passe { cSrcPath => aEdits }.
+STATIC FUNCTION WorkFromToken( hEdits, nLenOld, cNew )
+
+   LOCAL aOut := {}, cPath, aHit
+
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      FOR EACH aHit IN hEdits[ cPath ]
+         AAdd( aOut, LspEdit( cPath, aHit[ 1 ], aHit[ 2 ] - 1, nLenOld, cNew ) )
+      NEXT
+   NEXT
+
+   RETURN SortWork( aOut )
+
+// edições de SPAN (por tupla): hEdits = hash path -> array de
+// { linha 1b, col 1b, textoAntigo, textoNovo }
+STATIC FUNCTION WorkFromRange( hEdits )
+
+   LOCAL aOut := {}, cPath, aHit
+
+   FOR EACH cPath IN hb_HKeys( hEdits )
+      FOR EACH aHit IN hEdits[ cPath ]
+         AAdd( aOut, LspEdit( cPath, aHit[ 1 ], aHit[ 2 ] - 1, ;
+                              hb_BLen( aHit[ 3 ] ), aHit[ 4 ] ) )
+      NEXT
+   NEXT
+
+   RETURN SortWork( aOut )
+
+// ordem determinística do WorkspaceEdit: por (uri, linha, coluna). O `out` do
+// caso declarativo é byte a byte, e a ordem de iteração de um hash não é contrato
+STATIC FUNCTION SortWork( aWork )
+   RETURN ASort( aWork,,, {| x, y | ;
+      iif( x[ "uri" ] == y[ "uri" ], ;
+           iif( x[ "range" ][ "start" ][ "line" ] == y[ "range" ][ "start" ][ "line" ], ;
+                x[ "range" ][ "start" ][ "character" ] < y[ "range" ][ "start" ][ "character" ], ;
+                x[ "range" ][ "start" ][ "line" ] < y[ "range" ][ "start" ][ "line" ] ), ;
+           x[ "uri" ] < y[ "uri" ] ) } )
+
+// as locations do result (sempre presentes): o WorkspaceEdit sem o newText -
+// "onde eu toquei", que espelha os sítios que a prosa listava
+STATIC FUNCTION EditsToLocations( aWork )
+
+   LOCAL aOut := {}, h
+
+   FOR EACH h IN aWork
+      AAdd( aOut, { "uri" => h[ "uri" ], "range" => h[ "range" ] } )
+   NEXT
+
+   RETURN aOut
+
+// P17 como CAMPO: scope = { complete, unseen[] }. `complete: true` sai
+// explícito quando não há região pulada (a spec §2.5.3: incerteza é campo
+// POSITIVO, jamais ausência - senão o agente lê todo rename como completo)
+STATIC FUNCTION ScopeField( hAsts, hProj, cUpName )
+
+   LOCAL aUnseen := {}, aItem
+
+   FOR EACH aItem IN SkippedNameHits( hAsts, hProj, cUpName )
+      AAdd( aUnseen, { "file" => hb_FNameNameExt( aItem[ 1 ] ), ;
+                       "line" => aItem[ 2 ], "cond" => aItem[ 3 ] } )
+   NEXT
+
+   RETURN { "complete" => Empty( aUnseen ), "unseen" => aUnseen }
+
+// o result comum dos verbos de RENAME. cVerdict = "applied" | "preview";
+// cProof = a força da verificação quando aplicado (NIL/null sob --dry-run,
+// onde nada foi compilado); hScope = ScopeField(...) só nos verbos com
+// alcance condicional (o rename de local não tem: um homônimo em ramo pulado
+// é outra variável, não o mesmo símbolo)
+STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope )
+
+   LOCAL hRes := { ;
+      "verdict"   => cVerdict, ;
+      "kind"      => cKind, ;
+      "old"       => cOld, ;
+      "new"       => cNew, ;
+      "editCount" => Len( aWork ), ;
+      "proof"     => cProof, ;
+      "locations" => EditsToLocations( aWork ) }
+
+   IF hScope != NIL
+      hRes[ "scope" ] := hScope
+   ENDIF
+
+   RETURN hRes
+
+// o result do reorder-params. Não é rename: o pcode muda LEGITIMAMENTE (ordem
+// de push), então a prova é `symbols-preserved` (símbolos + conjunto de
+// funções intactos), nunca byte-identidade
+STATIC FUNCTION ReorderResult( cVerdict, cFunc, aOld, aNew, nSites, aWork, cProof )
+   RETURN { ;
+      "verdict"   => cVerdict, ;
+      "function"  => cFunc, ;
+      "oldOrder"  => aOld, ;
+      "newOrder"  => aNew, ;
+      "siteCount" => nSites, ;
+      "proof"     => cProof, ;
+      "locations" => EditsToLocations( aWork ) }
+
+// o result do inline-local. Também `symbols-preserved` (a expressão é
+// duplicada, o pcode muda), com a linha da declaração que foi removida
+STATIC FUNCTION InlineResult( cVerdict, cName, cExpr, cFunc, nUses, nDeclLine, aWork, cProof )
+   RETURN { ;
+      "verdict"     => cVerdict, ;
+      "name"        => cName, ;
+      "expr"        => cExpr, ;
+      "function"    => cFunc, ;
+      "useCount"    => nUses, ;
+      "declRemoved" => nDeclLine, ;
+      "proof"       => cProof, ;
+      "locations"   => EditsToLocations( aWork ) }
+
+// o result do extract-function. O pcode muda (função nova), então a prova é
+// `symbols-preserved` (símbolos preservados + a função/mensagem nova)
+STATIC FUNCTION ExtractResult( cVerdict, cTarget, cNewName, lMethod, cClass, ;
+                               nFirst, nLast, aParams, cRet, aMovedJson, aWork, cProof )
+   RETURN { ;
+      "verdict"     => cVerdict, ;
+      "target"      => cTarget, ;
+      "newName"     => cNewName, ;
+      "isMethod"    => lMethod, ;
+      "class"       => cClass, ;      // NIL/null quando função livre
+      "firstLine"   => nFirst, ;
+      "lastLine"    => nLast, ;
+      "params"      => aParams, ;
+      "returns"     => cRet, ;        // NIL/null quando não retorna valor
+      "movedLocals" => aMovedJson, ;
+      "proof"       => cProof, ;
+      "locations"   => EditsToLocations( aWork ) }
 
 // ---------------------------------------------------------------------------
 // utilidades
@@ -2632,10 +2822,10 @@ STATIC FUNCTION Envelope( cStatus, cReason, cAction, cDetail, hResult, aEdits )
 
 // sucesso com resultado estruturado. `cDetail` é a MESMA frase que o humano
 // veria - ela existe para o consumidor MOSTRAR, nunca para decidir
-STATIC FUNCTION Ok( cDetail, hResult, nExit )
+STATIC FUNCTION Ok( cDetail, hResult, nExit, aEdits )
 
    IF s_lJson
-      OutStd( Envelope( "ok", NIL, NIL, cDetail, hResult, NIL ) + hb_eol() )
+      OutStd( Envelope( "ok", NIL, NIL, cDetail, hResult, aEdits ) + hb_eol() )
       s_lEmitted := .T.
    ENDIF
 
@@ -2687,6 +2877,7 @@ STATIC FUNCTION RenameLocal( aArgs )
    LOCAL hDecl := NIL, aEdits := {}, nSpanEnd := 0, nI
    LOCAL cText, cUpOld, cUpNew, aPrev, cPrevType, nLine, aIdent
    LOCAL aDisc   // P4/P5: ocorrências que a diretiva descarta (relato honesto)
+   LOCAL aWork, cKind
 
    IF Len( aArgs ) < 6
       Usage()
@@ -2836,6 +3027,9 @@ STATIC FUNCTION RenameLocal( aArgs )
       RETURN Refuse( "no editable site found" )
    ENDIF
 
+   cKind := iif( lParamOnly, "param", "local" )
+   aWork := WorkFromToken( { cSrcPath => aEdits }, hb_BLen( cOld ), cNew )
+
    Prose( aArgs[ 1 ] + ": " + cOld + " -> " + cNew + " in " + ;
            iif( ":" $ cFunc .OR. Upper( cFunc ) == Upper( hFunc[ "name" ] ), cFunc, cFunc ) + ;
            " (" + hb_FNameNameExt( cSrcPath ) + ")" + hb_eol() )
@@ -2846,17 +3040,22 @@ STATIC FUNCTION RenameLocal( aArgs )
    // P4/P5 - relato honesto: ocorrências que uma DIRETIVA consome e DESCARTA
    // (marker `logical`/`nul`, ou casado e não usado no result) não chegam ao
    // compilador; nenhum fato as liga ao símbolo, então NÃO são renomeadas -
-   // mas o usuário precisa saber que o fonte ficou com o nome velho ali
+   // mas o usuário precisa saber que o fonte ficou com o nome velho ali.
+   // Sob --json é diagnostics[], não prosa no stderr (Diag reparte o canal)
    aDisc := DiscardedFills( hAst, cUpOld, aEdits )
    FOR nI := 1 TO Len( aDisc )
-      OutErr( "warning: " + hb_FNameNameExt( cSrcPath ) + ":" + ;
-              hb_ntos( aDisc[ nI ][ 1 ] ) + ":" + hb_ntos( aDisc[ nI ][ 2 ] ) + ": '" + cOld + ;
-              "' is consumed and DISCARDED by the directive (" + aDisc[ nI ][ 3 ] + ") - " + ;
-              "never reaches the compiler; NOT renamed" + hb_eol() )
+      Diag( "occurrence-discarded-by-directive", ;
+            hb_FNameNameExt( cSrcPath ) + ":" + ;
+            hb_ntos( aDisc[ nI ][ 1 ] ) + ":" + hb_ntos( aDisc[ nI ][ 2 ] ) + ": '" + cOld + ;
+            "' is consumed and DISCARDED by the directive (" + aDisc[ nI ][ 3 ] + ") - " + ;
+            "never reaches the compiler; NOT renamed", ;
+            LspLoc( cSrcPath, aDisc[ nI ][ 1 ], aDisc[ nI ][ 2 ], hb_BLen( cOld ) ) )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, NIL ), , aWork )
    ENDIF
 
    // estado "antes" para a verificação byte-idêntica
@@ -2886,7 +3085,9 @@ STATIC FUNCTION RenameLocal( aArgs )
    Prose( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + ;
            " module(s) byte-identical (-gh -l)" + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + ;
+              " module(s) byte-identical (-gh -l)", ;
+              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", NIL ) )
 
 // aplica edições { linha, col 1-based } trocando cOld->cNew; devolve o texto
 // novo; nLineBad > 0 quando o texto no site não confere (sanidade: a coluna
@@ -3473,7 +3674,7 @@ STATIC FUNCTION RenameStatic( aArgs )
    LOCAL cSpec, cFile, cOld, cNew, cFuncFilter := "", lDryRun := .F.
    LOCAL hProj, cTmp, cSrcPath, hAst, hFunc, hItem, hTok, aPrev, cPrevType
    LOCAL hOwner := NIL, lFileWide := .F., aEdits := {}, nI, cText, nLine
-   LOCAL cUpOld, cUpNew, hRule
+   LOCAL cUpOld, cUpNew, hRule, aWork, hScope, cKind
 
    IF Len( aArgs ) < 5
       Usage()
@@ -3585,10 +3786,14 @@ STATIC FUNCTION RenameStatic( aArgs )
       RETURN Refuse( "no editable site found" )
    ENDIF
 
+   cKind := "static"
+   aWork := WorkFromToken( { cSrcPath => aEdits }, hb_BLen( cOld ), cNew )
+   // P17: um STATIC é local ao ARQUIVO - o alcance a declarar é o dele
+   hScope := ScopeField( { cSrcPath => hAst }, { "files" => { cSrcPath } }, cUpOld )
+
    Prose( "rename-static: " + cOld + " -> " + cNew + ;
            iif( lFileWide, " (file-wide)", " in " + hOwner[ "name" ] ) + ;
            " (" + hb_FNameNameExt( cSrcPath ) + ")" + hb_eol() )
-   // P17: um STATIC é local ao ARQUIVO - o alcance a declarar é o dele
    SayScope( { cSrcPath => hAst }, { "files" => { cSrcPath } }, cUpOld, cOld )
    FOR nI := 1 TO Len( aEdits )
       Prose( "  " + hb_FNameNameExt( cSrcPath ) + ":" + hb_ntos( aEdits[ nI ][ 1 ] ) + ;
@@ -3596,7 +3801,9 @@ STATIC FUNCTION RenameStatic( aArgs )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
@@ -3622,7 +3829,9 @@ STATIC FUNCTION RenameStatic( aArgs )
    Prose( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + ;
            " module(s) byte-identical (-gh -l)" + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + ;
+              " module(s) byte-identical (-gh -l)", ;
+              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", hScope ) )
 
 STATIC FUNCTION InFuncSpan( hAst, hFunc, nLine )
 
@@ -3652,6 +3861,7 @@ STATIC FUNCTION RenameFunction( aArgs )
    LOCAL cUpOld, cUpNew, cText, hOrig := { => }, nLine, nTotal := 0, aHit
    LOCAL lEditRules := .F., aRuleSeen := {}, aRuleSites := {}, aSite
    LOCAL hRule, hTok, cSide, cKey, cChPath, cCwd, cSiteDesc
+   LOCAL aWork, hScope, cKind
 
    IF Len( aArgs ) < 4
       Usage()
@@ -3903,11 +4113,16 @@ STATIC FUNCTION RenameFunction( aArgs )
    ENDIF
 
    FOR nI := 1 TO Len( aWarn )
-      OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
+      Diag( "textual-reference", aWarn[ nI ], NIL )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "textual references found (see warnings) - repeat with --force to proceed without touching them" )
+      RETURN Refuse( "textual references found (see warnings) - repeat with --force to proceed without touching them", ;
+                     "textual-refs-require-force", ACT_RETRY )
    ENDIF
+
+   cKind := "function"
+   aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
+   hScope := ScopeField( hAsts, hProj, cUpOld )
 
    Prose( "rename-function: " + cOld + " -> " + cNew + ;
            iif( lStatic, " (static, only " + hb_FNameNameExt( cDefFile ) + ")", "" ) + hb_eol() )
@@ -3922,7 +4137,9 @@ STATIC FUNCTION RenameFunction( aArgs )
       // de mexer. Sem isto o aviso só apareceria depois da edição feita.
       SayScope( hAsts, hProj, cUpOld, cOld )
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
@@ -3954,7 +4171,9 @@ STATIC FUNCTION RenameFunction( aArgs )
    SayScope( hAsts, hProj, cUpOld, cOld )       // P17: o ALCANCE da prova
    Prose( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed as expected, pcode byte-identical" + ScopeTag( hAsts, hProj, cUpOld ) + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed " + ;
+              "as expected, pcode byte-identical", ;
+              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", hScope ) )
 
 STATIC PROCEDURE DedupHits( aE )
 
@@ -4094,6 +4313,7 @@ STATIC FUNCTION ExtractFunction( aArgs )
    LOCAL cGenNew := "", cUpGenNew := "", nAnchor := 0, aParentsUnk := {}
    LOCAL hClassMap, aChainQ, hChainSeen, aPP, cUpCur, hMembers, aCF, cPar
    LOCAL hOcc, hFrom, aRangeM, hAst2, hFn2, hIt2, cProtoLine
+   LOCAL aWork, aMovedJson := {}
 
    IF Len( aArgs ) < 5
       Usage()
@@ -4563,22 +4783,23 @@ STATIC FUNCTION ExtractFunction( aArgs )
       Prose( "  METHOD prototype " + cNewName + " inserted after line " + hb_ntos( nAnchor ) + ;
               " (next to the prototype of the source method)" + hb_eol() )
       FOR EACH cPar IN aParentsUnk
-         Prose( "  warning: parent " + cPar + " outside the project - inherited members not verifiable" + hb_eol() )
+         IF s_lJson
+            Diag( "parent-outside-project", "parent " + cPar + " outside the project - " + ;
+                  "inherited members not verifiable", NIL )
+         ELSE
+            Prose( "  warning: parent " + cPar + " outside the project - inherited members not verifiable" + hb_eol() )
+         ENDIF
       NEXT
    ENDIF
    FOR nI := 1 TO Len( aMoved )
       Prose( "  LOCAL " + aMoved[ nI ][ 3 ] + " (line " + hb_ntos( aMoved[ nI ][ 1 ] ) + ;
               ") is used only in the selection - moves to " + cNewName + hb_eol() )
+      AAdd( aMovedJson, { "name" => aMoved[ nI ][ 3 ], "line" => aMoved[ nI ][ 1 ] } )
    NEXT
-   IF lDryRun
-      Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
-   ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
-      RETURN Refuse( "failed to compile the reference state" )
-   ENDIF
-
+   // o texto final é PURO (sem compilar, sem escrever): computa-se aqui para o
+   // edits[] do --dry-run poder mostrar a forma resultante. A escrita e a
+   // verificação só acontecem no caminho aplicado, abaixo
    cTextNew := ReplaceLines( cText, nFirst, nLast, cCall, cEol ) + cNewFunc
    // migra as declarações das locais só-da-seleção (de baixo para cima:
    // linha removida desloca as de baixo; todas estão antes de nFirst)
@@ -4593,6 +4814,20 @@ STATIC FUNCTION ExtractFunction( aArgs )
                     "METHOD " + cNewName + ;
                     iif( Empty( aParams ), "()", "( " + ArrJoin( aParams, ", " ) + " )" )
       cTextNew := InsertLineAfter( cTextNew, nAnchor, cProtoLine, cEol )
+   ENDIF
+   aWork := { WholeDocEdit( cSrcPath, cText, cTextNew ) }
+
+   IF lDryRun
+      Prose( "dry run - nothing was written" + hb_eol() )
+      RETURN Ok( "dry run - nothing was written; the file would be restructured", ;
+                 ExtractResult( "preview", hTarget[ "name" ], cNewName, lMethod, ;
+                                iif( lMethod, cClassReal, NIL ), nFirst, nLast, aParams, ;
+                                iif( Empty( cOut ), NIL, cOut ), aMovedJson, aWork, NIL ), ;
+                 , aWork )
+   ENDIF
+
+   IF ! CompileHrbAll( hProj, cTmp, "before" )
+      RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    hb_MemoWrit( cSrcPath, cTextNew )
 
@@ -4626,11 +4861,16 @@ STATIC FUNCTION ExtractFunction( aArgs )
       ENDIF
    NEXT
 
-   Prose( "verified: symbols preserved (+" + ;
+   cWhy := "verified: symbols preserved (+" + ;
            iif( lMethod, cGenNew + "), message " + cNewName + " registered", cNewName + ")" ) + ;
-           "; run your test suite to confirm behaviour" + hb_eol() )
+           "; run your test suite to confirm behaviour"
+   Prose( cWhy + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( cWhy, ;
+              ExtractResult( "applied", hTarget[ "name" ], cNewName, lMethod, ;
+                             iif( lMethod, cClassReal, NIL ), nFirst, nLast, aParams, ;
+                             iif( Empty( cOut ), NIL, cOut ), aMovedJson, aWork, ;
+                             "symbols-preserved" ) )
 
 // pares { kind, linhaOpen, linhaClose } dos eventos de bloco do compilador
 // (pilha na ordem de parse; open/close da mesma kind casam por construção)
@@ -5322,8 +5562,15 @@ STATIC FUNCTION SkippedNameHits( hAsts, hProj, cUpName )
 // só, o caso da diretiva (outro verbo, outro "verified:") passava batido.
 STATIC PROCEDURE SayScope( hAsts, hProj, cUpName, cOld )
 
-   LOCAL aHits := SkippedNameHits( hAsts, hProj, cUpName )
-   LOCAL aItem, cWhy
+   LOCAL aHits, aItem, cWhy
+
+   // sob o contrato de máquina o alcance é `result.scope` (ScopeField), não
+   // prosa no stderr: aqui é o canal humano, cala como o Prose (a régua da P17)
+   IF s_lJson
+      RETURN
+   ENDIF
+
+   aHits := SkippedNameHits( hAsts, hProj, cUpName )
 
    FOR EACH aItem IN aHits
       cWhy := hb_FNameNameExt( aItem[ 1 ] ) + ":" + hb_ntos( aItem[ 2 ] ) + ;
@@ -5380,10 +5627,21 @@ STATIC PROCEDURE WarnDynLines( hAst, nFromLine )
       FOR EACH nLine IN aSites
          cList += iif( Empty( cList ), "", ", " ) + "line " + hb_ntos( nLine )
       NEXT
-      Prose( "warning: this module expands __LINE__ at " + hb_ntos( Len( aSites ) ) + ;
-              " site(s) whose lines shift with this edit (" + cList + ") - " + ;
-              "the expanded values follow the new position; the new values are correct " + ;
-              "(the code really moves), review only if they were meant to be stable" + hb_eol() )
+      // aviso é DADO sob o contrato (diagnostics[]) e prosa no canal humano.
+      // Diag manda para o stderr sem --json; aqui o canal certo é o stdout
+      // (Prose), então a repartição é explícita, não pelo Diag
+      IF s_lJson
+         Diag( "line-sensitive-shift", "this module expands __LINE__ at " + ;
+               hb_ntos( Len( aSites ) ) + " site(s) whose lines shift with this edit (" + ;
+               cList + ") - the expanded values follow the new position; the new " + ;
+               "values are correct (the code really moves), review only if they " + ;
+               "were meant to be stable", NIL )
+      ELSE
+         Prose( "warning: this module expands __LINE__ at " + hb_ntos( Len( aSites ) ) + ;
+                 " site(s) whose lines shift with this edit (" + cList + ") - " + ;
+                 "the expanded values follow the new position; the new values are correct " + ;
+                 "(the code really moves), review only if they were meant to be stable" + hb_eol() )
+      ENDIF
    ENDIF
 
    RETURN
@@ -5406,7 +5664,7 @@ STATIC FUNCTION InlineLocal( aArgs )
    LOCAL hDecl := NIL, nDeclLine, lInit := .F., nReads := 0, nI
    LOCAL hInit := NIL, hExpr, cWhy := "", aVarsExpr, cVar, nDeclsOnLine := 0
    LOCAL aToks, iName := 0, iA, iB, aSpan, cExpr, cRepl, nSpanEnd
-   LOCAL aSrc, cText, aEdits := {}, cUp, nLine
+   LOCAL aSrc, cText, aEdits := {}, cUp, nLine, aWork
 
    IF Len( aArgs ) < 5
       Usage()
@@ -5606,6 +5864,19 @@ STATIC FUNCTION InlineLocal( aArgs )
                      "compiler reads (" + hb_ntos( nReads ) + ") - refusing" )
    ENDIF
 
+   // o WorkspaceEdit LSP: as substituições de valor (span) + a REMOÇÃO da
+   // linha da declaração (deleção de linha inteira). O colapso da linha em
+   // branco órfã (decl entre dois brancos) tira TAMBÉM a de baixo - o edits[]
+   // reproduz a apply, senão o preview mentiria a forma final
+   aWork := WorkFromRange( { cSrcPath => aEdits } )
+   IF nDeclLine > 1 .AND. nDeclLine < Len( aSrc ) .AND. ;
+      Empty( aSrc[ nDeclLine - 1 ] ) .AND. Empty( aSrc[ nDeclLine + 1 ] )
+      AAdd( aWork, LspEditML( cSrcPath, nDeclLine, 0, nDeclLine + 2, 0, "" ) )
+   ELSE
+      AAdd( aWork, LspEditML( cSrcPath, nDeclLine, 0, nDeclLine + 1, 0, "" ) )
+   ENDIF
+   aWork := SortWork( aWork )
+
    Prose( "inline-local: " + cName + " := " + cExpr + " in " + hFunc[ "name" ] + ;
            " (" + hb_FNameNameExt( cSrcPath ) + ")" + hb_eol() )
    FOR nI := 1 TO Len( aEdits )
@@ -5619,7 +5890,10 @@ STATIC FUNCTION InlineLocal( aArgs )
    WarnDynLines( hAst, nDeclLine )
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 InlineResult( "preview", cName, cExpr, hFunc[ "name" ], nReads, ;
+                               nDeclLine, aWork, NIL ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
@@ -5658,7 +5932,10 @@ STATIC FUNCTION InlineLocal( aArgs )
    Prose( "verified: " + hb_ntos( nReads ) + " use(s) replaced; symbols intact; " + ;
            "run your test suite to confirm behaviour" + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "verified: " + hb_ntos( nReads ) + " use(s) replaced; symbols " + ;
+              "intact; run your test suite to confirm behaviour", ;
+              InlineResult( "applied", cName, cExpr, hFunc[ "name" ], nReads, ;
+                            nDeclLine, aWork, "symbols-preserved" ) )
 
 // pureza p/ duplicação: allowlist da árvore do compilador - folhas
 // literais/variáveis e operadores sem efeito colateral; QUALQUER outro nó
@@ -6006,6 +6283,7 @@ STATIC FUNCTION ReorderParams( aArgs )
    LOCAL cUpFunc, aArgsSpans, aSigHits, nTotal := 0, cWhy
    LOCAL aIdent, lIsMethod, cUpMsg := "", nAt, aOwnerClasses := {}
    LOCAL hOwn, cOwn, aSpell, hF, cCallName
+   LOCAL aWork, hRes
 
    IF Len( aArgs ) < 4
       Usage()
@@ -6243,11 +6521,14 @@ STATIC FUNCTION ReorderParams( aArgs )
    ENDIF
 
    FOR nI := 1 TO Len( aWarn )
-      OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
+      Diag( "textual-reference", aWarn[ nI ], NIL )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "textual references found - repeat with --force" )
+      RETURN Refuse( "textual references found - repeat with --force", ;
+                     "textual-refs-require-force", ACT_RETRY )
    ENDIF
+
+   aWork := WorkFromRange( hEdits )
 
    Prose( "reorder-params: " + cFunc + "( " + ArrJoin( aParams, ", " ) + " ) -> ( " + ;
            ArrJoin( aNew, ", " ) + " )" + hb_eol() )
@@ -6260,7 +6541,10 @@ STATIC FUNCTION ReorderParams( aArgs )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 ReorderResult( "preview", cFunc, aParams, aNew, nTotal, aWork, NIL ), ;
+                 , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
@@ -6289,7 +6573,10 @@ STATIC FUNCTION ReorderParams( aArgs )
    NEXT
    Prose( "verified: " + hb_ntos( nTotal ) + " site(s) reordered; symbols intact; run your test suite to confirm behaviour" + hb_eol() )
 
-   RETURN EXIT_OK
+   hRes := ReorderResult( "applied", cFunc, aParams, aNew, nTotal, aWork, ;
+                          "symbols-preserved" )
+   RETURN Ok( "verified: " + hb_ntos( nTotal ) + " site(s) reordered; symbols " + ;
+              "intact; run your test suite to confirm behaviour", hRes )
 
 // TODOS os call sites de uma função-alvo dentro do span de uma função
 // contêiner, balanceando o STREAM de tokens por TIPO (50='(' 51=')'
@@ -6861,6 +7148,7 @@ STATIC FUNCTION RenameDsl( aArgs )
    LOCAL nRTok, lOurs                    // ast-15: QUAL literal da regra o site casou
    LOCAL hTgt, cWitness                  // P11: ambiguidade julgada pelo pp VIVO
    LOCAL aDeadSkip := {}, aDead, hDel    // A4: colisão contra regra DESLIGADA (ast-16)
+   LOCAL aWork, hScope, hRes
 
    IF Len( aArgs ) < 4
       Usage()
@@ -7173,6 +7461,9 @@ STATIC FUNCTION RenameDsl( aArgs )
       AbsEditsAdd( hEdits, cChPath, aE )
    NEXT
 
+   aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
+   hScope := ScopeField( hAsts, hProj, cUpOld )
+
    Prose( "rename-dsl: " + cOld + " -> " + cNew + hb_eol() )
    FOR EACH cKey IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cKey ]
@@ -7182,7 +7473,11 @@ STATIC FUNCTION RenameDsl( aArgs )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      hRes := RenameResult( "preview", "dsl", cOld, cNew, aWork, NIL, hScope )
+      hRes[ "applicationSites" ] := nSites
+      hRes[ "directiveOccurrences" ] := nDirEdits
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", hRes, , aWork )
    ENDIF
 
    // referência: expansão (.ppo) e pcode (.hrb) de todos os módulos
@@ -7237,7 +7532,12 @@ STATIC FUNCTION RenameDsl( aArgs )
            hb_ntos( nDirEdits ) + " directive occurrence(s); .ppo and .hrb byte-identical" + ;
            ScopeTag( hAsts, hProj, cUpOld ) + hb_eol() )
 
-   RETURN EXIT_OK
+   hRes := RenameResult( "applied", "dsl", cOld, cNew, aWork, "expansion-identical", hScope )
+   hRes[ "applicationSites" ] := nSites
+   hRes[ "directiveOccurrences" ] := nDirEdits
+   RETURN Ok( "verified: " + hb_ntos( nSites ) + " application site(s) + " + ;
+              hb_ntos( nDirEdits ) + " directive occurrence(s); .ppo and .hrb byte-identical", ;
+              hRes )
 
 // ---------------------------------------------------------------------------
 // P8 - resolve-at DENTRO de um ARQUIVO DE REGRA (.ch). As DSLs reais moram em
@@ -7392,6 +7692,7 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    // nEdits SEM inicializador: `LOCAL x := 0` seguido de `x := <valor>` sem
    // leitura no meio é DEAD STORE e o Harbour avisa W0032 (quebra sob -es2)
    LOCAL hPpoBefore := { => }, cPpo, cText, nLine := 0, cKey, nEdits
+   LOCAL aWork, hScope
 
    IF ! OneWord( cNew )
       RETURN Refuse( "new name '" + cNew + "' is not a single word" )
@@ -7474,6 +7775,9 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    nEdits := Len( aE )
    AbsEditsAdd( hEdits, cChPath, aE )
 
+   aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
+   hScope := ScopeField( hAsts, hProj, Upper( cOld ) )
+
    Prose( "rename-rule-marker: <" + cOld + "> -> <" + cNew + "> in " + ;
            RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" + hb_eol() )
    SayScope( hAsts, hProj, Upper( cOld ), cOld )   // P17: o ALCANCE da prova
@@ -7485,7 +7789,9 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 RenameResult( "preview", "rule-marker", cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
    // padrão-ouro: alpha-rename é INVISÍVEL - a expansão e o pcode de todos os
@@ -7537,7 +7843,9 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    Prose( "verified: " + hb_ntos( nEdits ) + " marker occurrence(s) in the directive; " + ;
            ".ppo and .hrb byte-identical (alpha-rename)" + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "verified: " + hb_ntos( nEdits ) + " marker occurrence(s) in the " + ;
+              "directive; .ppo and .hrb byte-identical (alpha-rename)", ;
+              RenameResult( "applied", "rule-marker", cOld, cNew, aWork, "expansion-identical", hScope ) )
 
 // agrupa edições por arquivo com chave normalizada (a diretiva pode viver
 // num .prg do próprio projeto - as edições têm que ir na MESMA aplicação)
@@ -7971,7 +8279,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
    LOCAL cUpOld, cUpNew, hF, hFNew, hIdx, hReach, hInReach, aC, aU, aWarn := {}
    LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
-   LOCAL cWhy := "", aLive
+   LOCAL cWhy := "", aLive, aWork, hScope
 
    IF Len( aArgs ) < 4
       Usage()
@@ -8138,10 +8446,11 @@ STATIC FUNCTION RenameMemvar( aArgs )
    NEXT
 
    FOR nI := 1 TO Len( aWarn )
-      OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
+      Diag( "textual-reference", aWarn[ nI ], NIL )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "warnings above - repeat with --force to proceed without touching them" )
+      RETURN Refuse( "warnings above - repeat with --force to proceed without touching them", ;
+                     "textual-refs-require-force", ACT_RETRY )
    ENDIF
 
    // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos
@@ -8178,6 +8487,9 @@ STATIC FUNCTION RenameMemvar( aArgs )
       RETURN Refuse( "no editable site found for '" + cOld + "'" )
    ENDIF
 
+   aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
+   hScope := ScopeField( hAsts, hProj, cUpOld )
+
    Prose( "rename-memvar: " + cOld + " -> " + cNew + " (creator " + aC[ 4 ] + " in " + ;
            aC[ 2 ] + ", scope closed and clean)" + hb_eol() )
    SayScope( hAsts, hProj, cUpOld, cOld )       // P17: o ALCANCE da prova
@@ -8189,7 +8501,9 @@ STATIC FUNCTION RenameMemvar( aArgs )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", ;
+                 RenameResult( "preview", "memvar", cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
@@ -8220,7 +8534,9 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    Prose( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol renamed, pcode byte-identical" + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "verified: " + hb_ntos( nTotal ) + ;
+              " edit(s); symbol renamed, pcode byte-identical", ;
+              RenameResult( "applied", "memvar", cOld, cNew, aWork, "pcode-identical", hScope ) )
 
 STATIC FUNCTION MvFuncUsesOld( hFunc, cUpOld )
 
@@ -8769,9 +9085,17 @@ STATIC FUNCTION Annotate( aArgs )
       RETURN AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    ENDIF
 
-   AnnReport( hPlan, cJsonOut, .F. )
+   AnnReport( hPlan, cJsonOut, .F. )   // canal humano (cala sob o contrato)
 
-   RETURN EXIT_OK
+   // a escada de anotações como FATO: os mesmos campos que o `--json <file>`
+   // antigo escrevia, agora no envelope (o relatório NÃO edita -> edits vazio)
+   RETURN Ok( "annotation ladder (report only; --apply writes DECLAREs + AS CLASS)", ;
+              { "candidates"    => hPlan[ "rep" ], ;
+                "funReturns"    => hPlan[ "fr" ], ;
+                "methodReturns" => hPlan[ "mr" ], ;
+                "blockParams"   => hPlan[ "bp" ], ;
+                "localsScanned" => hPlan[ "scan" ], ;
+                "summary"       => hPlan[ "sum" ] } )
 
 // carrega o projeto para análise: dump ast + leitura + tabelas declaradas
 // + máquina dormente (B7Ctx, único consumidor - RE.3). NIL em qualquer
@@ -9466,6 +9790,7 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
    LOCAL hCand, hLn, hEntry, cPath, cWhy := "", cKt := "skipped", cKtBase := ""
    LOCAL lRunnable, hLoad2, hPlan2, aAnn := {}, nCol, hAst
    LOCAL hInert := AnnNoKt( hProj )    // baseline/inerte SEM -kt (projeto já--kt)
+   LOCAL aAnnJson := {}, hA
 
    HB_SYMBOL_UNUSED( cFuncFil )
 
@@ -9537,7 +9862,9 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
 
    IF Empty( aIns ) .AND. AnnCountN1( hPlan ) == 0 .AND. Empty( hPlan[ "bp" ] )
       Prose( "annotate --apply: nothing to materialize (no level 1/2 in scope)" + hb_eol() )
-      RETURN EXIT_OK
+      RETURN Ok( "annotate --apply: nothing to materialize (no level 1/2 in scope)", ;
+                 { "verdict" => "applied", "declarations" => 0, "annotations" => 0, ;
+                   "annotated" => {}, "proof" => NIL } )
    ENDIF
 
    // 3. escreve os one-liners e verifica (inerte + compila limpo + roda -kt)
@@ -9605,6 +9932,12 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
       ENDIF
    ENDIF
 
+   FOR EACH hA IN aAnn
+      AAdd( aAnnJson, { "file" => hb_FNameNameExt( hA[ "path" ] ), ;
+                        "line" => hA[ "line" ], "col" => hA[ "col" ], ;
+                        "text" => AllTrim( hA[ "text" ] ) } )
+   NEXT
+
    Prose( "annotate --apply: " + hb_ntos( Len( aIns ) ) + ;
            " declaration(s) + " + hb_ntos( Len( aAnn ) ) + " AS CLASS annotation(s)" + hb_eol() )
    Prose( "verified: .hrb byte-identical without -kt; compiles clean under -w3 -es2; " + ;
@@ -9613,7 +9946,14 @@ STATIC FUNCTION AnnApply( hProj, cTmp, hLoad, hPlan, cFileFil, cFuncFil )
                 "project not runnable - -kt step skipped (declared, not enforced)", ;
                 "execution already failed WITHOUT the edit - -kt step skipped (declared, not enforced)" ) ) + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "annotate --apply: " + hb_ntos( Len( aIns ) ) + " declaration(s) + " + ;
+              hb_ntos( Len( aAnn ) ) + " AS CLASS annotation(s)", ;
+              { "verdict" => "applied", ;
+                "declarations" => Len( aIns ), ;
+                "annotations"  => Len( aAnn ), ;
+                "annotated"    => aAnnJson, ;
+                "proof"        => "gold-standard", ;
+                "ktStep"       => cKt } )
 
 // clone do projeto SEM a flag -kt nos flags do compilador: o teste
 // inerte do padrão-ouro compara .hrb compilados sem ela (com -kt a
@@ -10200,7 +10540,7 @@ STATIC FUNCTION RegDriverSrc( aRun )
 STATIC FUNCTION RegSnapWrite( hDrv, hSel, cSpec, cStamp, cOut )
 
    LOCAL aBase := { "ERROR" }, aVm := {}, aCls := {}, hCls, hSkip
-   LOCAL nRev := 0
+   LOCAL nRev := 0, hSnap
 
    FOR EACH hCls IN hDrv[ "classes" ]
       IF hCls[ "from" ] == "startup" .AND. AScan( aBase, hCls[ "name" ] ) > 0
@@ -10213,12 +10553,15 @@ STATIC FUNCTION RegSnapWrite( hDrv, hSel, cSpec, cStamp, cOut )
       ENDIF
    NEXT
 
-   hb_MemoWrit( cOut, hb_jsonEncode( { "schema" => "rtr-1", ;
-                "stamp" => cStamp, "project" => cSpec, ;
-                "baseline" => aBase, "vm" => aVm, ;
-                "classes" => aCls, "ran" => hDrv[ "ran" ], ;
-                "failed" => hDrv[ "failed" ], "skipped" => hSel[ "skip" ], ;
-                "aborted" => hb_HGetDef( hDrv, "aborted", "" ) } ) )
+   // o retrato da tabela viva (schema rtr-1) - a MESMA fonte para o arquivo e
+   // para o envelope: o result aninha o snapshot em vez de duplicá-lo
+   hSnap := { "schema" => "rtr-1", ;
+              "stamp" => cStamp, "project" => cSpec, ;
+              "baseline" => aBase, "vm" => aVm, ;
+              "classes" => aCls, "ran" => hDrv[ "ran" ], ;
+              "failed" => hDrv[ "failed" ], "skipped" => hSel[ "skip" ], ;
+              "aborted" => hb_HGetDef( hDrv, "aborted", "" ) }
+   hb_MemoWrit( cOut, hb_jsonEncode( hSnap ) )
 
    Prose( "exec-registry (live table snapshot; the snapshot SUGGESTS, -kt enforces)" + hb_eol() )
    FOR EACH hCls IN aCls
@@ -10244,7 +10587,17 @@ STATIC FUNCTION RegSnapWrite( hDrv, hSel, cSpec, cStamp, cOut )
            " outside=" + hb_ntos( Len( hSel[ "skip" ] ) ) + ;
            " snapshot=" + cOut + hb_eol() )
 
-   RETURN EXIT_OK
+   RETURN Ok( "live table snapshot recorded (" + hb_ntos( nRev ) + ;
+              " class(es) revealed); the snapshot SUGGESTS, -kt enforces", ;
+              { "verdict"      => "recorded", ;
+                "snapshotPath" => cOut, ;
+                "summary"      => { "run" => Len( hDrv[ "ran" ] ), ;
+                                    "failed" => Len( hDrv[ "failed" ] ), ;
+                                    "classesRevealed" => nRev, ;
+                                    "startup" => Len( hDrv[ "startup" ] ) - Len( aVm ), ;
+                                    "vm" => Len( aVm ), ;
+                                    "outside" => Len( hSel[ "skip" ] ) }, ;
+                "snapshot"     => hSnap } )
 
 // ---------------------------------------------------------------------------
 // B7 - tipos interprocedurais (spec-b7-tipos-interprocedurais.md, portão
@@ -12488,6 +12841,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL hOpt := { => }, lData := .F.
    LOCAL cKey, aKParts, nApp, nMarker, aAlts, cAltList   // P5: validação do restrict
    LOCAL hArtIdx                                         // P6: guarda de órfão por FATO
+   LOCAL aWork, hRes, cKind, cProof, aPred := {}, aPredS := {}
 
    IF Len( aArgs ) < 4
       Usage()
@@ -12791,10 +13145,11 @@ STATIC FUNCTION RenameMethod( aArgs )
    NEXT
 
    FOR nI := 1 TO Len( aWarn )
-      OutErr( "warning: " + aWarn[ nI ] + hb_eol() )
+      Diag( "textual-reference", aWarn[ nI ], NIL )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "textual references found (see warnings) - repeat with --force" )
+      RETURN Refuse( "textual references found (see warnings) - repeat with --force", ;
+                     "textual-refs-require-force", ACT_RETRY )
    ENDIF
 
    // AddHit já normalizou tudo para pares { linha, coluna 1-based }
@@ -12803,6 +13158,10 @@ STATIC FUNCTION RenameMethod( aArgs )
       DedupHits( aE )
       nTotal += Len( aE )
    NEXT
+
+   cKind := iif( lData, "data", iif( lMethod, "method", "pp-marker" ) )
+   cProof := "symbols-renamed"
+   aWork := WorkFromToken( hEdits, hb_BLen( cMethod ), cNew )
 
    Prose( iif( lData, "rename-data: " + cUpClass + ":", ;
            iif( lMethod, "rename-method: " + cUpClass + ":", "rename-pp-marker: " ) ) + ;
@@ -12813,21 +13172,30 @@ STATIC FUNCTION RenameMethod( aArgs )
                  hb_ntos( aE[ 2 ] ) + hb_eol() )
       NEXT
    NEXT
-   // o que o rastro PREVÊ que muda junto (símbolos gerados e strings)
+   // o que o rastro PREVÊ que muda junto (símbolos gerados e strings) - campos
+   // do result: derived[] (símbolo -> símbolo) e derivedStrings[] (string na
+   // tabela de registro que o stringify do nome novo produz)
    FOR EACH cOwn IN hb_HKeys( hMap )
       IF !( cOwn == cUpOld )
          Prose( "  predicted: " + cOwn + " -> " + hMap[ cOwn ] + hb_eol() )
+         AAdd( aPred, { "from" => cOwn, "to" => hMap[ cOwn ] } )
       ENDIF
    NEXT
    FOR EACH cPath IN hb_HKeys( hPredStr )
       FOR EACH aHit IN hPredStr[ cPath ]
          Prose( "  predicted string: " + '"' + aHit[ 1 ] + '" -> "' + aHit[ 2 ] + '"' + ;
                  " (" + hb_FNameNameExt( cPath ) + ")" + hb_eol() )
+         AAdd( aPredS, { "from" => aHit[ 1 ], "to" => aHit[ 2 ], ;
+                         "file" => hb_FNameNameExt( cPath ) } )
       NEXT
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      RETURN EXIT_OK
+      hRes := RenameResult( "preview", cKind, cMethod, cNew, aWork, NIL, NIL )
+      hRes[ "derived" ] := aPred
+      hRes[ "derivedStrings" ] := aPredS
+      RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
+                 " edit(s) previewed", hRes, , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before" )
@@ -12893,17 +13261,19 @@ STATIC FUNCTION RenameMethod( aArgs )
       NEXT
    NEXT
 
-   IF lData
-      Prose( "verified: " + hb_ntos( nTotal ) + " edit(s); DATA member getter+setter renamed, " + ;
-              "registration re-derived, other modules byte-identical" + hb_eol() )
-   ELSEIF lMethod
-      Prose( "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
-              "other modules byte-identical" + hb_eol() )
-   ELSE
-      Prose( "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" + hb_eol() )
-   ENDIF
+   cWhy := iif( lData, ;
+      "verified: " + hb_ntos( nTotal ) + " edit(s); DATA member getter+setter renamed, " + ;
+      "registration re-derived, other modules byte-identical", ;
+      iif( lMethod, ;
+      "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
+      "other modules byte-identical", ;
+      "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" ) )
+   Prose( cWhy + hb_eol() )
 
-   RETURN EXIT_OK
+   hRes := RenameResult( "applied", cKind, cMethod, cNew, aWork, cProof, NIL )
+   hRes[ "derived" ] := aPred
+   hRes[ "derivedStrings" ] := aPredS
+   RETURN Ok( cWhy, hRes )
 
 // símbolos/funções iguais módulo um conjunto de renomes esperados; o
 // PCODE do módulo pode divergir (strings de registro de mensagem mudam

@@ -1,0 +1,2 @@
+extract-function: lines 7-7 of MAIN -> Soma( nA, nB ) returning nR
+dry run - nothing was written

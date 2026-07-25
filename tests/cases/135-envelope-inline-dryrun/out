@@ -1,0 +1,5 @@
+inline-local: nBase := 10 in MAIN (app.prg)
+  app.prg:5:10
+  app.prg:6:10
+  declaration on line 3 removed
+dry run - nothing was written

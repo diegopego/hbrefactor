@@ -154,15 +154,23 @@ ele vai querer *"converta este `DO CASE` em `SWITCH`"*. **O catálogo jamais alc
 imaginação de um LLM; o verificador alcança — porque não sabe nem se importa com qual foi a
 edição.**
 
-### A.1 — Contrato de máquina na CLI *(base: sem isto, nada em cima se apoia)* — **EM EXECUÇÃO (2026-07-25); plano em [plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)**
+### A.1 — Contrato de máquina na CLI *(base: sem isto, nada em cima se apoia)* — **EM EXECUÇÃO (2026-07-25); PASSO 1 COMPLETO; plano em [plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)**
 
 > **DECISÃO DE ARQUITETURA (Diego, 2026-07-24/25), final:** o CLI é consumido por **VSCode
 > e Claude**, e só. A saída é o **envelope (JSON), e nada mais**. **Sem renderizador humano**
 > (a prosa é arrasto → deletada); a **flag `--json` some** (sempre-envelope); `Usage()` fica
 > texto puro. Ordem VERTICAL por comando (arrancar a flag agora deixaria ~1000 testes
-> vermelhos de uma vez). **Estado: passo 1 — 8 comandos de leitura no contrato, `usages`
-> COMPLETO (flagrante do Class:Method morto); faltam os verbos de edição.** Plano, ordem,
-> armadilhas e critério de pronto: o plano linkado acima. Estado de retomada: handoff § 0.
+> vermelhos de uma vez).
+>
+> **Estado (2026-07-25): PASSO 1 COMPLETO — os 14 comandos modelam o fato.** Os 8 de leitura
+> já estavam; agora os **6 de edição** também (`rename` e a família de 7 subverbos,
+> `extract-function`, `inline-local`, `reorder-params`, `annotate`, `exec-registry`):
+> `edits[]` LSP `{uri,range,newText}` sob `--dry-run`, `result.locations` sempre,
+> `result.verdict` (applied/preview) + `result.proof` (a força da verificação), `scope` P17
+> como campo, avisos → `diagnostics[]`. **Placar PENDENTES da régua-json VAZIO (14/14).**
+> `make test` 1046/0, `ppcorpus` 121/0, `site-check` verde. O desenho (para não re-derivar)
+> está no plano linkado, § Passo 1. **Falta: passo 2 (migrar ~600 asserts de prosa), passo 3
+> (arrancar prosa+flag), passo 4 (extensão), passo 5 (página).** Estado de retomada: handoff § 0.
 
 > **O portão abriu com uma ordem de desenho junto:** *"quero que o Claude crie a especificação
 > para a interface CLI do hbrefactor que seja ideal para o Claude usá-la"* — e, na revisão,

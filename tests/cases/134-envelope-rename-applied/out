@@ -1,0 +1,5 @@
+rename-local: nTotal -> nSoma in MAIN (app.prg)
+  app.prg:3:10
+  app.prg:5:4
+  app.prg:7:10
+verified: all 1 module(s) byte-identical (-gh -l)

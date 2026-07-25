@@ -58,17 +58,44 @@ humano no terminal lê JSON (ou usa `jq`). *"realmente só está provocando comp
 Arrancar a flag AGORA deixaria ~1000 testes vermelhos de uma vez, sem distinguir "quebrei
 a lógica" de "teste ainda não migrado". A ordem é VERTICAL, por comando:
 
-### Passo 1 — Completar o CONTRATO de todos os 14 comandos *(a prosa fica como andaime)*
+### Passo 1 — Completar o CONTRATO de todos os 14 comandos *(a prosa fica como andaime)* ✅ COMPLETO (2026-07-25)
 Cada comando modela o `result` inteiro. Os campos que a prosa computava viram campos do
 dado. A régua-json (placar) mede a completude. **É este passo que torna a ferramenta ideal
 para os dois consumidores** — o resto é limpeza.
 - ✅ os 8 de leitura/relato (`usages`, `resolve-at`, `call-graph`, `find-dynamic-calls`,
   `dump`, `snapshot`, `verify`, `projects-of`);
 - ✅ **`usages` com o flagrante CONSERTADO** (kind/owner/certainty/text em cada location);
-- ⬜ os verbos de edição: `rename` (e a família RenameFunction/Local/Static/Memvar/Method/
+- ✅ os verbos de edição: `rename` (e a família RenameFunction/Local/Static/Memvar/Method/
   RuleMarker/Dsl), `extract-function`, `inline-local`, `reorder-params`, `annotate`,
-  `exec-registry` — modelar `edits[]` (as edições como `{uri, range, newText}`) e o
-  veredito.
+  `exec-registry`. **Placar PENDENTES da régua-json VAZIO (14/14).**
+
+**Como ficou (o desenho, para não re-derivar):**
+- **`edits[]`** (top-level `{uri, range, newText}`, formato LSP `WorkspaceEdit`) sai **só
+  sob `--dry-run`** (a régua da spec §2.2: "o que a ferramenta FARIA"); aplicado, sai
+  vazio. Builders por representação interna: `WorkFromToken` (troca uniforme dos 7 renames),
+  `WorkFromRange` (span de inline/reorder), `WholeDocEdit` (extract = documento inteiro
+  reestruturado, honesto e aplicável).
+- **`result.locations`** (LSP `{uri, range}`) sai **sempre** — é o que a prosa listava por
+  sítio; o dado é superconjunto da prosa (`EditsToLocations` tira o `newText`).
+- **`result.verdict`**: `"applied"` (escreveu + verificou) × `"preview"` (`--dry-run`);
+  espelha o `verify`. **`result.proof`** = a força da verificação, campo próprio:
+  `pcode-identical` (renames byte-idênticos), `expansion-identical` (dsl/rule-marker,
+  `.ppo`+`.hrb`), `symbols-preserved` (reorder/inline/extract, pcode muda legítimo),
+  `symbols-renamed` (data/method/pp-marker), `gold-standard` (annotate). NIL sob preview
+  (nada foi verificado).
+- **`result.scope`** (P17 `{complete, unseen[]}`, `ScopeField`) nos verbos com alcance
+  condicional (function/static/memvar/dsl/rule-marker); o rename de LOCAL não tem (homônimo
+  em ramo pulado é outra variável). `SayScope` cala sob `--json` (o alcance é o campo).
+- **avisos → `diagnostics[]`**: referências textuais (`--force`), P4/P5 descartado, P16(b)
+  `__LINE__` (`WarnDynLines`), parent fora do projeto. O canal humano (prosa/stderr) fica
+  byte-idêntico sem `--json`.
+- **recusas load-bearing** (`--force`, `--edit-rules`) ganharam `reason`
+  `"textual-refs-require-force"` + `action` `ACT_RETRY` — o que o passo 4 (extensão) lê no
+  lugar dos regexes. (A migração dos ~300 códigos de recusa restantes fica para o passo 2.)
+- **exec-registry**: o retrato rtr-1 vira `result.snapshot` (aninhado) + `summary`; annotate
+  reusa a estrutura do antigo `--json <file>` como `result` do relatório.
+- Provas: casos declarativos 133-136 (rename dry-run/aplicado, inline, extract) + 132
+  reproposto (exec-registry). Placar régua-json 14/14. `make test` 1046/0.
 
 ### Passo 2 — Migrar os ~600 asserts de prosa para o ENVELOPE
 Comando a comando. O `JLoad` do `tcheck.prg` já desembrulha o envelope; os casos novos
