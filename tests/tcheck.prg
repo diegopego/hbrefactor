@@ -25,6 +25,9 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "pof83"   ; lOk := Pof83( cA1 )             ; EXIT
    CASE "pof102"  ; lOk := Pof102( cA1 )            ; EXIT
    CASE "rtr101"  ; lOk := Rtr101( cA1 )            ; EXIT
+   CASE "enveq"   ; lOk := EnvEq( cA1, cA2, cA3 )   ; EXIT
+   CASE "envhas"  ; lOk := EnvHas( cA1, cA2, cA3 )  ; EXIT
+   CASE "envloc"  ; lOk := EnvLoc( cA1, cA2, cA3 )  ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
       lOk := .F.
@@ -39,6 +42,104 @@ STATIC FUNCTION Fail( cMsg )
    OutStd( "tcheck falhou: " + cMsg + hb_eol() )
 
    RETURN .F.
+
+// ---------------------------------------------------------------------------
+// A.1 passo 2 - asserção GENÉRICA sobre o envelope (cli-1). Migra o grep de
+// prosa para o FATO estruturado: em vez de casar a frase na saída (que o passo
+// 3 deleta), navega o campo por dot-path e compara. `result.` é implícito -
+// `verdict` = `result.verdict` (o consumidor fala da carga, não do envelope).
+// ---------------------------------------------------------------------------
+
+// navega o dot-path num envelope lido de arquivo. Sem prefixo explícito
+// (schema/command/status/reason/action/detail/diagnostics/edits), o path é
+// relativo a `result` - onde vive quase todo o fato
+STATIC FUNCTION EnvNav( cPath, cDot )
+
+   STATIC s_aTop := { "schema", "command", "status", "reason", "action", ;
+                      "detail", "diagnostics", "result", "edits" }
+   LOCAL x := hb_jsonDecode( hb_MemoRead( cPath ) )
+   LOCAL aKeys := hb_ATokens( cDot, "." ), cKey, nI
+
+   IF ! HB_ISHASH( x )
+      RETURN NIL
+   ENDIF
+   IF ! Empty( aKeys ) .AND. hb_AScan( s_aTop, aKeys[ 1 ],,, .T. ) == 0
+      x := hb_HGetDef( x, "result", { => } )   // path relativo à carga
+   ENDIF
+   FOR nI := 1 TO Len( aKeys )
+      cKey := aKeys[ nI ]
+      IF HB_ISHASH( x ) .AND. hb_HHasKey( x, cKey )
+         x := x[ cKey ]
+      ELSEIF HB_ISARRAY( x ) .AND. Val( cKey ) >= 1 .AND. Val( cKey ) <= Len( x )
+         x := x[ Val( cKey ) ]
+      ELSE
+         RETURN NIL
+      ENDIF
+   NEXT
+
+   RETURN x
+
+// stringifica um escalar do envelope para comparar
+STATIC FUNCTION EnvStr( x )
+   DO CASE
+   CASE x == NIL          ; RETURN "(nil)"
+   CASE HB_ISCHAR( x )    ; RETURN x
+   CASE HB_ISNUMERIC( x ) ; RETURN hb_ntos( x )
+   CASE HB_ISLOGICAL( x ) ; RETURN iif( x, "true", "false" )
+   ENDCASE
+   RETURN hb_jsonEncode( x )
+
+// campo == valor exato
+STATIC FUNCTION EnvEq( cPath, cDot, cVal )
+
+   LOCAL cGot := EnvStr( EnvNav( cPath, cDot ) )
+
+   IF cGot == hb_defaultValue( cVal, "" )
+      RETURN .T.
+   ENDIF
+
+   RETURN Fail( cDot + " = " + cGot + " (esperado: " + hb_defaultValue( cVal, "" ) + ")" )
+
+// campo CONTÉM substring (o campo pode ser escalar ou estrutura - stringifica)
+STATIC FUNCTION EnvHas( cPath, cDot, cSub )
+
+   LOCAL cGot := EnvStr( EnvNav( cPath, cDot ) )
+
+   IF hb_defaultValue( cSub, "" ) $ cGot
+      RETURN .T.
+   ENDIF
+
+   RETURN Fail( cDot + " nao contem '" + hb_defaultValue( cSub, "" ) + "' (tem: " + cGot + ")" )
+
+// existe uma location (result.locations OU edits[]) em <arquivo:linha>? A linha
+// é 1-based (o LSP é 0-based). Prova o que o grep "arquivo:linha: papel" dava,
+// mas pelo FATO estruturado (uri + range), não pela frase
+STATIC FUNCTION EnvLoc( cPath, cAt, cKind )
+
+   LOCAL x := hb_jsonDecode( hb_MemoRead( cPath ) )
+   LOCAL aLoc, hLoc, nColon, cFile, nLine
+
+   IF ! HB_ISHASH( x )
+      RETURN Fail( "envelope invalido" )
+   ENDIF
+   aLoc := hb_HGetDef( hb_HGetDef( x, "result", { => } ), "locations", NIL )
+   IF aLoc == NIL
+      aLoc := hb_HGetDef( x, "edits", {} )
+   ENDIF
+   nColon := RAt( ":", cAt )
+   cFile := Left( cAt, nColon - 1 )
+   nLine := Val( SubStr( cAt, nColon + 1 ) )
+
+   FOR EACH hLoc IN aLoc
+      IF EndsW( hLoc[ "uri" ], cFile ) .AND. ;
+         hLoc[ "range" ][ "start" ][ "line" ] + 1 == nLine .AND. ;
+         ( Empty( cKind ) .OR. hb_defaultValue( cKind, "" ) $ hb_HGetDef( hLoc, "kind", "" ) )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN Fail( "nenhuma location em " + cAt + ;
+                iif( Empty( cKind ), "", " com kind ~ '" + cKind + "'" ) )
 
 // A.1: o `--json` passou a emitir UM ENVELOPE em stdout (a forma
 // `--json <arquivo>` morreu - CLAUDE.md §1.5, sem compatibilidade para trás).

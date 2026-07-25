@@ -284,15 +284,17 @@ done
 unit_1() {
 echo "case 1: rename nTotal->nSoma in Main (success + verification)"
 D=$(fresh case1)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 diff -q "$D/a.prg" "$HERE/fix01/expected/a_renamed.prg" > /dev/null 2>&1
 check "a.prg matches expected"     $?
 cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
 check "b.prg untouched"            $?
-grep -q "verified: all 2 module" "$D/out.log"
-check "reports 2 modules verified" $?
+# passo 2: verified: all N module -> verdict applied (a verificacao passou; se
+# tivesse falhado o verbo recusaria com rollback, nunca "applied")
+"$TCHECK" enveq "$D/out.log" verdict applied
+check "verificado (verdict applied)" $?
 
 }
 
@@ -310,13 +312,13 @@ check "a.prg untouched"            $?
 unit_3() {
 echo "case 3: unrelated #define on the declaration line (safe rename succeeds)"
 D=$(fresh case3)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 nTeto > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 nTeto --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "nTeto := K_LIMITE" "$D/a.prg"
 check "nTeto renamed, define kept" $?
-grep -q "verified: all 2 module" "$D/out.log"
-check "verification passed"        $?
+"$TCHECK" enveq "$D/out.log" verdict applied
+check "verification passed (verdict applied)" $?
 
 }
 
@@ -332,10 +334,12 @@ check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
 unit_5() {
 echo "case 5: homonymous codeblock parameter shadows target (refuse)"
 D=$(fresh case5)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:26:10 xNovo > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:26:10 xNovo --json > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -qi "shadow" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" status refused
+check "recusou (status refused)"   $?
+"$TCHECK" envhas "$D/out.log" detail shadow
 check "reason mentions shadowing"  $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
@@ -346,10 +350,12 @@ check "a.prg untouched"            $?
 unit_7() {
 echo "case 7: symbol consumed by stringify marker - verification must roll back"
 D=$(fresh case7)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:33:10 nOutro > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:33:10 nOutro --json > out.log 2>&1 )
 RC=$?
 check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -qi "rollback" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" status refused
+check "recusou (status refused)"   $?
+"$TCHECK" envhas "$D/out.log" detail rollback
 check "reports rollback"           $?
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg restored byte-exact"  $?
