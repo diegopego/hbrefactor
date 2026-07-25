@@ -1,0 +1,12 @@
+{
+  "schema": "cli-1",
+  "command": "exec-registry",
+  "status": "refused",
+  "reason": "no-machine-contract-yet",
+  "action": "stop-and-report",
+  "detail": "'exec-registry' does not speak --json yet - run it without --json and read the prose, or use a command that does",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+}
+

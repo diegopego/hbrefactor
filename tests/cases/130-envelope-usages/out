@@ -1,0 +1,61 @@
+{
+  "schema": "cli-1",
+  "command": "usages",
+  "status": "ok",
+  "reason": null,
+  "action": null,
+  "detail": "2 result(s) for 'Dobro'",
+  "diagnostics": [],
+  "result":
+  {
+    "query": "Dobro",
+    "total": 2,
+    "returned": 2,
+    "truncated": false,
+    "locations":
+    [
+      {
+        "uri": "file://<CWD>/app.prg",
+        "range":
+        {
+          "start":
+          {
+            "line": 4,
+            "character": 13
+          },
+          "end":
+          {
+            "line": 4,
+            "character": 18
+          }
+        },
+        "kind": "call",
+        "owner": "MAIN",
+        "certainty": "confirmed",
+        "text": "nTotal += Dobro( 2 )"
+      },
+      {
+        "uri": "file://<CWD>/app.prg",
+        "range":
+        {
+          "start":
+          {
+            "line": 10,
+            "character": 9
+          },
+          "end":
+          {
+            "line": 10,
+            "character": 14
+          }
+        },
+        "kind": "definition (function)",
+        "owner": null,
+        "certainty": "confirmed",
+        "text": "FUNCTION Dobro( nX )"
+      }
+    ]
+  },
+  "edits": []
+}
+

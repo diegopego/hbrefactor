@@ -40,8 +40,22 @@ STATIC FUNCTION Fail( cMsg )
 
    RETURN .F.
 
+// A.1: o `--json` passou a emitir UM ENVELOPE em stdout (a forma
+// `--json <arquivo>` morreu - CLAUDE.md §1.5, sem compatibilidade para trás).
+// O desembrulho fica AQUI, num ponto só: os assertos abaixo continuam falando
+// da carga (Location[], {owners,candidates}), que é o que eles de fato provam.
 STATIC FUNCTION JLoad( cPath )
-   RETURN hb_jsonDecode( hb_MemoRead( cPath ) )
+
+   LOCAL xJson := hb_jsonDecode( hb_MemoRead( cPath ) )
+
+   IF HB_ISHASH( xJson ) .AND. hb_HGetDef( xJson, "schema", "" ) == "cli-1"
+      xJson := hb_HGetDef( xJson, "result", { => } )
+      IF HB_ISHASH( xJson ) .AND. hb_HHasKey( xJson, "locations" )
+         xJson := xJson[ "locations" ]
+      ENDIF
+   ENDIF
+
+   RETURN xJson
 
 STATIC FUNCTION EndsW( cText, cSuf )
    RETURN Right( cText, Len( cSuf ) ) == cSuf

@@ -125,7 +125,7 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
 
-## A — A IA COMO CONSUMIDOR DE PRIMEIRA CLASSE (jamais FONTE de fato) — **ATIVA: A.2 entregue; A.1/A.3/A.4 em PORTÃO FECHADO**
+## A — A IA COMO CONSUMIDOR DE PRIMEIRA CLASSE (jamais FONTE de fato) — **ATIVA: A.2 entregue; A.1 ABERTA (Diego, 2026-07-24); A.3/A.4 em PORTÃO FECHADO**
 
 Spec: **[spec-a-oraculo-para-agentes.md](spec-a-oraculo-para-agentes.md)**. Regra durável:
 CLAUDE.md § 1.6.
@@ -154,7 +154,50 @@ ele vai querer *"converta este `DO CASE` em `SWITCH`"*. **O catálogo jamais alc
 imaginação de um LLM; o verificador alcança — porque não sabe nem se importa com qual foi a
 edição.**
 
-### A.1 — Contrato de máquina na CLI *(base: sem isto, nada em cima se apoia)* — PORTÃO FECHADO
+### A.1 — Contrato de máquina na CLI *(base: sem isto, nada em cima se apoia)* — **EM EXECUÇÃO (2026-07-25); plano em [plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)**
+
+> **DECISÃO DE ARQUITETURA (Diego, 2026-07-24/25), final:** o CLI é consumido por **VSCode
+> e Claude**, e só. A saída é o **envelope (JSON), e nada mais**. **Sem renderizador humano**
+> (a prosa é arrasto → deletada); a **flag `--json` some** (sempre-envelope); `Usage()` fica
+> texto puro. Ordem VERTICAL por comando (arrancar a flag agora deixaria ~1000 testes
+> vermelhos de uma vez). **Estado: passo 1 — 8 comandos de leitura no contrato, `usages`
+> COMPLETO (flagrante do Class:Method morto); faltam os verbos de edição.** Plano, ordem,
+> armadilhas e critério de pronto: o plano linkado acima. Estado de retomada: handoff § 0.
+
+> **O portão abriu com uma ordem de desenho junto:** *"quero que o Claude crie a especificação
+> para a interface CLI do hbrefactor que seja ideal para o Claude usá-la"* — e, na revisão,
+> **"os principais consumidores do hbrefactor são o VSCode e o Claude"**. A resposta é a
+> **§2.5 da spec**, com declaração de conflito de interesse (quem escreve é UM dos dois
+> consumidores) e a **§2.6** listando o que eu pedi e **retirei**.
+>
+> **A correção do Diego mudou o desenho, não a redação.** A primeira versão dizia *"compacto por
+> padrão, `--verbose` para o resto"* — o que poria o **default errado para a extensão** e criaria
+> DUAS formas de envelope para testar. Regra que ficou: **flag nenhuma muda a FORMA do envelope,
+> só o VOLUME** (`--limit` corta quantos itens, nunca quais campos). Um schema, e quem quer menos
+> pede menos **explicitamente**.
+>
+> **E ela expôs um buraco:** a extensão regexa **`stderr + stdout`**, e eu havia especificado só
+> o stdout. Sob `--json`, todo aviso (referência textual, macro vivo, alcance da P17) vira
+> **`diagnostics[]` no envelope** e o **stderr fica só para falha de processo** — senão o
+> `--json` é meia-entrega.
+>
+> **Escopo:** `describe --json` gerado da mesma fonte da `Usage()` (para mim é descoberta, para a
+> extensão é **detecção de descompasso** no startup); flag desconhecida sempre reprova ecoando o
+> conjunto válido, sem abreviação nem prefixo; **truncagem declarada**; `action` como CAMPO ao
+> lado do `reason`; **incerteza como campo POSITIVO, jamais ausência** — a regra que só o
+> consumidor sabe, porque ausência não me chama atenção **por construção**; `Location` LSP;
+> determinismo byte a byte; **a extensão reacoplada na mesma fase**, com régua de zero regex de
+> prosa nela.
+>
+> **O `scope` do `ast-19` entra aqui:** a P17 acabou de produzir o fato, e sob `--json` ele vira
+> `scope: { complete, unseen[] }` — com `complete: true` **explícito**, senão eu leio todo rename
+> como completo.
+>
+> **Casos novos nascem no formato da fase T** (`tests/casedir.sh`): o `out` byte a byte é o que
+> prova o envelope inteiro, inclusive o que ele NÃO traz.
+
+**A contradição que se fecha:** a ferramenta **proíbe comparação de texto no MOTOR e obriga
+comparação de texto no CONSUMIDOR**. A extensão decide **fluxo** casando prosa (`/--force/`,
 
 **A contradição que se fecha:** a ferramenta **proíbe comparação de texto no MOTOR e obriga
 comparação de texto no CONSUMIDOR**. A extensão decide **fluxo** casando prosa (`/--force/`,

@@ -1,0 +1,19 @@
+{
+  "schema": "cli-1",
+  "command": "usages",
+  "status": "ok",
+  "reason": null,
+  "action": null,
+  "detail": "0 result(s) for 'NaoExiste'",
+  "diagnostics": [],
+  "result":
+  {
+    "query": "NaoExiste",
+    "total": 0,
+    "returned": 0,
+    "truncated": false,
+    "locations": []
+  },
+  "edits": []
+}
+

@@ -525,7 +525,8 @@ check "a.prg untouched"            $?
 unit_18() {
 echo "case 18: usages --json emits LSP Location[]"
 D=$(fresh case18)
-( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Dupla > out.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > locs.json 2>/dev/null )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 "$TCHECK" locs18 "$D/locs.json"
@@ -533,7 +534,7 @@ check "Location[] valid with def+call" $?
 # spec ABSOLUTO (o caminho que a extensão VSCode sempre passa): o URI não
 # pode duplicar o prefixo do cwd - regressão do LocationsJson (hb_PathJoin,
 # não hb_FNameMerge, para não concatenar caminho já absoluto)
-( cd "$D" && "$BIN" usages "$D/fix01.hbp" Dupla --json absl.json > /dev/null 2>&1 )
+( cd "$D" && "$BIN" usages "$D/fix01.hbp" Dupla --json > absl.json 2> /dev/null )
 "$TCHECK" absuri18 "$D/absl.json"
 check "absolute spec: URI not doubled (extension path)" $?
 
@@ -635,7 +636,8 @@ check "alias-> read listed as field" $?
 unit_26() {
 echo "case 26: usages --json carries real columns"
 D=$(fresh case26)
-( cd "$D" && "$BIN" usages fix01.hbp Dupla --json locs.json > out.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Dupla > out.log 2>&1 )
+( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > locs.json 2>/dev/null )
 "$TCHECK" cols26 "$D/locs.json"
 check "columns present in Location[]" $?
 
@@ -1758,7 +1760,7 @@ grep -q "confirmed send (receiver class CAIXA via declared types) in USA  | x:So
 check "cross-módulo: declared de r1 classifica send em r2" $?
 # --json (o que a extensão VSCode consome no find-references): excluded é
 # não-referência PROVADA e NÃO pode virar Location; confirmed/possible sim
-( cd "$D" && "$BIN" usages fixrcv.hbp Caixa:Soma --json locs.json > /dev/null 2>&1 )
+( cd "$D" && "$BIN" usages fixrcv.hbp Caixa:Soma --json > locs.json 2> /dev/null )
 "$TCHECK" json62 "$D/locs.json"
 check "--json: excluded fora das Locations, confirmed/possible dentro" $?
 
@@ -1840,7 +1842,8 @@ for f in d1.prg d2.prg d3.prg d4.prg; do
    check "fixdis/$f clean under -w3 -es2" $?
 done
 D=$(freshdis case66)
-( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json pm.json > pm.log 2>&1 )
+( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint > pm.log 2>&1 )
+( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json > pm.json 2>/dev/null )
 check "usages UWMain:Paint exit 0" $?
 grep -q "confirmed send (receiver class UWMAIN via declared types) in USA66  | oM:Paint()" "$D/pm.log"
 check "oM (instância exata de UWMain) segue confirmed" $?
@@ -1915,7 +1918,8 @@ echo "case 70: B4f-2 - homônimos de DECLARAÇÃO: protótipo/impl de outra clas
 # possible. Q4: resolução da consultada que atravessa vínculo escrito é
 # rebaixada a indecidível (o "alvo do dispatch por herança" virou possible).
 D=$(freshdis case70)
-( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json pm.json > pm.log 2>&1 )
+( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint > pm.log 2>&1 )
+( cd "$D" && "$BIN" usages fixdis.hbp UWMain:Paint --json > pm.json 2>/dev/null )
 check "usages UWMain:Paint exit 0" $?
 grep -q "d1.prg:13: method declaration (class UWMAIN)  | METHOD Paint()" "$D/pm.log"
 check "protótipo da consultada vira declaração (era 'possible reference in string')" $?
@@ -1967,7 +1971,8 @@ for f in m1.prg m2.prg m3.prg; do
    check "fixhom/$f clean under -w3 -es2" $?
 done
 D=$(freshhom case72)
-( cd "$D" && "$BIN" usages fixhom.hbp Totem:Brilho --json tb.json > tb.log 2>&1 )
+( cd "$D" && "$BIN" usages fixhom.hbp Totem:Brilho > tb.log 2>&1 )
+( cd "$D" && "$BIN" usages fixhom.hbp Totem:Brilho --json > tb.json 2>/dev/null )
 check "usages Totem:Brilho (dono de DSL) exit 0" $?
 grep -q "m1.prg:19: cog declaration (rig TOTEM)  | COG Brilho GIVES Totem" "$D/tb.log"
 check "declaração do próprio DSL confirmada NO VOCABULÁRIO do DSL (cog + dono rig, Q6)" $?
@@ -2017,7 +2022,8 @@ check "comando sobre classe de FORA do projeto (TBrowse): possible honesto" $?
 # runtime (provado: __objHasMsg NT e _NT) e declara via `_HB_MEMBER { a, b }`
 # (a lista do canal). Consumo genérico: writes casam, resolvem pelo par e
 # o site do VAR aparece.
-( cd "$D" && "$BIN" usages fixhom.hbp Grade:nT --json gn.json > gn.log 2>&1 )
+( cd "$D" && "$BIN" usages fixhom.hbp Grade:nT > gn.log 2>&1 )
+( cd "$D" && "$BIN" usages fixhom.hbp Grade:nT --json > gn.json 2>/dev/null )
 grep -q "confirmed send (receiver declared AS CLASS GRADE) in GRADE_NEW  | ::nT := n" "$D/gn.log"
 check "ESCRITA ::nT := n casa e confirma (fato 11 + Self tipado)" $?
 grep -q "excluded send within the declared class graph (dispatches to LOUSA:NT) in LOUSA_NEW" "$D/gn.log"
@@ -2042,7 +2048,8 @@ echo "case 73: B4f-3 - DSL REAL do contrib (xhb/cstruct.ch): classes de RUNTIME,
 D=$(freshcst case73)
 ( cd "$D" && "$HB_BIN/harbour" c1.prg -n -q0 -w3 -es2 -s -I"$HB_BIN/../../../include" -I. > /dev/null 2>&1 )
 check "fixcst/c1.prg (cstruct REAL) clean under -w3 -es2" $?
-( cd "$D" && "$BIN" usages c1.hbp Ponto:x --json px.json > px.log 2>&1 )
+( cd "$D" && "$BIN" usages c1.hbp Ponto:x > px.log 2>&1 )
+( cd "$D" && "$BIN" usages c1.hbp Ponto:x --json > px.json 2>/dev/null )
 check "usages Ponto:x sobre o DSL real exit 0" $?
 grep -q "possible send (dynamic dispatch, receiver unknown) in USACST  | p:x := 1" "$D/px.log"
 check "ESCRITA p:x := 1 listada (fato 11) como possible honesto" $?
@@ -2497,7 +2504,7 @@ check "forma da extensão (tudo absoluto): mesma resposta com specs absolutos" $
 RC=$?
 [ $RC -eq 0 ] && [ ! -s "$D/own4.log" ]
 check "órfão: resposta válida VAZIA com exit 0 (picker cai para todos)" $?
-( cd "$D" && "$BIN" projects-of s.prg p1.hbp p2.hbp --json own.json > /dev/null 2>&1 )
+( cd "$D" && "$BIN" projects-of s.prg p1.hbp p2.hbp --json > own.json 2> /dev/null )
 "$TCHECK" pof83 "$D/own.json"
 check "--json: o array que a extensão decodifica (tcheck via hb_jsonDecode)" $?
 ( cd "$D" && "$BIN" projects-of a.prg naoexiste.hbp p1.hbp > own5.log 2> own5.err )
@@ -3221,7 +3228,7 @@ RC=$?
 check "órfão: donos vazios com exit 0 (busca ampla não achou dono)" $?
 # 4) JSON do modo descoberta: objeto { owners, candidates } por proximidade -
 # candidates[1] é o decoy (mais perto), owners são os donos de FATO
-( cd "$D" && "$BIN" projects-of "$D/sub/deep/leaf.prg" --root "$D" --json d1.json > /dev/null 2>&1 )
+( cd "$D" && "$BIN" projects-of "$D/sub/deep/leaf.prg" --root "$D" --json > d1.json 2> /dev/null )
 "$TCHECK" pof102 "$D/d1.json"
 check "--json: objeto {owners,candidates}; candidato mais próximo (decoy) no topo" $?
 # as guardas do lado da extensão (ownerOf/--root/dedup/rótulos) vivem no
@@ -4596,6 +4603,42 @@ check "recusa ANTES de editar: fontes byte a byte intactos" $?
 check "régua do caso 64: nenhuma palavra da fixture fixviv na ferramenta" $?
 }
 
+unit_130() {
+# A.1 - o ENVELOPE. Um envelope em stdout e NADA mais; forma estável (todos os
+# campos sempre presentes); `certainty` explícito inclusive no caso fácil.
+run_casedir "$HERE/cases/130-envelope-usages"
+}
+
+unit_131() {
+# A.1 - "zero resultados" e' resposta OK, jamais recusa. Hoje sai EXIT_REFUSED
+# e o agente nao distingue "nao ha' usos" de "eu me recusei" - e' o bug que
+# mais empurra um LLM de volta para editar texto na mao.
+run_casedir "$HERE/cases/131-zero-nao-e-recusa"
+}
+
+unit_132() {
+# A.1 - o PORTÃO do contrato de máquina. Eu introduzi o bug e ele passou pela
+# suíte: ao separar o canal humano (Prose), os comandos ainda NÃO migrados
+# passaram a sair VAZIOS sob --json, com exit 0 - silêncio indistinguível de
+# sucesso, que é o pior modo de falha que esta ferramenta pode ter. O portão
+# vive no ponto ÚNICO de saída, então comando futuro nenhum escapa dele.
+run_casedir "$HERE/cases/132-json-nunca-silencioso"
+
+# régua: nenhum comando pode sair calado sob --json. Roda TODOS os comandos que
+# o binário expõe e reprova o que devolver stdout vazio.
+bash "$HERE/regua-json.sh" "$BIN" "$HERE/cases/132-json-nunca-silencioso/before" > "$HERE/tmp/regua-json.log" 2>&1
+check "régua: NENHUM comando sai calado sob --json" $?
+[ -s "$HERE/tmp/regua-json.log" ] && cat "$HERE/tmp/regua-json.log"
+
+# régua dos DOIS CANAIS (correção de rumo do Diego, 2026-07-24): a prosa é
+# RENDERIZAÇÃO do fato, não um canal paralelo - logo ela não pode mostrar nada
+# que o JSON não carregue. O consumidor de máquina recebia MENOS que o humano.
+bash "$HERE/regua-canais.sh" "$BIN" "$HERE/cases/130-envelope-usages/before" \
+     usages app.hbp Dobro > "$HERE/tmp/regua-canais.log" 2>&1
+check "régua: a prosa não mostra fato que o JSON não tem" $?
+[ -s "$HERE/tmp/regua-canais.log" ] && cat "$HERE/tmp/regua-canais.log"
+}
+
 unit_128() {
 # P17 - PRIMEIRO caso no formato DECLARATIVO (tests/casedir.sh): o estado
 # esperado é uma FIXTURE, não um grep. Prova as três coisas de uma vez - o
@@ -4625,7 +4668,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

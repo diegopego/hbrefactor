@@ -46,8 +46,13 @@ run_casedir() {
    [ -f "$dir/exit" ] && exp_exit="$(tr -d ' \n' < "$dir/exit")"
 
    # o comando roda DENTRO do tmp: caminhos relativos na saída (sem tmpdir)
-   ( cd "$d" && eval "\"$BIN\" $(cat "$dir/cmd")" > out.log 2>&1 )
+   ( cd "$d" && eval "\"$BIN\" $(cat "$dir/cmd")" > out.raw 2>&1 )
    got_exit=$?
+   # NORMALIZAÇÃO do que é legitimamente variável por máquina. O `uri` do
+   # formato LSP é ABSOLUTO por contrato (a extensão VSCode precisa dele
+   # assim), então a fixture guarda <CWD> no lugar do diretório do caso.
+   # Só isto se normaliza: qualquer outra variação é drift de verdade.
+   sed "s|$d|<CWD>|g" "$d/out.raw" > "$d/out.log"
    [ "$got_exit" = "$exp_exit" ]
    check "exit $got_exit == esperado $exp_exit" $?
 

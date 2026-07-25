@@ -12,7 +12,47 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-## 0. O ESTADO EXATO (2026-07-14, fim da sessão) — **LEIA ISTO PRIMEIRO**
+## 0. O ESTADO EXATO (2026-07-25, fim da sessão) — **LEIA ISTO PRIMEIRO**
+
+**A frente ativa é a FASE A.1 — o CLI vira contrato de máquina para VSCode e Claude.**
+Plano completo (o *como*, a ordem, as armadilhas): **[plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)** — LEIA-O INTEIRO ao retomar. Spec: fase A.1 no
+roadmap + §2.5 da spec-a.
+
+**A decisão do Diego (2026-07-24/25), final:** o hbrefactor é consumido por **VSCode e
+Claude**, e só. A saída de um comando é o **envelope (JSON), e nada mais**. Não há
+renderizador humano — a prosa (`Prose()`) é arrasto e VAI SER DELETADA. A flag `--json`
+some (vira sempre-envelope). `Usage()`/ajuda continua texto puro. *"não importa o tamanho
+das alterações que isso implique."*
+
+**O ESTADO DO CÓDIGO — trabalho GRANDE em andamento, NÃO committado.** `make test` **1034/0**,
+`make ppcorpus` **121/0**, árvore verde. Working tree sujo (o commit `85f2f69` do P17 é o
+último committado; TUDO da A.1 está por commitar):
+- `src/hbrefactor.prg` — o envelope (`EnvHash`/`Ok`/`Refuse`/`Diag`), a flag `--json`
+  global (`TakeJsonFlag`), o canal humano `Prose()` (andaime), o gate de saída única, e o
+  **contrato dos 8 comandos de leitura** — com o **`usages` COMPLETO** (kind/owner/
+  certainty/text em cada location; o flagrante do `Class:Method` está MORTO).
+- `tests/` — `casedir.sh` (formato declarativo), `regua-json.sh` (placar), `regua-canais.sh`,
+  `tcheck.prg` (JLoad desembrulha o envelope), casos 130/131/132, e os 17 sítios de
+  `--json <arquivo>` migrados para `--json > arquivo`.
+- `docs/` — o plano, a spec-a §2.5, a fase A.1 e a fase T no roadmap.
+
+**A PRÓXIMA sessão começa no PASSO 1 do plano, item ⬜: os verbos de edição.** Modelar
+`edits[]` + veredito de `rename` (e a família), `extract-function`, `inline-local`,
+`reorder-params`, `annotate`, `exec-registry`. Depois: migrar os ~600 asserts (passo 2),
+arrancar prosa+flag (passo 3), extensão (passo 4), landing page (passo 5).
+
+**DECISÃO DO DIEGO PENDENTE (passo 5):** a landing page/manual mostram transcrição do CLI
+(prosa). Sem prosa, ou a página mostra a experiência da IDE, ou aceita blocos de JSON. Ele
+autorizou refazer a página ("refaça a landing page se preciso") — mas a FORMA (IDE × JSON)
+é escolha dele.
+
+**Antes de commitar:** o commit deste incremento (contrato do usages + 8 comandos + réguas)
+foi OFERECIDO ao Diego e ele pediu "crie o plano e handoff" — ou seja, **o commit ainda não
+foi autorizado**. Confirmar com ele.
+
+---
+
+## 0-a1. O ESTADO EXATO (2026-07-14, fim da sessão) — frente ANTERIOR (corpus do pp, ARQUIVADA)
 
 **A frente ativa é o CORPUS DO PP, e ele mudou de MÉTODO.** Retomando o estudo do pp?
 **Cole `docs/pp-corpus/METODO.md` inteiro** — é o prompt, e ele carrega o **modelo mental**

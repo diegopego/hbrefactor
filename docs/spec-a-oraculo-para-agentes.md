@@ -133,6 +133,312 @@ uma linha de código.** O critério de pronto do A.1 mata as quatro.
 
 ---
 
+### 2.5 OS DOIS CONSUMIDORES — a extensão VSCode e o agente
+
+*(Escrita por ordem do Diego, 2026-07-24: **"quero que o Claude crie a especificação para a
+interface CLI que seja ideal para o Claude usá-la"**; **revisada na mesma sessão** pela
+correção dele: **"os principais consumidores do hbrefactor são o VSCode e o Claude"**.)*
+
+> **Declaração de interesse, e ela vem antes de tudo.** Quem escreve esta seção é UM dos dois
+> consumidores sendo projetados. Isso dá informação que ninguém mais tem — eu sei como eu erro —
+> e cria um **conflito** em dois eixos: pedir o que me é CONVENIENTE em vez do que mantém a
+> ferramenta honesta, e **projetar para mim degradando o outro consumidor**. A primeira versão
+> desta seção fez exatamente isso (ver a correção na §2.5.4, que é uma decisão de desenho, não
+> um detalhe de redação). Toda regra passou por um teste: *ela me tornaria mais capaz de
+> RELATAR, ou mais capaz de CONTORNAR?* A que não sobreviveu está na §2.6.
+
+**Os dois são de primeira classe, e nenhum é hipotético.** A extensão é o consumidor de **uso
+diário do Diego** (CLAUDE.md §5: *"todo comando novo tem que chegar à `extension.js`"*); o
+agente é a tese da fase. Eles têm um **substrato comum** e **divergem num eixo só** — e é
+preciso ser exato sobre qual, porque projetar para um deles no eixo errado quebra o outro.
+
+|  | extensão VSCode | agente (Claude) |
+|---|---|---|
+| escrita contra | **uma versão**, por quem leu | um **prior difuso**, que pode estar errado |
+| erra | uma vez, no desenvolvimento | **a cada chamada**, de formas novas |
+| o que faz com a saída | **decide fluxo** e desenha UI | decide fluxo e **relata ao humano** |
+| custo do volume | ~zero (filtra e vira lista virtual) | **alto** — disputa espaço com o problema |
+| posição | `vscode.Location` é a API **nativa** | LSP é conhecimento que eu **já tenho** |
+
+#### 2.5.0 A PROSA É UMA VISTA DO FATO, não um canal paralelo
+
+*(Correção de rumo do Diego, 2026-07-24, no meio da implementação: **"a prosa a meu ver é
+apenas um dos argumentos de saída; as ferramentas como IDE e o Claude via MCP precisam de
+dados adequados além da prosa"**. Ele estava certo, e o erro era meu — de arquitetura, não de
+formato.)*
+
+**O que eu tinha construído:** dois caminhos paralelos — os `Prose()` de um lado, a coleta de
+`result` do outro. Sintoma de que estava errado: eu precisei forçar o rótulo (`kind`) a sair da
+**mesma variável** que a prosa, um remendo manual contra a divergência.
+
+**A prova de que era errado, medida no próprio código:**
+
+```
+$ hbrefactor usages app.hbp Dobro          $ hbrefactor usages app.hbp Dobro --json
+app.prg:5: call in MAIN  | nTotal += ...     { "kind": "call", "owner": "MAIN",
+                           ^^^^^^^^^^^^        "certainty": "confirmed" }
+                     a linha do FONTE                     (sem ela)
+```
+
+**O consumidor de MÁQUINA recebia MENOS que o humano.** A IDE precisa daquele texto para o
+preview do find-references; um servidor MCP teria de **reabrir o arquivo** para completar a
+resposta — e reler é DECIDIR, o que **reprova o critério de matar da §4** (*"se o servidor
+precisar decidir algo que a CLI não decidiu, ele morre — e a necessidade dele prova que o
+contrato do A.1 ficou ruim"*). Ou seja: o buraco reprovaria a A.3 lá na frente.
+
+**O modelo correto:**
+
+```
+        FATO (o result estruturado)
+              ├── renderizado como prosa  → humano no terminal
+              └── emitido como JSON       → IDE, MCP, agente
+```
+
+Com isso duas coisas ficam **impossíveis por construção**, em vez de dependerem do meu cuidado:
+a prosa mostrar algo que o dado não tem, e os dois divergirem.
+
+**Corolário — o dado é SUPERCONJUNTO da prosa, nunca o contrário.** O JSON pode carregar mais
+(o `text` da definição, que a prosa não imprime); o que ele **não pode** é carregar menos.
+
+**O que NÃO entra, e a discordância é minha:** a prosa **não** vira campo do JSON (`"prose":
+"<o texto inteiro>"`). Seria dado redundante — para o agente custa contexto, para a IDE é
+inútil porque ela renderiza do jeito dela. A prosa é **derivada**, não **transportada**. O
+`detail` de uma frase continua, porque esse serve para o consumidor **mostrar** sem compor
+nada.
+
+**Portão** (`tests/regua-canais.sh`): para cada `arquivo:linha` que a prosa cita, o JSON tem de
+trazer a location correspondente; e se a prosa mostra a linha do fonte, o dado tem de carregar
+o campo `text`. *(A régua nasceu passando por VACUIDADE — sem `HB_BIN` o binário não rodava e
+as duas listas ficavam vazias. Ela agora se recusa a passar sem ter medido: é a mesma cicatriz
+do §T, e não é coincidência que tenha reaparecido.)*
+
+#### 2.5.1 O que os DOIS precisam igualmente (e é a maior parte)
+
+- **Nenhuma decisão de fluxo por prosa.** Hoje a extensão casa `/--force/`, `/--edit-rules/`,
+  `/no compile-time identifier/`, `/BROKEN/` — e eu faria o mesmo, pior. `reason` + `action`
+  como campos servem aos dois **exatamente igual**.
+- **Aviso é DADO, não prosa no stderr.** *(Buraco da primeira versão desta seção, achado ao ler
+  a extensão: ela concatena `res.stderr + res.stdout` para regexar.)* Sob `--json`, tudo o que
+  hoje sai por `OutErr` — referências textuais, macro vivo (P16 c), alcance incompleto (P17) —
+  entra no envelope como **`diagnostics[]`**, cada item com `code`, `severity`, `location` e
+  `detail`. **Sem isto o `--json` é meia-entrega**: o stdout fica estruturado e o consumidor
+  continua regexando prosa do stderr. Sob `--json`, **stderr só carrega falha de processo**.
+- **`edits[]` sob `--dry-run`** — para a extensão é um `WorkspaceEdit` aplicável e um preview
+  nativo; para mim é o que eu mostro ao humano antes de aplicar. Mesmo dado, dois usos.
+- **Incerteza como campo POSITIVO, jamais ausência** (a regra da §2.5.3, que vale para os dois).
+- **Determinismo byte a byte** — a extensão cacheia, eu comparo execuções.
+- **Nomes estáveis** entre comandos, `Location` LSP em todo lugar.
+- **`describe --json`** serve aos dois por motivos diferentes, e o da extensão eu não tinha
+  visto: para mim é **descoberta** (não decorei o manual); para ela é **detecção de
+  descompasso** — ela confere no startup que o binário encontrado fala o schema que ela espera,
+  em vez de falhar estranho no terceiro comando. É o mesmo remédio do caso 122, do lado do
+  consumidor.
+
+#### 2.5.2 O que só EU preciso — porque eu erro de um jeito que um programa não erra
+
+- **Alucino flags.** Vou inventar `--recursive`, `--all`, `--format=json`, `-y`. Flag
+  desconhecida tem de **reprovar sempre** (`usage`, exit ≠ 0) **ecoando o conjunto válido** — e
+  **sem abreviação e sem prefixo único**: `--for` não pode virar `--force`. Adivinhar a minha
+  intenção seria a ferramenta fazendo heurística, que é o que ela proíbe. *(Coerente com a §7 do
+  CLAUDE.md: o projeto já escolheu a família `x` do pp para não ter casamento por abreviação.)*
+  Para a extensão isso é inócuo — ela não inventa flag.
+- **Meu contexto é finito.** Ver a §2.5.4, que é onde os dois divergem de verdade.
+- **A recusa precisa dizer o que FAZER**, não só o que houve. A extensão pode traduzir um
+  `reason` num botão porque foi programada para isso; eu, diante de um código que não entendo,
+  faço o que sou famoso por fazer: **edito o texto na mão**. Daí `action` ser campo:
+
+  ```json
+  { "status": "refused",
+    "reason": "textual-refs-require-force",
+    "action": "ask-human-then-retry",
+    "retry": { "flag": "--force" },
+    "detail": "textual references found - repeat with --force to proceed without touching them" }
+  ```
+
+  `stop-and-report` × `ask-human-then-retry` × `fix-environment` — a taxonomia da §2.3 virada
+  dado. O `reason` diz o que houve; o `action` diz o que fazer. **Os dois, sempre.**
+
+#### 2.5.3 A regra que eu só sei porque sou eu que erro
+
+**INCERTEZA É CAMPO POSITIVO, NUNCA AUSÊNCIA.**
+
+Se a dúvida for expressa **pela falta** de um campo — sem `certainty`, logo é certo — eu **vou**
+perder. Não às vezes: por construção. Eu generalizo do que está presente; ausência não me chama
+atenção, e quando eu resumo ao humano o que não estava escrito não aparece.
+
+- `certainty` **explícito e sempre presente** (`possible`/`confirmed`/`excluded`/`guaranteed` —
+  a escada que a ferramenta já tem), inclusive no caso fácil;
+- alcance incompleto é **campo**, não observação no `detail`. A P17 (entregue hoje) é o exemplo
+  vivo: `"scope": { "complete": false, "unseen": [ { "file": "...", "line": 248,
+  "cond": "__PLATFORM__WINDOWS" } ] }` — e `"complete": true` sai **igualmente explícito**
+  quando não há região pulada. Se "completo" for a ausência de `scope`, eu leio todo rename como
+  completo;
+- vale também para o que a ferramenta decidiu **CALAR** por fato (a ocorrência em dado da
+  P16 a): num JSON o silêncio não se distingue do nada, então a supressão deliberada precisa
+  aparecer.
+
+Para a extensão essa regra é barata (um `if` a mais). Para mim é a diferença entre relatar e
+enganar. **Custo assimétrico, benefício assimétrico — e por isso ela entra.**
+
+#### 2.5.4 Onde os dois DIVERGEM — e a correção que a revisão do Diego forçou
+
+O único eixo de conflito real é **volume**: eu preciso de pouco, a extensão aguenta tudo.
+
+**A primeira versão desta seção resolvia isso errado:** *"compacto por padrão, `--verbose` para
+o resto"*. Isso obrigaria a extensão a passar `--verbose` sempre — ou seja, o **default estaria
+errado para um dos dois consumidores principais** — e, pior, criaria **duas FORMAS de envelope**
+para testar, com cada consumidor podendo receber a que não espera.
+
+**A regra que fica, e ela é geral:**
+
+> **Flag nenhuma muda a FORMA do envelope — só o VOLUME.** Os mesmos campos, sempre, com o
+> mesmo significado. `--limit N` corta **quantos itens** vêm; jamais quais campos cada item tem.
+
+Assim há **um** schema para testar, e o consumidor que quer menos pede menos **explicitamente**
+— o que é auditável, ao contrário de um default que muda por baixo.
+
+E o corolário que a P17 acabou de comprar na marra: **truncagem DECLARADA**.
+`"truncated": true, "total": 4127, "returned": 200`. Lista curta calada é indistinguível de
+lista completa, e eu relato *"são 200 usos"* com toda a confiança do mundo. É a mesma regra do
+CLAUDE.md §4 (*"no silent caps"*), agora do lado do consumidor.
+
+O `detail` em prosa fica fora do caminho de decisão dos dois — mas com um requisito prático que
+vem de ambos: a extensão o mostra num modal, eu o copio ao humano. Logo ele tem de ser **uma
+frase que faz sentido sozinha**, sem o resto do JSON em volta.
+
+#### 2.5.5 Os quatro pontos em que eu sou diferente, resumidos
+
+Ficam aqui porque cada um virou requisito acima: **(a)** não li o manual e minha lembrança dele
+pode estar errada → `describe`; **(b)** alucino flags → reprovação com o conjunto válido;
+**(c)** contexto finito → `--limit` com truncagem declarada, forma estável; **(d)** trabalho em
+loop propor→verificar→relatar → `edits[]` no dry-run e `action` na recusa.
+
+**(a) Eu não li o manual, e a minha lembrança dele pode estar ERRADA.** Chamo a ferramenta a
+partir de um prior difuso — o que vi de CLIs parecidas, o que li desta há dez mil tokens, o
+que eu *acho* que uma ferramenta assim deveria ter. Requisito: **descoberta em tempo de
+execução**, não decoreba.
+
+- `hbrefactor describe --json` emite o **manifesto de capacidades**: comandos, argumentos
+  posicionais, flags (com tipo e default), os `reason` que cada comando pode devolver, e a
+  versão de schema de cada `result`. É o mesmo fato que o MCP anuncia pelo protocolo (§4) —
+  **uma fonte, dois transportes**.
+- O manifesto é gerado **do mesmo lugar** que a `Usage()` humana. Manifesto que se escreve à
+  mão envelhece — e envelhecer calado é o modo de falha que esta fase existe para matar.
+
+**(b) Eu ALUCINO flags.** Vou inventar `--recursive`, `--all`, `--format=json`, `-y`. Se a
+ferramenta **ignorar em silêncio** o que não conhece, eu acredito que usei — e relato ao humano
+uma garantia que nunca existiu. Requisito:
+
+- **flag/argumento desconhecido = `usage`, exit ≠ 0, SEMPRE.** Nunca ignorar.
+- a recusa **ecoa o conjunto válido** para aquele comando. Sem isso eu tento de novo às cegas, e
+  o loop de tentativa é onde eu queimo contexto e paciência do humano.
+- **sem abreviação e sem prefixo único.** `--for` não pode virar `--force`: eu escrevo prefixo
+  errado com frequência, e adivinhar a minha intenção é heurística — do lado da ferramenta,
+  justamente o que ela proíbe. *(Coerente com a §7 do CLAUDE.md: o projeto escolheu a família
+  `x` do pp exatamente para não ter casamento por abreviação.)*
+
+**(c) O meu contexto é FINITO, e a saída disputa espaço com o problema do usuário.** Um `usages`
+de 4.000 hits não me deixa mais informado: me deixa **sem espaço para pensar**. Requisito:
+
+- **compacto por padrão**, `--verbose` para o resto. Nada de campo decorativo em toda linha.
+- **`--limit N` com truncagem DECLARADA**: `"truncated": true, "total": 4127, "returned": 200`.
+  **Silêncio jamais** — uma lista truncada calada é indistinguível de uma lista completa, e eu
+  vou relatar "são 200 usos" com toda a confiança do mundo. *(É a mesma regra que o CLAUDE.md
+  §4 já impõe aos números da página: "no silent caps".)*
+- o `detail` em prosa fica **fora** do caminho de decisão (§2.2 já diz isso) — mas vale a
+  consequência prática: ele existe para eu **copiar ao humano**, então tem que ser uma frase
+  que faz sentido sozinha, sem o resto do JSON.
+
+**(d) Eu trabalho em LOOP: propor → verificar → relatar.** A ferramenta não é o meu destino, é
+o meu **oráculo** no meio do loop. Requisito: cada resposta tem que me dizer **em que ponto do
+loop eu estou**.
+
+- `--dry-run --json` devolve `edits[]` como **dado** — é assim que eu mostro ao humano ANTES de
+  aplicar, que é a única forma de ele consentir de verdade.
+- A recusa carrega o que FAZER, e isso é **campo**, não parágrafo:
+
+  ```json
+  { "status": "refused",
+    "reason": "textual-refs-require-force",
+    "action": "ask-human-then-retry",
+    "retry": { "flag": "--force" },
+    "detail": "textual references found - repeat with --force to proceed without touching them" }
+  ```
+
+  Os três valores de `action` são a taxonomia da §2.3 virada dado: `stop-and-report`
+  (recusa de política), `ask-human-then-retry` (recusa acionável), `fix-environment`
+  (ambiente quebrado). **O `reason` diz o que houve; o `action` diz o que fazer.** Eu preciso
+  dos dois: sem o `reason` eu não sei relatar; sem o `action` eu improviso — e improviso, para
+  um LLM, quer dizer editar o texto na mão.
+
+**(e) A regra mais importante desta seção: INCERTEZA É CAMPO POSITIVO, NUNCA AUSÊNCIA.**
+
+Esta é a que eu só sei porque sou eu que erro. Se a dúvida for expressa **pela falta** de um
+campo — sem `certainty`, logo é certo — eu **vou** perder. Não às vezes: por construção. Eu
+generalizo do que está presente; ausência não me chama atenção, e quando eu resumo ao humano
+o que não estava escrito não aparece.
+
+- todo veredito traz `certainty` **explícito e sempre presente** (`possible` / `confirmed` /
+  `excluded` / `guaranteed` — a escada que a ferramenta já tem), inclusive quando é o caso
+  fácil;
+- todo relato de alcance incompleto é **campo**, não observação no `detail`. A P17 (entregue
+  hoje) é o exemplo vivo: `"scope": { "complete": false, "unseen": [ { "file": "...",
+  "line": 248, "cond": "__PLATFORM__WINDOWS" } ] }` — e `"complete": true` sai **igualmente
+  explícito** quando não há região pulada. Se "alcance completo" for a ausência de `scope`, eu
+  vou tratar todo rename como completo;
+- o mesmo vale para o `possible` do `usages`, para a string que é macro vivo (P16 c) e para a
+  ocorrência em dado suprimida por fato (P16 a) — **o que a ferramenta decidiu CALAR também é
+  fato**, e num JSON o silêncio não se distingue do nada.
+
+**(f) Nomes ESTÁVEIS entre comandos.** Eu generalizo de exemplo: se `usages` chama de `file` e
+`rename` chama de `path`, eu vou usar o errado na metade das vezes. Mesmo conceito → mesma
+chave, em toda a superfície. Posição é **LSP `Location`** em todo lugar (a `LocationsJson()` já
+é a semente) — não porque LSP seja bonito, mas porque **eu já o conheço**, e conhecimento que
+eu já tenho é contexto que eu não gasto.
+
+**(g) Determinismo byte a byte.** Mesma entrada → mesma saída, sem timestamp, sem caminho
+absoluto de temporário, sem ordem de hash. Isso me deixa **comparar duas execuções** — que é
+como eu verifico que uma mudança fez o que eu disse que faria — e é o que torna a fase T
+(fixture esperada) possível do lado do agente também.
+
+### 2.6 O que eu pedi e RETIREI — o teste do "relatar × contornar"
+
+Registrado porque o conflito de interesse da §2.5 só é honesto se as rejeições aparecerem.
+
+- **`"confidence": 0.87`** — REJEITADO. Número contínuo é convite à inferência: eu compararia
+  com um limiar que eu mesmo inventei, e a ferramenta inteira existe para não ter limiar
+  inventado. A certeza aqui é **categórica** e vem de fato (§2.5e).
+- **`"suggestion"` com o comando pronto para contornar a recusa** — REJEITADO na forma geral.
+  Dizer *"a flag que permitiria isto é `--force`"* é FATO e fica (`retry.flag`). Dizer *"rode
+  isto para resolver"* transforma toda recusa em **degrau**, e o §1.6 é explícito: a recusa tem
+  de ser legível para eu RELATAR, não para CONTORNAR.
+- **Modo "força bruta": aplicar sem verificar, para ganhar tempo** — REJEITADO. É o motor, não
+  a superfície. A latência se resolve na fase V, não desligando a prova.
+- **A ferramenta aceitar intenção em linguagem natural** (`hbrefactor "renomeie o método X"`) —
+  REJEITADO, e este era o mais tentador. Parsear intenção é heurística, e colocá-la DENTRO da
+  ferramenta contamina o motor. A tradução intenção → comando é **minha**, e é exatamente a
+  fronteira que o §1.6 desenha: eu proponho a intenção, ela decide o que é fato.
+- **`--yes` global** (pular confirmação) — REJEITADO: consentimento é do humano, e um agente que
+  pode pular consentimento é o modo de falha que este produto existe para eliminar.
+
+### 2.7 O que esta seção NÃO resolve, e é honesto dizer
+
+- **Latência.** Cada comando re-dumpa o projeto inteiro; num loop de agente isso é o custo
+  dominante, e nenhum formato de saída conserta. É a fase V (fatia 2), e o A.5 já a nomeia como
+  **pré-requisito, não detalhe**. **Dói nos DOIS consumidores** — na extensão é a espera que o
+  Diego sente todo dia; em mim é o custo de cada passo do loop.
+- **Progresso de operação longa.** A extensão hoje mostra spinner indeterminado, porque um
+  comando de 10 s sem sinal parece travado. Progresso real exigiria **stream** (NDJSON), o que
+  colide com *"um envelope, nada mais em stdout"*. **Fica FORA da A.1, de propósito**: resolver
+  latência (fase V) é melhor que instrumentar a espera. Registrado para não parecer esquecido.
+- **Cancelamento.** A extensão pode ter o usuário fechando o diálogo no meio. Hoje é matar o
+  processo — o que é seguro porque a ferramenta só escreve depois de provar, e reverte se
+  falhar. Nenhum requisito novo, mas vale estar escrito.
+- **Lote.** Eu frequentemente quero renomear dez coisas; hoje são dez carregamentos de projeto.
+  Um `--batch` é tentador e **fica fora desta fase de propósito**: sem a fase V ele só esconde o
+  custo, e com verificação por operação ele muda a semântica da prova (o que é "rollback" de um
+  lote parcialmente aplicado?). Registrado como pergunta aberta, não como item.
+
 ## 3. A.2 — `verify`: o oráculo exposto
 
 ### 3.1 O reframe
@@ -356,3 +662,37 @@ confiabilidade, não velocidade. Não misturar as duas.)*
   servidor **não contém decisão nenhuma**.
 - Régua do não-objetivo: nenhum `anthropic|openai|api[_-]?key|https?://` no fonte da ferramenta.
 - `make test` verde; `make site-check` verde.
+
+**Acrescentado pela §2.5 (os DOIS consumidores), tudo executável:**
+
+- **A prosa não mostra fato que o JSON não tenha** (`tests/regua-canais.sh`, §2.5.0) — e a
+  régua **recusa passar sem ter medido**, porque régua vazia é pior que régua nenhuma.
+- **Nenhum comando sai CALADO sob `--json`** (`tests/regua-json.sh`): o portão vive no ponto
+  ÚNICO de saída, então comando futuro nenhum escapa. *(Cicatriz: ao separar o canal humano eu
+  fiz os dez comandos não-migrados devolverem stdout VAZIO com exit 0 — silêncio indistinguível
+  de sucesso — e a suíte inteira passou verde por cima, porque nenhum caso os rodava com
+  `--json`.)*
+- **`diagnostics[]` no envelope**: sob `--json`, **stderr não carrega aviso nenhum** — só falha
+  de processo. Caso na suíte roda um comando que hoje avisa (macro vivo, alcance da P17) e
+  prova que o stderr saiu **vazio** e o aviso está no envelope. *(Sem isto o `--json` é
+  meia-entrega: a extensão hoje regexa `stderr + stdout`.)*
+- `describe --json` lista **todos** os comandos que o binário expõe — régua: comando vivo fora
+  do manifesto **reprova a suíte** (é a mesma classe de portão da régua da P17, que pegou o meu
+  próprio rot).
+- **Flag desconhecida reprova com `usage`** e o conjunto válido na saída — caso na suíte com uma
+  flag inventada; e `--for` **não** resolve para `--force` (sem prefixo, sem abreviação).
+- **`certainty` presente em 100%** dos vereditos emitidos, inclusive no caso fácil — caso que
+  falha se algum veredito sair sem o campo.
+- **`scope` presente sempre**, com `complete: true` explícito quando não há região pulada
+  (consome o `ppSkipped` do `ast-19`, entregue na P17).
+- **A FORMA do envelope não muda com flag** — só o volume: caso na suíte compara o **conjunto de
+  chaves** com e sem `--limit`, e ele tem de ser **idêntico**.
+- **Truncagem declarada**: `--limit N` sobre um resultado maior emite `truncated: true` com
+  `total`; caso na suíte prova que a lista curta **nunca** sai calada.
+- **Determinismo**: o mesmo comando duas vezes → stdout **byte-idêntico** (sem tempo, sem
+  caminho de temporário, sem ordem de hash). Caso na suíte compara as duas execuções.
+- **A extensão reacoplada NA MESMA FASE**, e a régua: **zero** regex de prosa em
+  `vscode/extension.js` (os quatro morrem), provado por grep no fonte dela — o mesmo tipo de
+  portão que a §9 já exigia, agora contado.
+- Formato dos casos novos: **fixture esperada** (fase T, `tests/casedir.sh`) — o `out` byte a
+  byte é o que prova o envelope inteiro, inclusive o que ele **não** traz.
