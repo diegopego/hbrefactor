@@ -51,6 +51,26 @@
 #define ACT_RETRY     "ask-human-then-retry"  // é possível; falta consentimento
 #define ACT_FIXENV    "fix-environment"       // não é sobre a refatoração: o projeto/toolchain
 
+// `reason` - o que HOUVE, como CÓDIGO. Ficam aqui, num lugar só, porque:
+// (a) o `describe --json` vai enumerá-los (critério de pronto da fase) e
+// manifesto que se escreve à mão apodrece; (b) código repetido como literal
+// solto vira dois códigos por um erro de digitação, e o consumidor decide
+// fluxo por ele. Migração dos ~300 sítios ainda `unclassified` é gradual: cada
+// caso que migra para o formato declarativo classifica o que ele exercita.
+//
+// FAMÍLIA "o nome novo não está livre" (rename de palavra de pp/DSL): todas
+// são recusa de POLÍTICA - a troca compilaria e mudaria a semântica calada. A
+// ação é sempre `stop-and-report`: escolher outro nome é decisão do humano
+// sobre o código dele, não algo que o agente contorne sozinho.
+#define RSN_HEAD_TAKEN   "new-name-already-rule-head"
+#define RSN_ABBR_NEW     "new-name-collides-by-abbreviation"
+#define RSN_ABBR_OLD     "old-name-collides-by-abbreviation"   // ambiguidade PRÉ-existente
+#define RSN_MATCH_WORD   "new-name-already-match-word"
+#define RSN_APP_WORD     "new-name-already-rule-word-in-use"
+#define RSN_CAPTURES     "new-name-captures-identifier"
+#define RSN_UNDONE       "renamed-rule-would-be-removed"
+#define RSN_NOT_RULEWORD "not-a-rule-word"                     // o velho não é palavra de regra
+
 // sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
 #define PP_PROBE_HIT "__HBREF_PP_HIT__"
 
@@ -7087,7 +7107,9 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
    NEXT
 
    // aplicações: tokens marker 0 (palavra literal da regra) com o texto -
-   // cobre a cabeça e as palavras secundárias (ACTION, AT, SAY...)
+   // cobre a cabeça e as keywords SECUNDÁRIAS da regra, quaisquer que sejam
+   // (a régua do caso 64 vale para comentário: ilustrar com a palavra de uma
+   // fixture é o mesmo vício de citar DSL conhecida no motor)
    FOR EACH hApp IN hAst[ "ppApplications" ]
       hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
       FOR EACH hTok IN hApp[ "tokens" ]
@@ -7284,18 +7306,20 @@ STATIC FUNCTION RenameDsl( aArgs )
             ! IsRuleDel( hRule )
             IF Upper( hRule[ "head" ] ) == cUpNew
                RETURN Refuse( "'" + cNew + "' is already a rule head (" + RuleTag( hRule ) + ;
-                              ", " + RuleWhere( hRule ) + ")" )
+                              ", " + RuleWhere( hRule ) + ")", RSN_HEAD_TAKEN )
             ENDIF
             // escrever o nome NOVO casaria com esta regra? (abreviação dBase
             // inclusive) - quem responde é o pp, não aritmética local
             IF PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpNew )
                RETURN Refuse( "'" + cNew + "' collides by abbreviation with rule " + ;
-                              RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
+                              RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")", ;
+                              RSN_ABBR_NEW )
             ENDIF
             IF PpHeadHit( Upper( hRule[ "head" ] ), hRule[ "kind" ], cUpOld )
                RETURN Refuse( "'" + cOld + "' collides by abbreviation with rule " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ") - " + ;
-                              "pre-existing ambiguity, resolve it before the rename" )
+                              "pre-existing ambiguity, resolve it before the rename", ;
+                              RSN_ABBR_OLD )
             ENDIF
          ENDIF
          // o nome novo já é palavra do match de alguma regra: a renomeada o
@@ -7312,7 +7336,8 @@ STATIC FUNCTION RenameDsl( aArgs )
                   ( ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 ) .OR. ;
                     hTok[ "role" ] == "restrict" )
                   RETURN Refuse( "'" + cNew + "' is already a match word of rule " + ;
-                                 RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" )
+                                 RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")", ;
+                                 RSN_MATCH_WORD )
                ENDIF
             NEXT
          ENDIF
@@ -7320,7 +7345,7 @@ STATIC FUNCTION RenameDsl( aArgs )
    NEXT
    IF Empty( aTargets )
       RETURN Refuse( "'" + cOld + "' is not a match word of any project pp rule " + ;
-                     "(head, secondary keyword or restriction)" )
+                     "(head, secondary keyword or restriction)", RSN_NOT_RULEWORD )
    ENDIF
 
    // A4: as colisões contra regra DESLIGADA foram poupadas acima - mas só são
@@ -7343,7 +7368,8 @@ STATIC FUNCTION RenameDsl( aArgs )
                            RuleTag( hDel ) + " at " + RuleWhere( hDel ) + " - after " + ;
                            "the rename that directive removes the renamed rule (it " + ;
                            "matches by pattern), and the sites would expand through " + ;
-                           RuleTag( aDead[ 2 ] ) + " (" + RuleWhere( aDead[ 2 ] ) + ")" )
+                           RuleTag( aDead[ 2 ] ) + " (" + RuleWhere( aDead[ 2 ] ) + ")", ;
+                           RSN_UNDONE )
          ENDIF
       NEXT
    NEXT
@@ -7377,7 +7403,7 @@ STATIC FUNCTION RenameDsl( aArgs )
                RETURN Refuse( "'" + cNew + "' collides by abbreviation with rule " + ;
                               RuleTag( hRule ) + " (" + RuleWhere( hRule ) + ")" + ;
                               " - after the rename, writing '" + cWitness + ;
-                              "' would match BOTH rules" )
+                              "' would match BOTH rules", RSN_ABBR_NEW )
             ENDIF
          NEXT
       NEXT
@@ -7392,7 +7418,7 @@ STATIC FUNCTION RenameDsl( aArgs )
             Upper( hTok[ "text" ] ) == cUpNew
             RETURN Refuse( "'" + cNew + "' is already an identifier used in " + ;
                            hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
-                           " - the renamed rule would capture it" )
+                           " - the renamed rule would capture it", RSN_CAPTURES )
          ENDIF
       NEXT
       FOR EACH hApp IN hAst[ "ppApplications" ]
@@ -7401,7 +7427,7 @@ STATIC FUNCTION RenameDsl( aArgs )
                RETURN Refuse( "'" + cNew + "' is already a word of rule " + ;
                               RuleTag( hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ] ) + ;
                               " in applications (" + hb_FNameNameExt( cPath ) + ":" + ;
-                              hb_ntos( hApp[ "line" ] ) + ")" )
+                              hb_ntos( hApp[ "line" ] ) + ")", RSN_APP_WORD )
             ENDIF
          NEXT
       NEXT
