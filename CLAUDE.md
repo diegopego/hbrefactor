@@ -190,6 +190,15 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
 ## 3. Testes, suíte e corpus
 
 - **Contrato executável: `make test`** — deve permanecer verde.
+- **FIXTURE EXPECTED, padrão TDD (casedir) onde couber** *(Diego, 2026-07-25)*: um `grep` de
+  saída — mesmo migrado para campo estruturado (`tcheck enveq/envhas`) — é **FRÁGIL**: prova um
+  pedaço, nunca o que a ferramenta **NÃO** disse. O caso declarativo (`tests/casedir.sh`:
+  `before/` + `cmd` + `out` byte a byte [+ `after/`]) prova a saída **INTEIRA**. **Preferir
+  casedir para toda asserção de saída de comando único**; reservar imperativo + helper
+  estruturado só para o que casedir não modela (idempotência A→B→A, saída-de-programa idêntica,
+  bateria multi-passo de recusa). *(A régua-canais — "a prosa não mostra fato que o JSON não
+  tem" — só vale para o comando que ela EXERCITA: comando com prosa mais rica que `usages`
+  simples merece o seu próprio caso, senão o gap volta calado. [achado no gap de usages-DSL])*
 - **Compile todo `.prg` (fixture, exemplo, teste) ANTES de usá-lo** —
   `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto via hbmk2. Fixture que não compila
   gera diagnóstico enganoso.

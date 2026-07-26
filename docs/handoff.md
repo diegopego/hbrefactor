@@ -12,63 +12,88 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-## 0. O ESTADO EXATO (2026-07-25, fim da sessão) — **LEIA ISTO PRIMEIRO**
+## 0-MIGRAÇÃO (2026-07-25) — **CONTINUAR NOUTRA MÁQUINA: LEIA ISTO PRIMEIRO**
 
-**A frente ativa é a FASE A.1 — o CLI vira contrato de máquina para VSCode e Claude.**
-Plano completo (o *como*, a ordem, as armadilhas): **[plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)** — LEIA-O INTEIRO ao retomar. Spec: fase A.1 no
-roadmap + §2.5 da spec-a.
+O projeto foi preparado para mudar de computador. Estado dos DOIS repositórios:
 
-**A decisão do Diego (2026-07-24/25), final:** o hbrefactor é consumido por **VSCode e
-Claude**, e só. A saída de um comando é o **envelope (JSON), e nada mais**. Não há
-renderizador humano — a prosa (`Prose()`) é arrasto e VAI SER DELETADA. A flag `--json`
-some (vira sempre-envelope). `Usage()`/ajuda continua texto puro. *"não importa o tamanho
-das alterações que isso implique."*
+- **`hbrefactor`** — árvore **LIMPA** (nada por commitar). `origin` =
+  `git@github.com:diegopego/hbrefactor.git`; **`origin/master` == HEAD == `2d5281f`**
+  (confirmado por `git ls-remote`: tudo está no GitHub). Na máquina nova:
+  `git clone git@github.com:diegopego/hbrefactor.git`.
+- **`harbour-core`** (o fork do Diego, com os patches ast-* de que a ferramenta depende) —
+  árvore **LIMPA**; branch **`feature/compiler-ast-dump`**; `origin` =
+  `git@github.com:diegopego/harbour-core.git` (o `upstream` `harbour/core` tem push
+  **DISABLE**, de propósito). Estava **5 commits à frente** do fork ao migrar — **`git push
+  origin feature/compiler-ast-dump`** antes de sair (ou copiar o diretório). Na máquina nova:
+  clonar o fork, `git checkout feature/compiler-ast-dump`, buildar (ver § abaixo).
+- **Memória privada do Claude** (`~/.claude/projects/-home-diego-devel-hbrefactor/memory/`, 5
+  arquivos) — é estilo-de-trabalho com o Diego, **NÃO** repo-específico (por desenho, §6: regra
+  do repo vai versionada no `CLAUDE.md`), então **não viaja com o `git`**. Nada de projeto está
+  encalhado nela. Se quiser que o Claude na máquina nova a tenha, **copie esse diretório à
+  mão**; senão ela se re-aprende.
 
-**O ESTADO DO CÓDIGO — PASSO 1 COMPLETO, NÃO committado.** `make test` **1046/0**,
-`make ppcorpus` **121/0**, `site-check` verde. Working tree sujo (o commit `da3260c` do passo 1
-de leitura é o último committado; o passo 1 dos VERBOS DE EDIÇÃO está por commitar):
-- `src/hbrefactor.prg` — TODOS os 14 comandos no contrato. Novo desde `da3260c`: os 6 verbos
-  de edição. `Ok()` ganhou o 4º arg `aEdits`. Helpers novos: `FileUri`, `LspLoc`, `LspEdit`,
-  `LspEditML`, `WholeDocEdit`, `WorkFromToken`, `WorkFromRange`, `SortWork`, `EditsToLocations`,
-  `ScopeField`, `RenameResult`, `ReorderResult`, `InlineResult`, `ExtractResult`. `SayScope`/
-  `WarnDynLines` calam sob `--json` (viram campo/diagnostic). **O DESENHO está no plano § Passo 1
-  — leia lá, não re-derive.**
-- `tests/` — placar `regua-json.sh` **VAZIO** (14/14); caso 132 reproposto (era o demo do
-  fallback com exec-registry; virou `132-exec-registry-envelope` porque o fallback ficou
-  inalcançável — todos migraram; a propriedade "nenhum comando calado" é agora garantida pela
-  régua-json sobre os 14); casos NOVOS 133-136 (rename dry-run/aplicado, inline, extract);
-  `run.sh` `ALL_UNITS` += 133 134 135 136.
-- `docs/` — plano § Passo 1 (o desenho), roadmap (A.1 passo 1 completo), este handoff.
+**Setup na máquina nova (o toolchain é a dependência real):**
+1. Clonar os dois repos (acima). O `hbrefactor` espera o core em `~/devel/harbour-core/harbour`
+   (ou ajustar `HB_BIN`).
+2. Buildar o core: no `harbour-core/harbour`, `make` (as 3 armadilhas do rebuild estão na §2 do
+   `CLAUDE.md` e na cicatriz §5.1 — mudou o compilador ⇒ rebuildar `harbour` **e** `hbmk2`).
+3. **Exportar `HB_BIN`** = `~/devel/harbour-core/harbour/bin/linux/gcc` (sem ele o `HbMk2Bin()`
+   cai no hbmk2 do sistema — sintoma enganoso "o projeto não compila", cicatriz §5.2).
+4. `cd hbrefactor && make test` (deve dar **1053/0**), `make ppcorpus` (**121/0**), `make
+   site-check` (verde). `.claude/settings.json` já dá acesso ao core; conferir os caminhos.
 
-**A PRÓXIMA sessão começa no PASSO 2 do plano: migrar os ~600 asserts de prosa para o
-ENVELOPE**, comando a comando (o `JLoad` do `tcheck.prg` já desembrulha; casos novos nascem
-no formato declarativo `casedir.sh`). Depois: passo 3 (arrancar `Prose()`/`--json`/o gate de
-`no-machine-contract-yet`/`s_lJson`), passo 4 (extensão: os 4 regexes de prosa → `reason`/
-`action`/`verdict` campos — os códigos `textual-refs-require-force`+`ACT_RETRY` JÁ estão nas
-recusas de `--force`), passo 5 (landing page).
+---
 
-**DÍVIDA CONHECIDA (não bloqueia):** (a) a migração dos ~300 códigos de recusa restantes (hoje
-`unclassified`) é passo 2; só as recusas load-bearing de `--force` ganharam código. (b) `IsJson()`
-virou função morta (W0034; não escala com `-es2`) — apagar num passo de limpeza. (c) o comando
-`describe --json` (manifesto de capacidades, critério de pronto da fase) ainda NÃO existe — item
-próprio, não é passo 1.
+## 0. O ESTADO EXATO (2026-07-25) — **A FASE E ONDE RETOMAR**
 
-**DECISÃO DO DIEGO PENDENTE (passo 5):** a landing page/manual mostram transcrição do CLI
-(prosa). Sem prosa, ou a página mostra a experiência da IDE, ou aceita blocos de JSON. Ele
-autorizou refazer a página ("refaça a landing page se preciso") — mas a FORMA (IDE × JSON)
-é escolha dele.
+**A frente ativa é a FASE A.1 — o CLI vira contrato de máquina para VSCode e Claude.** Plano
+(o *como*, a ordem, as armadilhas): **[plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)** — LEIA-O INTEIRO. Spec: fase A.1 no roadmap + §2.5 da spec-a.
 
-**DRIFT a sinalizar no commit (§3):** o caso 132 foi **reproposto** (renomeado de
-`132-json-nunca-silencioso` para `132-exec-registry-envelope`). Era o demo do portão
-`no-machine-contract-yet` via exec-registry; como exec-registry migrou, o fallback ficou
-inalcançável por comando real e o demo perdeu o objeto. A propriedade que ele guardava
-("nenhum comando calado") é agora garantida de forma abrangente pela **régua-json** (roda os
-14). É a única alteração de expectativa de teste pré-existente — nasceu na mesma fase A.1
-(commit `da3260c`) e sua obsolescência era antecipada pelo plano (o exec-registry estava no
-placar PENDENTES de propósito).
+**Decisão do Diego (final):** o CLI é consumido por **VSCode e Claude**, e só. A saída é o
+**envelope (JSON), e nada mais**. A prosa (`Prose()`) VAI SER DELETADA (passo 3); a flag
+`--json` some (vira sempre-envelope); `Usage()` fica texto puro.
 
-**Antes de commitar:** commit do passo-1-verbos-de-edição **ainda não autorizado** — pedir ao
-Diego (portão por-commit).
+**PASSO 1 ✅ COMPLETO E COMMITADO** (`59691bb`): os 14 comandos modelam o fato — leitura +
+os 6 verbos de edição (`edits[]` LSP sob `--dry-run`, `result.verdict`/`proof`, `scope` P17,
+avisos → `diagnostics[]`). O DESENHO está no plano § Passo 1 — **não re-derive**. Placar
+régua-json **14/14**.
+
+**PASSO 2 🔨 EM ANDAMENTO** — migrar os ~468 asserts de prosa (`*.log`) para o ENVELOPE. Os
+~200 greps em fonte/`.ppo`/`.ast.json` **continuam válidos**. Commitado:
+- `58e0578` — infra de asserção no `tcheck`: `enveq`/`envhas`/`envrow`/`envloc` (assere o
+  campo estruturado). + piloto (rename-core).
+- `10341e6` — units 1-30; e o conserto: build quebrado sob `--json` vira `diagnostics[]`
+  (o erro cru do compilador vazava no stderr e quebrava o JSON no `2>&1`).
+- `2d5281f` — **usages de palavra de DSL fica COMPLETO** (era gap do passo 1: kind
+  "occurrence"/text null/faltavam directive+in-rule-match; a régua-canais não pegava porque só
+  testava `usages Dupla`). + **§5**: 3 leaks de português no CLI corrigidos (`sequestraria`→
+  `hijack`, `soletra`→`spells out`, `renomear`→`renaming`). Caso **137** (fixture expected) +
+  régua-canais **estendida a DSL**.
+
+**A REGRA DE OURO que o Diego cravou no meio do passo 2 (2026-07-25) — SIGA:** **fixture
+EXPECTED, padrão TDD (casedir) onde couber.** Um `grep` de campo (mesmo via `tcheck enveq`) é
+**frágil** — prova um pedaço, não o que a ferramenta NÃO disse. O caso declarativo
+(`before/`+`cmd`+`out` byte a byte [+`after/`]) prova o envelope **inteiro**. **Preferir
+casedir para toda asserção de saída de comando único**; reservar imperativo+`tcheck` só para o
+que casedir não modela (idempotência A→B→A, saída-de-programa idêntica, baterias multi-passo de
+recusa). *(Método do gap: cada comando com prosa mais rica que `usages Dupla` merece o seu caso
+de régua-canais — senão o gap volta calado.)*
+
+**RETOMAR O PASSO 2 EM:** os greps `*.log` a partir da unit_38 (a maioria de DSL/method/memvar/
+annotate/verify/projects-of). **DECISÃO DO DIEGO PENDENTE:** os ~30 units já migrados com
+`enveq`/`envhas` (units 1-37) — **converter para casedir** (menos frágil) ou deixar? Recomendei
+converter os de **comando único** e deixar imperativos os multi-passo; o corte é dele. Depois do
+passo 2: passo 3 (arrancar `Prose()`/`--json`/gate `no-machine-contract-yet`/`s_lJson`/`IsJson`
+morto), passo 4 (extensão: 4 regexes de prosa → campos; os códigos `textual-refs-require-force`+
+`ACT_RETRY` já estão nas recusas de `--force`), passo 5 (página).
+
+**DÍVIDA CONHECIDA (não bloqueia):** (a) ~300 códigos de recusa ainda `unclassified` (migração
+gradual no passo 2); (b) `IsJson()` é função morta (W0034, não escala com `-es2`) — apagar na
+limpeza do passo 3; (c) `describe --json` (manifesto de capacidades, critério de pronto da fase)
+ainda NÃO existe — item próprio.
+
+**DECISÃO DO DIEGO PENDENTE (passo 5):** página/manual mostram transcrição de prosa; sem prosa,
+a página mostra a experiência da IDE **ou** aceita blocos de JSON — a FORMA é escolha dele.
 
 ---
 
