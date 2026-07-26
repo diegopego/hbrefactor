@@ -20,7 +20,7 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-HB_BIN="${HB_BIN:-$HOME/devel/harbour-core/harbour/bin/linux/gcc}"
+. "$HERE/tools/hbenv.sh"   # HB_BIN da fonte única
 BIN="${BIN:-$HERE/bin/hbrefactor}"
 HBMK2="$HB_BIN/hbmk2"
 PAGE="$HERE/site/index.html"

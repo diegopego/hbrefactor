@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-CORE="${CORE:-$HOME/devel/harbour-core/harbour}"
+. "$(cd "$(dirname "$0")" && pwd)/hbenv.sh"   # CORE (harbour-core) da fonte única
 BR_FONTE="feature/compiler-ast-dump"
 FORK="diegopego/harbour-core"
 

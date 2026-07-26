@@ -326,9 +326,19 @@ STATIC PROCEDURE AddUniq( aList, cValue )
 // réplica não tem o que fazer. Não reintroduzir: se faltar um dado do projeto,
 // o caminho é o hbmk2 responder, não nós parsearmos.
 
+// o diretório do toolchain do FORK (harbour/hbmk2 com o dump -x). NAMESPACE:
+// HBREFACTOR_HB_BIN vence HB_BIN - assim um HB_BIN global de OUTRO harbour no
+// computador nao contamina o hbrefactor. A extensao e o make setam o
+// namespaced (fonte unica: tools/hbenv.sh); no terminal cru, exporte-o
+STATIC FUNCTION HbBinDir()
+
+   LOCAL cBin := hb_GetEnv( "HBREFACTOR_HB_BIN" )
+
+   RETURN iif( Empty( cBin ), hb_GetEnv( "HB_BIN" ), cBin )
+
 STATIC FUNCTION HbMk2Bin()
 
-   LOCAL cBin := hb_GetEnv( "HB_BIN" )
+   LOCAL cBin := HbBinDir()
 
    RETURN iif( Empty( cBin ), "hbmk2", hb_DirSepAdd( cBin ) + "hbmk2" )
 
@@ -355,7 +365,7 @@ STATIC FUNCTION AstDumps( hProj, cTmp )
       // a falha clássica sem HB_BIN é o hbmk2 do PATH (sem -x) reprovando
       // um projeto que compila - nomear a causa provável evita o
       // diagnóstico enganoso "the project does not compile"
-      IF Empty( hb_GetEnv( "HB_BIN" ) )
+      IF Empty( HbBinDir() )
          IF s_lJson
             Diag( "hb-bin-unset", "HB_BIN not set - used the hbmk2 from PATH, " + ;
                   "which may lack the fork's -x; export HB_BIN=<dir of the " + ;
@@ -3162,7 +3172,7 @@ STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag, lAst )
 
 STATIC FUNCTION HarbourBin()
 
-   LOCAL cBin := hb_GetEnv( "HB_BIN" )
+   LOCAL cBin := HbBinDir()
 
    RETURN iif( Empty( cBin ), "harbour", hb_DirSepAdd( cBin ) + "harbour" )
 
@@ -11861,7 +11871,7 @@ STATIC PROCEDURE B7AuditWalk( hExpr, hInter )
 // honesto para o comportamento de hoje (possible)
 STATIC FUNCTION OracleLoad()
 
-   LOCAL cBin := hb_GetEnv( "HB_BIN" ), cRoot, cSrc, cCacheDir, cJson
+   LOCAL cBin := HbBinDir(), cRoot, cSrc, cCacheDir, cJson
    LOCAL tSrc, cOut := "", cErr := "", hAst, hFunc, hRegs, cM, cCls, hMembers
    LOCAL cPs := hb_ps()
 

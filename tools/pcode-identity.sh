@@ -18,7 +18,8 @@ set -uo pipefail
 
 STOCK="${1:?caminho do harbour STOCK}"
 PATCHED="${2:?caminho do harbour REMENDADO}"
-ROOT="${3:-$HOME/devel/harbour-core/harbour}"
+ROOT="${3:-}"
+. "$(cd "$(dirname "$0")" && pwd)/hbenv.sh"   # ROOT (harbour-core) da fonte única se $3 vazio
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT

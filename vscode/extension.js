@@ -121,7 +121,10 @@ function run(args, cwd) {
   return new Promise(resolve => {
     const env = Object.assign({}, process.env);
     const hb = cfg().get('hbBin');
-    if (hb) env.HB_BIN = hb.replace(/^~/, os.homedir());
+    // HBREFACTOR_HB_BIN (namespaced) é o que a ferramenta lê PRIMEIRO: isola o
+    // toolchain do fork de um HB_BIN global de outro harbour no computador.
+    // HB_BIN também, por compat (fallback da ferramenta e chamadas diretas).
+    if (hb) { const p = hb.replace(/^~/, os.homedir()); env.HBREFACTOR_HB_BIN = p; env.HB_BIN = p; }
     const inc = cfg().get('includePaths');
     if (inc) env.INCLUDE = inc.replace(/~/g, os.homedir());
     const bin = resolveBin();

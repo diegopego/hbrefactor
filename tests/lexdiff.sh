@@ -6,7 +6,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/.."
 HB_BIN="${1:?uso: lexdiff.sh <dir HB_BIN com harbour -x ast>}"
-HB=${HB:-$HOME/devel/harbour-core/harbour}
+. "$HERE/../tools/hbenv.sh"   # HB (harbour-core) da fonte única
 OLD_BIN="${OLD_BIN:-}"   # binário da era occ (opcional; aponte p/ um build
                           # do branch feature/refactoring-mechanism se quiser
                           # reativar a paridade occ<->ast — andaime da B1)

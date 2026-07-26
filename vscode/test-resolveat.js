@@ -59,8 +59,11 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'ut
 const hbBinDefault = pkg.contributes.configuration.properties['hbrefactor.hbBin'].default;
 check('hbrefactor.hbBin tem default não-vazio (bin do fork, layout do repo)',
   /harbour.*bin/.test(hbBinDefault), '-> ' + JSON.stringify(hbBinDefault));
-check('run() repassa hbBin como env HB_BIN com ~ expandido',
-  /env\.HB_BIN = hb\.replace\(\/\^~\/, os\.homedir\(\)\)/.test(src));
+// namespaced primeiro (isola de outro harbour), HB_BIN por compat; os dois
+// recebem o hbBin com ~ expandido
+check('run() repassa hbBin como env HBREFACTOR_HB_BIN (namespaced) e HB_BIN, ~ expandido',
+  /env\.HBREFACTOR_HB_BIN = p;\s*env\.HB_BIN = p/.test(src) &&
+  /const p = hb\.replace\(\/\^~\/, os\.homedir\(\)\)/.test(src));
 
 // 6. picker ciente do arquivo (B5+, proximidade): a DECISÃO é pura
 // (pickerChoices, extraída e executada aqui) e a DESCOBERTA é fato do CLI

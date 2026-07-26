@@ -8,13 +8,25 @@
 # smoketest/hbrefactor-occ.prg as reference; tests/ keeps the behaviour
 # contract the new tool must honour case by case.
 
-HB_BIN ?= $(HOME)/devel/harbour-core/harbour/bin/linux/gcc
+# HB_BIN vem da FONTE ÚNICA (tools/hbenv.sh), a mesma que os scripts leem -
+# um lugar só decide onde está o harbour-core. Override sempre vence:
+#   make test HB_BIN=/outro/caminho/bin/linux/gcc
+HB_BIN ?= $(shell sh tools/hbenv.sh --print HB_BIN)
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
-.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage help
+# `make` sem argumento mostra o help (convenção comum) - nunca dispara um build
+# por engano. `make build` continua compilando.
+.DEFAULT_GOAL := help
 
-## build       compila a ferramenta em bin/hbrefactor (alvo padrão)
+.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env help
+
+# RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
+# bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
+#   make setup-env RC=~/.bashrc
+RC ?= $(HOME)/.bashrc $(HOME)/.zshrc
+
+## build       compila a ferramenta em bin/hbrefactor
 build: hooks $(BIN)
 
 # a lista sai dos comentários `## <alvo> <descrição>` dos próprios alvos:
@@ -45,7 +57,7 @@ $(BIN): src/hbrefactor.prg
 # JOBS=1 força o modo sequencial com saída ao vivo, para depurar um caso
 ## test        roda a suíte (contrato executável; JOBS=1 força sequencial)
 test: build bin/tcheck bin/parrun
-	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
+	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
 
 # suite EXPLORATORIA do PP (P-DOC): o corpus de diretivas REAIS do Harbour
 # (docs/pp-corpus.md) casado com os quatro oraculos (.ppo/.ppt/ast dump/codigo
@@ -53,7 +65,7 @@ test: build bin/tcheck bin/parrun
 # modificado durante a exploracao. Nao entra no `make test`.
 ## ppcorpus    suíte EXPLORATÓRIA do pp (fora do contrato; não entra no test)
 ppcorpus: build
-	@HB_BIN=$(HB_BIN) tests/ppcorpus.sh
+	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) tests/ppcorpus.sh
 
 bin/tcheck: tests/tcheck.prg
 	@mkdir -p bin
@@ -67,11 +79,11 @@ bin/parrun: tests/parrun.prg
 # fixtures + hbhttpd (0 divergências reais exigidas)
 ## site-check   falha se algum exemplo das páginas estiver defasado
 site-check: $(BIN)
-	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tools/site-examples.sh --check
+	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tools/site-examples.sh --check
 
 ## site-examples  RE-EXECUTA todo exemplo da página e regrava os blocos (nada é digitado)
 site-examples: tools/site-examples.sh $(BIN)
-	@HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tools/site-examples.sh
+	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tools/site-examples.sh
 
 ## lexdiff     porta de precisão: dump ast vs TokenScan arquivado
 lexdiff: bin/lexdiff
@@ -98,6 +110,10 @@ site-serve:
 ## tmp-usage   AVISA se os temporários passaram do limite (nunca apaga; HBREFACTOR_TMP_WARN_MB=500)
 tmp-usage: tools/tmp-usage.sh
 	@tools/tmp-usage.sh
+
+## setup-env   adiciona o export HBREFACTOR_HB_BIN aos shell rc (idempotente; RC=~/.bashrc p/ um só)
+setup-env: tools/setup-env.sh tools/hbenv.sh
+	@for rc in $(RC); do sh tools/setup-env.sh "$$rc" "$(abspath tools/hbenv.sh)"; done
 
 ## clean       remove bin/
 clean:
