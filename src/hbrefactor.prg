@@ -71,6 +71,10 @@
 #define RSN_UNDONE       "renamed-rule-would-be-removed"
 #define RSN_NOT_RULEWORD "not-a-rule-word"                     // o velho não é palavra de regra
 
+// mesma família, do lado dos SÍMBOLOS: o nome novo já está ocupado no escopo -
+// renomear fundiria duas variáveis distintas numa só, e compilaria calado
+#define RSN_NAME_TAKEN   "new-name-already-declared"
+
 // sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
 #define PP_PROBE_HIT "__HBREF_PP_HIT__"
 
@@ -2979,7 +2983,8 @@ STATIC FUNCTION RenameLocal( aArgs )
    // o alvo precisa ser LOCAL (ou parâmetro) declarado na função
    FOR EACH hItem IN hFunc[ "declarations" ]
       IF Upper( hItem[ "sym" ] ) == cUpNew
-         RETURN Refuse( "new name '" + cNew + "' already declared in the function (scope " + hItem[ "scope" ] + ")" )
+         RETURN Refuse( "new name '" + cNew + "' already declared in the function (scope " + ;
+                        hItem[ "scope" ] + ")", RSN_NAME_TAKEN )
       ENDIF
       IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "local"
          hDecl := hItem

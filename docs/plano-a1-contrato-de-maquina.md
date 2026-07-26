@@ -163,8 +163,12 @@ handoff). O manual (`docs/manual.md`) idem.
   **`Prose()`** (vai ser deletado no passo 3, mas até lá não renomear para `Say`).
 - **Artefato vazando no `before/`** de um caso: NUNCA rodar o comando dentro de `before/`;
   copiar para um tmp. `annotate`/`exec-registry` geram `.astr.json`/binário.
-- **`hb_jsonEncode( h, .T. )`** formata array/objeto vazio como `[\n  ]` — a fixture `out`
-  tem de casar o formato exato (gerar de uma execução real, nunca escrever à mão).
+- **`hb_jsonEncode( h, .T. )`** formata array/objeto vazio como `[\n  ]` — o esperado tem de
+  casar o formato exato. **A recomendação que estava aqui — *"gerar de uma execução real, nunca
+  escrever à mão"* — foi REVOGADA pelo Diego (2026-07-26): é a premissa errada que construiu a
+  pasta `tests/cases/` inteira.** Gravar congela o defeito atual como se fosse contrato; o
+  esperado se escreve À MÃO, ANTES (`tests/README.md` § 2, cicatrizes § 6.4). O formato exato do
+  JSON se acerta no primeiro diff — é só isso que ele custa.
 - **`kind` e `certainty` SEPARADOS**: o `SendVerdict` devolve "confirmed send (...)"; a
   certeza é a 1a palavra (`FirstWord`), o kind é "send". Não misturar no campo.
 - **`LocationsJson` devolve HASH-array, não string** (mudou nesta sessão): o `tcheck.JLoad`

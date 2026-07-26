@@ -281,33 +281,7 @@ done
 
 }
 
-unit_1() {
-echo "case 1: rename nTotal->nSoma in Main (success + verification)"
-D=$(fresh case1)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nSoma --json > out.log 2>&1 )
-RC=$?
-check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-diff -q "$D/a.prg" "$HERE/fix01/expected/a_renamed.prg" > /dev/null 2>&1
-check "a.prg matches expected"     $?
-cmp -s "$D/b.prg" "$HERE/fix01/b.prg"
-check "b.prg untouched"            $?
-# passo 2: verified: all N module -> verdict applied (a verificacao passou; se
-# tivesse falhado o verbo recusaria com rollback, nunca "applied")
-"$TCHECK" enveq "$D/out.log" verdict applied
-check "verificado (verdict applied)" $?
 
-}
-
-unit_2() {
-echo "case 2: collision with existing local (refuse)"
-D=$(fresh case2)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 i > out.log 2>&1 )
-RC=$?
-check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
-check "a.prg untouched"            $?
-
-}
 
 unit_3() {
 echo "case 3: unrelated #define on the declaration line (safe rename succeeds)"
@@ -4739,7 +4713,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
+ALL_UNITS="0 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

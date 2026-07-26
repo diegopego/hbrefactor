@@ -169,8 +169,23 @@ edição.**
 > `result.verdict` (applied/preview) + `result.proof` (a força da verificação), `scope` P17
 > como campo, avisos → `diagnostics[]`. **Placar PENDENTES da régua-json VAZIO (14/14).**
 > `make test` 1046/0, `ppcorpus` 121/0, `site-check` verde. O desenho (para não re-derivar)
-> está no plano linkado, § Passo 1. **Falta: passo 2 (migrar ~600 asserts de prosa), passo 3
-> (arrancar prosa+flag), passo 4 (extensão), passo 5 (página).** Estado de retomada: handoff § 0.
+> está no plano linkado, § Passo 1.
+>
+> **Estado (2026-07-26): PASSO 2 EM EXECUÇÃO, e ele MUDOU DE FORMA.** Migrar assert de prosa
+> para campo estruturado (`tcheck enveq`) provou-se insuficiente — o `grep` de um campo não diz
+> o que a ferramenta NÃO disse, e o formato declarativo que existia (`tests/cases/`) tinha o
+> esperado **GRAVADO da execução**, que congela o defeito atual em vez de afirmar o contrato.
+> Ordem do Diego: **todos os testes migram para `tests/scenarios/`**, no formato especificado em
+> **[tests/README.md](../tests/README.md)** — `source/` + `expected/` escritos À MÃO, a saída
+> como transcrição byte a byte, o retrato `.ppo`/`.ppt` do core, e a régua do caso 64 declarada
+> no próprio cenário. `make scenarios` roda só o conjunto migrado; o `make test` encadeia os dois.
+>
+> **Critério de pronto do passo 2 (mecânico):** `tests/run.sh` sem nenhum `unit_*`, `tests/cases/`
+> vazio, `tests/scenarios/` cobrindo o que os dois provavam, `make test` verde. A fila e o que
+> cada teste virou ficam no handoff § 0.
+>
+> **Falta: passo 2 (a migração), passo 3 (arrancar prosa+flag), passo 4 (extensão), passo 5
+> (página).** Estado de retomada: handoff § 0.
 
 > **O portão abriu com uma ordem de desenho junto:** *"quero que o Claude crie a especificação
 > para a interface CLI do hbrefactor que seja ideal para o Claude usá-la"* — e, na revisão,
@@ -201,11 +216,10 @@ edição.**
 > `scope: { complete, unseen[] }` — com `complete: true` **explícito**, senão eu leio todo rename
 > como completo.
 >
-> **Casos novos nascem no formato da fase T** (`tests/casedir.sh`): o `out` byte a byte é o que
-> prova o envelope inteiro, inclusive o que ele NÃO traz.
-
-**A contradição que se fecha:** a ferramenta **proíbe comparação de texto no MOTOR e obriga
-comparação de texto no CONSUMIDOR**. A extensão decide **fluxo** casando prosa (`/--force/`,
+> **Casos novos nascem no formato de CENÁRIO** (`tests/scenarios/`, spec em
+> [tests/README.md](../tests/README.md)): `source/` + `expected/` + a transcrição, todos
+> escritos À MÃO, do contrato. O `tests/casedir.sh` da fase T foi o passo intermediário e é
+> legado — ele provava o envelope inteiro, mas o esperado dele era GRAVADO da execução.
 
 **A contradição que se fecha:** a ferramenta **proíbe comparação de texto no MOTOR e obriga
 comparação de texto no CONSUMIDOR**. A extensão decide **fluxo** casando prosa (`/--force/`,

@@ -1,60 +1,13 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
-# CENÁRIO - o formato NOVO de teste (Diego, 2026-07-26), e o destino de TODOS
-# os testes da suíte. Um cenário é uma frase completa, num diretório só:
+# RUNNER dos cenários - o formato NOVO de teste (Diego, 2026-07-26).
 #
-#    tests/scenarios/<nome>/
-#       case.json   os ESCALARES (não se beneficiam de diff), COM SCHEMA:
-#                      schema:  "case-1" - exato; divergir BERRA (lei §1.5)
-#                      kind:    "command" (roda o hbrefactor). Os outros tipos
-#                               entram junto com o código que os executa
-#                      desc:    uma linha - o que este cenário prova
-#                      cmd:     a linha do hbrefactor SEM o binário, ou uma
-#                               LISTA delas (A->B->A e afins), rodadas em ordem
-#                      creates: (opcional) artefatos que o comando pode deixar
-#                      forbid:  (opcional) o vocabulário desta fixture, que NÃO
-#                               pode aparecer em src/hbrefactor.prg (caso 64)
-#       source/     o projeto ANTES - todos os arquivos
-#       expected/   os arquivos DEPOIS, escritos À MÃO; SÓ os que mudam
-#       output      a TRANSCRIÇÃO esperada, byte a byte: por comando, a linha
-#                   `$ hbrefactor <cmd>`, a saída, e `-> exit N`
-#       oracle/     o RETRATO do .ppo/.ppt que o core produz para a `source/`
-#                   (gravado do core por `make oracle`, nunca escrito à mão)
+# O CONTRATO DO FORMATO MORA EM tests/README.md, e só lá: o que é um cenário,
+# as chaves do `case.json`, as provas, a regra do esperado escrito à mão, a
+# exceção do `oracle/` e como propor mudança. Duplicá-lo aqui criaria uma
+# segunda fonte de verdade, que envelhece torto.
 #
-# POR QUE O `case` É JSON COM SCHEMA (Diego, 2026-07-26): a validação é o
-# produto, não a leitura. Em "chave: valor" solto, um `exitt:` por engano é
-# ignorado em SILÊNCIO e o cenário passa provando outra coisa - a vacuidade que
-# este formato existe para matar. O `tcheck scen` recusa schema ausente/errado,
-# chave desconhecida, obrigatória faltando e tipo errado.
-#
-# A ORDEM É TDD (Diego): *"escreve os arquivos expected, depois escreve o
-# arquivo que vai ser alterado, e compara a saída do actual vs expected"*. O
-# `expected/` e o `output` se escrevem À MÃO, ANTES, do CONTRATO - nunca se
-# GRAVAM de uma execução. Os dois arquivos ficam idênticos; os dois testes,
-# não: gravado, o esperado afirma "a ferramenta faz isto hoje" (e congela o
-# defeito atual); escrito, ele afirma "o contrato pede isto" (e o defeito vira
-# FALHA). É PROIBIDA ferramenta que grave esperado. [cicatrizes §6.4]
-#
-# AUSÊNCIA DE `expected/` TEM SIGNIFICADO: é a promessa de que NADA muda - o
-# cenário é de recusa ou de consulta, e o projeto inteiro volta byte a byte.
-#
-# AS SEIS PROVAS de cada cenário:
-#   1. o exit bate;
-#   2. TODO arquivo de `source/` bate byte a byte com o esperado - com
-#      `expected/<arquivo>` onde o cenário edita, e com o próprio `source/`
-#      onde não edita (é isto que prova o que a ferramenta NÃO tocou);
-#   3. `expected/` que nomeie arquivo fora de `source/` REPROVA - nunca seria
-#      comparado, e passaria por vacuidade (a cicatriz que criou o formato);
-#   4. arquivo NOVO no projeto que o `case` não declarou em `creates:` reprova
-#      (a ferramenta não suja o projeto do usuário);
-#   5. a saída bate byte a byte com `output` - o que prova também o que a
-#      ferramenta NÃO disse (um aviso a mais reprova, e é para reprovar);
-#   6. o projeto DEPOIS compila limpo sob -w3 -es2. Esta é a rede do método:
-#      esperado escrito à mão tem erro de digitação, e sem ela o erro vira uma
-#      falha que se "conserta" regravando - que é o golden-file voltando pela
-#      janela.
-#
-# Falha mostra DIFF, nunca "um grep não casou".
+# Aqui ficam só as decisões de IMPLEMENTAÇÃO deste script.
 # ---------------------------------------------------------------------------
 set -u
 

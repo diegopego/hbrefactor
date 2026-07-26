@@ -12,88 +12,79 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-## 0-MIGRAÇÃO (2026-07-25) — **CONTINUAR NOUTRA MÁQUINA: LEIA ISTO PRIMEIRO**
+## 0. O ESTADO EXATO (2026-07-26) — **A MIGRAÇÃO DA SUÍTE, e onde retomar**
 
-O projeto foi preparado para mudar de computador. Estado dos DOIS repositórios:
+**A frente ativa é a FASE A.1 passo 2**, e ele mudou de forma no dia 26: em vez de trocar
+`grep` de prosa por `grep` de campo, **todos os testes migram para o formato de CENÁRIO**.
 
-- **`hbrefactor`** — árvore **LIMPA** (nada por commitar). `origin` =
-  `git@github.com:diegopego/hbrefactor.git`; **`origin/master` == HEAD == `2d5281f`**
-  (confirmado por `git ls-remote`: tudo está no GitHub). Na máquina nova:
-  `git clone git@github.com:diegopego/hbrefactor.git`.
-- **`harbour-core`** (o fork do Diego, com os patches ast-* de que a ferramenta depende) —
-  árvore **LIMPA**; branch **`feature/compiler-ast-dump`**; `origin` =
-  `git@github.com:diegopego/harbour-core.git` (o `upstream` `harbour/core` tem push
-  **DISABLE**, de propósito). Estava **5 commits à frente** do fork ao migrar — **`git push
-  origin feature/compiler-ast-dump`** antes de sair (ou copiar o diretório). Na máquina nova:
-  clonar o fork, `git checkout feature/compiler-ast-dump`, buildar (ver § abaixo).
-- **Memória privada do Claude** (`~/.claude/projects/-home-diego-devel-hbrefactor/memory/`, 5
-  arquivos) — é estilo-de-trabalho com o Diego, **NÃO** repo-específico (por desenho, §6: regra
-  do repo vai versionada no `CLAUDE.md`), então **não viaja com o `git`**. Nada de projeto está
-  encalhado nela. Se quiser que o Claude na máquina nova a tenha, **copie esse diretório à
-  mão**; senão ela se re-aprende.
+> **O CONTRATO DO FORMATO NÃO ESTÁ AQUI — está em [`tests/README.md`](../tests/README.md)**,
+> por ordem do Diego (*"esta spec deve estar no readme dos testes… mais durável que apenas o
+> handoff ou memória"*). **Leia-o inteiro antes de escrever um teste.** Aqui fica só o ESTADO.
 
-**Setup na máquina nova (o toolchain é a dependência real):**
-1. Clonar os dois repos (acima). O `hbrefactor` espera o core em `~/devel/harbour-core/harbour`
-   (ou ajustar `HB_BIN`).
-2. Buildar o core: no `harbour-core/harbour`, `make` (as 3 armadilhas do rebuild estão na §2 do
-   `CLAUDE.md` e na cicatriz §5.1 — mudou o compilador ⇒ rebuildar `harbour` **e** `hbmk2`).
-3. **Exportar `HB_BIN`** = `~/devel/harbour-core/harbour/bin/linux/gcc` (sem ele o `HbMk2Bin()`
-   cai no hbmk2 do sistema — sintoma enganoso "o projeto não compila", cicatriz §5.2).
-4. `cd hbrefactor && make test` (deve dar **1053/0**), `make ppcorpus` (**121/0**), `make
-   site-check` (verde). `.claude/settings.json` já dá acesso ao core; conferir os caminhos.
+**Por que mudou** (a cicatriz é a [§6.4](cicatrizes.md)): a pasta `tests/cases/` inteira tinha
+sido construída **gravando** a saída da ferramenta — o plano da fase até recomendava isso por
+escrito. Gravado, o esperado afirma *"a ferramenta faz isto hoje"* e congela o defeito atual.
+A ordem do Diego é a inversa e é TDD: **escreve o expected primeiro, à mão, do contrato**.
+Prova no mesmo dia: duas recusas saíam com `reason: "unclassified"` — o campo pelo qual a
+extensão e o agente DECIDEM —, e nem o grep antigo nem um esperado gravado pegariam.
+
+**O LOOP DE MIGRAÇÃO** (é o trabalho, e ele é repetitivo de propósito):
+
+1. leia o `unit_N` no `tests/run.sh` e veja o que ele prova de verdade;
+2. crie `tests/scenarios/<nome-que-diz-o-que-prova>/` (passo a passo no README § 5);
+3. **escreva `expected/` e `output` à mão, ANTES de rodar**;
+4. `make oracle NOME=<nome>` e **leia** o retrato do core;
+5. `make scenarios NOME=<nome>`. Divergiu? **separe os dois lados**: erro meu → conserta o
+   esperado; buraco da ferramenta → conserta a ferramenta (é onde os códigos de recusa vêm
+   nascendo, um por cenário);
+6. **tire o `unit_N` do `run.sh`** (da função E da lista `ALL_UNITS`) — migrar é mover;
+7. `make test` verde (ele encadeia os dois runners).
+
+**FEITO até aqui:** `unit_1` → `rename-local`; `unit_2` → `refuse-local-name-taken`;
+`unit_38` (o rename de DSL) → `rename-dsl-head`. Suíte: **`make test` 1045/0 + 3 cenários 16/0**.
+
+**PRÓXIMO: `unit_3`**, e daí em diante na ordem numérica. Faltam ~119 units + os 11 casos
+antigos em `tests/cases/` (128, 130-138, 140, 141), que também migram.
+
+**O `unit_0` NÃO dissolve ainda.** Ele prova que `tests/fix01/` compila limpo, e ~38 units
+ainda usam essa fixture; cada cenário só prova a `source/` DELE. Ele sai quando o último
+usuário de `fix01` migrar — antes disso a fixture ficaria sem guarda.
+
+**DECISÕES DO DIEGO PENDENTES** (nenhuma bloqueia a fila):
+- **`program-output`** (identidade de saída de programa, ~12 units, o `unit_14` é o primeiro):
+  o cenário DECLARA num arquivo o que o programa imprime, ou basta "antes == depois"? O ponto
+  dele já está claro: **build que falha é falha do teste**, nunca resultado vazio comparado com
+  vazio (é o buraco que o formato antigo tinha).
+- **colisão de vocabulário `ACTION`**: a fixture do `rename-dsl-head` usa `ACTION` como keyword
+  secundária, e a régua `forbid` é case-insensitive — ela bate no campo `action` do NOSSO
+  envelope. Tirei a palavra da lista; a alternativa é trocar a keyword na `source/` do cenário
+  (ele é dono da própria fixture agora), e aí a régua cobre o vocabulário inteiro.
+
+**DÍVIDA CONHECIDA:** (a) ~300 recusas ainda `unclassified` — vão sendo classificadas **por
+cenário migrado**, que é a política; o `resolve-at` fora de identificador é uma delas, e o nome
+já está reservado na taxonomia (`no-fact-at-position`); (b) `IsJson()` é função morta (W0034),
+apagar na limpeza do passo 3; (c) `describe --json` (manifesto de capacidades, critério de
+pronto da fase) ainda não existe.
+
+**As chaves do `case-1` PROJETADAS e ainda não implementadas** (`runs`, `needs`, `check`, e os
+`kind` `oracle`/`harness`) estão no README § 6, com a regra que as governa: **uma chave só entra
+no validador quando o runner a honra** — chave aceita e ignorada é pior que desconhecida.
 
 ---
 
-## 0. O ESTADO EXATO (2026-07-25) — **A FASE E ONDE RETOMAR**
+## 0-mig. MIGRAÇÃO DE MÁQUINA (2026-07-25) — concluída em 2026-07-26
 
-**A frente ativa é a FASE A.1 — o CLI vira contrato de máquina para VSCode e Claude.** Plano
-(o *como*, a ordem, as armadilhas): **[plano-a1-contrato-de-maquina.md](plano-a1-contrato-de-maquina.md)** — LEIA-O INTEIRO. Spec: fase A.1 no roadmap + §2.5 da spec-a.
+O projeto mudou de computador. O que a máquina nova precisou, além dos dois clones:
 
-**Decisão do Diego (final):** o CLI é consumido por **VSCode e Claude**, e só. A saída é o
-**envelope (JSON), e nada mais**. A prosa (`Prose()`) VAI SER DELETADA (passo 3); a flag
-`--json` some (vira sempre-envelope); `Usage()` fica texto puro.
+- **`node`** (o harness da extensão é JS) — agora há **`make deps`**, e o teste que precisa
+  dele falha nomeando-o em vez de falhar sem explicar;
+- **identidade do git** — os commits herdam o e-mail literal
+  `{ID}+{username}@users.noreply.github.com` (o modelo do GitHub não preenchido). Decisão do
+  Diego em 2026-07-26: **repetir o placeholder**, para o histórico ficar consistente;
+- o core vive em `~/devel/harbour-hbrefactor/harbour-core` (o `tools/hbenv.sh` detecta os dois
+  layouts conhecidos; um valor no ambiente sempre vence).
 
-**PASSO 1 ✅ COMPLETO E COMMITADO** (`59691bb`): os 14 comandos modelam o fato — leitura +
-os 6 verbos de edição (`edits[]` LSP sob `--dry-run`, `result.verdict`/`proof`, `scope` P17,
-avisos → `diagnostics[]`). O DESENHO está no plano § Passo 1 — **não re-derive**. Placar
-régua-json **14/14**.
-
-**PASSO 2 🔨 EM ANDAMENTO** — migrar os ~468 asserts de prosa (`*.log`) para o ENVELOPE. Os
-~200 greps em fonte/`.ppo`/`.ast.json` **continuam válidos**. Commitado:
-- `58e0578` — infra de asserção no `tcheck`: `enveq`/`envhas`/`envrow`/`envloc` (assere o
-  campo estruturado). + piloto (rename-core).
-- `10341e6` — units 1-30; e o conserto: build quebrado sob `--json` vira `diagnostics[]`
-  (o erro cru do compilador vazava no stderr e quebrava o JSON no `2>&1`).
-- `2d5281f` — **usages de palavra de DSL fica COMPLETO** (era gap do passo 1: kind
-  "occurrence"/text null/faltavam directive+in-rule-match; a régua-canais não pegava porque só
-  testava `usages Dupla`). + **§5**: 3 leaks de português no CLI corrigidos (`sequestraria`→
-  `hijack`, `soletra`→`spells out`, `renomear`→`renaming`). Caso **137** (fixture expected) +
-  régua-canais **estendida a DSL**.
-
-**A REGRA DE OURO que o Diego cravou no meio do passo 2 (2026-07-25) — SIGA:** **fixture
-EXPECTED, padrão TDD (casedir) onde couber.** Um `grep` de campo (mesmo via `tcheck enveq`) é
-**frágil** — prova um pedaço, não o que a ferramenta NÃO disse. O caso declarativo
-(`before/`+`cmd`+`out` byte a byte [+`after/`]) prova o envelope **inteiro**. **Preferir
-casedir para toda asserção de saída de comando único**; reservar imperativo+`tcheck` só para o
-que casedir não modela (idempotência A→B→A, saída-de-programa idêntica, baterias multi-passo de
-recusa). *(Método do gap: cada comando com prosa mais rica que `usages Dupla` merece o seu caso
-de régua-canais — senão o gap volta calado.)*
-
-**RETOMAR O PASSO 2 EM:** os greps `*.log` a partir da unit_38 (a maioria de DSL/method/memvar/
-annotate/verify/projects-of). **DECISÃO DO DIEGO PENDENTE:** os ~30 units já migrados com
-`enveq`/`envhas` (units 1-37) — **converter para casedir** (menos frágil) ou deixar? Recomendei
-converter os de **comando único** e deixar imperativos os multi-passo; o corte é dele. Depois do
-passo 2: passo 3 (arrancar `Prose()`/`--json`/gate `no-machine-contract-yet`/`s_lJson`/`IsJson`
-morto), passo 4 (extensão: 4 regexes de prosa → campos; os códigos `textual-refs-require-force`+
-`ACT_RETRY` já estão nas recusas de `--force`), passo 5 (página).
-
-**DÍVIDA CONHECIDA (não bloqueia):** (a) ~300 códigos de recusa ainda `unclassified` (migração
-gradual no passo 2); (b) `IsJson()` é função morta (W0034, não escala com `-es2`) — apagar na
-limpeza do passo 3; (c) `describe --json` (manifesto de capacidades, critério de pronto da fase)
-ainda NÃO existe — item próprio.
-
-**DECISÃO DO DIEGO PENDENTE (passo 5):** página/manual mostram transcrição de prosa; sem prosa,
-a página mostra a experiência da IDE **ou** aceita blocos de JSON — a FORMA é escolha dele.
+Conferência de que o ambiente está de pé: `make test` (verde), `make ppcorpus`, `make site-check`.
 
 ---
 
