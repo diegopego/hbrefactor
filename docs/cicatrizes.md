@@ -433,6 +433,33 @@ Errei **4× numa sessão** (uma delas fazendo a suíte falhar), e uma por ler a 
 arquivo que o rename **anterior** já tinha mudado. Dump é 0-based, CLI é 1-based; o `col`
 de um marker aponta o **NOME**, não o `<`.
 
+### 6.4 Eu GRAVEI o expected e chamei de TDD (2026-07-25)
+
+Migrando o caso 38 para o formato declarativo, escrevi `tools/mkcase.sh`: ele rodava o
+comando e **gravava** a saída como `out`, imprimindo-a "para eu conferir". Racionalizei com
+a armadilha real de escrever JSON à mão (`hb_jsonEncode` formata array vazio como `[\n  ]`)
+e com o volume da migração (~468 asserts).
+
+O Diego cortou: *"eu havia proposto algo bem estilo TDD: escreve os arquivos expected,
+depois escreve o arquivo que vai ser alterado, e compara a saída do actual vs expected"*.
+
+**Os dois arquivos ficam IDÊNTICOS; os dois testes, não.** Gravado, o `out` afirma *"a
+ferramenta faz isto hoje"* — qualquer defeito atual entra no arquivo como se fosse contrato.
+Escrito antes, ele afirma *"o contrato diz isto"*, e o defeito aparece como **falha**.
+
+A prova saiu na mesma sessão, contra mim: as duas recusas de DSL saíam com
+`reason: "unclassified"` — o campo pelo qual a extensão e o agente decidem. O grep antigo
+(`grep -q "abbreviation"`) passava verde; o `out` **gravado** também teria passado verde,
+porque eu gravei o que a ferramenta dizia. Só peguei porque **li** a saída — sorte, não
+método. Escrevendo o expected antes, eu escrevo `new-name-collides-by-abbreviation`, o caso
+falha, e o buraco aparece por construção.
+
+Refazendo os quatro casos na ordem certa (expected à mão, derivado da fixture e do
+contrato), **tudo semântico bateu de primeira** — colunas, ordem dos sítios, `kind`,
+`detail`, `reason`, `proof`, `editCount`, `scope`. A única divergência foi uma linha em
+branco no fim (o envelope sai com um `hb_eol()` a mais). O medo do volume era real; a
+resposta a ele não era inverter a ordem.
+
 ---
 
 ## 7. Regras revogadas (para não voltarem por engano)

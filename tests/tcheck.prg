@@ -29,6 +29,7 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "envhas"  ; lOk := EnvHas( cA1, cA2, cA3 )  ; EXIT
    CASE "envloc"  ; lOk := EnvLoc( cA1, cA2, cA3 )  ; EXIT
    CASE "envrow"  ; lOk := EnvRow( cA1, cA2, cA3 )  ; EXIT
+   CASE "scen"    ; lOk := Scen( cA1, cA2 )         ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
       lOk := .F.
@@ -862,3 +863,125 @@ STATIC FUNCTION Rtr101( cJson )
 STATIC FUNCTION AstAtLeast( hAst, nMin )
    LOCAL cSchema := hb_HGetDef( hAst, "schema", "" )
    RETURN hb_LeftEq( cSchema, "ast-" ) .AND. Val( SubStr( cSchema, 5 ) ) >= nMin
+
+// ---------------------------------------------------------------------------
+// `scen` - o arquivo `case.json` de um CENÁRIO (tests/scenarios.sh), lido e
+// VALIDADO (Diego, 2026-07-26: *"o case deve usar json também para garantir
+// estrutura, com schema e versão do schema"*).
+//
+// A validação é o produto aqui, não a leitura: sem ela, uma chave com erro de
+// digitação (`exitt`) é ignorada em SILÊNCIO e o cenário passa provando outra
+// coisa - a mesma vacuidade que o formato existe para matar. Por isso:
+//   - `schema` ausente ou diferente do corrente RECUSA, nomeando as duas
+//     versões (a lei §1.5: schema é EXATO, e divergência BERRA);
+//   - chave DESCONHECIDA recusa (é typo ou é campo que este runner não honra);
+//   - chave obrigatória ausente recusa;
+//   - tipo errado recusa (`exit` texto, `creates` que não é lista).
+//
+// Uso:  tcheck scen <case.json>          valida e cala
+//       tcheck scen <case.json> <chave>  valida e ecoa a chave (vazio se não há)
+// ---------------------------------------------------------------------------
+#define CASE_SCHEMA "case-1"
+
+STATIC FUNCTION Scen( cPath, cKey )
+
+   // REGRA DO SCHEMA: uma chave só entra aqui quando o runner a HONRA. Chave
+   // aceita e ignorada seria pior que chave desconhecida - o caso a declara,
+   // acha que provou, e ninguém confere. (Por isso `kind` só aceita "command"
+   // hoje: `oracle` e `harness` entram junto com o código que os executa.)
+   STATIC s_aKnown := { "schema", "kind", "desc", "cmd", "creates", "forbid" }
+   STATIC s_aReq   := { "schema", "kind", "desc" }
+   STATIC s_aKinds := { "command" }
+   STATIC s_aLists := { "creates", "forbid" }
+   LOCAL cRaw := hb_MemoRead( hb_defaultValue( cPath, "" ) )
+   LOCAL x, cK, cSchema, xVal, cOut, xI
+
+   IF Len( cRaw ) == 0
+      RETURN Fail( "scen: " + hb_defaultValue( cPath, "(sem arquivo)" ) + " vazio ou inexistente" )
+   ENDIF
+   // a forma de 2 args devolve os BYTES consumidos - 0 é JSON inválido. A de
+   // 1 arg devolve hash vazio para texto quebrado, e o diagnóstico saía
+   // "sem schema", mandando quem lê caçar a coisa errada
+   IF hb_jsonDecode( cRaw, @x ) == 0 .OR. ! HB_ISHASH( x )
+      RETURN Fail( "scen: " + cPath + " não é JSON válido (esperado um objeto)" )
+   ENDIF
+   cSchema := hb_HGetDef( x, "schema", NIL )
+   IF cSchema == NIL
+      RETURN Fail( "scen: " + cPath + " sem `schema` (esperado " + CASE_SCHEMA + ")" )
+   ENDIF
+   IF !( cSchema == CASE_SCHEMA )
+      RETURN Fail( "scen: schema " + hb_jsonEncode( cSchema ) + " != " + CASE_SCHEMA + ;
+                   " (o cenário e o runner estão fora de passo - " + cPath + ")" )
+   ENDIF
+   FOR EACH cK IN hb_HKeys( x )
+      IF hb_AScan( s_aKnown, cK,,, .T. ) == 0
+         RETURN Fail( "scen: chave desconhecida `" + cK + "` em " + cPath + ;
+                      " (conhecidas: " + ArrJoin( s_aKnown ) + ")" )
+      ENDIF
+   NEXT
+   FOR EACH cK IN s_aReq
+      IF ! hb_HHasKey( x, cK ) .OR. ! HB_ISCHAR( x[ cK ] ) .OR. Len( x[ cK ] ) == 0
+         RETURN Fail( "scen: `" + cK + "` ausente ou vazio em " + cPath )
+      ENDIF
+   NEXT
+   IF hb_AScan( s_aKinds, x[ "kind" ],,, .T. ) == 0
+      RETURN Fail( "scen: kind " + hb_jsonEncode( x[ "kind" ] ) + " não é honrado por este " + ;
+                   "runner (honrados: " + ArrJoin( s_aKinds ) + ") - " + cPath )
+   ENDIF
+   // `cmd` é UMA linha ou uma LISTA de linhas (A->B->A e afins). Lista vazia
+   // ou item vazio recusa: cenário sem comando não prova nada
+   IF ! hb_HHasKey( x, "cmd" )
+      RETURN Fail( "scen: `cmd` ausente em " + cPath )
+   ENDIF
+   IF HB_ISCHAR( x[ "cmd" ] )
+      x[ "cmd" ] := { x[ "cmd" ] }
+   ENDIF
+   IF ! HB_ISARRAY( x[ "cmd" ] ) .OR. Len( x[ "cmd" ] ) == 0
+      RETURN Fail( "scen: `cmd` tem de ser uma linha ou uma LISTA não-vazia em " + cPath )
+   ENDIF
+   FOR EACH xI IN x[ "cmd" ]
+      IF ! HB_ISCHAR( xI ) .OR. Len( xI ) == 0
+         RETURN Fail( "scen: item vazio (ou não-texto) em `cmd` de " + cPath )
+      ENDIF
+   NEXT
+   FOR EACH cK IN s_aLists
+      IF hb_HHasKey( x, cK )
+         IF ! HB_ISARRAY( x[ cK ] )
+            RETURN Fail( "scen: `" + cK + "` tem de ser LISTA em " + cPath )
+         ENDIF
+         FOR EACH xI IN x[ cK ]
+            IF ! HB_ISCHAR( xI ) .OR. Len( xI ) == 0
+               RETURN Fail( "scen: item vazio (ou não-texto) em `" + cK + "` de " + cPath )
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   IF ! Empty( cKey )
+      xVal := hb_HGetDef( x, cKey, NIL )
+      DO CASE
+      // LISTA sai UMA POR LINHA - juntar com espaço quebraria `cmd`, cujos
+      // itens TÊM espaços (o shell lê linha a linha)
+      CASE HB_ISARRAY( xVal )   ; cOut := ArrLines( xVal )
+      CASE xVal == NIL          ; cOut := ""
+      CASE HB_ISNUMERIC( xVal ) ; cOut := hb_ntos( xVal )
+      OTHERWISE                 ; cOut := xVal
+      ENDCASE
+      OutStd( cOut + hb_eol() )
+   ENDIF
+
+   RETURN .T.
+
+STATIC FUNCTION ArrLines( a )
+   LOCAL c := "", x
+   FOR EACH x IN a
+      c += iif( Len( c ) == 0, "", hb_eol() ) + iif( HB_ISCHAR( x ), x, hb_jsonEncode( x ) )
+   NEXT
+   RETURN c
+
+STATIC FUNCTION ArrJoin( a )
+   LOCAL c := "", x
+   FOR EACH x IN a
+      c += iif( Len( c ) == 0, "", " " ) + iif( HB_ISCHAR( x ), x, hb_jsonEncode( x ) )
+   NEXT
+   RETURN c

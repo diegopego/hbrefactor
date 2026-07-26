@@ -199,6 +199,13 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
   bateria multi-passo de recusa). *(A régua-canais — "a prosa não mostra fato que o JSON não
   tem" — só vale para o comando que ela EXERCITA: comando com prosa mais rica que `usages`
   simples merece o seu próprio caso, senão o gap volta calado. [achado no gap de usages-DSL])*
+- **A ORDEM É TDD, e ela não é detalhe** *(Diego, 2026-07-25)*: *"escreve os arquivos expected,
+  depois escreve o arquivo que vai ser alterado, e compara a saída do actual vs expected"*. O
+  `out`/`after/` se escreve **À MÃO, ANTES**, do CONTRATO e da fixture — nunca se GRAVA de uma
+  execução. Gravar produz um arquivo idêntico e um teste diferente: golden-file prova que nada
+  **mudou**, TDD prova que está **certo**. **É PROIBIDO ferramenta que grave expected**
+  (escrevi uma; foi deletada). O que fica é a régua de derivação: **coluna se COMPUTA** do
+  arquivo (§7), nunca se conta na cabeça. *([cic §6.4])*
 - **Compile todo `.prg` (fixture, exemplo, teste) ANTES de usá-lo** —
   `$HB_BIN/harbour arquivo.prg -n -q0` ou o projeto via hbmk2. Fixture que não compila
   gera diagnóstico enganoso.

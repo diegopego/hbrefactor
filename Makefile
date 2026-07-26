@@ -19,7 +19,7 @@ BIN    := bin/hbrefactor
 # por engano. `make build` continua compilando.
 .DEFAULT_GOAL := help
 
-.PHONY: build test ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env help
+.PHONY: build test scenarios oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
 
 # RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
 # bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
@@ -58,6 +58,24 @@ $(BIN): src/hbrefactor.prg
 ## test        roda a suíte (contrato executável; JOBS=1 força sequencial)
 test: build bin/tcheck bin/parrun
 	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
+	@$(MAKE) --no-print-directory scenarios
+
+# CENÁRIOS - o formato NOVO (Diego, 2026-07-26; contrato em tests/scenarios.sh):
+# source/ + expected/ escritos À MÃO, e a saída byte a byte. Alvo PRÓPRIO para
+# rodar só o conjunto migrado enquanto a migração acontece (`make scenarios
+# <nome>` roda um só); entra TAMBÉM no `make test`, senão o formato novo não
+# gateia nada. Destino: TODOS os testes da suíte migram para cá.
+# RETRATO do core: grava os .ppo/.ppt de cada cenário. É o UNICO esperado que
+# se grava em vez de escrever - e só porque ali a autoridade e' o core, nao
+# nos. Rodar isto e' ato DELIBERADO: o diff dos retratos entra na revisao do
+# commit que mexeu no core.
+## oracle      regrava os retratos .ppo/.ppt dos cenários (NOME=x para um só)
+oracle: build bin/tcheck
+	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tests/scenarios.sh --oracle $(NOME)
+
+## scenarios   roda só os testes no formato NOVO (make scenarios NOME=x roda um)
+scenarios: build bin/tcheck
+	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tests/scenarios.sh $(NOME)
 
 # suite EXPLORATORIA do PP (P-DOC): o corpus de diretivas REAIS do Harbour
 # (docs/pp-corpus.md) casado com os quatro oraculos (.ppo/.ppt/ast dump/codigo
@@ -110,6 +128,10 @@ site-serve:
 ## tmp-usage   AVISA se os temporários passaram do limite (nunca apaga; HBREFACTOR_TMP_WARN_MB=500)
 tmp-usage: tools/tmp-usage.sh
 	@tools/tmp-usage.sh
+
+## deps        instala as dependências EXTERNAS dos testes (node); --check só relata
+deps: tools/deps.sh
+	@tools/deps.sh
 
 ## setup-env   adiciona o export HBREFACTOR_HB_BIN aos shell rc (idempotente; RC=~/.bashrc p/ um só)
 setup-env: tools/setup-env.sh tools/hbenv.sh
