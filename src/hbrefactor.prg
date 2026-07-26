@@ -943,7 +943,7 @@ STATIC FUNCTION Usages( aArgs )
       // o nome citado DENTRO do texto das regras (match[]/result[], B4g):
       // keyword de match, identificador em result, palavra de restrição
       IF ! lAtSym
-         nHits += RuleSiteHits( hAst, cUp, aRuleSeen )
+         nHits += RuleSiteHits( hAst, cUp, aRuleSeen, aLoc )
       ENDIF
 
       // sites do NOME DE MARKER que atravessam diretivas (B4d): posições
@@ -3950,7 +3950,7 @@ STATIC FUNCTION RenameFunction( aArgs )
          FOR EACH hItem IN hFunc[ "calls" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew
                RETURN Refuse( "'" + cNew + "' is already called in " + hb_FNameNameExt( cPath ) + ;
-                              ":" + hb_ntos( hItem[ "line" ] ) + " - o rename sequestraria essas chamadas" )
+                              ":" + hb_ntos( hItem[ "line" ] ) + " - the rename would hijack those calls" )
             ENDIF
          NEXT
          IF Upper( hFunc[ "name" ] ) == cUpOld
@@ -4561,8 +4561,15 @@ STATIC FUNCTION ExtractFunction( aArgs )
       // strings soltas que soletram o nome novo: relato (nunca edição)
       FOR EACH hTok IN hAst[ "tokens" ]
          IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. Upper( hTok[ "text" ] ) == cUpNew
-            Prose( "warning: string on line " + hb_ntos( hTok[ "line" ] ) + ;
-                    " soletra '" + cNewName + "'" + hb_eol() )
+            IF s_lJson
+               Diag( "string-spells-new-name", "string on line " + ;
+                     hb_ntos( hTok[ "line" ] ) + " spells out '" + cNewName + "'", ;
+                     LspLoc( cSrcPath, hTok[ "line" ], iif( hTok[ "col" ] == NIL, 1, ;
+                             hTok[ "col" ] + 1 ), Len( cNewName ) ) )
+            ELSE
+               Prose( "warning: string on line " + hb_ntos( hTok[ "line" ] ) + ;
+                       " spells out '" + cNewName + "'" + hb_eol() )
+            ENDIF
          ENDIF
       NEXT
    ENDIF
@@ -7037,7 +7044,9 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
    LOCAL hRule, hApp, hTok, nHits := 0, cKey, lHead, cWhat
 
    // definição: a diretiva (o mesmo .ch registra a regra em cada módulo
-   // que o inclui - dedupe global por arquivo+linha+tipo)
+   // que o inclui - dedupe global por arquivo+linha+tipo). `cWhat` é a
+   // classificação que sai IGUAL na prosa e na location (kind) - a régua da
+   // §2.5.0: um só fato, duas vistas, divergir vira impossível
    FOR EACH hRule IN hAst[ "ppRules" ]
       IF hRule[ "head" ] != NIL .AND. Upper( hRule[ "head" ] ) == cUp
          cKey := RuleWhere( hRule ) + "|" + hRule[ "kind" ]
@@ -7045,18 +7054,23 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
             AAdd( aDefSeen, cKey )
             nHits++
             IF hRule[ "file" ] == NIL
-               Prose( "(builtin): directive (" + RuleTag( hRule ) + ", " + ;
-                  hb_ntos( hRule[ "markers" ] ) + " marker(s)) - core/-D rule, no file" + hb_eol() )
+               cWhat := "directive (" + RuleTag( hRule ) + ", " + ;
+                        hb_ntos( hRule[ "markers" ] ) + " marker(s)) - core/-D rule, no file"
+               Prose( "(builtin): " + cWhat + hb_eol() )
+               // builtin não tem posição de fonte -> só o relato (sem location)
             ELSE
                // A4: uma REMOÇÃO que não removeu regra nenhuma é código MORTO, e
                // o Harbour a aceita calado. O fato é do ast-16 (`undoes` NIL num
                // registro de remoção = órfão) e não tinha consumidor: aqui ele
                // vira RELATO - a ferramenta não edita o que não pode verificar.
-               Prose( hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) + ;
-                  ": directive (" + RuleTag( hRule ) + ", " + ;
-                  hb_ntos( hRule[ "markers" ] ) + " marker(s))" + ;
-                  iif( IsRuleDel( hRule ) .AND. hRule[ "undoes" ] == NIL, ;
-                       " - ORPHAN: removes no rule (dead directive)", "" ) + hb_eol() )
+               cWhat := "directive (" + RuleTag( hRule ) + ", " + ;
+                        hb_ntos( hRule[ "markers" ] ) + " marker(s))" + ;
+                        iif( IsRuleDel( hRule ) .AND. hRule[ "undoes" ] == NIL, ;
+                             " - ORPHAN: removes no rule (dead directive)", "" )
+               Prose( hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) + ": " + cWhat + hb_eol() )
+               // a location vive no ARQUIVO DA REGRA (o .ch), não no módulo;
+               // sem coluna byte-exata (a prosa também só cita a linha)
+               LocAdd( aLoc, hRule[ "file" ], hRule[ "line" ], {}, 0, cWhat, NIL, "confirmed", NIL )
             ENDIF
          ENDIF
       ENDIF
@@ -7073,11 +7087,16 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
             cWhat := iif( lHead, "application", "keyword" ) + ;
                      " (" + RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")"
             IF hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL
-               LocAdd( aLoc, cPath, hTok[ "line" ], { hTok[ "col" ] + 1 }, nLen )
+               LocAdd( aLoc, cPath, hTok[ "line" ], { hTok[ "col" ] + 1 }, nLen, ;
+                       cWhat, NIL, "confirmed", aSrc )
                Prose( cModFile + ":" + hb_ntos( hTok[ "line" ] ) + ":" + ;
                   hb_ntos( hTok[ "col" ] + 1 ) + ": " + cWhat + ;
                   SrcLine( aSrc, hTok[ "line" ] ) + hb_eol() )
             ELSE
+               // sem coluna byte-exata (aplicação nascida da expansão de outra
+               // regra/include): a location vai sem span, o kind carrega o porquê
+               LocAdd( aLoc, cPath, hApp[ "line" ], {}, 0, ;
+                       cWhat + " - no source position", NIL, "confirmed", aSrc )
                Prose( cModFile + ":" + hb_ntos( hApp[ "line" ] ) + ": " + cWhat + ;
                   " - no source position (expansion of another rule/include)" + hb_eol() )
             ENDIF
@@ -7097,7 +7116,7 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
 // no ARQUIVO DA REGRA (não no módulo), por isso não entra nas Location[].
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen )
+STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen, aLoc )
 
    LOCAL hRule, hTok, cSide, nHits := 0, cKey, cWhat, cWhere
 
@@ -7130,6 +7149,13 @@ STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen )
                            iif( hTok[ "col" ] == NIL, "", ;
                                 ":" + hb_ntos( hTok[ "col" ] + 1 ) ) )
             Prose( cWhere + ": " + cWhat + hb_eol() )
+            // a location vive no ARQUIVO DA REGRA (.ch), com posição do token
+            // do match/result; builtin ou sem linha não posiciona -> só relato
+            IF hRule[ "file" ] != NIL .AND. hTok[ "line" ] != NIL
+               LocAdd( aLoc, hRule[ "file" ], hTok[ "line" ], ;
+                       iif( hTok[ "col" ] == NIL, {}, { hTok[ "col" ] + 1 } ), ;
+                       Len( hTok[ "text" ] ), cWhat, NIL, "confirmed", NIL )
+            ENDIF
          NEXT
       NEXT
    NEXT
@@ -13113,7 +13139,7 @@ STATIC FUNCTION RenameMethod( aArgs )
             !( Upper( hTok[ "text" ] ) == cUpOld )
             RETURN Refuse( "the source spells out the generated name '" + hTok[ "text" ] + "' (" + ;
                            hb_FNameNameExt( cPath ) + ":" + hb_ntos( hTok[ "line" ] ) + ;
-                           ") - renomear '" + cMethod + "' would orphan it; refusing" )
+                           ") - renaming '" + cMethod + "' would orphan it; refusing" )
          ENDIF
       NEXT
    NEXT

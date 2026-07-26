@@ -796,14 +796,14 @@ FUNCTION ChamaContinuada()
 
    RETURN n
 EOF
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "^              Dobrar( 4 ) + ;$" "$D/a.prg"
 check "middle continuation line renamed" $?
 grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
 check "definition renamed"         $?
-grep -q "pcode byte-identical" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" proof pcode-identical
 check "structural verification"    $?
 
 }
@@ -878,14 +878,14 @@ echo "case 35: inline-local replaces reads with the init expression (B3)"
 # Dupla is executed by Main: behaviour must be identical after inlining nR
 D=$(fresh case35)
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
-( cd "$D" && "$BIN" inline-local fix01.hbp b.prg Dupla nR > out.log 2>&1 )
+( cd "$D" && "$BIN" inline-local fix01.hbp b.prg Dupla nR --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "RETURN ( nV + nV )" "$D/b.prg"
 check "read replaced by parenthesized expression" $?
 ! grep -q "LOCAL nR" "$D/b.prg"
 check "declaration removed"        $?
-grep -q "symbols intact" "$D/out.log"
+"$TCHECK" enveq "$D/out.log" proof symbols-preserved
 check "structural verification"    $?
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 diff -q "$D/saida_antes.txt" "$D/saida_depois.txt" > /dev/null 2>&1
@@ -907,23 +907,23 @@ FUNCTION ComImpura( nQtd )
 
    RETURN nQtd + nDobro + nMuda
 EOF
-( cd "$D" && "$BIN" inline-local fix01.hbp b.prg ComImpura nDobro > imp.log 2>&1 )
+( cd "$D" && "$BIN" inline-local fix01.hbp b.prg ComImpura nDobro --json > imp.log 2>&1 )
 RC=$?
 check "function call in init refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "impure" "$D/imp.log"
+"$TCHECK" envhas "$D/imp.log" detail impure
 check "reason mentions purity"     $?
-( cd "$D" && "$BIN" inline-local fix01.hbp b.prg ComImpura nMuda > mut.log 2>&1 )
+( cd "$D" && "$BIN" inline-local fix01.hbp b.prg ComImpura nMuda --json > mut.log 2>&1 )
 RC=$?
 check "rewritten variable refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-( cd "$D" && "$BIN" inline-local fix01.hbp a.prg Main nTotal > blk.log 2>&1 )
+( cd "$D" && "$BIN" inline-local fix01.hbp a.prg Main nTotal --json > blk.log 2>&1 )
 RC=$?
 check "codeblock capture refused"  $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "codeblock" "$D/blk.log"
+"$TCHECK" envhas "$D/blk.log" detail codeblock
 check "reason mentions codeblock"  $?
-( cd "$D" && "$BIN" inline-local fix01.hbp a.prg Rotulada nVisto > str.log 2>&1 )
+( cd "$D" && "$BIN" inline-local fix01.hbp a.prg Rotulada nVisto --json > str.log 2>&1 )
 RC=$?
 check "stringified name refused"   $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "stringify" "$D/str.log"
+"$TCHECK" envhas "$D/str.log" detail stringify
 check "reason mentions stringify"  $?
 ( cd "$D" && "$BIN" inline-local fix01.hbp a.prg LimiteMax nMax > def.log 2>&1 )
 RC=$?
@@ -937,45 +937,45 @@ unit_37() {
 echo "case 37: name validity comes from the project's compiler, not from lists"
 # WHILE is rejected by the compiler as a variable name -> clean refusal
 D=$(fresh case37)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 while > out.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 while --json > out.log 2>&1 )
 RC=$?
 check "compiler-rejected name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "project compiler rejects" "$D/out.log"
+"$TCHECK" envhas "$D/out.log" detail "project compiler rejects"
 check "refusal cites the compiler"  $?
 # LOOP is ACCEPTED by the compiler as a local name (the occ-era list wrongly
 # refused it - grammar truth restored); byte-identical verification still rules
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 Loop > loop.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 Loop --json > loop.log 2>&1 )
 RC=$?
 check "compiler-accepted keyword-like name renames" $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "verified: all 2 module" "$D/loop.log"
+"$TCHECK" enveq "$D/loop.log" verdict applied
 check "byte-identical verification" $?
 # hard-reserved RTL names (Len, Space...) the compiler itself refuses to
 # redefine - the probe relays that; names it does accept (OutStd) but the
 # RUNTIME knows (hb_IsFunction) get a shadowing warning + --force gate
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 Len > rtl.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 Len --json > rtl.log 2>&1 )
 RC=$?
 check "compiler-protected RTL name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "project compiler rejects" "$D/rtl.log"
+"$TCHECK" envhas "$D/rtl.log" detail "project compiler rejects"
 check "probe relays the compiler refusal" $?
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_ntos > rtl2.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_ntos --json > rtl2.log 2>&1 )
 RC=$?
 check "runtime function name refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "Harbour runtime function" "$D/rtl2.log"
+"$TCHECK" envhas "$D/rtl2.log" diagnostics "Harbour runtime function"
 check "warning explains the shadowing" $?
 # hb_MilliSeconds is NOT linked into the tool itself: only the canonical
 # core list (include/harbour.hbx, found via the project's -i paths) knows
 # it - hb_IsFunction alone would miss the shadowing
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_MilliSeconds > rtl3.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_MilliSeconds --json > rtl3.log 2>&1 )
 RC=$?
 check "core function unknown to the tool's runtime still refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "Harbour runtime function" "$D/rtl3.log"
+"$TCHECK" envhas "$D/rtl3.log" diagnostics "Harbour runtime function"
 check "harbour.hbx caught it" $?
 # renaming to a name the project already CALLS (even an external one, like
 # QOut) would hijack those calls
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 QOut > hij.log 2>&1 )
+( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 QOut --json > hij.log 2>&1 )
 RC=$?
 check "name already called in project refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "sequestraria" "$D/hij.log"
+"$TCHECK" envhas "$D/hij.log" detail "would hijack those calls"
 check "refusal explains the hijack" $?
 
 }
@@ -4650,6 +4650,14 @@ bash "$HERE/regua-canais.sh" "$BIN" "$HERE/cases/130-envelope-usages/before" \
      usages app.hbp Dobro > "$HERE/tmp/regua-canais.log" 2>&1
 check "régua: a prosa não mostra fato que o JSON não tem" $?
 [ -s "$HERE/tmp/regua-canais.log" ] && cat "$HERE/tmp/regua-canais.log"
+
+# a MESMA régua sobre uma PALAVRA DE DSL: a prosa de um comando/DSL é muito mais
+# rica (directive/application/keyword) e o JSON empobrecia calado (gap do passo
+# 1, achado ao migrar o caso 38). Sem exercitar pp aqui, o gap voltaria mudo.
+bash "$HERE/regua-canais.sh" "$BIN" "$HERE/cases/137-usages-dsl-complete/before" \
+     usages fixdsl.hbp MENUITEM > "$HERE/tmp/regua-canais-dsl.log" 2>&1
+check "régua (DSL): a prosa de palavra de pp não mostra fato que o JSON não tem" $?
+[ -s "$HERE/tmp/regua-canais-dsl.log" ] && cat "$HERE/tmp/regua-canais-dsl.log"
 }
 
 unit_133() {
@@ -4683,6 +4691,15 @@ unit_136() {
 run_casedir "$HERE/cases/136-envelope-extract-dryrun"
 }
 
+unit_137() {
+# A.1 - usages de PALAVRA DE DSL: o envelope carrega TUDO que a prosa tem. Era
+# um gap do passo 1 (kind "occurrence" generico, text null, e faltavam a
+# diretiva e o "in rule match") - a regua-canais nao pegou porque so testava
+# uma funcao simples. Fixture expected byte-a-byte (padrao TDD): prova as 5
+# locations com kind (directive/application/keyword/in-rule-match) e o text.
+run_casedir "$HERE/cases/137-usages-dsl-complete"
+}
+
 unit_128() {
 # P17 - PRIMEIRO caso no formato DECLARATIVO (tests/casedir.sh): o estado
 # esperado é uma FIXTURE, não um grep. Prova as três coisas de uma vez - o
@@ -4712,7 +4729,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

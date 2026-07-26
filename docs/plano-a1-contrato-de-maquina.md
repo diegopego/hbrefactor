@@ -97,9 +97,35 @@ para os dois consumidores** — o resto é limpeza.
 - Provas: casos declarativos 133-136 (rename dry-run/aplicado, inline, extract) + 132
   reproposto (exec-registry). Placar régua-json 14/14. `make test` 1046/0.
 
-### Passo 2 — Migrar os ~600 asserts de prosa para o ENVELOPE
-Comando a comando. O `JLoad` do `tcheck.prg` já desembrulha o envelope; os casos novos
-nascem no formato declarativo (`tests/casedir.sh`), comparando o `out` byte a byte.
+### Passo 2 — Migrar os ~468 asserts de prosa (`*.log`) para o ENVELOPE *(EM ANDAMENTO)*
+Comando a comando. Os ~200 greps em fonte/`.ppo`/`.ast.json` **continuam válidos** (não
+dependem de prosa).
+
+**A REGRA DE OURO (Diego, 2026-07-25): fixture EXPECTED, padrão TDD — casedir onde couber.**
+Um `grep` de campo (mesmo estruturado, via `tcheck enveq`) é **frágil**: prova um pedaço, não
+o que a ferramenta NÃO disse. O caso declarativo (`tests/casedir.sh`: `before/` + `cmd` +
+`out` byte a byte [+ `after/`]) prova o envelope **inteiro** — é o menos frágil. **Preferir
+casedir para toda asserção de saída de comando único.** Reservar o imperativo + helpers
+estruturados só para o que casedir não modela (idempotência A→B→A, saída-de-programa
+idêntica, baterias multi-passo de recusa).
+
+**Ferramentas de asserção estruturada** (`tcheck`, para o caso imperativo): `enveq <json>
+<dot-path> <val>` (campo == valor; `result.` implícito), `envhas <json> <path> <substr>`,
+`envrow <json> <array> "k=v;k=v"` (linha de `edges`/`findings`/`locations` casa os pares),
+`envloc <json> <arquivo:linha> ["kind in owner"]`.
+
+**GAP DE COMPLETUDE achado (e consertado) ao migrar o caso 38:** o `usages` de uma **palavra
+de pp/DSL** emitia envelope **mais pobre que a prosa** — `kind: "occurrence"` genérico, `text:
+null`, e faltavam a **diretiva** e o **in-rule-match**. A régua-canais não pegou porque só
+exercitava `usages Dupla` (função simples). Consertado em `DslHits`/`RuleSiteHits` (a location
+recebe a MESMA classificação que a prosa já monta — §2.5.0, um fato duas vistas); régua-canais
+**estendida a uma palavra de DSL**; caso **137** (fixture expected byte-a-byte) trava as 5
+locations com kind+text. **Nota de método: cada comando com prosa mais rica que `usages Dupla`
+merece um caso da régua-canais próprio — o gap volta calado sem isso.**
+
+**§5 — leaks de português no PRODUTO consertados** (o CLI é inglês; a conversa é PT): a recusa
+de sequestro (`sequestraria`→`hijack`), o aviso de string do extract (`soletra`→`spells out`,
+e roteado a `diagnostics[]` sob `--json`), e a recusa de órfão (`renomear`→`renaming`).
 
 ### Passo 3 — Arrancar a prosa e o modo
 Quando NENHUM teste ler prosa: deletar `Prose()` (a função e os 133 sítios — o fato já
