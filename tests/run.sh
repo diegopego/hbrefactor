@@ -981,35 +981,25 @@ check "refusal explains the hijack" $?
 }
 
 unit_38() {
-echo "case 38: S1 - user pp DSL (three families): usages + rename-dsl round-trip"
+echo "case 38: S1 - user pp DSL (three families): o que casedir NÃO modela (ida-e-volta)"
+# A.1 passo 2: a saída de CADA comando único desta fixture virou caso
+# declarativo (137 usages da cabeça, 138 da palavra secundária, 139 o rename
+# aplicado com after/, 140/141 as duas recusas) - lá a prova é o envelope
+# INTEIRO, byte a byte, e não um grep que nunca diz o que a ferramenta calou.
+# Sobra aqui só o que o formato declarativo não modela: A->B->A (dois comandos,
+# estado encadeado) e o dry-run que não escreve.
 # fixtures compile clean first (working rule: never test with a broken fixture)
 for f in a.prg b.prg; do
    "$HB_BIN/harbour" "$HERE/fixdsl/$f" -n -q0 -w3 -es2 -s -I"$HERE/fixdsl" > /dev/null 2>&1
    check "fixdsl/$f clean under -w3 -es2" $?
 done
 D=$(freshdsl case38)
-( cd "$D" && "$BIN" usages fixdsl.hbp MENUITEM > dsl.log 2>&1 )
-RC=$?
-check "usages of a DSL word exit 0"  $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "menu.ch:8: directive (#command MENUITEM, 4 marker(s))" "$D/dsl.log"
-check "directive found (pp convention: line = last physical line)" $?
-grep -q "a.prg:11:4: application (#command MENUITEM, menu.ch:8)" "$D/dsl.log"
-check "application with exact column"  $?
-grep -q "b.prg:6:4: application" "$D/dsl.log"
-check "application in second module"   $?
-( cd "$D" && "$BIN" usages fixdsl.hbp ACTION > act.log 2>&1 )
-grep -q "a.prg:11:21: keyword (#command MENUITEM" "$D/act.log"
-check "secondary DSL word reported as keyword of the rule" $?
-( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM > ren.log 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_ITEM --json > ren.log 2>&1 )
 RC=$?
 check "rename-dsl exit 0"            $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "3 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical" "$D/ren.log"
-check "verification: .ppo/.hrb byte-identical" $?
-grep -q "MENU_ITEM <label>" "$D/menu.ch"
-check "directive head renamed in menu.ch" $?
-grep -q 'MENU_ITEM "Abrir"' "$D/a.prg" && grep -q 'MENU_ITEM "Sub"' "$D/b.prg"
-check "application sites renamed in both modules" $?
-( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENUITEM > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENUITEM --json > back.log 2>&1 )
+"$TCHECK" enveq "$D/back.log" verdict applied
+check "a volta também VERIFICA (não é só reescrita de texto)" $?
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/b.prg" "$HERE/fixdsl/b.prg" && \
    cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "A->B->A round-trip byte-exact (sources + .ch)" $?
@@ -1022,17 +1012,6 @@ check "#define round-trip byte-exact"  $?
 ( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU_X --dry-run > dry.log 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fixdsl/a.prg" && cmp -s "$D/menu.ch" "$HERE/fixdsl/menu.ch"
 check "dry run writes nothing"        $?
-# recusas: sequestro de identificador, abbreviation dBase, palavra inexistente
-( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MenuAdd > hij.log 2>&1 )
-RC=$?
-check "new word already an identifier refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "would capture it" "$D/hij.log"
-check "refusal explains the capture"  $?
-( cd "$D" && "$BIN" rename fixdsl.hbp a.prg:11:4 MENU > abr.log 2>&1 )
-RC=$?
-check "dBase 4-letter abbreviation clash refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-grep -q "abbreviation" "$D/abr.log"
-check "refusal cites the abbreviation rule" $?
 
 }
 
@@ -1962,7 +1941,14 @@ echo "case 71: extensão VSCode - consulta por POSIÇÃO (Q5: methodQuery morto)
 # identificador de compilação cai para a consulta crua da palavra. O
 # harness extrai as funções REAIS do extension.js (técnica do harness
 # anterior) e ASSERTA a morte da regex de construto (V1).
-node "$HERE/../vscode/test-resolveat.js" > /dev/null 2>&1
+# o harness é JS (a extensão é JS): sem node ele não roda - e a falha tem de
+# NOMEAR isso, senão um ambiente incompleto parece defeito da ferramenta
+if ! command -v node > /dev/null 2>&1; then
+   note "     (node ausente nesta máquina - rode 'make deps'; o harness da extensão é JS)"
+   false
+else
+   node "$HERE/../vscode/test-resolveat.js" > /dev/null 2>&1
+fi
 check "extensão por posição: conversão real + fallback + methodQuery morto" $?
 
 }
@@ -4654,7 +4640,7 @@ check "régua: a prosa não mostra fato que o JSON não tem" $?
 # a MESMA régua sobre uma PALAVRA DE DSL: a prosa de um comando/DSL é muito mais
 # rica (directive/application/keyword) e o JSON empobrecia calado (gap do passo
 # 1, achado ao migrar o caso 38). Sem exercitar pp aqui, o gap voltaria mudo.
-bash "$HERE/regua-canais.sh" "$BIN" "$HERE/cases/137-usages-dsl-complete/before" \
+bash "$HERE/regua-canais.sh" "$BIN" "$HERE/fixdsl" \
      usages fixdsl.hbp MENUITEM > "$HERE/tmp/regua-canais-dsl.log" 2>&1
 check "régua (DSL): a prosa de palavra de pp não mostra fato que o JSON não tem" $?
 [ -s "$HERE/tmp/regua-canais-dsl.log" ] && cat "$HERE/tmp/regua-canais-dsl.log"
@@ -4700,6 +4686,30 @@ unit_137() {
 run_casedir "$HERE/cases/137-usages-dsl-complete"
 }
 
+unit_138() {
+# A.1 - a palavra SECUNDÁRIA da DSL (ACTION): keyword da regra em cada
+# aplicação MAIS o sítio dentro do match da diretiva. A prosa mostrava um
+# sítio (o grep do caso 38); o envelope prova os quatro, e prova que não há
+# um quinto.
+run_casedir "$HERE/cases/138-usages-dsl-keyword"
+}
+
+
+unit_140() {
+# A.1 - RECUSA: o nome novo já é identificador do projeto, e a regra renomeada
+# capturaria aquelas chamadas. Sem after/: a promessa central é que a entrada
+# volta byte a byte. `reason` NOMEADO (era "unclassified") - é o campo pelo
+# qual a extensão e o agente decidem, no lugar de casar a frase em inglês.
+run_casedir "$HERE/cases/140-rename-dsl-sequestro"
+}
+
+unit_141() {
+# A.1 - RECUSA: abreviação dBase. `MENU` casaria também a cabeça MENUBOX (o
+# `#command` casa palavra abreviada a partir de 4 letras) - quem responde isso
+# é o pp, não aritmética nossa. Recusa de política: `stop-and-report`.
+run_casedir "$HERE/cases/141-rename-dsl-abreviacao"
+}
+
 unit_128() {
 # P17 - PRIMEIRO caso no formato DECLARATIVO (tests/casedir.sh): o estado
 # esperado é uma FIXTURE, não um grep. Prova as três coisas de uma vez - o
@@ -4729,7 +4739,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137"
+ALL_UNITS="0 1 2 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

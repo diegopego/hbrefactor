@@ -1,0 +1,12 @@
+{
+  "schema": "cli-1",
+  "command": "rename",
+  "status": "refused",
+  "reason": "new-name-captures-identifier",
+  "action": "stop-and-report",
+  "detail": "'MenuAdd' is already an identifier used in b.prg:10 - the renamed rule would capture it",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+}
+

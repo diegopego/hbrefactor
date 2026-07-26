@@ -1,0 +1,12 @@
+{
+  "schema": "cli-1",
+  "command": "rename",
+  "status": "refused",
+  "reason": "new-name-collides-by-abbreviation",
+  "action": "stop-and-report",
+  "detail": "'MENU' collides by abbreviation with rule #command MENUBOX (menu.ch:9)",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+}
+
