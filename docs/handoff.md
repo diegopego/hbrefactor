@@ -12,63 +12,191 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-## 0. O ESTADO EXATO (2026-07-26) — **A MIGRAÇÃO DA SUÍTE, e onde retomar**
+## 0. O ESTADO EXATO (2026-07-27, fim da sessão) — **a linguagem foi DECIDIDA: Go**
 
-**A frente ativa é a FASE A.1 passo 2**, e ele mudou de forma no dia 26: em vez de trocar
-`grep` de prosa por `grep` de campo, **todos os testes migram para o formato de CENÁRIO**.
+**A frente ativa é a FASE A.1 passo 2** — a migração da suíte. A escolha da linguagem da
+camada de controle está **fechada**, e a fila é o que sobrou nos três legados:
 
-> **O CONTRATO DO FORMATO NÃO ESTÁ AQUI — está em [`tests/README.md`](../tests/README.md)**,
-> por ordem do Diego (*"esta spec deve estar no readme dos testes… mais durável que apenas o
-> handoff ou memória"*). **Leia-o inteiro antes de escrever um teste.** Aqui fica só o ESTADO.
+| formato | onde | quantos | estado |
+|---|---|---|---|
+| legado imperativo | `tests/run.sh` + `bin/parrun` + `tcheck.prg` | 127 units | 1021/0 |
+| legado intermediário | `tests/casedir.sh` + `tests/cases/` | 12 casos | roda dentro do run.sh |
+| ponte declarativa (bash) | `tests/scenarios.sh` + `tests/scenarios/` | 9 cenários | 81/0 |
+| **o destino** | `tests-go/suite/` (Go) | 1 caso | verde |
 
-**Por que mudou** (a cicatriz é a [§6.4](cicatrizes.md)): a pasta `tests/cases/` inteira tinha
-sido construída **gravando** a saída da ferramenta — o plano da fase até recomendava isso por
-escrito. Gravado, o esperado afirma *"a ferramenta faz isto hoje"* e congela o defeito atual.
-A ordem do Diego é a inversa e é TDD: **escreve o expected primeiro, à mão, do contrato**.
-Prova no mesmo dia: duas recusas saíam com `reason: "unclassified"` — o campo pelo qual a
-extensão e o agente DECIDEM —, e nem o grep antigo nem um esperado gravado pegariam.
+**`make test` verde: 1021/0 + 81/0 + `tests/docs` + `tests/suite`.**
+**Fila total: 148.** Os três legados **só encolhem** — o hook `formato-de-teste.sh` barra
+o commit que faça qualquer um deles crescer.
 
-**O LOOP DE MIGRAÇÃO** (é o trabalho, e ele é repetitivo de propósito):
+> **O CONTRATO NÃO ESTÁ AQUI — está em [`tests/README.md`](../tests/README.md)**, escrito
+> como **especificação INDEPENDENTE DE LINGUAGEM**. Leia-o inteiro antes de escrever um
+> teste. Aqui fica só o ESTADO e o que vai fazer você tropeçar.
+> **O loop de UMA iteração está na skill `migrate-test`** — não o re-derive.
 
-1. leia o `unit_N` no `tests/run.sh` e veja o que ele prova de verdade;
-2. crie `tests/scenarios/<nome-que-diz-o-que-prova>/` (passo a passo no README § 5);
-3. **escreva `expected/` e `output` à mão, ANTES de rodar**;
-4. `make oracle NOME=<nome>` e **leia** o retrato do core;
-5. `make scenarios NOME=<nome>`. Divergiu? **separe os dois lados**: erro meu → conserta o
-   esperado; buraco da ferramenta → conserta a ferramenta (é onde os códigos de recusa vêm
-   nascendo, um por cenário);
-6. **tire o `unit_N` do `run.sh`** (da função E da lista `ALL_UNITS`) — migrar é mover;
-7. `make test` verde (ele encadeia os dois runners).
+### Go, e por que a comparação anterior não valia
 
-**FEITO até aqui:** `unit_1` → `rename-local`; `unit_2` → `refuse-local-name-taken`;
-`unit_38` (o rename de DSL) → `rename-dsl-head`. Suíte: **`make test` 1045/0 + 3 cenários 16/0**.
+*(Diego, 2026-07-27.)* A escolha foi refeita porque o dado estava **contaminado**: a versão
+Go que existia era **transliteração** do Python, método a método (`Roda`/`roda`,
+`EnvelopesEsperados`/`envelopes_esperados` — até os nomes em português atravessaram). Ela
+media o custo da TRADUÇÃO, não o do Go. Reescrita a partir da spec, sem olhar a outra:
+**infra 447 → 351 linhas de código, e o caso 26 → 7**.
 
-**PRÓXIMO: `unit_3`**, e daí em diante na ordem numérica. Faltam ~119 units + os 11 casos
-antigos em `tests/cases/` (128, 130-138, 140, 141), que também migram.
+O que decidiu não foi o placar, foram **dois portões que o desenho em Go torna
+impossíveis de esquecer** — e a doutrina do repo é essa (§1.6, portão executável × regra):
 
-**O `unit_0` NÃO dissolve ainda.** Ele prova que `tests/fix01/` compila limpo, e ~38 units
-ainda usam essa fixture; cada cenário só prova a `source/` DELE. Ele sai quando o último
-usuário de `fix01` migrar — antes disso a fixture ficaria sem guarda.
+- **vacuidade**: as duas comparações são do harness e rodam depois da função do caso
+  retornar, então não existe caso que rode a ferramenta e não compare. No Python era uma
+  rede em teardown, que ainda reportava `1 failed, 1 error`;
+- **fixture órfã**: pasta em `testdata/` sem caso registrado reprova. Medido no outro lado:
+  passava **verde, calada**.
 
-**DECISÕES DO DIEGO PENDENTES** (nenhuma bloqueia a fila):
-- **`program-output`** (identidade de saída de programa, ~12 units, o `unit_14` é o primeiro):
-  o cenário DECLARA num arquivo o que o programa imprime, ou basta "antes == depois"? O ponto
-  dele já está claro: **build que falha é falha do teste**, nunca resultado vazio comparado com
-  vazio (é o buraco que o formato antigo tinha).
-- **colisão de vocabulário `ACTION`**: a fixture do `rename-dsl-head` usa `ACTION` como keyword
-  secundária, e a régua `forbid` é case-insensitive — ela bate no campo `action` do NOSSO
-  envelope. Tirei a palavra da lista; a alternativa é trocar a keyword na `source/` do cenário
-  (ele é dono da própria fixture agora), e aí a régua cobre o vocabulário inteiro.
+**A régua que gerou tudo isto continua valendo:** ao portar qualquer coisa, a pergunta não é
+*"como escrevo isto na outra linguagem"*, é *"o que esta linguagem faz para esta
+necessidade"*. Foram três traduções pegas pelo Diego (bash→Python, Python→Go,
+`tools/oracle.py`→binário) antes de a régua existir.
 
-**DÍVIDA CONHECIDA:** (a) ~300 recusas ainda `unclassified` — vão sendo classificadas **por
-cenário migrado**, que é a política; o `resolve-at` fora de identificador é uma delas, e o nome
-já está reservado na taxonomia (`no-fact-at-position`); (b) `IsJson()` é função morta (W0034),
-apagar na limpeza do passo 3; (c) `describe --json` (manifesto de capacidades, critério de
-pronto da fase) ainda não existe.
+### As DUAS CLASSES de teste *(decisão do Diego)*
 
-**As chaves do `case-1` PROJETADAS e ainda não implementadas** (`runs`, `needs`, `check`, e os
-`kind` `oracle`/`harness`) estão no README § 6, com a regra que as governa: **uma chave só entra
-no validador quando o runner a honra** — chave aceita e ignorada é pior que desconhecida.
+- **Classe A — transformação** (o hbrefactor): `source/` + comandos + `expected/`. É o que
+  está em `tests-go/suite/`. **Recusa é subcaso**: `expected == source`.
+- **Classe B — estudo** (exploratório): o **pp-corpus**, único ocupante hoje (26 famílias,
+  `tests/ppc-*`, 28 guardas). Fica em **Harbour + hbtest** — ali o objeto de estudo é
+  Harbour e o teste precisa do pp vivo. **NÃO migra** para o formato da classe A.
+  Exige **explicação** (§ abaixo); a classe A não.
+
+### A "explicação" — desenhada, NÃO implementada
+
+Nome certo *(Diego)*: **"explicação para programadores Harbour de como o código em `source/`
+funciona"**. Só na classe B. O desenho acordado:
+
+- **`make test` só VERIFICA** (hash de `source/`+`expected/` casando com o registrado);
+  determinístico, sem rede, sem modelo. **`make explica` GERA**, disparando o agente.
+- O agente lê `.ppo`, `.ppt` e **AST**; compreende os dois lados numa transformação; **se
+  faltar fato, ESTENDE O CORE**; escreve `explicacao.md` na pasta do teste.
+- O hash mora num **JSON de metadados** do teste, com schema. **A régua que impede o
+  `case.json` de voltar: o JSON DESCREVE o teste, nunca o EXECUTA.**
+- A AST não fica no `oracle/` (76 KB por fixture); é gerada sob demanda e descartada.
+
+### O runner, em uma tela
+
+```
+tests-go/suite/
+   suite_test.go       registro, descoberta, as DUAS comparações do §5
+   projeto_test.go     o projeto no tmp e a invocação (as invariantes do §4)
+   fixture_test.go     as três propriedades do §7 (compila, vocabulário, retrato)
+   envelope_test.go    o envelope cli-2 como tipo
+   <nome>_test.go      UM por caso: init() + registra() + o que ele afirma
+   testdata/<nome>/    source/ expected/ outputs.json oracle/
+```
+
+```bash
+make caso NOME=x      # UM caso + as provas da fixture dele (segundos)
+make gotest           # a suíte da classe A inteira
+make oracle NOME=x    # regrava o retrato do core (ato DELIBERADO)
+tools/caso-new.sh <nome> <fixture>    # o esqueleto; NÃO escreve esperado
+```
+
+**Os portões que nasceram nesta sessão** (todos com controle negativo rodado):
+
+| portão | pega |
+|---|---|
+| harness | caso que não comparou, artefato novo, `unclassified` congelado, fixture órfã |
+| `tests-go/docs` | comando/caminho citado pela spec ou pela skill que não existe |
+| hook `formato-de-teste.sh` | commit que faça `run.sh`, `tests/cases/` ou `tests/scenarios/` crescer |
+
+### PRÓXIMO PASSO
+
+Migrar **um caso de recusa** e **um multi-comando** — é onde a spec encontra o que ainda não
+previmos (`expected == source`, `outputs.json` com lista de verdade). Só então o resto dos
+148. Os 9 cenários de `tests/scenarios/` são os mais baratos (o esperado já está escrito à
+mão); os 12 de `tests/cases/` exigem cuidado redobrado, porque **o esperado deles foi
+GRAVADO de uma execução** e precisa ser reescrito do contrato, nunca copiado.
+
+---
+
+## 0-hoje. O QUE ESTA SESSÃO ENTREGOU (2026-07-26)
+
+**Na ferramenta** (`src/hbrefactor.prg`):
+
+- **O envelope virou `cli-2`**, com dois campos novos, ambos por crítica do Diego:
+  - **`exit`** — e ele **não era derivável** do `status`: o `verify` de veredito BROKEN sai
+    `status: "ok"` com exit 1. Quem lia o stdout num pipe concluía o oposto do shell;
+  - **`argv`** — a invocação inteira, *"demonstrando o conjunto comando/resultado"*.
+- **O `NameAccepted` MORREU** *(ordem do Diego: "o próprio compilador vai reclamar depois")*.
+  Ele não era heurística (chamava `hb_compileFromBuf`), mas era um oráculo **aproximado**
+  para o que a recompilação responde de forma **definitiva** — e os dois divergiam: medido,
+  ele recusava `while` como nome de LOCAL, que o projeto real **aceita**. Era falso-negativo,
+  barrando rename legítimo. No mesmo passo, os erros do compilador viraram `diagnostics[]`
+  (`DiagCompile`) em vez de vazar em prosa no stderr sob `--json`.
+- **Um `\n` a mais em todo envelope**, achado pelo esperado escrito à mão: o
+  `hb_jsonEncode( x, .T. )` já termina em newline e as quatro emissões somavam `hb_eol()`.
+- **Recusas classificadas**: `compile-failed-rolled-back`, `verification-failed-rolled-back`,
+  `old-name-shadowed-by-codeblock-param`, `new-name-is-codeblock-param`,
+  `new-name-already-called`. A política é uma por cenário migrado; família/par nasce junto.
+
+**Na suíte:** units 3, 4, 5, 7 e **37** migrados (o 37 virou TRÊS cenários). O `unit_37`
+provava que `while` era recusado — **a premissa dele era falsa**, e a migração revelou.
+
+**Ferramentas e portões novos:** `tools/unit-brief.py` (o brief de um unit, com a coluna
+COMPUTADA), `.claude/hooks/formato-de-teste.sh`, skill `migrate-test` (substitui a
+`new-fixture`, que ensinava o formato legado), `make deps` provisionando **Go 1.26.5 do
+site oficial**.
+
+---
+
+## 0-27. O QUE A SESSÃO DE 2026-07-27 ENTREGOU
+
+**A decisão da linguagem, com o dado refeito** (§0). O Python foi removido inteiro
+(`tests/*.py`, `tests/casos/`, `tests/meta/`, `pytest.ini`, `pyrightconfig.json`, o venv);
+o `tools/deps.sh` parou de provisioná-lo.
+
+**O runner ligado ao `make`** — antes ele só rodava quando alguém digitava o comando à mão,
+o que na prática é não rodar. `make caso NOME=x` é o comando do loop; `make oracle` regrava
+o retrato dos dois formatos que ainda convivem.
+
+**Três defeitos achados por auditoria, não por teste** — todos no próprio runner, onde
+nenhum teste olha:
+
+- **`make caso` saía 0 com o caso quebrado.** Terminava em `| grep`, e o exit de um pipeline
+  é o do ÚLTIMO comando. Imprimia `FAIL` e reportava sucesso. O mesmo defeito estava no
+  `oracle` e, em outra forma, no `gotest NOME=x` (que passava o nome a um `-run` que não
+  casa nada — e `go test` sai **0** com *"no tests to run"*). **Comando de portão não passa
+  por pipe.**
+- **Nenhum `oracle/` jamais foi versionado**: o `.gitignore` tem `*.ppo`/`*.ppt`, que os
+  engolia. O retrato existe para o diff dele aparecer na revisão do commit que mexeu no pp —
+  ignorado, não rastreava nada, e num clone novo todo caso reprovaria pedindo `make oracle`.
+- **O `tools/scen-new.sh` sobrevivia** criando arquivos num formato que o hook agora barra no
+  commit. Ferramenta cujo único produto é proibido não deveria existir.
+
+**A régua do bash, medida:** o modo de falha padrão dele é **sucesso silencioso**. Além dos
+dois acima, o runner bash checa artefato com `for f in "$d"/*` + `[ -f ]` — só topo, e o
+glob nem enxerga nome com ponto. **Portão novo nasce em Go**, onde o extrator pode ter teste
+próprio (foi assim que o `tests-go/docs` substituiu a primeira versão, em bash, que passava
+verde se o regex parasse de casar).
+
+---
+
+## 0-trop. ONDE VOCÊ VAI TROPEÇAR (desta sessão)
+
+- **O hook `formato-de-teste.sh` vai barrar o commit de trabalho ANTERIOR a ele** — o
+  critério dele é a data do diff, não a intenção, e ele não tem como distinguir "o legado
+  está crescendo" de "estou commitando cenário escrito ontem". Aconteceu no commit `7f5a2cd`:
+  desliguei por um comando, declarando o motivo, e reativei conferindo que voltou a morder.
+  **Se repetir, a resposta certa é migrar o cenário — não afrouxar o portão.**
+- **Editar por script (`python3 - <<EOF` sobre um Makefile/`.sh`) não é pego por nada.**
+  Foi assim que os três defeitos do §0-27 entraram, e o `make test` ficou **verde** com todos
+  eles: estavam no runner, onde nenhum teste olha. **Depois de edição por script, LEIA o
+  resultado**; se o alvo é um portão, quebre-o de propósito e confira que reprova.
+- **`open(p,'w').write(open(p).read()...)` TRUNCA antes de ler.** Cometi **duas vezes**, nas
+  duas o diff mostrou "esperado vazio" e quase virou diagnóstico errado. Nenhum compilador
+  pega; o TESTE pega. Leia para uma variável primeiro.
+- **`map` em Go itera em ordem ALEATÓRIA.** A saída do regravador de retrato variava entre
+  execuções até eu ordenar. Saída de ferramenta que se lê num commit tem de ser determinística.
+- **`json.Marshal` do Go escapa `<`, `>` e `&`** (defesa de XSS em HTML). O `<CWD>` virava
+  `\u003cCWD\u003e`. Use `Encoder` com `SetEscapeHTML(false)`.
+- **Sonda de dependência mente:** perguntar `--help` a um comando não prova que ele
+  funciona. Sonde o que de fato falta.
+- **O `~/.local/go` não está no git**; em máquina nova, `make deps`.
 
 ---
 

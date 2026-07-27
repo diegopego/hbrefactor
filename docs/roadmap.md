@@ -180,12 +180,108 @@ edição.**
 > como transcrição byte a byte, o retrato `.ppo`/`.ppt` do core, e a régua do caso 64 declarada
 > no próprio cenário. `make scenarios` roda só o conjunto migrado; o `make test` encadeia os dois.
 >
-> **Critério de pronto do passo 2 (mecânico):** `tests/run.sh` sem nenhum `unit_*`, `tests/cases/`
-> vazio, `tests/scenarios/` cobrindo o que os dois provavam, `make test` verde. A fila e o que
-> cada teste virou ficam no handoff § 0.
+> **Critério de pronto do passo 2 (mecânico), ATUALIZADO em 2026-07-27 com o destino
+> decidido:** `tests/run.sh` sem nenhum `unit_*`, **`tests/cases/` e `tests/scenarios/`
+> vazios**, `tests-go/suite/` cobrindo o que os três provavam, `make test` verde. Fila hoje:
+> **148** (127 units + 12 casos + 9 cenários). Quando os três esvaziarem, morrem junto o
+> `run.sh`, o `casedir.sh`, o `scenarios.sh`, o `parrun` e o `tcheck`. A fila e o que cada
+> teste virou ficam no handoff § 0.
 >
 > **Falta: passo 2 (a migração), passo 3 (arrancar prosa+flag), passo 4 (extensão), passo 5
 > (página).** Estado de retomada: handoff § 0.
+>
+> **Estado (2026-07-26, fim do dia): o envelope é `cli-2` e o FORMATO DE TESTE foi
+> reespecificado.**
+>
+> **`cli-2`** ganhou dois campos, ambos por crítica do Diego ao esperado de um cenário:
+> **`exit`** (que NÃO é derivável do `status` — o `verify` BROKEN sai `status: "ok"` com exit
+> 1, e quem lê o stdout num pipe concluía o oposto do shell) e **`argv`** (a invocação
+> inteira, para o envelope carregar o par comando/resultado). Propagado a `tcheck`, às duas
+> réguas, aos 7 casos de `tests/cases/`, à spec e ao plano.
+>
+> **O `NameAccepted` morreu** *(ordem do Diego: "o próprio compilador vai reclamar depois")* —
+> ver a fase U/A no roadmap-fases-entregues e o handoff § 0-hoje. Medido: ele recusava `while`
+> como nome de LOCAL, que o projeto real aceita — falso-negativo barrando rename legítimo.
+> Os erros do compilador viraram `diagnostics[]` no mesmo passo.
+>
+> **O formato de teste foi reespecificado** em `tests/README.md`, agora **independente de
+> linguagem**, com a ordem que a sessão descobriu: *primeiro a especificação, depois cada
+> implementação a partir dela* — implementar numa e traduzir para a outra produziu, três
+> vezes, uma versão estranha às duas. E com **duas classes**: transformação (o hbrefactor) e
+> estudo (o pp-corpus, que fica em Harbour+hbtest e não migra).
+>
+> **A camada de controle da suíte é GO — DECIDIDO (Diego, 2026-07-27).** A comparação
+> anterior estava contaminada e foi refeita: a versão Go que existia era transliteração do
+> Python, então media o custo da TRADUÇÃO. Reescrita da spec: infra 447→351 linhas de
+> código, caso 26→7. **O que decidiu não foi o placar**, foram dois portões que o desenho em
+> Go torna impossíveis de esquecer (§1.6 — portão executável × regra): a **vacuidade**
+> deixa de existir (as duas comparações são do harness, depois da função do caso) e a
+> **fixture órfã** reprova (no Python passava verde, calada). A candidata Python foi
+> removida inteira. Estado, layout e comandos: handoff § 0.
+>
+> **A DISCIPLINA DO PASSO 2 virou FERRAMENTA (2026-07-26, ordem do Diego: *"crie ferramentas
+> para garantir disciplina, que é preferível a prosa"*).** São ~127 iterações repetitivas, e
+> a lei §1.6 diz que regra em prosa é regra que eu quebro — no mesmo dia eu quebrei duas.
+> Então:
+> - **`tcheck scenlint <dir>`** — a disciplina do cenário, sem rodá-lo: `unclassified`
+>   congelado no esperado, caminho absoluto de máquina, comando sem `--json` (prosa é
+>   arrasto: o passo 3 a deleta), fixture com diretiva sem `forbid`, `desc` citando número
+>   de caso. Roda como prova (0) de cada cenário.
+> - **`tests/scenarios.sh`** — `expected/` espelha `source/` arquivo a arquivo (ausência não
+>   significa nada), e `outputs/N` é a transcrição do N-ésimo `cmd`, faltando ou sobrando
+>   reprova.
+> - **`.claude/hooks/formato-de-teste.sh`** — barra o commit que ACRESCENTA `unit_N` ao
+>   `run.sh`/número a `ALL_UNITS`/arquivo a `tests/cases/`. Remover continua livre: o fluxo
+>   é de mão única.
+> - **`tools/unit-brief.py`** (o que o unit antigo prova + a coluna COMPUTADA de cada alvo;
+>   `--fila` mostra o que falta) e **`tools/caso-new.sh`** (`source/` + o `.go` que registra
+>   o caso). **Nenhum dos dois escreve `expected/` ou `outputs.json`, e nenhum roda o
+>   hbrefactor** — ver o esperado antes de escrevê-lo transforma escrever em copiar. *(O
+>   `scen-new.sh`, do formato-ponte, foi deletado em 2026-07-27: ele criava arquivos que o
+>   hook agora barra no commit.)*
+> - **skill `migrate-test`** (substitui a `new-fixture`, que ensinava o formato legado):
+>   fina, sem duplicar o contrato, com o catálogo de erros que já custaram uma iteração.
+>
+> **Os portões que 2026-07-27 acrescentou** *(todos com controle negativo rodado)*: o hook
+> passou a barrar `tests/scenarios/` também (os três legados só encolhem); o **harness Go**
+> recusa `unclassified` congelado, artefato novo não declarado, caso que não comparou e
+> **fixture órfã**; e **`tests-go/docs`** cobra que todo comando/caminho citado pela spec e
+> pela skill exista — ela nasceu porque a skill ensinou `tools/scen-new.sh` e
+> `make scenarios` por uma sessão inteira depois de os dois morrerem.
+>
+> **Critério de pronto desta fatia (mecânico):** `make test` verde com o `scenlint` ligado;
+> o hook barrando `unit_` novo e passando em remoção (as duas provas rodadas); a
+> `new-fixture` deletada. **✅ 2026-07-26 — `make test` 1021/0 + 10 cenários 70/0.**
+>
+> **Fase 1 (revisar os 10 já migrados) FEITA, e ela achou dívida:** 9 dos 10 reprovaram no
+> `scenlint` recém-escrito (nenhum declarava `forbid`; três congelavam prosa).
+>
+> **O ENVELOPE VIROU `cli-2` (Diego, 2026-07-26), com DOIS campos novos.** Os dois vieram da
+> mesma crítica dele ao esperado de um cenário — *"o resultado não me parece estruturado para
+> consumo de máquina: vejo o json do comando, mas o exit desestruturado, fora"*:
+> - **`exit`** — e ele **não é derivável do `status`**: medidas as 37 chamadas de `Ok()`, uma
+>   devolve exit ≠ 0 (`verify` de veredito BROKEN: `status: "ok"` + exit 1, `hbrefactor.prg`
+>   § Verify). Sem o campo, quem lê o stdout — o normal num pipe — concluía SUCESSO onde o
+>   shell dizia falha. O modo de falha que a fase existe para eliminar, dentro do contrato.
+> - **`argv`** — a invocação inteira, *"demonstrando claramente o conjunto comando/resultado"*.
+>   O `command` dava o VERBO; quem lê um envelope solto não sabia sobre o quê.
+>
+> **Consequência no formato de teste:** `outputs/N` deixou de ser híbrido texto+JSON e passou a
+> ser o **envelope PURO**, byte a byte — sem eco do comando (está no `argv`) e sem linha de
+> exit (está no `exit`). O runner ganhou duas provas: o exit real do processo **contra** o
+> campo, e **stderr vazio sob `--json`** (stdout e stderr agora são colhidos separados; juntá-los
+> escondia violação da regra *"aviso é `diagnostics[]`, stderr só carrega falha de processo"*).
+>
+> **E o método pegou um defeito no caminho:** o esperado escrito à mão acusou uma **linha em
+> branco a mais** em todo envelope — `hb_jsonEncode( x, .T. )` já termina em `}`+newline e as
+> quatro emissões somavam `+ hb_eol()`. Removido.
+>
+> **`cmd` virou LISTA DE ARGV, a mesma forma do campo `argv`** *(Diego: "se o cmd no case.json
+> é em um formato, por que o do output está em outro?")*. A invocação é um fato só, e
+> representá-la como linha de texto de um lado e array do outro obrigava quem lê o cenário a
+> traduzir de cabeça. Ganho além da simetria: **o runner perdeu o `eval`** — os argumentos vão
+> direto ao binário, e argumento com espaço, aspas ou `*` deixou de ser bomba armada. A forma
+> antiga (linha de texto) recusa nomeando a nova.
 
 > **O portão abriu com uma ordem de desenho junto:** *"quero que o Claude crie a especificação
 > para a interface CLI do hbrefactor que seja ideal para o Claude usá-la"* — e, na revisão,
