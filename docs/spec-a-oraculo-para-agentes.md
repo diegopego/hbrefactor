@@ -63,7 +63,7 @@ exatamente como está — o humano também é consumidor de primeira classe.
 Schema versionado, à moda do `ast-16`/`rtr-1`. **Um** envelope, **nada mais** em stdout:
 
 ```json
-{ "schema":  "cli-1",
+{ "schema":  "cli-2",          // cli-2 (2026-07-26): ganhou `argv` e `exit`
   "command": "rename",
   "status":  "ok" | "refused" | "usage",
   "reason":  null | "<código>",

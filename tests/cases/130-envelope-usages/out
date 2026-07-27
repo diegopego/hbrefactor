@@ -1,7 +1,15 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "usages",
+  "argv":
+  [
+    "usages",
+    "app.hbp",
+    "Dobro",
+    "--json"
+  ],
   "status": "ok",
+  "exit": 0,
   "reason": null,
   "action": null,
   "detail": "2 result(s) for 'Dobro'",
@@ -58,4 +66,3 @@
   },
   "edits": []
 }
-

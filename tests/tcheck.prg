@@ -30,6 +30,9 @@ PROCEDURE Main( cSub, cA1, cA2, cA3 )
    CASE "envloc"  ; lOk := EnvLoc( cA1, cA2, cA3 )  ; EXIT
    CASE "envrow"  ; lOk := EnvRow( cA1, cA2, cA3 )  ; EXIT
    CASE "scen"    ; lOk := Scen( cA1, cA2 )         ; EXIT
+   CASE "scenlint"; lOk := ScenLint( cA1 )          ; EXIT
+   CASE "cmdcount"; lOk := CmdCount( cA1 )          ; EXIT
+   CASE "cmdargs" ; lOk := CmdArgs( cA1, cA2 )      ; EXIT
    OTHERWISE
       OutErr( "tcheck: subcomando desconhecido: " + hb_defaultValue( cSub, "(vazio)" ) + hb_eol() )
       lOk := .F.
@@ -46,7 +49,9 @@ STATIC FUNCTION Fail( cMsg )
    RETURN .F.
 
 // ---------------------------------------------------------------------------
-// A.1 passo 2 - asserção GENÉRICA sobre o envelope (cli-1). Migra o grep de
+#define CLI_SCHEMA "cli-2"   // acompanha o CLI_SCHEMA de src/hbrefactor.prg
+
+// A.1 passo 2 - asserção GENÉRICA sobre o envelope. Migra o grep de
 // prosa para o FATO estruturado: em vez de casar a frase na saída (que o passo
 // 3 deleta), navega o campo por dot-path e compara. `result.` é implícito -
 // `verdict` = `result.verdict` (o consumidor fala da carga, não do envelope).
@@ -57,7 +62,7 @@ STATIC FUNCTION Fail( cMsg )
 // relativo a `result` - onde vive quase todo o fato
 STATIC FUNCTION EnvNav( cPath, cDot )
 
-   STATIC s_aTop := { "schema", "command", "status", "reason", "action", ;
+   STATIC s_aTop := { "schema", "command", "argv", "status", "exit", "reason", "action", ;
                       "detail", "diagnostics", "result", "edits" }
    LOCAL x := hb_jsonDecode( hb_MemoRead( cPath ) )
    LOCAL aKeys := hb_ATokens( cDot, "." ), cKey, nI
@@ -163,7 +168,7 @@ STATIC FUNCTION EnvRow( cPath, cArr, cSpec )
    LOCAL x := hb_jsonDecode( hb_MemoRead( cPath ) )
    LOCAL aRows, hRow, cPair, nEq, cK, cV, lAll
 
-   IF HB_ISHASH( x ) .AND. hb_HGetDef( x, "schema", "" ) == "cli-1"
+   IF HB_ISHASH( x ) .AND. hb_HGetDef( x, "schema", "" ) == CLI_SCHEMA
       x := hb_HGetDef( x, "result", { => } )
    ENDIF
    aRows := iif( HB_ISHASH( x ), hb_HGetDef( x, hb_defaultValue( cArr, "" ), {} ), {} )
@@ -201,7 +206,7 @@ STATIC FUNCTION JLoad( cPath )
 
    LOCAL xJson := hb_jsonDecode( hb_MemoRead( cPath ) )
 
-   IF HB_ISHASH( xJson ) .AND. hb_HGetDef( xJson, "schema", "" ) == "cli-1"
+   IF HB_ISHASH( xJson ) .AND. hb_HGetDef( xJson, "schema", "" ) == CLI_SCHEMA
       xJson := hb_HGetDef( xJson, "result", { => } )
       IF HB_ISHASH( xJson ) .AND. hb_HHasKey( xJson, "locations" )
          xJson := xJson[ "locations" ]
@@ -894,7 +899,7 @@ STATIC FUNCTION Scen( cPath, cKey )
    STATIC s_aKinds := { "command" }
    STATIC s_aLists := { "creates", "forbid" }
    LOCAL cRaw := hb_MemoRead( hb_defaultValue( cPath, "" ) )
-   LOCAL x, cK, cSchema, xVal, cOut, xI
+   LOCAL x, cK, cSchema, xVal, cOut, xI, xJ
 
    IF Len( cRaw ) == 0
       RETURN Fail( "scen: " + hb_defaultValue( cPath, "(sem arquivo)" ) + " vazio ou inexistente" )
@@ -928,21 +933,33 @@ STATIC FUNCTION Scen( cPath, cKey )
       RETURN Fail( "scen: kind " + hb_jsonEncode( x[ "kind" ] ) + " não é honrado por este " + ;
                    "runner (honrados: " + ArrJoin( s_aKinds ) + ") - " + cPath )
    ENDIF
-   // `cmd` é UMA linha ou uma LISTA de linhas (A->B->A e afins). Lista vazia
-   // ou item vazio recusa: cenário sem comando não prova nada
+   // `cmd` é uma LISTA DE ARGV - uma lista de argumentos por comando, na ordem.
+   // A mesma forma do campo `argv` do envelope (Diego, 2026-07-26: *"se o cmd no
+   // case.json é em um formato, por que o do output está em outro?"* - a
+   // invocação é UM fato, e representá-la de dois jeitos obriga quem lê o
+   // cenário a traduzir de cabeça). Ganho concreto além da simetria: o runner
+   // executa os argumentos DIRETO, sem `eval` - argumento com espaço ou aspas
+   // deixa de ser uma bomba armada.
    IF ! hb_HHasKey( x, "cmd" )
       RETURN Fail( "scen: `cmd` ausente em " + cPath )
    ENDIF
-   IF HB_ISCHAR( x[ "cmd" ] )
-      x[ "cmd" ] := { x[ "cmd" ] }
-   ENDIF
    IF ! HB_ISARRAY( x[ "cmd" ] ) .OR. Len( x[ "cmd" ] ) == 0
-      RETURN Fail( "scen: `cmd` tem de ser uma linha ou uma LISTA não-vazia em " + cPath )
+      RETURN Fail( "scen: `cmd` tem de ser uma LISTA não-vazia de argv em " + cPath )
    ENDIF
    FOR EACH xI IN x[ "cmd" ]
-      IF ! HB_ISCHAR( xI ) .OR. Len( xI ) == 0
-         RETURN Fail( "scen: item vazio (ou não-texto) em `cmd` de " + cPath )
+      IF HB_ISCHAR( xI )
+         RETURN Fail( "scen: `cmd` tem uma LINHA de texto em " + cPath + " - cada comando " + ;
+                      "é uma LISTA de argumentos, como o `argv` do envelope: " + ;
+                      "[ [ " + hb_jsonEncode( "rename" ) + ", " + hb_jsonEncode( "app.hbp" ) + ", ... ] ]" )
       ENDIF
+      IF ! HB_ISARRAY( xI ) .OR. Len( xI ) == 0
+         RETURN Fail( "scen: item de `cmd` não é uma lista de argumentos não-vazia em " + cPath )
+      ENDIF
+      FOR EACH xJ IN xI
+         IF ! HB_ISCHAR( xJ ) .OR. Len( xJ ) == 0
+            RETURN Fail( "scen: argumento vazio (ou não-texto) em `cmd` de " + cPath )
+         ENDIF
+      NEXT
    NEXT
    FOR EACH cK IN s_aLists
       IF hb_HHasKey( x, cK )
@@ -969,6 +986,155 @@ STATIC FUNCTION Scen( cPath, cKey )
       ENDCASE
       OutStd( cOut + hb_eol() )
    ENDIF
+
+   RETURN .T.
+
+// ---------------------------------------------------------------------------
+// `scenlint <dir>` - a DISCIPLINA do cenário, cobrada sem rodá-lo.
+//
+// Por que existe, e por que é CÓDIGO e não parágrafo no README: cada régua aqui
+// nasceu de um erro que ACONTECEU, e a lei do repo (§1.6) diz que "regra nova
+// sem portão novo é regra que eu vou violar de novo". O README continua sendo o
+// contrato que se LÊ; isto é o que MORDE. Régua nova entra nos dois lugares.
+//
+// Separado do `scen` de propósito: aquele valida a FORMA do case.json e é
+// chamado a cada leitura de chave (barato, sem I/O de diretório); este olha o
+// cenário INTEIRO e roda uma vez só.
+// ---------------------------------------------------------------------------
+STATIC FUNCTION ScenLint( cDir )
+
+   LOCAL cName, cOut, cLine, aCmd, cCmd, aBad := {}, cCh
+   LOCAL x, cRaw
+
+   IF Empty( cDir ) .OR. ! hb_DirExists( cDir )
+      RETURN Fail( "scenlint: diretório de cenário ausente: " + hb_defaultValue( cDir, "(vazio)" ) )
+   ENDIF
+   cDir  := hb_DirSepDel( cDir )
+   cName := hb_FNameNameExt( cDir )
+   cRaw  := hb_MemoRead( cDir + hb_ps() + "case.json" )
+   IF hb_jsonDecode( cRaw, @x ) == 0 .OR. ! HB_ISHASH( x )
+      RETURN Fail( "scenlint: " + cName + " sem case.json legível (o `scen` diz o quê)" )
+   ENDIF
+   aCmd := hb_HGetDef( x, "cmd", {} )   // lista de argv (o `scen` já validou a forma)
+
+   // (a) o `desc` não amarra ao runner LEGADO. Cenário se identifica pelo que
+   // prova; número de caso é o vocabulário do formato que está morrendo
+   IF hb_regexHas( "(?i)\b(case|unit|caso)\s+[0-9]+", hb_HGetDef( x, "desc", "" ) )
+      AAdd( aBad, "`desc` cita número de caso/unit - o cenário se identifica pelo que PROVA, " + ;
+                  "não pela posição no runner antigo" )
+   ENDIF
+
+   // (b) o `output` é o coração: ele é ESCRITO do contrato, nunca gravado da
+   // execução. Não dá para provar a ordem em que foi escrito, mas dá para pegar
+   // os dois CHEIROS de gravado:
+   //   - `unclassified` congelado como contrato: é o campo pelo qual a extensão
+   //     e o agente DECIDEM, e sair "não classificado" é dívida a pagar NESTE
+   //     cenário, não fato a gravar (aconteceu comigo em 2026-07-26);
+   //   - caminho ABSOLUTO de máquina: o runner normaliza <CWD>/<CORE>, então um
+   //     path cru só chega ali se veio colado de outra execução.
+   // `outputs/` é um DIRETÓRIO, um arquivo por comando na ordem do `cmd` (Diego,
+   // 2026-07-26). O runner confere a correspondência 1:1 e o byte a byte; aqui
+   // vale a disciplina do CONTEÚDO, e ela vale para todos os arquivos.
+   IF hb_vfExists( cDir + hb_ps() + "outputs" ) .AND. ! hb_DirExists( cDir + hb_ps() + "outputs" )
+      AAdd( aBad, "`outputs` é um ARQUIVO: virou DIRETÓRIO, um por comando na ordem do `cmd`" )
+   ELSEIF ! hb_DirExists( cDir + hb_ps() + "outputs" )
+      AAdd( aBad, "sem `outputs/`: o cenário tem de declarar a transcrição esperada de cada comando" )
+   ELSE
+      FOR EACH cCh IN hb_Directory( cDir + hb_ps() + "outputs" + hb_ps() + "*" )
+         cOut := hb_MemoRead( cDir + hb_ps() + "outputs" + hb_ps() + cCh[ 1 ] )
+         FOR EACH cLine IN hb_ATokens( StrTran( cOut, Chr( 13 ), "" ), Chr( 10 ) )
+            IF "unclassified" $ cLine
+               AAdd( aBad, "outputs/" + cCh[ 1 ] + " congela reason `unclassified` - esse é o " + ;
+                           "campo pelo qual o agente DECIDE. Classifique a recusa NESTE " + ;
+                           "cenário (o código nasce aqui)" )
+               EXIT
+            ENDIF
+            IF "/home/" $ cLine .OR. "/Users/" $ cLine .OR. hb_regexHas( "[A-Za-z]:\\", cLine )
+               AAdd( aBad, "outputs/" + cCh[ 1 ] + " tem caminho ABSOLUTO de máquina (" + ;
+                           AllTrim( cLine ) + ") - o runner normaliza <CWD>/<CORE>; isso só " + ;
+                           "chega aí colado de uma execução" )
+               EXIT
+            ENDIF
+         NEXT
+      NEXT
+   ENDIF
+
+   // (d) SÓ O CANAL JSON - e o cenário que congela PROSA reprova.
+   //
+   // Eu escrevi aqui, em 2026-07-26, o portão EXATAMENTE INVERTIDO (exigindo o
+   // par prosa+json) por ter lido a spec §2.2 - a prosa como renderização do
+   // fato - e NÃO o roadmap A.1, onde está a decisão FINAL e posterior do
+   // Diego (2026-07-24/25): *"a saída é o envelope (JSON), e nada mais. Sem
+   // renderizador humano (a prosa é arrasto -> deletada); a flag --json some"*.
+   // O passo 3 da própria fase que estou executando é "arrancar prosa+flag".
+   //
+   // Logo, congelar a transcrição da prosa não é cobertura: é ARRASTO. Cada
+   // `output` com prosa é um arquivo a reescrever no passo 3, e ~127 cenários
+   // com prosa congelada transformariam a remoção num mutirão. O cenário testa
+   // o que vai SOBREVIVER. (A prosa ainda existe enquanto o passo 3 não roda;
+   // o que este portão proíbe é AMARRÁ-LA num teste novo.)
+   FOR EACH cCmd IN aCmd
+      IF ! HB_ISARRAY( cCmd ) .OR. hb_AScan( cCmd, "--json",,, .T. ) == 0
+         AAdd( aBad, "o comando `" + ArrJoin( cCmd ) + "` roda sem --json, e a transcrição " + ;
+                     "da PROSA vira arrasto: a decisão da fase A.1 é envelope e nada mais " + ;
+                     "(roadmap A.1 - passo 3: arrancar prosa+flag). Teste o que sobrevive" )
+         EXIT
+      ENDIF
+   NEXT
+
+   // (e) fixture que traz DIRETIVA traz VOCABULÁRIO, e ele não pode vazar para
+   // o fonte da ferramenta (a régua do caso 64). O `forbid` fica no cenário que
+   // introduz a palavra - senão quem cria fixture nova precisa LEMBRAR de
+   // escrever a régua dela, e lembrar não é portão
+   IF Len( hb_HGetDef( x, "forbid", {} ) ) == 0
+      FOR EACH cCh IN hb_Directory( cDir + hb_ps() + "source" + hb_ps() + "*.ch" )
+         IF hb_regexHas( "(?im)^\s*#x?(command|translate)", ;   // `m`: a diretiva não está na 1ª linha
+                         hb_MemoRead( cDir + hb_ps() + "source" + hb_ps() + cCh[ 1 ] ) )
+            AAdd( aBad, "a source traz diretiva em " + cCh[ 1 ] + " e o cenário não declara " + ;
+                        "`forbid`: o vocabulário da fixture não pode aparecer em " + ;
+                        "src/hbrefactor.prg (régua do caso 64)" )
+            EXIT
+         ENDIF
+      NEXT
+   ENDIF
+
+   IF Len( aBad ) > 0
+      OutStd( "tcheck falhou: scenlint " + cName + hb_eol() )
+      FOR EACH cLine IN aBad
+         OutStd( "   - " + cLine + hb_eol() )
+      NEXT
+      RETURN .F.
+   ENDIF
+
+   RETURN .T.
+
+// quantos comandos o cenário roda - o runner precisa saber sem parsear JSON
+STATIC FUNCTION CmdCount( cPath )
+
+   LOCAL x
+
+   IF hb_jsonDecode( hb_MemoRead( hb_defaultValue( cPath, "" ) ), @x ) == 0 .OR. ! HB_ISHASH( x )
+      RETURN Fail( "cmdcount: " + hb_defaultValue( cPath, "" ) + " não é JSON válido" )
+   ENDIF
+   OutStd( hb_ntos( Len( hb_HGetDef( x, "cmd", {} ) ) ) + hb_eol() )
+
+   RETURN .T.
+
+// os argumentos do comando N, UM POR LINHA - o runner lê com `mapfile` e passa
+// direto ao binário. É isto que aposenta o `eval`: o argumento atravessa sem o
+// shell reinterpretar espaço, aspas ou glob.
+STATIC FUNCTION CmdArgs( cPath, cN )
+
+   LOCAL x, nN := Val( hb_defaultValue( cN, "0" ) ), a
+
+   IF hb_jsonDecode( hb_MemoRead( hb_defaultValue( cPath, "" ) ), @x ) == 0 .OR. ! HB_ISHASH( x )
+      RETURN Fail( "cmdargs: " + hb_defaultValue( cPath, "" ) + " não é JSON válido" )
+   ENDIF
+   a := hb_HGetDef( x, "cmd", {} )
+   IF nN < 1 .OR. nN > Len( a )
+      RETURN Fail( "cmdargs: não há comando " + hb_ntos( nN ) + " em " + cPath )
+   ENDIF
+   OutStd( ArrLines( a[ nN ] ) + hb_eol() )
 
    RETURN .T.
 

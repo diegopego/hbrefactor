@@ -33,9 +33,9 @@ humano que faz refactor de verdade usa a IDE ou o agente — nunca lê o CLI cru
 humano no terminal lê JSON (ou usa `jq`). *"realmente só está provocando complexidade"*
 (Diego).
 
-**O envelope** (schema `cli-1`, já implementado em `EnvHash`/`Envelope`):
+**O envelope** (schema `cli-2`, já implementado em `EnvHash`/`Envelope`):
 ```json
-{ "schema": "cli-1", "command": "...", "status": "ok|refused|usage",
+{ "schema": "cli-2", "command": "...", "argv": [...], "status": "ok|refused|usage", "exit": 0,
   "reason": null|"<código>", "action": null|"stop-and-report|ask-human-then-retry|fix-environment",
   "detail": "<uma frase p/ o consumidor MOSTRAR>", "diagnostics": [ ],
   "result": { }, "edits": [ ] }

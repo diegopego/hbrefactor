@@ -1,7 +1,15 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "usages",
+  "argv":
+  [
+    "usages",
+    "fixdsl.hbp",
+    "ACTION",
+    "--json"
+  ],
   "status": "ok",
+  "exit": 0,
   "reason": null,
   "action": null,
   "detail": "4 result(s) for 'ACTION'",
@@ -98,4 +106,3 @@
   },
   "edits": []
 }
-

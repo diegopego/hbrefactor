@@ -107,9 +107,17 @@ O requisito evoluiu para um **pipe**:
 6. **O hbrefactor não replica resolução de projeto**: fontes e
    switches vêm do trace `hbmk2 -traceonly -rebuild`
    (`src/hbrefactor.prg:107-168`) e tudo reusa
-   `hProj["files"]/["inc"]/["flags"]`. **Precedente do idioma do
-   probe**: `NameAccepted` (`:1568-1592`) já chama `hb_compileFromBuf`
-   herdando os flags de dialeto `-k*` do trace.
+   `hProj["files"]/["inc"]/["flags"]`. **O precedente do idioma do
+   probe MORREU em 2026-07-26**: o `NameAccepted` chamava
+   `hb_compileFromBuf` herdando os `-k*` do projeto, e foi **removido por
+   ordem do Diego** — uma sonda artificial é oráculo *aproximado* para uma
+   pergunta que a recompilação do projeto responde de forma *definitiva*, e
+   as duas divergiam (ele recusava `while` como nome de LOCAL, que o projeto
+   real aceita). **A B8 herda a lição, não o idioma**: se o probe de macro
+   for uma sonda cuja resposta o ciclo recompila-e-compara já dá, ele não
+   deve existir. O probe só se justifica onde **não há** fato equivalente no
+   fim do ciclo — que é o caso da string de macro (ela não é código do
+   projeto), e é isso que a fase precisa demonstrar antes de codar.
 
 ## Decisões do portão (Diego, 2026-07-08)
 
@@ -171,8 +179,8 @@ verdade do compilador, o complemento é derivado). Cada entrada:
 
 - Embrulho: expressão → `FUNCTION __HBR_PROBE()` + `RETURN <expr>`;
   codeblock (HB_MACROBLOCK) → `RETURN <bloco>`.
-- Switches: dialeto **`-k*` herdado do trace** (idioma do
-  `NameAccepted`, fato 6) + `-n -q0 -w0 -u -x<caminho-tmp>` +
+- Switches: dialeto **`-k*` herdado do trace** (o idioma que o
+  `NameAccepted` usava; ele já não existe — ver fato 6) + `-n -q0 -w0 -u -x<caminho-tmp>` +
   pseudo-nome; **sem** include paths e sem regras do projeto
   (fidelidade: o macro-compilador de runtime não roda pp).
 - Cache por hash(string+switches) em `~/.cache/hbrefactor` (mesmo

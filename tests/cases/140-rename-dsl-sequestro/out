@@ -1,7 +1,16 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "rename",
+  "argv":
+  [
+    "rename",
+    "fixdsl.hbp",
+    "a.prg:11:4",
+    "MenuAdd",
+    "--json"
+  ],
   "status": "refused",
+  "exit": 1,
   "reason": "new-name-captures-identifier",
   "action": "stop-and-report",
   "detail": "'MenuAdd' is already an identifier used in b.prg:10 - the renamed rule would capture it",
@@ -9,4 +18,3 @@
   "result": {},
   "edits": []
 }
-

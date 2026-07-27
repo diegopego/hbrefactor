@@ -1,7 +1,15 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "usages",
+  "argv":
+  [
+    "usages",
+    "app.hbp",
+    "NaoExiste",
+    "--json"
+  ],
   "status": "ok",
+  "exit": 0,
   "reason": null,
   "action": null,
   "detail": "0 result(s) for 'NaoExiste'",
@@ -16,4 +24,3 @@
   },
   "edits": []
 }
-

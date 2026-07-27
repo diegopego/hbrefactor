@@ -38,7 +38,7 @@ for c in $CMDS; do
    if [ -z "$out" ]; then
       echo "  $c: stdout VAZIO sob --json (silêncio não pode parecer sucesso)"
       falhas=$(( falhas + 1 ))
-   elif ! printf '%s' "$out" | grep -q '"schema": "cli-1"'; then
+   elif ! printf '%s' "$out" | grep -q '"schema": "cli-2"'; then
       echo "  $c: stdout não é o envelope cli-1"
       falhas=$(( falhas + 1 ))
    elif printf '%s' "$out" | grep -q '"no-machine-contract-yet"'; then

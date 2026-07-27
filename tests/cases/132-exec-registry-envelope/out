@@ -1,7 +1,14 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "exec-registry",
+  "argv":
+  [
+    "exec-registry",
+    "app.hbp",
+    "--json"
+  ],
   "status": "ok",
+  "exit": 0,
   "reason": null,
   "action": null,
   "detail": "live table snapshot recorded (0 class(es) revealed); the snapshot SUGGESTS, -kt enforces",
@@ -41,4 +48,3 @@
   },
   "edits": []
 }
-

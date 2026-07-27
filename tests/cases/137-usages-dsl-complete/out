@@ -1,7 +1,15 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "usages",
+  "argv":
+  [
+    "usages",
+    "fixdsl.hbp",
+    "MENUITEM",
+    "--json"
+  ],
   "status": "ok",
+  "exit": 0,
   "reason": null,
   "action": null,
   "detail": "5 result(s) for 'MENUITEM'",
@@ -118,4 +126,3 @@
   },
   "edits": []
 }
-

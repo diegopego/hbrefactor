@@ -44,7 +44,7 @@
 //  - a recusa diz o que HOUVE (`reason`) e o que FAZER (`action`) - sem o
 //    segundo o agente improvisa, e improvisar quer dizer editar texto na mão.
 // ---------------------------------------------------------------------------
-#define CLI_SCHEMA    "cli-1"
+#define CLI_SCHEMA    "cli-2"   // cli-2: o envelope ganhou `exit` (2026-07-26)
 
 // `action` - o que o consumidor deve FAZER (taxonomia da spec-a §2.3)
 #define ACT_STOP      "stop-and-report"       // recusa de política: pare e conte ao humano
@@ -75,6 +75,34 @@
 // renomear fundiria duas variáveis distintas numa só, e compilaria calado
 #define RSN_NAME_TAKEN   "new-name-already-declared"
 
+// a edição foi escrita, o projeto DEIXOU de compilar, e o fonte voltou byte a
+// byte. É por aqui que passa o nome novo inválido (reservada, caractere ilegal)
+// desde que o pré-check morreu: quem recusa é o compilador do projeto, no fim
+// do ciclo, e os erros dele vêm em `diagnostics[]`. Ação `stop-and-report` - o
+// nome é escolha do humano sobre o código dele; um agente que "tentasse outro"
+// estaria inventando nome, que é justamente a heurística que a ferramenta mata
+#define RSN_COMPILE_FAILED "compile-failed-rolled-back"
+
+// o projeto JÁ CHAMA o nome novo: renomear a função para ele faria essas
+// chamadas caírem na renomeada, calado. Recusa de política - a chamada
+// sequestrada compila perfeitamente, e é por isso que ninguém a veria
+#define RSN_NAME_CALLED  "new-name-already-called"
+
+// SOMBRA de parâmetro de codeblock, os dois lados. Dentro do bloco o nome é
+// OUTRA variável, e o dump não separa os dois sítios por posição: renomear
+// escreveria no símbolo errado calado. Recusa de política; o par nasce junto
+// de propósito - meio classificado, o mesmo fato sairia com dois códigos
+#define RSN_OLD_SHADOWED "old-name-shadowed-by-codeblock-param"
+#define RSN_NEW_IS_BLOCK "new-name-is-codeblock-param"
+
+// a edição FOI escrita, o pcode saiu diferente, e o fonte voltou byte a byte.
+// É a prova central da ferramenta funcionando, não um erro dela - o agente
+// relata "tentei, não era neutro, desfiz". Só ESTA condição leva o código: as
+// outras duas recusas com "rollback" na mensagem (o texto do sítio não bate; o
+// projeto parou de compilar) são fatos DIFERENTES e ganham o seu quando um
+// cenário as exercitar - código sem cenário é código que ninguém confere
+#define RSN_VERIFY_FAILED "verification-failed-rolled-back"
+
 // sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
 #define PP_PROBE_HIT "__HBREF_PP_HIT__"
 
@@ -88,6 +116,12 @@ STATIC s_hPpHit := NIL
 STATIC s_lJson := .F.
 STATIC s_aDiag := {}
 STATIC s_cCmd  := ""
+// a invocação INTEIRA, para o envelope levar o par comando/resultado junto
+// (Diego, 2026-07-26). Sem ela, quem lê um envelope solto - num log, num
+// pipeline, na fila de um agente que disparou vários comandos - sabe o VERBO
+// (`command`) e não sabe SOBRE O QUÊ. É o mesmo princípio do campo `exit`:
+// o envelope se basta, e o consumidor não cruza canais para entender.
+STATIC s_aArgv := {}
 STATIC s_lEmitted := .F.   // saiu envelope? (portão do ponto único de saída)
 
 PROCEDURE Main()
@@ -97,6 +131,7 @@ PROCEDURE Main()
 
    // A.1: `--json` é flag GLOBAL, retirada antes do despacho - cada comando
    // segue vendo os seus próprios argumentos, sem saber do modo de máquina
+   s_aArgv := AClone( aArgs )        // a invocação como o usuário a deu
    aArgs := TakeJsonFlag( aArgs )
    s_cCmd := iif( Empty( aArgs ), "", Lower( aArgs[ 1 ] ) )   // guarda de acesso, não gramática
 
@@ -158,12 +193,12 @@ PROCEDURE Main()
          OutStd( Envelope( "usage", "bad-invocation", ACT_STOP, ;
                            "wrong arguments for '" + s_cCmd + "' - run " + ;
                            "hbrefactor with no arguments for the command list", ;
-                           NIL, NIL ) + hb_eol() )
+                           NIL, NIL, EXIT_USAGE ) )
       ELSE
          OutStd( Envelope( "refused", "no-machine-contract-yet", ACT_STOP, ;
                            "'" + s_cCmd + "' does not speak --json yet - run it " + ;
                            "without --json and read the prose, or use a command " + ;
-                           "that does", NIL, NIL ) + hb_eol() )
+                           "that does", NIL, NIL, EXIT_REFUSED ) )
          nExit := EXIT_REFUSED
       ENDIF
    ENDIF
@@ -2849,15 +2884,51 @@ STATIC PROCEDURE Diag( cCode, cDetail, hLoc )
 
    RETURN
 
-// o envelope. UM em stdout, e nada mais ali. Todo campo SEMPRE presente: a
-// forma é estável, e "ausência" nunca carrega significado
-STATIC FUNCTION Envelope( cStatus, cReason, cAction, cDetail, hResult, aEdits )
+// os erros do compilador DO PROJETO, quando uma recompilação falha. Em prosa
+// saem como sempre; sob `--json` são DADO, e com severity "error": não são
+// aviso, são o PORQUÊ da recusa que vem logo em seguida. Antes disto o agente
+// recebia "o projeto parou de compilar" no envelope e o motivo real vazava
+// para o stderr, fora dele - justo o que o contrato de máquina existe p/ matar
+STATIC PROCEDURE DiagCompile( cPath, cText )
+
+   LOCAL cLine
+
+   IF s_lJson
+      FOR EACH cLine IN hb_ATokens( ErrLines( cText ), hb_eol() )
+         IF Len( cLine ) == 0        // o corte por hb_eol() sobra vazio no fim
+            LOOP
+         ENDIF
+         AAdd( s_aDiag, { "code" => "compiler-error", "severity" => "error", ;
+                          "location" => NIL, "detail" => cLine } )
+      NEXT
+   ELSE
+      OutErr( "hbrefactor: " + cPath + ":" + hb_eol() + ErrLines( cText ) )
+   ENDIF
+
+   RETURN
+
+// o envelope. UM em stdout, e nada mais ali - nem uma linha em branco: o
+// hb_jsonEncode( x, .T. ) JÁ termina em "}" + newline, e o + hb_eol() que
+// havia nas emissões punha um a mais. Achado em 2026-07-26 pelo esperado
+// escrito à mão de um cenário - o método fazendo o trabalho dele. Todo campo SEMPRE presente: a
+// forma é estável, e "ausência" nunca carrega significado.
+//
+// `exit` entrou no cli-2 (Diego, 2026-07-26) porque ele NÃO é derivável do
+// `status`: o `verify` de veredito BROKEN devolve `status: "ok"` com exit 1 - o
+// comando fez o trabalho dele (determinou o veredito), e a convenção de shell
+// quer 1. Sem o campo, um consumidor que lê o stdout - o normal num pipe -
+// concluía SUCESSO onde o shell dizia falha, cruzando dois canais para saber.
+// É o modo de falha que esta fase existe para eliminar, e estava dentro do
+// próprio contrato de máquina.
+STATIC FUNCTION Envelope( cStatus, cReason, cAction, cDetail, hResult, aEdits, nExit )
 
    LOCAL hEnv := { => }
 
    hEnv[ "schema" ]      := CLI_SCHEMA
    hEnv[ "command" ]     := s_cCmd
+   hEnv[ "argv" ]        := s_aArgv          // a invocação inteira, sem o binário
    hEnv[ "status" ]      := cStatus
+   hEnv[ "exit" ]        := hb_defaultValue( nExit, EXIT_OK )
    hEnv[ "reason" ]      := cReason
    hEnv[ "action" ]      := cAction
    hEnv[ "detail" ]      := cDetail
@@ -2872,7 +2943,10 @@ STATIC FUNCTION Envelope( cStatus, cReason, cAction, cDetail, hResult, aEdits )
 STATIC FUNCTION Ok( cDetail, hResult, nExit, aEdits )
 
    IF s_lJson
-      OutStd( Envelope( "ok", NIL, NIL, cDetail, hResult, aEdits ) + hb_eol() )
+      // o MESMO valor que a função devolve ao shell - uma variável só, para o
+      // campo e o exit real não poderem divergir (a régua do runner os compara)
+      OutStd( Envelope( "ok", NIL, NIL, cDetail, hResult, aEdits, ;
+                        hb_defaultValue( nExit, EXIT_OK ) ) )
       s_lEmitted := .T.
    ENDIF
 
@@ -2889,7 +2963,7 @@ STATIC FUNCTION Refuse( cMsg, cReason, cAction )
       OutStd( Envelope( "refused", ;
                         iif( cReason == NIL, "unclassified", cReason ), ;
                         iif( cAction == NIL, ACT_STOP, cAction ), ;
-                        cMsg, NIL, NIL ) + hb_eol() )
+                        cMsg, NIL, NIL, EXIT_REFUSED ) )
       s_lEmitted := .T.
    ELSE
       OutErr( "hbrefactor: " + cMsg + hb_eol() )
@@ -2960,9 +3034,6 @@ STATIC FUNCTION RenameLocal( aArgs )
       RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
-   IF ! NameAccepted( hProj, cNew, .F. )
-      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a variable name" )
-   ENDIF
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
@@ -3012,10 +3083,12 @@ STATIC FUNCTION RenameLocal( aArgs )
    FOR EACH hItem IN hFunc[ "occurrences" ]
       IF hItem[ "block" ] .AND. hItem[ "scope" ] == "local"
          IF Upper( hItem[ "sym" ] ) == cUpOld
-            RETURN Refuse( "a codeblock parameter of the same name shadows '" + cOld + "' - refusing" )
+            RETURN Refuse( "a codeblock parameter of the same name shadows '" + cOld + "' - refusing", ;
+                           RSN_OLD_SHADOWED )
          ENDIF
          IF Upper( hItem[ "sym" ] ) == cUpNew
-            RETURN Refuse( "'" + cNew + "' is a codeblock parameter in the function - the rename would be shadowed" )
+            RETURN Refuse( "'" + cNew + "' is a codeblock parameter in the function - the rename would be shadowed", ;
+                           RSN_NEW_IS_BLOCK )
          ENDIF
       ENDIF
    NEXT
@@ -3120,13 +3193,15 @@ STATIC FUNCTION RenameLocal( aArgs )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]           // reuso de cSpec como iterador
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback" )
+         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
 
@@ -3188,7 +3263,7 @@ STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag, lAst )
       IF hb_processRun( HarbourBin() + " " + cPath + " -q -gh -l" + cFlags + ;
              " -o" + hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + "." + cTag + ".hrb",, ;
              @cOut, @cErr ) != 0
-         OutErr( "hbrefactor: " + cPath + ":" + hb_eol() + ErrLines( cOut + cErr ) )
+         DiagCompile( cPath, cOut + cErr )
          RETURN .F.
       ENDIF
    NEXT
@@ -3380,41 +3455,19 @@ STATIC FUNCTION ProjectMember( hProj, cFile )
 
    RETURN ""
 
-// validade de nome novo - decidida pelo COMPILADOR, não por listas
-// próprias: um trecho mínimo (LOCAL <nome> em contexto de variável;
-// FUNCTION <nome>() em contexto de função) vai a hb_compileFromBuf() - o
-// compilador como biblioteca, embutido na ferramenta como no hbmk2 - com o
-// dialeto (-k*) resolvido para o projeto. Não existe "lista de reservadas"
-// consultável: reserva é CONTEXTUAL na gramática (LOOP vale como variável,
-// WHILE não), e a lista da era occ divergia do oráculo nas duas direções
-// (26 de 39 "reservadas" eram aceitas; ENDFOR, rejeitado, faltava). O que
-// o compilador aceitar aqui mas quebrar num site específico cai na rede
-// recompila+compara+rollback.
-STATIC FUNCTION NameAccepted( hProj, cName, lAsFunc )
-
-   LOCAL cSnip, cTok, aArgs := { "harbour", "-n2", "-q2", "-w0", "-gh" }
-
-   FOR EACH cTok IN hProj[ "flags" ]
-      IF Left( cTok, 2 ) == "-k"          // o dialeto muda o que é reservado
-         AAdd( aArgs, cTok )
-      ENDIF
-   NEXT
-   IF lAsFunc
-      cSnip := "FUNCTION " + cName + "()" + hb_eol() + hb_eol() + ;
-               "   RETURN NIL" + hb_eol()
-   ELSE
-      cSnip := "PROCEDURE __hbrfprobe()" + hb_eol() + hb_eol() + ;
-               "   LOCAL " + cName + hb_eol() + hb_eol() + ;
-               "   " + cName + " := 1" + hb_eol() + ;
-               "   IF " + cName + " == 1" + hb_eol() + ;
-               "      " + cName + "++" + hb_eol() + ;
-               "   ENDIF" + hb_eol() + hb_eol() + ;
-               "   RETURN" + hb_eol()
-   ENDIF
-
-   // devolve o .hrb compilado (string) no sucesso; NIL quando o compilador
-   // rejeita o fonte
-   RETURN HB_ISSTRING( hb_compileFromBuf( cSnip, aArgs ) )
+// [REMOVIDO 2026-07-26, ordem do Diego] Aqui existia o `NameAccepted`: um
+// pré-check que compilava uma SONDA (`LOCAL <nome>` / `FUNCTION <nome>()`) por
+// hb_compileFromBuf para dizer, antes de editar, se o nome novo era válido no
+// dialeto do projeto. Não era heurística - era o compilador respondendo. Foi
+// removido mesmo assim, e a razão é melhor: a sonda é um oráculo APROXIMADO (um
+// trecho artificial, sem os headers do projeto) para uma pergunta que o oráculo
+// DEFINITIVO - recompilar o projeto e comparar - já responde no fim do ciclo.
+// Duas portas para o mesmo fato divergem; a que sobra é a que decide.
+//
+// A cobertura NÃO caiu (medido): sem ele, `rename ... nIL` edita, o projeto
+// para de compilar, e o fonte volta byte a byte. O que caiu foi a QUALIDADE do
+// relato, e ela foi recuperada no mesmo passo: os erros do compilador do
+// projeto viram `diagnostics[]` (DiagCompile) e a recusa ganhou código próprio.
 
 // o nome é função do core/runtime Harbour? Duas fontes existentes do
 // próprio Harbour: include/harbour.hbx (lista canônica COMPLETA das
@@ -3759,9 +3812,6 @@ STATIC FUNCTION RenameStatic( aArgs )
       RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
-   IF ! NameAccepted( hProj, cNew, .F. )
-      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a variable name" )
-   ENDIF
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
@@ -3865,13 +3915,15 @@ STATIC FUNCTION RenameStatic( aArgs )
    ENDIF
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback" )
+         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
    Prose( "verified: all " + hb_ntos( Len( hProj[ "files" ] ) ) + ;
@@ -3945,9 +3997,6 @@ STATIC FUNCTION RenameFunction( aArgs )
       RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
-   IF ! NameAccepted( hProj, cNew, .T. )
-      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a function name" )
-   ENDIF
    // função do core/runtime Harbour (harbour.hbx + hb_IsFunction): definir
    // no projeto uma função homônima sombreia a nativa em TODAS as chamadas
    IF CoreFunction( hProj, cUpNew )
@@ -3985,7 +4034,8 @@ STATIC FUNCTION RenameFunction( aArgs )
          FOR EACH hItem IN hFunc[ "calls" ]
             IF Upper( hItem[ "sym" ] ) == cUpNew
                RETURN Refuse( "'" + cNew + "' is already called in " + hb_FNameNameExt( cPath ) + ;
-                              ":" + hb_ntos( hItem[ "line" ] ) + " - the rename would hijack those calls" )
+                              ":" + hb_ntos( hItem[ "line" ] ) + " - the rename would hijack those calls", ;
+                              RSN_NAME_CALLED )
             ENDIF
          NEXT
          IF Upper( hFunc[ "name" ] ) == cUpOld
@@ -4205,14 +4255,16 @@ STATIC FUNCTION RenameFunction( aArgs )
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                           hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                           cUpOld, cUpNew, @cSpec )              // reuso de cSpec p/ motivo
          RollbackAll( hOrig )
-         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
 
@@ -4401,9 +4453,6 @@ STATIC FUNCTION ExtractFunction( aArgs )
       RETURN Refuse( "'" + cFile + "' is not a source of project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
-   IF ! NameAccepted( hProj, cNewName, .T. )
-      RETURN Refuse( "the project compiler rejects '" + cNewName + "' as a function name" )
-   ENDIF
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
@@ -4888,7 +4937,8 @@ STATIC FUNCTION ExtractFunction( aArgs )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "the project stopped compiling after the extraction - rollback" )
+      RETURN Refuse( "the project stopped compiling after the extraction - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       cWhy := ""
@@ -4901,18 +4951,21 @@ STATIC FUNCTION ExtractFunction( aArgs )
                                         hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                                         cUpGenNew, cUpNew, Upper( cClassReal ), cNewName, @cWhy )
                hb_MemoWrit( cSrcPath, cText )
-               RETURN Refuse( "verification FAILED: " + cWhy + " - rollback" )
+               RETURN Refuse( "verification FAILED: " + cWhy + " - rollback", ;
+                              RSN_VERIFY_FAILED )
             ENDIF
          ELSEIF ! HrbExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                                    hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                                    cUpNew, @cWhy )
             hb_MemoWrit( cSrcPath, cText )
-            RETURN Refuse( "verification FAILED: " + cWhy + " - rollback" )
+            RETURN Refuse( "verification FAILED: " + cWhy + " - rollback", ;
+                           RSN_VERIFY_FAILED )
          ENDIF
       ELSEIF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
                 hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verification FAILED: an unedited module changed - rollback" )
+         RETURN Refuse( "verification FAILED: an unedited module changed - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
 
@@ -5969,19 +6022,22 @@ STATIC FUNCTION InlineLocal( aArgs )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      RETURN Refuse( "the project stopped compiling after the inline - rollback" )
+      RETURN Refuse( "the project stopped compiling after the inline - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]                          // reuso
       IF cSpec == cSrcPath
          IF ! HrbSymbolsEqual( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ), ;
                                hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ), @cWhy )
             hb_MemoWrit( cSrcPath, cText )
-            RETURN Refuse( "verification FAILED: " + cWhy + " - rollback" )
+            RETURN Refuse( "verification FAILED: " + cWhy + " - rollback", ;
+                           RSN_VERIFY_FAILED )
          ENDIF
       ELSEIF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
                 hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         RETURN Refuse( "verification FAILED: an unedited module changed - rollback" )
+         RETURN Refuse( "verification FAILED: an unedited module changed - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
    Prose( "verified: " + hb_ntos( nReads ) + " use(s) replaced; symbols intact; " + ;
@@ -6617,13 +6673,15 @@ STATIC FUNCTION ReorderParams( aArgs )
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "the project stopped compiling after the reorder - rollback" )
+      RETURN Refuse( "the project stopped compiling after the reorder - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ! HrbSymbolsEqual( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), @cWhy )
          RollbackAll( hOrig )
-         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
    Prose( "verified: " + hb_ntos( nTotal ) + " site(s) reordered; symbols intact; run your test suite to confirm behaviour" + hb_eol() )
@@ -7597,7 +7655,8 @@ STATIC FUNCTION RenameDsl( aArgs )
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
@@ -7910,7 +7969,8 @@ STATIC FUNCTION RenameRuleMarker( cSpec, hR, cNew, lDryRun )
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
@@ -8391,9 +8451,6 @@ STATIC FUNCTION RenameMemvar( aArgs )
       RETURN Refuse( "could not resolve the project '" + cSpec + "'" )
    ENDIF
    cTmp := WorkDir()
-   IF ! NameAccepted( hProj, cNew, .F. )
-      RETURN Refuse( "the project compiler rejects '" + cNew + "' as a variable name" )
-   ENDIF
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "the project does not compile - fix the build errors first" )
    ENDIF
@@ -8601,14 +8658,16 @@ STATIC FUNCTION RenameMemvar( aArgs )
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
                           hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
                           cUpOld, cUpNew, @cWhy )
          RollbackAll( hOrig )
-         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback" )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback", ;
+                        RSN_VERIFY_FAILED )
       ENDIF
    NEXT
 
@@ -13141,10 +13200,6 @@ STATIC FUNCTION RenameMethod( aArgs )
    FOR EACH cOwn IN hb_HKeys( hMap )
       cPred := hMap[ cOwn ]
       IF !( cOwn == cUpOld )
-         IF ! NameAccepted( hProj, cPred, .T. )
-            RETURN Refuse( "the project compiler rejects '" + cPred + ;
-                           "' (name of the generated function) - choose another name" )
-         ENDIF
          FOR EACH cPath IN hProj[ "files" ]
             IF FuncByName( hAsts[ cPath ], cPred ) != NIL
                RETURN Refuse( "'" + cPred + "' (predicted for artifact " + cOwn + ;
@@ -13295,7 +13350,8 @@ STATIC FUNCTION RenameMethod( aArgs )
    // previstas são conferidas fato a fato
    IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       RollbackAll( hOrig )
-      RETURN Refuse( "the project stopped compiling after the rename - rollback" )
+      RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
+                     RSN_COMPILE_FAILED )
    ENDIF
    // módulos com artefato derivado: o pcode muda DE VERDADE (strings de
    // registro e nome da função gerada) - símbolos conferidos com o mapa
@@ -13306,12 +13362,14 @@ STATIC FUNCTION RenameMethod( aArgs )
       IF ! Empty( hFacts[ cPath ][ "arts" ] )
          IF ! HrbSymbolsRenamed( cText, cWhy, hMap, hOpt, @cSpec )
             RollbackAll( hOrig )
-            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
+                           RSN_VERIFY_FAILED )
          ENDIF
       ELSE
          IF ! HrbEquivalent( cText, cWhy, cUpOld, cUpNew, @cSpec )
             RollbackAll( hOrig )
-            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback" )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
+                           RSN_VERIFY_FAILED )
          ENDIF
       ENDIF
    NEXT

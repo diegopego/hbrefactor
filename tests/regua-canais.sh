@@ -39,7 +39,7 @@ cp "$FIX"/* "$D"/ 2>/dev/null
 # passou verde uma vez porque o binário não rodou - sem HB_BIN - e as duas
 # listas ficaram vazias. Silêncio não pode parecer sucesso nem aqui dentro.)
 [ -s "$D/prosa.txt" ] || { echo "régua-canais: a prosa saiu VAZIA - o comando não rodou"; exit 1; }
-grep -q '"schema": "cli-1"' "$D/dados.json" || { echo "régua-canais: o --json não produziu envelope"; exit 1; }
+grep -q '"schema": "cli-2"' "$D/dados.json" || { echo "régua-canais: o --json não produziu envelope"; exit 1; }
 
 # linhas que a PROSA cita: "<arquivo>:<linha>:" no começo
 sed -n 's/^\([A-Za-z0-9_.-]*\.prg\):\([0-9]*\):.*/\1 \2/p' "$D/prosa.txt" | sort -u > "$D/p.txt"

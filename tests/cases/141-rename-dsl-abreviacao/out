@@ -1,7 +1,16 @@
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "rename",
+  "argv":
+  [
+    "rename",
+    "fixdsl.hbp",
+    "a.prg:11:4",
+    "MENU",
+    "--json"
+  ],
   "status": "refused",
+  "exit": 1,
   "reason": "new-name-collides-by-abbreviation",
   "action": "stop-and-report",
   "detail": "'MENU' collides by abbreviation with rule #command MENUBOX (menu.ch:9)",
@@ -9,4 +18,3 @@
   "result": {},
   "edits": []
 }
-
