@@ -1,9 +1,0 @@
-{
-  "schema": "case-1",
-  "kind": "command",
-  "desc": "recusa: o nome novo ja' e' um LOCAL declarado na mesma funcao - renomear fundiria duas variaveis",
-  "cmd": [
-    [ "rename", "fix01.hbp", "a.prg:5:10", "i", "--json" ]
-  ],
-  "forbid": [ "MOSTRA" ]
-}

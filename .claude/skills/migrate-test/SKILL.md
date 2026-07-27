@@ -1,6 +1,6 @@
 ---
 name: migrate-test
-description: O loop de UMA iteração de teste no formato de CASO (tests-go/suite/, em Go) — migrando um teste legado (unit_N do run.sh, tests/cases/ ou tests/scenarios/), ou escrevendo um caso novo do zero. Carrega a ordem, os portões executáveis que mordem em cada passo, e o catálogo de erros que já custaram uma iteração. Use ao migrar teste antigo, ao abrir teste novo, ou quando um caso divergir e você precisar separar os dois lados.
+description: O loop de UMA iteração de teste no formato de CASO (tests-go/suite/, em Go) — migrando um teste legado (unit_N do run.sh ou tests/cases/), ou escrevendo um caso novo do zero. Carrega a ordem, os portões executáveis que mordem em cada passo, e o catálogo de erros que já custaram uma iteração. Use ao migrar teste antigo, ao abrir teste novo, ou quando um caso divergir e você precisar separar os dois lados.
 disable-model-invocation: true
 ---
 
@@ -29,7 +29,7 @@ funcionar.
 
 ```bash
 tools/unit-brief.py --fila          # os unit_N que sobraram no tests/run.sh
-ls tests/cases tests/scenarios      # os dois formatos-ponte, que também migram
+ls tests/cases                      # o formato-ponte que ainda resta
 ```
 
 A fila são os próprios legados: o que sobrou neles é o que falta. Nada de estado
@@ -125,7 +125,7 @@ Só entra erro que **aconteceu**, com o caso que o expôs. Hipotético não entr
 | `fixture/vocabulário` | palavra de diretiva da fixture aparece em `src/hbrefactor.prg` (régua do caso 64) — extraída sozinha, não se declara |
 | `fixture/retrato` | o `.ppo`/`.ppt` do core divergiu do `oracle/` |
 | compilador + `go vet` | o resto (`make govet`) |
-| hook `formato-de-teste.sh` | commit que ACRESCENTA teste a `tests/run.sh`, `tests/cases/` ou `tests/scenarios/` |
+| hook `formato-de-teste.sh` | commit que ACRESCENTA teste a um formato legado — os que restam, e os já extintos, que ele barra de ressuscitar |
 
 ## Não coube no formato?
 

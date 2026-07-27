@@ -1,9 +1,0 @@
-{
-  "schema": "case-1",
-  "kind": "command",
-  "desc": "a diretiva stringify o nome numa string literal: o rename muda o pcode, a verificacao -gh -l pega, e o fonte volta byte a byte",
-  "cmd": [
-    [ "rename", "fix01.hbp", "a.prg:33:10", "nOutro", "--json" ]
-  ],
-  "forbid": [ "MOSTRA" ]
-}

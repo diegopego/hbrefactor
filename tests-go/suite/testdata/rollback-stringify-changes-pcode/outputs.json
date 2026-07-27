@@ -1,0 +1,21 @@
+[
+  {
+    "schema": "cli-2",
+    "command": "rename",
+    "argv": [
+      "rename",
+      "fix01.hbp",
+      "a.prg:33:10",
+      "nOutro",
+      "--json"
+    ],
+    "status": "refused",
+    "exit": 1,
+    "reason": "verification-failed-rolled-back",
+    "action": "stop-and-report",
+    "detail": "verification FAILED: a.hrb changed - rollback",
+    "diagnostics": [],
+    "result": {},
+    "edits": []
+  }
+]

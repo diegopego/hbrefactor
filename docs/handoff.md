@@ -21,12 +21,21 @@ camada de controle está **fechada**, e a fila é o que sobrou nos três legados
 |---|---|---|---|
 | legado imperativo | `tests/run.sh` + `bin/parrun` + `tcheck.prg` | 127 units | 1021/0 |
 | legado intermediário | `tests/casedir.sh` + `tests/cases/` | 12 casos | roda dentro do run.sh |
-| ponte declarativa (bash) | `tests/scenarios.sh` + `tests/scenarios/` | 7 cenários | 63/0 |
-| **o destino** | `tests-go/suite/` (Go) | 3 casos | verde |
+| ~~ponte declarativa (bash)~~ | ~~`tests/scenarios.sh`~~ | **0** | **EXTINTO em 2026-07-27** |
+| **o destino** | `tests-go/suite/` (Go) | 10 casos | verde |
 
-**`make test` verde: 1021/0 + 63/0 + `tests/docs` + `tests/suite`.**
-**Fila total: 146.** Os três legados **só encolhem** — o hook `formato-de-teste.sh` barra
-o commit que faça qualquer um deles crescer.
+**`make test` verde: 1021/0 + `tests/docs` + `tests/suite`.**
+**Fila total: 139.** Os legados **só encolhem** — o hook `formato-de-teste.sh` barra
+o commit que faça qualquer um deles crescer, e continua barrando a **ressurreição** do
+formato-ponte.
+
+**O primeiro legado morreu inteiro.** Com `tests/scenarios/` vazio o `scenarios.sh` saía 1
+por anti-vacuidade e derrubava o `make test` — matá-lo deixou de ser opcional. Saíram
+junto: o alvo `make scenarios`, o ramo bash do `make oracle` (que agora é só Go) e a
+citação da skill. **Régua que isto ensinou:** esvaziar um legado é a metade barata; a outra
+metade é arrancar o runner, o alvo do Makefile e toda citação dele — e o portão
+`tests-go/docs` é quem cobra a última (ele reprovou a skill citando `tests/scenarios`, e
+reprovou **de novo** quando eu tentei explicar a extinção citando o caminho morto).
 
 > **O CONTRATO NÃO ESTÁ AQUI — está em [`tests/README.md`](../tests/README.md)**, escrito
 > como **especificação INDEPENDENTE DE LINGUAGEM**. Leia-o inteiro antes de escrever um
@@ -125,13 +134,31 @@ ponteiros — um `*env.Reason` cru num caso é panic no dia em que a ferramenta 
 recusar, que é justo o dia em que se quer LER a falha. Sucesso vira `""/""`, e o caso falha
 mostrando isso.
 
+### O que a migração dos 7 cenários encontrou (e não estava previsto)
+
+**A régua do vocabulário ficou mais rigorosa ao migrar, e a primeira coisa que ela achou foi
+uma colisão entre a DSL da fixture e o INGLÊS DO PRODUTO.** No formato-ponte a lista de
+palavras proibidas era escrita à mão (`forbid` do `case.json`) e o `fixdsl` **esquecera** as
+cabeças `REPEAT`/`UNTIL`; o harness Go extrai as cabeças sozinho, e a `REPEAT` bateu nas seis
+mensagens `"repeat with --force"` do fonte.
+
+**Decisão do Diego: a fixture cede, e as cabeças ganham PREFIXO** (`CMD_REPEAT`/`CMD_UNTIL`
+— inglês, uppercase, prefixado). A régua não afrouxa: ela é textual e case-insensitive de
+propósito, porque um gatilho de verdade se escreve `== "repeat"`, minúsculo, dentro de
+string. **O contrato disso está em [`tests/README.md`](../tests/README.md) §7.2** — é lá que
+quem escrever fixture nova vai ler.
+
+**Mina que fica:** a cabeça `SQUARED` do mesmo `fixdsl` é palavra inglesa comum passando com
+zero ocorrências hoje. Não foi trocada porque mexer nela ripplaria no `outputs.json` e no
+`expected/` (ela é usada em 3 sítios), e churn sem prova é o que a lei do repo evita — mas
+ela é o próximo `UNTIL`.
+
 ### PRÓXIMO PASSO
 
-O volume, agora sem sonda: **os 7 cenários restantes de `tests/scenarios/`** são os mais
-baratos (o esperado já está escrito à mão — é transcrição, e o `outputs/N` vira item da
-lista do `outputs.json`). Depois os 127 units. **Os 12 de `tests/cases/` por último e com
-cuidado redobrado**, porque **o esperado deles foi GRAVADO de uma execução** e precisa ser
-reescrito do contrato, nunca copiado.
+O volume: **os 127 units de `tests/run.sh`** (`tools/unit-brief.py --fila` dá a lista; o
+`unit_0` sai por último, ele guarda a fixture `fix01`). **Os 12 de `tests/cases/` por último
+e com cuidado redobrado**, porque **o esperado deles foi GRAVADO de uma execução** e precisa
+ser reescrito do contrato, nunca copiado.
 
 **Lote de 5, `make caso NOME=x` a cada iteração, `make test` no fim do lote** — salvo se
 tocar em `src/hbrefactor.prg` (aí é na hora).

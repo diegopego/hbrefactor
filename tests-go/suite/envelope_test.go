@@ -32,7 +32,17 @@ type Diagnostico struct {
 	Detail   string `json:"detail"`
 }
 
-// A forma do result é POR COMANDO — um rename não tem os campos de um usages.
+// Escopo é o que o veredito de uma palavra de DSL diz sobre o que ele NÃO viu:
+// o pp não é o compilador, e um sítio dentro de um ramo que a compilação pulou
+// não foi visto por ninguém. `complete: false` com `unseen` cheio é a ferramenta
+// dizendo até onde a prova alcança, em vez de afirmar sobre a árvore inteira.
+type Escopo struct {
+	Complete bool     `json:"complete"`
+	Unseen   []string `json:"unseen"`
+}
+
+// A forma do result é POR COMANDO — um rename não tem os campos de um usages,
+// e o rename de palavra de DSL tem os seus.
 type Resultado struct {
 	Verdict   string  `json:"verdict,omitempty"`
 	Kind      string  `json:"kind,omitempty"`
@@ -41,6 +51,11 @@ type Resultado struct {
 	EditCount int     `json:"editCount,omitempty"`
 	Proof     string  `json:"proof,omitempty"`
 	Locations []Local `json:"locations,omitempty"`
+
+	// só no rename de palavra de DSL
+	Scope                *Escopo `json:"scope,omitempty"`
+	ApplicationSites     int     `json:"applicationSites,omitempty"`
+	DirectiveOccurrences int     `json:"directiveOccurrences,omitempty"`
 }
 
 type Edicao struct {

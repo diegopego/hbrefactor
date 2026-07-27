@@ -21,7 +21,7 @@ BIN    := bin/hbrefactor
 # por engano. `make build` continua compilando.
 .DEFAULT_GOAL := help
 
-.PHONY: build test scenarios caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
+.PHONY: build test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
 
 # RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
 # bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
@@ -60,18 +60,15 @@ $(BIN): src/hbrefactor.prg
 ## test        roda a suíte (contrato executável; JOBS=1 força sequencial)
 test: build bin/tcheck bin/parrun
 	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
-	@$(MAKE) --no-print-directory scenarios
 	@$(MAKE) --no-print-directory govet
 	@$(MAKE) --no-print-directory gotest
 
-# RETRATO do core: grava os .ppo/.ppt de cada caso, nos DOIS formatos que ainda
-# convivem (os cenários bash que faltam migrar, e a suíte Go). É o UNICO
-# esperado que se grava em vez de escrever - e só porque ali a autoridade e' o
-# core, nao nos. Rodar isto e' ato DELIBERADO: o diff dos retratos entra na
-# revisao do commit que mexeu no core.
+# RETRATO do core: grava os .ppo/.ppt de cada caso. É o UNICO esperado que se
+# grava em vez de escrever - e só porque ali a autoridade e' o core, nao nos.
+# Rodar isto e' ato DELIBERADO: o diff dos retratos entra na revisao do commit
+# que mexeu no core.
 ## oracle      regrava os retratos .ppo/.ppt de cada caso (NOME=x para um só)
-oracle: build bin/tcheck
-	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tests/scenarios.sh --oracle $(NOME)
+oracle: build
 	@cd tests-go && HB_BIN=$(HB_BIN) $(GO) test ./suite -update -count=1 -v \
 	   -run 'TestCasos/$(if $(NOME),$(NOME),.*)/fixture/retrato'
 
@@ -79,8 +76,8 @@ oracle: build bin/tcheck
 # para onde TODOS os testes migram. Um caso é uma pasta em
 # tests-go/suite/testdata/<nome>/ (source/ + expected/ + outputs.json + oracle/)
 # mais um <nome>_test.go que se registra e afirma o que é dele. O contrato do
-# formato está em tests/README.md; o runner bash e o tests/scenarios/ seguem só
-# com o que ainda não migrou.
+# formato está em tests/README.md; o tests/run.sh segue só com o que ainda não
+# migrou.
 #   make deps                 instala o Go e o resto
 #   make gotest               a suíte inteira
 #   make caso NOME=x          UM caso, com as provas da fixture dele
@@ -107,10 +104,6 @@ caso: build
 govet:
 	@cd tests-go && test -z "$$($(GO) fmt ./...)" || { echo "gofmt reformatou arquivos"; exit 1; }
 	@cd tests-go && $(GO) vet ./...
-
-## scenarios   roda só os testes no formato NOVO (make scenarios NOME=x roda um)
-scenarios: build bin/tcheck
-	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tests/scenarios.sh $(NOME)
 
 # suite EXPLORATORIA do PP (P-DOC): o corpus de diretivas REAIS do Harbour
 # (docs/pp-corpus.md) casado com os quatro oraculos (.ppo/.ppt/ast dump/codigo

@@ -155,6 +155,18 @@ caso, e não a cada invocação:
 2. **vocabulário** — nenhuma palavra de diretiva da fixture aparece em
    `src/hbrefactor.prg` (a régua do caso 64). Capacidade sobre uma DSL só conta
    como genérica se o fonte da ferramenta não conhece as palavras dela.
+
+   **Corolário para quem ESCREVE a fixture: prefixe as cabeças** (`CMD_REPEAT`,
+   nunca `REPEAT`). A régua é textual e case-insensitive — ela não distingue *"a
+   ferramenta conhece esta DSL"* de *"a ferramenta escreveu uma frase em inglês
+   com essa palavra"*, e **não deve distinguir**: um gatilho de verdade se
+   escreve `== "repeat"`, dentro de string, em minúscula. O produto é em inglês
+   (CLAUDE.md §5), então uma DSL montada com palavras inglesas comuns não
+   consegue cumprir o papel de *"vocabulário que a ferramenta não conhece"*.
+   *(Medido em 2026-07-27: a cabeça `REPEAT` colidia com as seis mensagens
+   `"repeat with --force"`; a irmã `UNTIL` passava com zero ocorrências — sorte,
+   não desenho, e uma futura mensagem com "until" reprovaria um caso de DSL sem
+   ter nada a ver com DSL.)*
 3. **retrato** — o `oracle/` está atualizado (§6).
 
 ---
