@@ -1,6 +1,0 @@
-{
-  "schema": "case-1",
-  "kind": "command",
-  "desc": "rename de LOCAL: a declaracao, o uso dentro do codeblock e o uso no codigo - e o homonimo do COMENTARIO fica",
-  "cmd": "rename fix01.hbp a.prg:5:10 nSoma --json"
-}

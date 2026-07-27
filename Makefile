@@ -12,6 +12,8 @@
 # um lugar só decide onde está o harbour-core. Override sempre vence:
 #   make test HB_BIN=/outro/caminho/bin/linux/gcc
 HB_BIN ?= $(shell sh tools/hbenv.sh --print HB_BIN)
+# o Go dos testes: instalado por `make deps` em ~/.local/go (do site oficial)
+GO     ?= $(shell command -v go 2>/dev/null || echo $(HOME)/.local/go/bin/go)
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
@@ -19,7 +21,7 @@ BIN    := bin/hbrefactor
 # por engano. `make build` continua compilando.
 .DEFAULT_GOAL := help
 
-.PHONY: build test scenarios oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
+.PHONY: build test scenarios caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
 
 # RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
 # bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
@@ -59,19 +61,52 @@ $(BIN): src/hbrefactor.prg
 test: build bin/tcheck bin/parrun
 	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
 	@$(MAKE) --no-print-directory scenarios
+	@$(MAKE) --no-print-directory govet
+	@$(MAKE) --no-print-directory gotest
 
-# CENÁRIOS - o formato NOVO (Diego, 2026-07-26; contrato em tests/scenarios.sh):
-# source/ + expected/ escritos À MÃO, e a saída byte a byte. Alvo PRÓPRIO para
-# rodar só o conjunto migrado enquanto a migração acontece (`make scenarios
-# <nome>` roda um só); entra TAMBÉM no `make test`, senão o formato novo não
-# gateia nada. Destino: TODOS os testes da suíte migram para cá.
-# RETRATO do core: grava os .ppo/.ppt de cada cenário. É o UNICO esperado que
-# se grava em vez de escrever - e só porque ali a autoridade e' o core, nao
-# nos. Rodar isto e' ato DELIBERADO: o diff dos retratos entra na revisao do
-# commit que mexeu no core.
-## oracle      regrava os retratos .ppo/.ppt dos cenários (NOME=x para um só)
+# RETRATO do core: grava os .ppo/.ppt de cada caso, nos DOIS formatos que ainda
+# convivem (os cenários bash que faltam migrar, e a suíte Go). É o UNICO
+# esperado que se grava em vez de escrever - e só porque ali a autoridade e' o
+# core, nao nos. Rodar isto e' ato DELIBERADO: o diff dos retratos entra na
+# revisao do commit que mexeu no core.
+## oracle      regrava os retratos .ppo/.ppt de cada caso (NOME=x para um só)
 oracle: build bin/tcheck
 	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) tests/scenarios.sh --oracle $(NOME)
+	@cd tests-go && HB_BIN=$(HB_BIN) $(GO) test ./suite -update -count=1 -v \
+	   -run 'TestCasos/$(if $(NOME),$(NOME),.*)/fixture/retrato'
+
+# A SUÍTE DA CLASSE A (transformação), em Go (Diego, 2026-07-26) — o formato
+# para onde TODOS os testes migram. Um caso é uma pasta em
+# tests-go/suite/testdata/<nome>/ (source/ + expected/ + outputs.json + oracle/)
+# mais um <nome>_test.go que se registra e afirma o que é dele. O contrato do
+# formato está em tests/README.md; o runner bash e o tests/scenarios/ seguem só
+# com o que ainda não migrou.
+#   make deps                 instala o Go e o resto
+#   make gotest               a suíte inteira
+#   make caso NOME=x          UM caso, com as provas da fixture dele
+## gotest      roda a suíte da classe A (Go; o formato para onde tudo migra)
+gotest: build
+	@command -v $(GO) > /dev/null 2>&1 || { echo "sem Go - rode 'make deps'"; exit 1; }
+	@cd tests-go && HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) \
+	   $(GO) test ./... -count=1 $(if $(VERBOSE),-v,)
+
+# UM caso e TUDO sobre ele: a transformação e as três provas da fixture
+# (compila, vocabulário, retrato). É o comando do loop de migração - segundos,
+# em vez do `make test` inteiro.
+# SEM PIPE, e isto não é estilo: o exit de um pipeline é o do ÚLTIMO comando, e
+# um `| grep` no fim engole a falha do `go test`. Medido em 2026-07-26 - este
+# alvo saía 0 com o caso deliberadamente quebrado, dando verde vacuoso no
+# comando que mais se roda.
+## caso        roda UM caso e as provas da fixture dele (make caso NOME=x)
+caso: build
+	@test -n "$(NOME)" || { echo "uso: make caso NOME=<pasta em tests-go/suite/testdata>"; exit 1; }
+	@cd tests-go && HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) \
+	   $(GO) test ./suite -count=1 -v -run 'TestCasos/$(NOME)'
+
+## govet       gofmt + go vet dos testes (o compilador já é o portão de tipos)
+govet:
+	@cd tests-go && test -z "$$($(GO) fmt ./...)" || { echo "gofmt reformatou arquivos"; exit 1; }
+	@cd tests-go && $(GO) vet ./...
 
 ## scenarios   roda só os testes no formato NOVO (make scenarios NOME=x roda um)
 scenarios: build bin/tcheck
