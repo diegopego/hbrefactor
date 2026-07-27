@@ -62,3 +62,24 @@ type Envelope struct {
 	Result      Resultado     `json:"result"`
 	Edits       []Edicao      `json:"edits"`
 }
+
+// Recusa devolve o par (código, ação) de uma recusa, e ("", "") quando o
+// envelope não é recusa nenhuma. Os dois campos são PONTEIRO por contrato
+// (`null` quando não há recusa), e um `*env.Reason` cru dentro de um caso é um
+// panic esperando o dia em que a ferramenta parar de recusar — que é
+// exatamente o dia em que se quer ler uma falha, não um stack trace.
+//
+// Achatar em "" é de propósito: um caso que pede recusa e recebe sucesso falha
+// mostrando `""/""`, e não some por comparar dois ponteiros nulos.
+func (e Envelope) Recusa() (reason, action string) {
+	if e.Status != "refused" {
+		return "", ""
+	}
+	if e.Reason != nil {
+		reason = *e.Reason
+	}
+	if e.Action != nil {
+		action = *e.Action
+	}
+	return reason, action
+}

@@ -183,7 +183,7 @@ edição.**
 > **Critério de pronto do passo 2 (mecânico), ATUALIZADO em 2026-07-27 com o destino
 > decidido:** `tests/run.sh` sem nenhum `unit_*`, **`tests/cases/` e `tests/scenarios/`
 > vazios**, `tests-go/suite/` cobrindo o que os três provavam, `make test` verde. Fila hoje:
-> **148** (127 units + 12 casos + 9 cenários). Quando os três esvaziarem, morrem junto o
+> **146** (127 units + 12 casos + 7 cenários). Quando os três esvaziarem, morrem junto o
 > `run.sh`, o `casedir.sh`, o `scenarios.sh`, o `parrun` e o `tcheck`. A fila e o que cada
 > teste virou ficam no handoff § 0.
 >

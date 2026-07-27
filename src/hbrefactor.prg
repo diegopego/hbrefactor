@@ -103,6 +103,14 @@
 // cenário as exercitar - código sem cenário é código que ninguém confere
 #define RSN_VERIFY_FAILED "verification-failed-rolled-back"
 
+// referência TEXTUAL achada (o não-verificável: string, comentário, função do
+// runtime que o nome novo sombrearia). Único código da taxonomia com
+// `ask-human-then-retry`: a refatoração é possível, o que falta é consentimento
+// - o `--force` é o portão, e quem o abre é o humano, nunca o agente sozinho.
+// Vinha repetido como literal em 4 sítios, que é o erro que o cabeçalho desta
+// seção descreve; virou #define ao migrar o caso que o exercita (2026-07-27)
+#define RSN_TEXTUAL_FORCE "textual-refs-require-force"
+
 // sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
 #define PP_PROBE_HIT "__HBREF_PP_HIT__"
 
@@ -4215,7 +4223,7 @@ STATIC FUNCTION RenameFunction( aArgs )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
       RETURN Refuse( "textual references found (see warnings) - repeat with --force to proceed without touching them", ;
-                     "textual-refs-require-force", ACT_RETRY )
+                     RSN_TEXTUAL_FORCE, ACT_RETRY )
    ENDIF
 
    cKind := "function"
@@ -6636,7 +6644,7 @@ STATIC FUNCTION ReorderParams( aArgs )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
       RETURN Refuse( "textual references found - repeat with --force", ;
-                     "textual-refs-require-force", ACT_RETRY )
+                     RSN_TEXTUAL_FORCE, ACT_RETRY )
    ENDIF
 
    aWork := WorkFromRange( hEdits )
@@ -8587,7 +8595,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
       RETURN Refuse( "warnings above - repeat with --force to proceed without touching them", ;
-                     "textual-refs-require-force", ACT_RETRY )
+                     RSN_TEXTUAL_FORCE, ACT_RETRY )
    ENDIF
 
    // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos
@@ -13284,7 +13292,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    NEXT
    IF ! Empty( aWarn ) .AND. ! lForce
       RETURN Refuse( "textual references found (see warnings) - repeat with --force", ;
-                     "textual-refs-require-force", ACT_RETRY )
+                     RSN_TEXTUAL_FORCE, ACT_RETRY )
    ENDIF
 
    // AddHit já normalizou tudo para pares { linha, coluna 1-based }

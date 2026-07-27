@@ -21,11 +21,11 @@ camada de controle está **fechada**, e a fila é o que sobrou nos três legados
 |---|---|---|---|
 | legado imperativo | `tests/run.sh` + `bin/parrun` + `tcheck.prg` | 127 units | 1021/0 |
 | legado intermediário | `tests/casedir.sh` + `tests/cases/` | 12 casos | roda dentro do run.sh |
-| ponte declarativa (bash) | `tests/scenarios.sh` + `tests/scenarios/` | 9 cenários | 81/0 |
-| **o destino** | `tests-go/suite/` (Go) | 1 caso | verde |
+| ponte declarativa (bash) | `tests/scenarios.sh` + `tests/scenarios/` | 7 cenários | 63/0 |
+| **o destino** | `tests-go/suite/` (Go) | 3 casos | verde |
 
-**`make test` verde: 1021/0 + 81/0 + `tests/docs` + `tests/suite`.**
-**Fila total: 148.** Os três legados **só encolhem** — o hook `formato-de-teste.sh` barra
+**`make test` verde: 1021/0 + 63/0 + `tests/docs` + `tests/suite`.**
+**Fila total: 146.** Os três legados **só encolhem** — o hook `formato-de-teste.sh` barra
 o commit que faça qualquer um deles crescer.
 
 > **O CONTRATO NÃO ESTÁ AQUI — está em [`tests/README.md`](../tests/README.md)**, escrito
@@ -104,13 +104,37 @@ tools/caso-new.sh <nome> <fixture>    # o esqueleto; NÃO escreve esperado
 | `tests-go/docs` | comando/caminho citado pela spec ou pela skill que não existe |
 | hook `formato-de-teste.sh` | commit que faça `run.sh`, `tests/cases/` ou `tests/scenarios/` crescer |
 
+### A sonda de recusa e a de multi-comando — FEITAS (2026-07-27), e o formato aguentou
+
+Os dois casos que o passo anterior mandava tentar antes do volume estão migrados, e
+**nenhum deles pediu mudança em `tests/README.md`**:
+
+- **`refuse-old-name-shadowed-by-block-param`** (recusa, 1 comando): `expected/` é o
+  `source/` copiado, e é ele que prova que a recusa não tocou em nada. Nada a inventar.
+- **`refuse-new-function-name-shadows-runtime`** (3 comandos): `outputs.json` é a lista, na
+  ordem; o caso itera os três nomes num `for` e o harness compara a lista inteira. O
+  controle negativo (tirar o 3º envelope) reprova.
+
+**O que a migração pagou, e é o padrão a repetir:** o `reason` do multi-comando
+(`textual-refs-require-force`) vivia como **literal repetido em 4 sítios** do
+`src/hbrefactor.prg` — o único fora da taxonomia `#define RSN_*`, e exatamente o erro que o
+cabeçalho da taxonomia descreve. Virou `RSN_TEXTUAL_FORCE`.
+
+**Ganho de infra:** `Envelope.Recusa()` devolve o par `(reason, action)` achatando os
+ponteiros — um `*env.Reason` cru num caso é panic no dia em que a ferramenta parar de
+recusar, que é justo o dia em que se quer LER a falha. Sucesso vira `""/""`, e o caso falha
+mostrando isso.
+
 ### PRÓXIMO PASSO
 
-Migrar **um caso de recusa** e **um multi-comando** — é onde a spec encontra o que ainda não
-previmos (`expected == source`, `outputs.json` com lista de verdade). Só então o resto dos
-148. Os 9 cenários de `tests/scenarios/` são os mais baratos (o esperado já está escrito à
-mão); os 12 de `tests/cases/` exigem cuidado redobrado, porque **o esperado deles foi
-GRAVADO de uma execução** e precisa ser reescrito do contrato, nunca copiado.
+O volume, agora sem sonda: **os 7 cenários restantes de `tests/scenarios/`** são os mais
+baratos (o esperado já está escrito à mão — é transcrição, e o `outputs/N` vira item da
+lista do `outputs.json`). Depois os 127 units. **Os 12 de `tests/cases/` por último e com
+cuidado redobrado**, porque **o esperado deles foi GRAVADO de uma execução** e precisa ser
+reescrito do contrato, nunca copiado.
+
+**Lote de 5, `make caso NOME=x` a cada iteração, `make test` no fim do lote** — salvo se
+tocar em `src/hbrefactor.prg` (aí é na hora).
 
 ---
 
