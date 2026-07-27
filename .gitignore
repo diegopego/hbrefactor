@@ -3,6 +3,16 @@ tests/tmp/
 *.hrb
 *.ppo
 *.ppt
+
+# ...MENOS os retratos do core (tests/README.md §6): ali o .ppo/.ppt não é lixo
+# de build, é o ÚNICO esperado que se grava, e ele existe para o diff aparecer
+# na revisão do commit que mexeu no pp. Ignorado, o retrato nunca chega a um
+# commit - não rastreia nada, e num clone novo todo caso reprova pedindo
+# `make oracle`. Achado em 2026-07-27: nenhum oracle/ estava versionado.
+!tests-go/suite/testdata/*/oracle/*.ppo
+!tests-go/suite/testdata/*/oracle/*.ppt
+!tests/scenarios/*/oracle/*.ppo
+!tests/scenarios/*/oracle/*.ppt
 *.occ.json
 *.ast.json
 *.vsix
@@ -16,3 +26,6 @@ work/
 # artefatos de build incremental do hbmk2 em fixtures/experimentos
 .hbmk/
 .vscode/settings.json
+
+# cache dos utilitários em python de tools/ e das sondas do pp-corpus
+__pycache__/
