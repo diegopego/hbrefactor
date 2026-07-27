@@ -1,0 +1,11 @@
+{
+  "schema": "case-1",
+  "kind": "command",
+  "desc": "renomear funcao para nome do runtime Harbour sombreia a nativa em TODA chamada: recusa com --force como portao - e o hb_MilliSeconds, que nao esta linkado na ferramenta, prova que a fonte e' o harbour.hbx do projeto",
+  "cmd": [
+    [ "rename", "fix01.hbp", "b.prg:19:10", "Len", "--json" ],
+    [ "rename", "fix01.hbp", "b.prg:19:10", "hb_ntos", "--json" ],
+    [ "rename", "fix01.hbp", "b.prg:19:10", "hb_MilliSeconds", "--json" ]
+  ],
+  "forbid": [ "MOSTRA" ]
+}

@@ -1,8 +1,16 @@
-$ hbrefactor rename fixdsl.hbp a.prg:11:4 MENU_ITEM --json
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "rename",
+  "argv":
+  [
+    "rename",
+    "fixdsl.hbp",
+    "a.prg:11:4",
+    "MENU_ITEM",
+    "--json"
+  ],
   "status": "ok",
+  "exit": 0,
   "reason": null,
   "action": null,
   "detail": "verified: 3 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical",
@@ -92,5 +100,3 @@ $ hbrefactor rename fixdsl.hbp a.prg:11:4 MENU_ITEM --json
   },
   "edits": []
 }
-
--> exit 0

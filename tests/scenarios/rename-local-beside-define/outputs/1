@@ -1,0 +1,63 @@
+{
+  "schema": "cli-2",
+  "command": "rename",
+  "argv":
+  [
+    "rename",
+    "fix01.hbp",
+    "a.prg:20:10",
+    "nTeto",
+    "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: all 2 module(s) byte-identical (-gh -l)",
+  "diagnostics": [],
+  "result":
+  {
+    "verdict": "applied",
+    "kind": "local",
+    "old": "nMax",
+    "new": "nTeto",
+    "editCount": 2,
+    "proof": "pcode-identical",
+    "locations":
+    [
+      {
+        "uri": "file://<CWD>/a.prg",
+        "range":
+        {
+          "start":
+          {
+            "line": 19,
+            "character": 9
+          },
+          "end":
+          {
+            "line": 19,
+            "character": 13
+          }
+        }
+      },
+      {
+        "uri": "file://<CWD>/a.prg",
+        "range":
+        {
+          "start":
+          {
+            "line": 21,
+            "character": 10
+          },
+          "end":
+          {
+            "line": 21,
+            "character": 14
+          }
+        }
+      }
+    ]
+  },
+  "edits": []
+}

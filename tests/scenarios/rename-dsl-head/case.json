@@ -2,6 +2,8 @@
   "schema": "case-1",
   "kind": "command",
   "desc": "renomeia a CABEÇA de um #command: a diretiva na .ch e os 3 sítios de aplicação nos dois módulos",
-  "cmd": "rename fixdsl.hbp a.prg:11:4 MENU_ITEM --json",
+  "cmd": [
+    [ "rename", "fixdsl.hbp", "a.prg:11:4", "MENU_ITEM", "--json" ]
+  ],
   "forbid": [ "MENUITEM", "MENU_ITEM", "MENUBOX", "SQUARED", "LIMITE_TETO", "MenuAdd", "AbreCoisa" ]
 }

@@ -283,58 +283,6 @@ done
 
 
 
-unit_3() {
-echo "case 3: unrelated #define on the declaration line (safe rename succeeds)"
-D=$(fresh case3)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 nTeto --json > out.log 2>&1 )
-RC=$?
-check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q "nTeto := K_LIMITE" "$D/a.prg"
-check "nTeto renamed, define kept" $?
-"$TCHECK" enveq "$D/out.log" verdict applied
-check "verification passed (verdict applied)" $?
-
-}
-
-unit_4() {
-echo "case 4: new name is reserved word written as 'nIL' (refuse)"
-D=$(fresh case4)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 nIL > out.log 2>&1 )
-RC=$?
-check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-
-}
-
-unit_5() {
-echo "case 5: homonymous codeblock parameter shadows target (refuse)"
-D=$(fresh case5)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:26:10 xNovo --json > out.log 2>&1 )
-RC=$?
-check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" enveq "$D/out.log" status refused
-check "recusou (status refused)"   $?
-"$TCHECK" envhas "$D/out.log" detail shadow
-check "reason mentions shadowing"  $?
-cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
-check "a.prg untouched"            $?
-
-}
-
-
-unit_7() {
-echo "case 7: symbol consumed by stringify marker - verification must roll back"
-D=$(fresh case7)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:33:10 nOutro --json > out.log 2>&1 )
-RC=$?
-check "exit != 0"                  $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" enveq "$D/out.log" status refused
-check "recusou (status refused)"   $?
-"$TCHECK" envhas "$D/out.log" detail rollback
-check "reports rollback"           $?
-cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
-check "a.prg restored byte-exact"  $?
-
-}
 
 unit_8() {
 echo "case 8: usages of a function across modules"
@@ -904,53 +852,6 @@ RC=$?
 check "#define init (no source position) refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
 cmp -s "$D/a.prg" "$HERE/fix01/a.prg"
 check "a.prg untouched"            $?
-
-}
-
-unit_37() {
-echo "case 37: name validity comes from the project's compiler, not from lists"
-# WHILE is rejected by the compiler as a variable name -> clean refusal
-D=$(fresh case37)
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:5:10 while --json > out.log 2>&1 )
-RC=$?
-check "compiler-rejected name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" envhas "$D/out.log" detail "project compiler rejects"
-check "refusal cites the compiler"  $?
-# LOOP is ACCEPTED by the compiler as a local name (the occ-era list wrongly
-# refused it - grammar truth restored); byte-identical verification still rules
-( cd "$D" && "$BIN" rename fix01.hbp a.prg:20:10 Loop --json > loop.log 2>&1 )
-RC=$?
-check "compiler-accepted keyword-like name renames" $([ $RC -eq 0 ] && echo 0 || echo 1)
-"$TCHECK" enveq "$D/loop.log" verdict applied
-check "byte-identical verification" $?
-# hard-reserved RTL names (Len, Space...) the compiler itself refuses to
-# redefine - the probe relays that; names it does accept (OutStd) but the
-# RUNTIME knows (hb_IsFunction) get a shadowing warning + --force gate
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 Len --json > rtl.log 2>&1 )
-RC=$?
-check "compiler-protected RTL name refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" envhas "$D/rtl.log" detail "project compiler rejects"
-check "probe relays the compiler refusal" $?
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_ntos --json > rtl2.log 2>&1 )
-RC=$?
-check "runtime function name refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" envhas "$D/rtl2.log" diagnostics "Harbour runtime function"
-check "warning explains the shadowing" $?
-# hb_MilliSeconds is NOT linked into the tool itself: only the canonical
-# core list (include/harbour.hbx, found via the project's -i paths) knows
-# it - hb_IsFunction alone would miss the shadowing
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 hb_MilliSeconds --json > rtl3.log 2>&1 )
-RC=$?
-check "core function unknown to the tool's runtime still refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" envhas "$D/rtl3.log" diagnostics "Harbour runtime function"
-check "harbour.hbx caught it" $?
-# renaming to a name the project already CALLS (even an external one, like
-# QOut) would hijack those calls
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:19:10 QOut --json > hij.log 2>&1 )
-RC=$?
-check "name already called in project refused" $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" envhas "$D/hij.log" detail "would hijack those calls"
-check "refusal explains the hijack" $?
 
 }
 
@@ -4713,7 +4614,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 3 4 5 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
+ALL_UNITS="0 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

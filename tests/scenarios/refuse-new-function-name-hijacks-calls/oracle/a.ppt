@@ -1,0 +1,8 @@
+a.prg(13) >? "Total:", nTotal<
+#command >QOut( "Total:", nTotal )<
+a.prg(14) >? "Subtracao:", Sub2( 10, 3 )<
+#command >QOut( "Subtracao:", Sub2( 10, 3 ) )<
+a.prg(20) >K_LIMITE<
+#define >4<
+a.prg(35) >MOSTRA nVisto<
+#xcommand >QOut( "nVisto", nVisto )<

@@ -1,0 +1,9 @@
+{
+  "schema": "case-1",
+  "kind": "command",
+  "desc": "rename de LOCAL cuja declaracao carrega um #define alheio: o LOCAL muda, a constante do header fica escrita",
+  "cmd": [
+    [ "rename", "fix01.hbp", "a.prg:20:10", "nTeto", "--json" ]
+  ],
+  "forbid": [ "MOSTRA" ]
+}

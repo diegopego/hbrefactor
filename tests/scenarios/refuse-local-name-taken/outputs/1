@@ -1,8 +1,16 @@
-$ hbrefactor rename fix01.hbp a.prg:5:10 i --json
 {
-  "schema": "cli-1",
+  "schema": "cli-2",
   "command": "rename",
+  "argv":
+  [
+    "rename",
+    "fix01.hbp",
+    "a.prg:5:10",
+    "i",
+    "--json"
+  ],
   "status": "refused",
+  "exit": 1,
   "reason": "new-name-already-declared",
   "action": "stop-and-report",
   "detail": "new name 'i' already declared in the function (scope local)",
@@ -10,5 +18,3 @@ $ hbrefactor rename fix01.hbp a.prg:5:10 i --json
   "result": {},
   "edits": []
 }
-
--> exit 1

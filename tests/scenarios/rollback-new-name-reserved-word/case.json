@@ -1,0 +1,9 @@
+{
+  "schema": "case-1",
+  "kind": "command",
+  "desc": "nome novo e' reservada lida em uppercase ('nIL' -> NIL): a ferramenta edita, o COMPILADOR DO PROJETO recusa no fim do ciclo, o fonte volta byte a byte e os erros dele viram diagnostics[]",
+  "cmd": [
+    [ "rename", "fix01.hbp", "a.prg:5:10", "nIL", "--json" ]
+  ],
+  "forbid": [ "MOSTRA" ]
+}

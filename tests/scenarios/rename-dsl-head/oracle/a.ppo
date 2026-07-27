@@ -1,0 +1,26 @@
+#line 4 "a.prg"
+PROCEDURE Main()
+
+   LOCAL GetList := {}
+   LOCAL nTotal := ( ( 3 ) * ( 3 ) )
+   LOCAL nVez := 0
+   LOCAL cNome := "abc"
+
+   MenuAdd( 5, 10, "Abrir", {|| AbreCoisa( nTotal ) } )
+
+
+   MenuAdd( 6, 10, "Sair", {|| QOut( "fim" ) } )
+   MenuAdd( 0, 0, "Moldura", NIL )
+
+   QOut( ( ( 2 ) * ( 2 ) ), ( ( nTotal ) * ( nTotal ) ) )
+
+   while .T.
+      nVez++
+   IF nVez >= 3 ; EXIT ; END ; END
+
+   DevPos( 1, 2 ) ; DevOut( "oi" ) ; SetPos( Row(), Col() + 1 ) ; AAdd( GetList, _GET_( cNome, "cNome",,, ) ) ; ATail( GetList ):Display()
+   ReadModal( GetList, NIL,,,,, ) ; GetList := {} ; ( GetList )
+
+   QOut( nVez, cNome )
+
+   RETURN

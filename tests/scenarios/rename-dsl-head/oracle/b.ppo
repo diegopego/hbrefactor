@@ -1,0 +1,15 @@
+#line 4 "b.prg"
+FUNCTION AbreCoisa( nQtd )
+
+   MenuAdd( 7, 12, "Sub", {|| QOut( nQtd ) } )
+
+   RETURN Min( nQtd, 40 )
+
+FUNCTION MenuAdd( nRow, nCol, cLabel, bAct )
+
+   QOut( nRow, nCol, cLabel )
+   IF bAct <> NIL
+      Eval( bAct )
+   ENDIF
+
+   RETURN NIL

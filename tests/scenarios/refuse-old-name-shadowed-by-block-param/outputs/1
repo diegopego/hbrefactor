@@ -1,0 +1,20 @@
+{
+  "schema": "cli-2",
+  "command": "rename",
+  "argv":
+  [
+    "rename",
+    "fix01.hbp",
+    "a.prg:26:10",
+    "xNovo",
+    "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "old-name-shadowed-by-codeblock-param",
+  "action": "stop-and-report",
+  "detail": "a codeblock parameter of the same name shadows 'xVal' - refusing",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+}

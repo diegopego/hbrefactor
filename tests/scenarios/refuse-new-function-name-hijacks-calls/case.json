@@ -1,0 +1,9 @@
+{
+  "schema": "case-1",
+  "kind": "command",
+  "desc": "recusa: o projeto ja' CHAMA o nome novo (QOut, que uma diretiva do std.ch gera) - renomear sequestraria essas chamadas para a funcao renomeada",
+  "cmd": [
+    [ "rename", "fix01.hbp", "b.prg:19:10", "QOut", "--json" ]
+  ],
+  "forbid": [ "MOSTRA" ]
+}

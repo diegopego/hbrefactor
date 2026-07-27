@@ -1,0 +1,9 @@
+{
+  "schema": "case-1",
+  "kind": "command",
+  "desc": "recusa: um parametro de codeblock homonimo sombreia o LOCAL alvo - dentro do bloco o nome ja' e' OUTRA variavel",
+  "cmd": [
+    [ "rename", "fix01.hbp", "a.prg:26:10", "xNovo", "--json" ]
+  ],
+  "forbid": [ "MOSTRA" ]
+}

@@ -1,0 +1,6 @@
+b.prg(6) >MENUITEM "Sub" ACTION QOut( nQtd ) AT 7, 12<
+#command >MenuAdd( 7, 12, "Sub", {|| QOut( nQtd ) } )<
+b.prg(8) >LIMITE_TETO<
+#define >40<
+b.prg(12) >? nRow, nCol, cLabel<
+#command >QOut( nRow, nCol, cLabel )<

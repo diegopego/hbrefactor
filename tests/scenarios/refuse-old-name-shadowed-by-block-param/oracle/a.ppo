@@ -1,0 +1,46 @@
+#line 3 "a.prg"
+PROCEDURE Main()
+
+   LOCAL nTotal := 0
+   LOCAL bAcum := {| x | nTotal += x }
+   LOCAL i
+
+   FOR i := 1 TO 3
+      Eval( bAcum, Dupla( i ) )
+   NEXT
+
+   QOut( "Total:", nTotal )
+   QOut( "Subtracao:", Sub2( 10, 3 ) )
+
+   RETURN
+
+FUNCTION LimiteMax()
+
+   LOCAL nMax := 4
+
+   RETURN nMax
+
+FUNCTION Sombra()
+
+   LOCAL xVal := 1
+   LOCAL bBloco := {| xVal | xVal + 1 }
+
+   RETURN Eval( bBloco, xVal )
+
+FUNCTION Rotulada()
+
+   LOCAL nVisto := 2
+
+   QOut( "nVisto", nVisto )
+
+   RETURN nVisto
+
+FUNCTION Continuada()
+
+   LOCAL cMsg := "abc"
+
+
+
+   OutStd( "x" +  cMsg +  "y" )
+
+   RETURN cMsg

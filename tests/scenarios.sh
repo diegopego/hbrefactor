@@ -86,7 +86,7 @@ scen_oracle() {
 run_scenario() { # run_scenario <dir-do-cenário>
    local dir="$1" name; name="$(basename "$dir")"
    local d="$HERE/tmp/scen-$name"
-   local cmd got_exit creates f base exp bad ok
+   local got_exit creates f base exp bad ok nout i argv
 
    # o case.json é a IDENTIDADE do cenário: inválido, nada mais faz sentido
    if ! "$TCHECK" scen "$dir/case.json"; then
@@ -99,35 +99,78 @@ run_scenario() { # run_scenario <dir-do-cenário>
 
    echo "scenario $name: $(meta "$dir" desc)"
 
+   # (0) a DISCIPLINA do cenário, cobrada sem rodá-lo: cada régua do `scenlint`
+   # nasceu de um erro que aconteceu (esperado que congela `unclassified`, saída
+   # colada de outra máquina, só um canal exercitado, fixture com diretiva sem
+   # `forbid`). Vem ANTES de tudo porque um cenário indisciplinado pode passar
+   # nas outras provas e não estar provando o que diz.
+   "$TCHECK" scenlint "$dir"
+   check "a disciplina do cenário (tcheck scenlint)" $?
+
    rm -rf "$d"; mkdir -p "$d"
    cp "$dir"/source/* "$d"/ 2>/dev/null
 
    # os comandos rodam EM ORDEM, dentro do tmp (caminhos relativos na saída), e
-   # o resultado é uma TRANSCRIÇÃO: comando, saída e exit de cada um. É por isso
-   # que não existe chave `exit` no case.json - com N comandos o exit é por
-   # comando, e o lugar dele é aqui, comparado byte a byte junto com a saída.
-   : > "$d/out.log"
-   while IFS= read -r cmd; do
-      [ -n "$cmd" ] || continue
-      ( cd "$d" && eval "\"$BIN\" $cmd" > out.raw 2>&1 )
+   # cada um produz o SEU envelope. É por isso que não existe chave `exit` no
+   # case.json: com N comandos o exit é por comando, e desde o cli-2 ele é campo
+   # do próprio envelope, comparado byte a byte junto com o resto.
+   #
+   # UM ARQUIVO POR COMANDO (Diego, 2026-07-26: *"dado que os comandos são uma
+   # lista, o output também deveria estar em formato de lista, na mesma ordem"*).
+   # A estrutura do esperado espelha a da entrada: `outputs/N` <-> N-ésimo `cmd`.
+   # Ganha-se diff localizado (falhou o 3º? só o 3º aparece) e edição isolada -
+   # antes, mexer num comando reescrevia a transcrição inteira. O nome é PLURAL
+   # porque são N saídas distintas - diferente de source/ e expected/, que são
+   # UM projeto cada, espalhado em arquivos.
+   #
+   # E `outputs/N` é o ENVELOPE PURO: sem eco do comando (está no campo `argv`)
+   # e sem linha de exit (está no campo `exit`). O esperado deixou de ser um
+   # híbrido texto+JSON e virou artefato de máquina. (Diego, 2026-07-26: *"o
+   # exit desestruturado, fora"* - e ele não era derivável do `status`.)
+   #
+   # stdout e stderr SEPARADOS: sob --json o stderr só pode carregar falha de
+   # processo, e juntá-los escondia a violação dessa regra dentro do esperado.
+   nout="$( "$TCHECK" scen "$dir/case.json" && "$TCHECK" cmdcount "$dir/case.json" )"
+   rm -rf "$d/.out"; mkdir -p "$d/.out"
+   : > "$d/.out/exits"
+   : > "$d/.out/stderr"
+   for i in $( seq 1 "$nout" ); do
+      # SEM `eval`: os argumentos vêm um por linha e entram no binário como
+      # array. O eval que havia aqui reinterpretava espaço, aspas e glob - uma
+      # fixture com nome de arquivo contendo espaço seria uma bomba armada.
+      mapfile -t argv < <( "$TCHECK" cmdargs "$dir/case.json" "$i" )
+      ( cd "$d" && "$BIN" "${argv[@]}" > out.raw 2> err.raw )
       got_exit=$?
       # NORMALIZAÇÃO do que é legitimamente variável por máquina: o diretório do
       # cenário (<CWD>) e a árvore do harbour-core (<CORE>) - o `uri` do formato
       # LSP é ABSOLUTO por contrato, e o core muda de lugar entre máquinas (o
       # tools/hbenv.sh detecta dois layouts). Só ESTES DOIS: o resto é drift.
-      printf '$ hbrefactor %s\n' "$cmd" >> "$d/out.log"
-      sed -e "s|$d|<CWD>|g" -e "s|$CORE|<CORE>|g" "$d/out.raw" >> "$d/out.log"
-      printf -- '-> exit %s\n' "$got_exit" >> "$d/out.log"
-   done < <( meta "$dir" cmd )
-   rm -f "$d/out.raw"
+      sed -e "s|$d|<CWD>|g" -e "s|$CORE|<CORE>|g" "$d/out.raw" > "$d/.out/$i"
+      printf '%s %s\n' "$i" "$got_exit" >> "$d/.out/exits"
+      [ -s "$d/err.raw" ] && { printf '=== comando %s ===\n' "$i" >> "$d/.out/stderr"; \
+                               cat "$d/err.raw" >> "$d/.out/stderr"; }
+   done
+   rm -f "$d/out.raw" "$d/err.raw"
 
-   # (2)+(3) os fontes: expected/ onde edita, source/ onde não
+   # (2)+(3) os fontes: TODO arquivo de `source/` tem o seu par em `expected/`,
+   # inclusive quando o esperado é "igual ao original" - aí o par é uma CÓPIA do
+   # original, escrita de propósito. (Diego, 2026-07-26. A primeira versão usava
+   # a AUSÊNCIA de expected/ para significar "nada muda"; é a mesma régua que o
+   # envelope da ferramenta impõe a si mesmo - "todo campo SEMPRE presente,
+   # ausência nunca carrega significado" - e eu a violei aqui. Pior: um
+   # expected/ esquecido ficava indistinguível de um deliberado, e um cenário
+   # que DEVIA editar passava verde se a ferramenta parasse de editar.)
    bad=0
    for f in "$dir"/source/*; do
       [ -f "$f" ] || continue
       base="$(basename "$f")"
-      exp="$f"
-      [ -f "$dir/expected/$base" ] && exp="$dir/expected/$base"
+      exp="$dir/expected/$base"
+      if [ ! -f "$exp" ]; then
+         bad=1
+         echo "    --- expected/$base NÃO existe: todo arquivo de source/ declara o seu"
+         echo "        estado final, mesmo quando ele é o original inalterado ---"
+         continue
+      fi
       if ! cmp -s "$exp" "$d/$base"; then
          bad=1
          echo "    --- diff de $base (esperado < , obtido >) ---"
@@ -148,11 +191,7 @@ run_scenario() { # run_scenario <dir-do-cenário>
    # existe justamente para matar vacuidade. Foi o shellcheck do editor que
    # pegou. Régua: `$?` nunca atravessa um comando, nem que seja um `[`.)
    [ "$bad" = 0 ]; ok=$?
-   if [ -d "$dir/expected" ]; then
-      check "o projeto depois bate com expected/ (e o resto intacto)" $ok
-   else
-      check "NADA EDITADO: o projeto inteiro volta byte a byte" $ok
-   fi
+   check "o projeto depois bate com expected/, arquivo a arquivo" $ok
 
    # (4) artefato não declarado: a ferramenta não suja o projeto do usuário
    bad=0
@@ -168,16 +207,70 @@ run_scenario() { # run_scenario <dir-do-cenário>
    [ "$bad" = 0 ]; ok=$?
    check "nenhum artefato inesperado no projeto" $ok
 
-   # (5) a saída INTEIRA - prova também o que a ferramenta não disse
-   if [ -f "$dir/output" ]; then
-      cmp -s "$dir/output" "$d/out.log"; ok=$?
-      if [ "$ok" -ne 0 ]; then
-         echo "    --- diff da saída (esperado < , obtido >) ---"
-         diff "$dir/output" "$d/out.log" | head -30 | sed 's/^/    /'
-      fi
-      check "a saída bate byte a byte com output" $ok
+   # (5) a saída de CADA comando - byte a byte, e prova também o que a
+   # ferramenta NÃO disse. `outputs/N` <-> N-ésimo `cmd`, na mesma ordem.
+   if [ -f "$dir/output" ] || [ -d "$dir/output" ]; then
+      # formato antigo (transcrição única): recusa ALTO, nomeando a mudança -
+      # degradar em silêncio deixaria o cenário provando outra coisa
+      # o nome mudou para o PLURAL: são N saídas distintas, uma por comando -
+      # diferente de source/ e expected/, que são UM projeto cada
+      echo "    --- 'output' virou 'outputs/' (plural: uma saída por comando) ---"
+      check "o cenário usa outputs/ (um arquivo por comando)" 1
    else
-      check "o cenário declara a saída esperada (arquivo output)" 1
+      bad=0
+      for i in $( seq 1 "$nout" ); do
+         if [ ! -f "$dir/outputs/$i" ]; then
+            bad=1
+            echo "    --- outputs/$i não existe: o comando $i não declara a saída esperada ---"
+            continue
+         fi
+         if ! cmp -s "$dir/outputs/$i" "$d/.out/$i"; then
+            bad=1
+            echo "    --- diff da saída do comando $i (esperado < , obtido >) ---"
+            diff "$dir/outputs/$i" "$d/.out/$i" | head -30 | sed 's/^/    /'
+         fi
+      done
+      # esperado SOBRANDO é tão grave quanto faltando: um `cmd` removido sem
+      # limpar o output deixa uma afirmação que ninguém mais executa
+      for f in "$dir"/outputs/*; do
+         [ -f "$f" ] || continue
+         base="$(basename "$f")"
+         if [ ! -f "$d/.out/$base" ]; then
+            bad=1
+            echo "    --- outputs/$base sobra: não há comando $base em cmd ---"
+         fi
+      done
+      [ "$bad" = 0 ]; ok=$?
+      check "o envelope de cada comando bate byte a byte com outputs/N" $ok
+
+      # (5b) o EXIT do processo bate com o campo `exit` do envelope. Não é
+      # redundância com o byte a byte: o arquivo prova o que a ferramenta
+      # ESCREVEU, esta prova cruza o que ela escreveu com o que ela DEVOLVEU ao
+      # shell. Divergir aqui é bug da ferramenta - um consumidor que lê o stdout
+      # (o normal num pipe) concluiria o oposto do que o shell diz.
+      bad=0
+      while read -r i real; do
+         [ -n "$i" ] || continue
+         campo="$( "$TCHECK" enveq "$d/.out/$i" exit "$real" >/dev/null 2>&1 && echo ok || echo no )"
+         if [ "$campo" != ok ]; then
+            bad=1
+            echo "    --- comando $i: o processo saiu $real e o envelope diz outra coisa ---"
+            "$TCHECK" enveq "$d/.out/$i" exit "$real" 2>&1 | sed 's/^/    /'
+         fi
+      done < "$d/.out/exits"
+      [ "$bad" = 0 ]; ok=$?
+      check "o exit do processo == campo \`exit\` do envelope" $ok
+
+      # (5c) sob --json o stderr só pode carregar FALHA DE PROCESSO. Enquanto
+      # stdout e stderr eram juntados no esperado, uma mensagem vazando para o
+      # stderr passava despercebida - foi assim que os erros do compilador
+      # ficaram fora do envelope até 2026-07-26.
+      if [ -s "$d/.out/stderr" ]; then
+         echo "    --- stderr NÃO está vazio sob --json (aviso é diagnostics[], não stderr) ---"
+         head -10 "$d/.out/stderr" | sed 's/^/    /'
+      fi
+      [ ! -s "$d/.out/stderr" ]; ok=$?
+      check "stderr vazio sob --json (o envelope carrega tudo)" $ok
    fi
 
    # (6) o RETRATO do que o pré-compilador e o compilador fizeram com a
