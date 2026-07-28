@@ -589,14 +589,21 @@ logic is always a worse copy.
 
 ### What it sees but must not touch
 
-<!-- prov: cases 125 (data suppression), 126 (__LINE__ axis), 127 (live macro string);
-     commits b1ee6b7 + 5256b35; core facts ast-17 (77a105602d) and ast-18 (f76137f85d),
-     motivation corrected by 4c02f40f44. Outputs below captured live 2026-07-23 against
-     scratch fixtures that compile clean under -w3 -es2. NOTE the asymmetry, it is the
-     point: a WRITTEN string equal to a name is reported (it can be a call by name via
-     &()/__mvGet); a stream-block line is NOT (no such mechanism exists — the match is a
-     coincidence). The tool does not decide that from token shape: the pp seals the
-     stream line. -->
+<!-- prov: cases 126 (__LINE__ axis), 127 (live macro string); commits b1ee6b7 + 5256b35;
+     core facts ast-17 (77a105602d) and ast-18 (f76137f85d), motivation corrected by
+     4c02f40f44. Outputs captured live 2026-07-23, EXCEPT the last two blocks, recaptured
+     2026-07-27 against scratch fixtures that compile clean under -w3 -es2.
+
+     REWRITTEN 2026-07-27: the old third example showed `possible reference in string` and
+     presented it as a virtue. That report matched a string's TEXT against the queried name
+     — gatilho 1 — and was removed; case 125 (which pinned it, plus the stream-data
+     suppression that existed only to mute its false positives) was removed with it. The
+     asymmetry this section used to teach is therefore GONE: no string is reported for
+     matching a name. What replaced it is the boundary itself — refuse where the compiler
+     cannot see, report where it can, and say so.
+
+     NOTE this section has no executable gate (CLAUDE.md §4 open debt): it rotted silently
+     until the removal broke the behaviour it described. -->
 
 "Never edits what it cannot prove" protects you from a wrong edit. It says nothing about
 the other failure: **silence** — a rename that is perfectly correct and never mentions the
@@ -643,20 +650,45 @@ $ hbrefactor usages rel.hbp --at rel.prg:3:10
 rel.prg:3: declaration (local) in MAIN  | LOCAL cSaldo := "1.234,00"
 rel.prg:3: write (local) in MAIN  | LOCAL cSaldo := "1.234,00"
 rel.prg:12: read (local) in MAIN  | QOut( cSaldo )
-rel.prg:5: possible reference in string  | QOut( "cSaldo" )
-4 result(s) for 'cSaldo'
+3 result(s) for 'cSaldo'
 ```
 
-Line 5 is worth your attention: a string **you wrote** whose contents equal a name can be a
-call by name (`&()`, `__mvGet`). That same file has a `TEXT ... ENDTEXT` block whose line 9
-reads `cSaldo apurado no periodo` — and it is **not** in the list. Inside a stream block
-your source stops being code: the preprocessor turns each raw line into a string, and a word
-in there matching one of your variables is a *coincidence*, with no mechanism by which it
-could ever name your variable. Reporting it would be noise, and noise you learn to skip is
-worse than nothing.
+Line 5 of that file reads `QOut( "cSaldo" )` — a string whose contents happen to equal the
+name — and it is **not** in the list. Nothing about it is a reference: `cSaldo` is a local,
+and a local cannot be reached by name while your program runs. The tool used to report it,
+by comparing the string's text against the name you asked about. Comparing text to decide
+what something *is* is the one thing this tool must never do, so that report is gone.
 
-That silence is not the tool failing to look, and not a rule about how the string *looks*:
-the preprocessor stamps a stream line as data, so staying quiet is a fact it was **told**.
+Keeping a symbol's name in a string, and reaching it by name later, is a thing you can do
+in Harbour — and it is **your** thread to keep, not something the tool will hold for you.
+
+### Where the line actually sits
+
+Harbour lets a program build code while it runs and use it in the next instant. No
+refactoring tool controls that, and this one does not pretend to. What it does instead is
+split cleanly:
+
+**It refuses where it cannot see.** A macro whose target is only known at run time —
+`cVar := "mOutra"` and then `&cVar.` — is a hole in the reachable scope, and the command
+stops rather than promise a completeness it cannot have:
+
+```
+$ hbrefactor rename d.hbp d.prg:6:12 mNova
+hbrefactor: the dynamic scope of MAIN has holes:
+  - MAIN (d.prg) uses macro '&'
+hbrefactor: scope with holes - code outside the static graph may see 'mOutra'; refusing
+```
+
+**It reports where it can see.** The `&cLayout` string above is the case where the compiler
+*can* say which memvar a string re-expands — so you are told where, and the string is never
+edited.
+
+That second case is **one form among many**. A codeblock built from text
+(`hb_macroBlock( cExpr )`), a call made by name through the runtime, a name assembled from
+pieces — none of those are seen, and none of them can be. **No output of this tool should
+be read as "your dynamic code is covered."** The promise is narrower and firmer than that:
+*verified* means verified against what compilation can see. Where compilation sees nothing,
+you get a refusal, not a guess.
 
 ### The certainty ladder
 

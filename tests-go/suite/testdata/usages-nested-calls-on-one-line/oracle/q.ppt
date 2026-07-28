@@ -1,0 +1,2 @@
+q.prg(7) >? n<
+#command >QOut( n )<

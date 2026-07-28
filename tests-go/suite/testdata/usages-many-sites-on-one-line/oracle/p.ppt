@@ -1,0 +1,2 @@
+p.prg(7) >? nTotal<
+#command >QOut( nTotal )<

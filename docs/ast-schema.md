@@ -637,11 +637,12 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
     { "sym": "NTOTAL", "scope": "local"|"detached"|"static"|"memvar"|
                         "field"|"memvar_implicit",
       "line": 12,     // ATENÇÃO: statement continuado → ÚLTIMA linha física
+      "col": 13,      // ast-20: coluna 0-based DESTE sítio (ver § abaixo)
       "access": "read"|"write"|"ref"|"use",
       "block": false, // true = dentro de corpo de codeblock
       "filewide": true /* só quando static file-wide */ } ],
-  "calls":  [ { "sym": "DUPLA", "line": 10, "block": false } ],
-  "sends":  [ { "sym": "EVAL",  "line": 10, "block": false } ],
+  "calls":  [ { "sym": "DUPLA", "line": 10, "col": 19, "block": false } ],
+  "sends":  [ { "sym": "EVAL",  "line": 10, "col": 6,  "block": false } ],
   "blocks": [   // eventos de estrutura de controle, do próprio parser
     { "kind": "if"|"while"|"for"|"case"|"switch"|"sequence",
       "event": "open"|"close", "line": 24, "tok": 118 } ],
@@ -668,6 +669,48 @@ parâmetros do bloco como declarados, `[{"sym","type","class"}]`, presos ao
 nó — tipam o receptor pelo bloco EXATO); `ALIASVAR/ALIASEXPR` → `alias`+`var`+
 `expr`; `SETGET` → `var`+`expr`; `MACRO` → `val`+`expr`; `RTVAR` → `val`.
 Folhas com `val`: VARIABLE, FUNNAME, STRING (+ NUMERIC/LOGICAL/DATE).
+
+### `col` e `tokLine` nos três canais de SÍTIO (ast-20)
+
+`occurrences[]`, `calls[]` e `sends[]` carregam a posição do token daquele sítio.
+**Duas chaves, ambas OPCIONAIS** — ler com `hb_HGetDef`:
+
+| chave | o que é | quando aparece |
+|---|---|---|
+| `col` | coluna **0-based** do token do sítio | quando a posição é conhecida |
+| `tokLine` | linha **física** do token do sítio | **só quando difere de `line`** |
+
+**`line` NÃO mudou de significado** e nunca vai mudar: é a linha em que o
+compilador estava ao registrar o sítio. Quem correlaciona sítios com outros canais
+por ela continua funcionando. Quem quer o **lugar** do sítio lê
+`(hb_HGetDef(h,"tokLine",h["line"]), col)`.
+
+**Dois problemas distintos, ambos medidos antes do conserto:**
+
+1. **N sítios do mesmo nome numa linha eram indistinguíveis** — o consumidor
+   resolvia todos pelo PRIMEIRO token. `n := n + n` saía em 3/3/3 (reais 3/13/22);
+   `Dobro( Dobro( 2 ) ) + Dobro( 3 )` em 8/8/8 (reais 8/15/30);
+   `? o:Description, o:Description` em 7/7 (reais 7/22).
+2. **Statement continuado com `;`**: `line` é a ÚLTIMA linha física do statement,
+   e o sítio está numa anterior. O uso de `cMsg` em `OutStd( "x" + ; / cMsg + ; /
+   "y" )` saía na linha do `"y" )`, coluna 0, com o texto errado.
+
+**Nenhuma das duas posições é adivinhada**, e elas vêm de caminhos diferentes:
+
+- **`col` na mesma linha**: o K-ésimo sítio de um nome numa linha casa com o
+  K-ésimo token de fonte daquele nome na **mesma** linha. A âncora na linha limita
+  o estrago — nome que o fluxo não traz deixa o fato ausente e não desloca nenhum
+  outro sítio.
+- **`tokLine` + `col`**: capturados quando o sítio é **REGISTRADO**, pela mesma
+  janela para trás que as `declarations` já usavam. É o que resolve o continuado,
+  onde não há token nenhum na linha do registro.
+
+Mensagem escrita como atribuição (`o:x := v`) é registrada sob o nome manjado `_X`
+do próprio compilador enquanto o token lê `X`; o core desfaz esse prefixo — é ele
+lendo o próprio registro, não chutando sobre o fonte.
+
+**Fato ausente ≠ fato errado**: sem nenhuma das duas posições (símbolo entregue por
+macro, cuja posição o pp não tem — P18), as chaves simplesmente não vêm.
 
 Semânticas importantes:
 - `stmt` = statement-expressão completo; `push` = expressão empurrada em

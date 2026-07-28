@@ -1,0 +1,11 @@
+PROCEDURE Main()
+
+   LOCAL cMsg := "abc"
+
+
+
+   OutStd( "x" +  cMsg +  "y" )
+
+   QOut( cMsg )
+
+   RETURN

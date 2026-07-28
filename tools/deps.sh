@@ -9,7 +9,9 @@
 #   - `go`, que roda a suíte da classe A (tests-go/). O compilador é o portão
 #     de tipos, e o `go test` traz descoberta, tmp e paralelismo prontos;
 #   - `python3`, que roda os utilitários de tools/ e as sondas do pp-corpus
-#     (só a stdlib - nenhum pacote a instalar).
+#     (só a stdlib - nenhum pacote a instalar);
+#   - `bison`, que regenera o parser do compilador do core
+#     (`HB_REBUILD_PARSER=yes`) - ver a nota de VERSÃO mais abaixo.
 #
 # `hbtest` (do harbour-core) segue sendo o certo para a suíte EXPLORATÓRIA do
 # pp - lá o objeto de estudo é Harbour, e escrever o teste em Harbour dá acesso
@@ -63,6 +65,43 @@ go_garante() {
    return 0
 }
 
+# --- o bison: PRESENÇA não basta, a VERSÃO tem de ser a do core ------------
+# Diego, 2026-07-27: *"precisa ser o mesmo que o harbour-core usa"*. O
+# `HB_REBUILD_PARSER=yes` regenera o parser a partir do `harbour.y`, e o que se
+# COMMITA no core é a SAÍDA do bison (`harbour.yyc`/`.yyh`): outra versão troca o
+# skeleton inteiro, e o diff passa de "mudei a gramática" para "reescrevi 6k
+# linhas". Toolchain fora de passo é erro que BERRA, não que degrada.
+#
+# A versão esperada NÃO se crava aqui - lê-se do artefato commitado do core, que
+# é quem tem o fato. Core ausente = sem fato: relata a versão instalada e cala,
+# em vez de inventar um veredito.
+bison_confere_versao() {
+   command -v bison > /dev/null 2>&1 || return 0   # ausência já foi relatada acima
+
+   _hb_core="$(sh "$ROOT/tools/hbenv.sh" --print HB_CORE 2>/dev/null)"
+   _yyc="$_hb_core/src/compiler/harbour.yyc"
+   _tenho="$(bison --version 2>/dev/null | sed -n '1s/.*) *//p')"
+
+   if [ ! -r "$_yyc" ]; then
+      printf '  ok      %-7s %s (o core não está em %s - versão não conferida)\n' \
+         "bison" "$_tenho" "$_hb_core"
+      return 0
+   fi
+
+   _quero="$(sed -n '1s/.*GNU Bison \([0-9][0-9.]*[0-9]\).*/\1/p' "$_yyc")"
+   if [ "$_tenho" = "$_quero" ]; then
+      printf '  ok      %-7s %s (= a do parser commitado do core)\n' "bison" "$_tenho"
+      return 0
+   fi
+
+   printf '  ERRO    %-7s %s, mas o parser commitado do core saiu do %s\n' \
+      "bison" "$_tenho" "$_quero"
+   echo "          ($_yyc)"
+   echo "          regenerar com esta versão reescreve o skeleton inteiro do .yyc/.yyh."
+   echo "          instale o bison $_quero antes de usar HB_REBUILD_PARSER=yes."
+   return 1
+}
+
 # --- comandos de sistema ---------------------------------------------------
 # a tabela é `comando|pacote-apt|para-que-serve`, lida por LINHA (a descrição
 # tem espaços - separar por espaço quebrava a tabela em pedaços)
@@ -71,7 +110,9 @@ echo "dependências externas da suíte:"
 while IFS='|' read -r cmd pkg why; do
    [ -n "$cmd" ] || continue
    if command -v "$cmd" > /dev/null 2>&1; then
-      printf '  ok      %-7s %s\n' "$cmd" "$why"
+      # o bison tem relato PRÓPRIO (nele a VERSÃO é o fato, não a presença) - a
+      # linha dele sai em bison_confere_versao, depois da instalação
+      [ "$cmd" = bison ] || printf '  ok      %-7s %s\n' "$cmd" "$why"
    else
       printf '  FALTA   %-7s %s  -> pacote %s\n' "$cmd" "$why" "$pkg"
       missing="$missing $pkg"
@@ -80,6 +121,7 @@ done <<'EOF'
 node|nodejs|harness da extensão VSCode (a extensão é JS, o harness dela também)
 python3|python3|utilitários de tools/ e sondas do pp-corpus (só stdlib)
 curl|curl|baixar o Go do site oficial
+bison|bison|regenerar o parser do compilador do core (HB_REBUILD_PARSER=yes)
 EOF
 
 # --- instalação ------------------------------------------------------------
@@ -101,7 +143,10 @@ if [ -n "$missing" ]; then
    echo
 fi
 
-go_garante || exit 1
+bison_confere_versao || falhou=yes
+go_garante || falhou=yes
+
+[ "${falhou:-no}" = yes ] && exit 1
 
 echo
 echo "tudo pronto."

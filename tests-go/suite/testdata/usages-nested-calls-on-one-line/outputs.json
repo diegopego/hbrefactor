@@ -1,0 +1,38 @@
+[
+  {
+    "schema": "cli-2",
+    "command": "usages",
+    "argv": [ "usages", "q.hbp", "Dobro", "--json" ],
+    "status": "ok",
+    "exit": 0,
+    "reason": null,
+    "action": null,
+    "detail": "4 result(s) for 'Dobro'",
+    "diagnostics": [],
+    "result": {
+      "query": "Dobro",
+      "total": 4,
+      "returned": 4,
+      "truncated": false,
+      "locations": [
+        { "uri": "file://<CWD>/q.prg",
+          "range": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 13 } },
+          "kind": "call", "owner": "MAIN", "certainty": "confirmed",
+          "text": "n := Dobro( Dobro( 2 ) ) + Dobro( 3 )" },
+        { "uri": "file://<CWD>/q.prg",
+          "range": { "start": { "line": 4, "character": 15 }, "end": { "line": 4, "character": 20 } },
+          "kind": "call", "owner": "MAIN", "certainty": "confirmed",
+          "text": "n := Dobro( Dobro( 2 ) ) + Dobro( 3 )" },
+        { "uri": "file://<CWD>/q.prg",
+          "range": { "start": { "line": 4, "character": 30 }, "end": { "line": 4, "character": 35 } },
+          "kind": "call", "owner": "MAIN", "certainty": "confirmed",
+          "text": "n := Dobro( Dobro( 2 ) ) + Dobro( 3 )" },
+        { "uri": "file://<CWD>/q.prg",
+          "range": { "start": { "line": 10, "character": 9 }, "end": { "line": 10, "character": 14 } },
+          "kind": "definition (function)", "owner": null, "certainty": "confirmed",
+          "text": "FUNCTION Dobro( nX )" }
+      ]
+    },
+    "edits": []
+  }
+]

@@ -1,0 +1,2 @@
+s.prg(5) >? o:Description, o:Description<
+#command >QOut( o:Description, o:Description )<

@@ -1,0 +1,2 @@
+s.prg(8) >? a, b<
+#command >QOut( a, b )<

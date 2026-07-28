@@ -108,6 +108,12 @@ aparece; (d) ChangeLog.
 **Silêncio de busca minha NÃO é evidência de ausência**; "não achei" quase sempre é "não
 procurei". *(Custou um veredito errado publicado: [cic §1.4])*
 
+**E vale para SONDA, não só para busca** *(2026-07-27)*: sonda que responde silêncio exige
+**controle positivo** antes de virar afirmação — `which bison` mudo virou "bison não está
+instalado, nenhuma rota compila", e o bison 3.8.2 estava em `/usr/bin`, no PATH. É o mesmo
+princípio do `TestExtrai` em `tests-go/docs/`: *guarda cujo extrator emudece passa verde sem
+verificar nada*. Eu escrevi esse controle para o código e não o apliquei a mim. *([cic §1.3e])*
+
 ### 1.4 Editar o harbour-core não é permissão — é DEVER
 
 A ferramenta age só sobre fato da AST; a AST é produzida pelo core; logo **moldar a AST**
@@ -115,7 +121,10 @@ A ferramenta age só sobre fato da AST; a AST é produzida pelo core; logo **mol
 ferramenta que não pode construir a AST de que precisa está amputada do próprio princípio.
 *(Diego, 2026-07-09.)*
 
-Permissão **total e esperada** de editar `~/devel/harbour-core/harbour` (branch
+Permissão **total e esperada** de editar o clone do core — **onde ele está quem diz é
+`sh tools/hbenv.sh --print HB_CORE`**, a fonte única (caminho cravado aqui envelhece: já
+apontou para um diretório inexistente, e a `additionalDirectories` do `settings.json` foi
+junto) — (branch
 `feature/compiler-ast-dump`, acesso no `.claude/settings.json`). O único freio é o de
 sempre: **commit no core continua sob autorização por-commit do Diego** — não editar ≠
 não commitar.
@@ -159,6 +168,42 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
   `anti-heuristica.sh`, a régua-grep do caso 64, o schema que berra. **Regra nova sem portão
   novo é regra que eu vou violar de novo.**
 
+### 1.7 A lei vale para o MEU RACIOCÍNIO, não só para o código da ferramenta
+
+*(Diego, 2026-07-27: "o quanto eu tive que guiar o claude a investigar com precisão". Quatro
+empurrões numa sessão, os quatro mudaram a resposta. [cic §1.3e])*
+
+A ferramenta não pode inferir sobre o código do usuário; **eu não posso inferir sobre o
+core**. É a MESMA regra, e eu vinha aplicando só de um lado: dentro de `src/hbrefactor.prg`
+eu paro no gatilho, mas ao **projetar** uma extensão de core eu lia o fonte, deduzia e
+propunha — que é exatamente a heurística que o projeto existe para matar, feita por mim.
+
+1. **Antes de propor MECANISMO, a TABELA DE SONDAS.** Toda extensão de core nasce de uma
+   tabela: **cada classe de caso × o que o core responde HOJE × o comando que produziu a
+   resposta**. Sem ela, o mecanismo é palpite bem escrito — e ele vai para a spec com cara
+   de fato. É o mesmo TDD do `expected/` (§3): **a pergunta primeiro, a solução depois**.
+   *(Custou um mecanismo errado já escrito no roadmap: eu li `nBirthTok` como "o índice do
+   token do nome" e um dump de 30 segundos mostrou que ele varia com o lookahead.)*
+2. **Medir a DISTRIBUIÇÃO antes de desenhar para o canto.** "É caso raro" é afirmação sobre
+   o mundo, e vale a régua do §4: ou se mede no corpus, ou não se escreve. *(Eu classifiquei
+   "sítio sem coluna" como canto; no corpus do core são 40% dos sítios, porque código real é
+   construído sobre DSL.)*
+3. **Ler o FONTE não substitui PERGUNTAR ao binário.** Comentário e struct dizem o que o
+   autor pretendia; o dump diz o que sai. Quando os dois discordam, quem manda é o dump.
+4. **Empurrão do Diego = sonda pulada.** Quando ele diz "investigue com precisão" ou
+   "decida corretamente", a leitura certa **não** é "responda melhor" — é **"existe uma
+   medição barata que eu não fiz"**. A resposta é rodar a sonda, não argumentar melhor.
+   *(É prima da §1.3d: lá eu produzia defesa; aqui, prosa no lugar de medida.)*
+5. **LISTA DE NOMES QUE EU ESCOLHO É HEURÍSTICA — mesmo quando cada nome é real.** O gatilho 1
+   do §1.2 fala de comparar TEXTO; o disfarce é comparar **símbolo resolvido pelo compilador**
+   contra uma lista que **eu** montei. O símbolo é fato; a lista não é. *(Flagrado 2026-07-27:
+   propus trocar o casamento de string por `calls[].sym ∈ { __mvGet, Type, hb_macroBlock }` e
+   chamei isso de "substituto honesto" — era a mesma heurística um nível acima do texto puro. O
+   Diego cortou: **"me recuso a ter heurística nele"**.)* A pergunta que desarma: **quem é dono
+   deste conhecimento?** Se é a RTL, o fato mora no core — e o core costuma já ter a casa
+   (ali era a `s_stdFunc` do `hbfunchk.c`, onde o `TYPE` já estava). Se ninguém no core pode
+   ser dono, **a ferramenta não suporta o caso e diz isso**.
+
 ---
 
 ## 2. Core e toolchain
@@ -189,7 +234,14 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
 
 ## 3. Testes, suíte e corpus
 
-- **Contrato executável: `make test`** — deve permanecer verde.
+- **Contrato executável: `make test`** — deve permanecer verde. Ele cobre `tests/run.sh`,
+  `govet`, **`lexdiff`**, **`site-check`** e `gotest`, nesta ordem. *(Os dois do meio
+  entraram em 2026-07-27: ao remover um comportamento eu enumerei os testes afetados
+  rodando `make test`, reportei três, e **faltava um quarto** — o exemplo da landing page
+  que anunciava ao leitor a proteção recém-removida. Ele só apareceu por acaso. Portão de
+  afirmação-que-o-usuário-lê fora do contrato é portão que não existe. [cic §6.5])*
+  **Portão novo nasce DENTRO do `make test`**, e antes do `gotest` se for barato: a cadeia
+  para no primeiro erro, e um vermelho de TDD longevo emudece tudo o que vier depois.
 - **FIXTURE EXPECTED, padrão TDD (casedir) onde couber** *(Diego, 2026-07-25)*: um `grep` de
   saída — mesmo migrado para campo estruturado (`tcheck enveq/envhas`) — é **FRÁGIL**: prova um
   pedaço, nunca o que a ferramenta **NÃO** disse. O caso declarativo (`tests/casedir.sh`:
@@ -235,10 +287,10 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
   capacidade sozinho.)*
 - **ESTUDAR CLASSE: os dois pontos de partida** *(Diego, 2026-07-13)* — vale para qualquer
   frente que toque OOP (tipo de receiver, rename de DATA/método, dispatch, herança):
-  - `~/devel/harbour-core/harbour/include/hbclass.ch` — a **DSL inteira** (`CREATE CLASS`,
+  - `$(sh tools/hbenv.sh --print HB_CORE)/include/hbclass.ch` — a **DSL inteira** (`CREATE CLASS`,
     `METHOD`, `DATA`, `VAR`, `INLINE`, `DELEGATE`, escopos): é o açúcar que a ferramenta
     tem de atravessar, escrito em `#command`/`#translate` de verdade.
-  - `~/devel/harbour-core/harbour/utils/hbtest/rt_class.prg` — o **exercício** dela pelo
+  - `$(sh tools/hbenv.sh --print HB_CORE)/utils/hbtest/rt_class.prg` — o **exercício** dela pelo
     core: as formas todas em uso, compilando, com oráculo executável.
 
   Continua valendo a régua do corpus: espécime é fonte do core, nunca exemplo que eu

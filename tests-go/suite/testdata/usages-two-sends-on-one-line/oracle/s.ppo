@@ -1,0 +1,7 @@
+PROCEDURE Main()
+
+   LOCAL o := ErrorNew()
+
+   QOut( o:Description, o:Description )
+
+   RETURN

@@ -1018,34 +1018,6 @@ app.prg:26: excluded method declaration (declares REGISTRO:ENVIAR)  | METHOD Env
 <!-- SITE-EX:10-usages:END -->
     </div>
 
-    <div class="cap">
-      <h3>Knowing when to stop — a string that is really a call</h3>
-      <p class="muted">Harbour is dynamic. Here <span class="mono">"Backup"</span> is not a label — it is handed to <span class="mono">&amp;cNome</span> and <b class="emph">becomes the call</b>. Rename the function and nothing in the compiled output would tell you the string went stale; the program would simply die at runtime, three weeks from now. No fact can prove whether a given string is a call, so the tool refuses to decide for you — it hands you the line and stops.</p>
-<!-- SITE-EX:09-string-guard:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
-<div class="ex">
-    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
-<pre class="num"><code><span class="l">PROCEDURE Main()</span>
-<span class="l"> </span>
-<span class="l">   ? Rodar( &quot;Backup&quot; )</span>
-<span class="l"> </span>
-<span class="l">   RETURN</span>
-<span class="l"> </span>
-<span class="l">FUNCTION Rodar( cNome )</span>
-<span class="l"> </span>
-<span class="l">   RETURN &amp;cNome + &quot;()&quot;</span>
-<span class="l"> </span>
-<span class="l">FUNCTION Backup()</span>
-<span class="l"> </span>
-<span class="l">   RETURN &quot;feito&quot;</span></code></pre></div>
-  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
-<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:11:10 Salvaguarda
-<span class="warn">warning: app.prg:3: string equal to &#x27;Backup&#x27; - possible call by name (will NOT be changed)</span>
-<span class="bad">hbrefactor: textual references found (see warnings) - repeat with --force to proceed without touching them</span></code></pre></div>
-  <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
-</div>
-<!-- SITE-EX:09-string-guard:END -->
-      <p class="muted">Say <span class="mono">--force</span> and it does the part it <em>can</em> prove, still leaving the string untouched. Notice which way the danger runs. Find&nbsp;&amp;&nbsp;Replace would have changed that string too — and been right <em>by luck</em>. A conventional refactoring tool would have renamed the function and said nothing about the string at all. <strong>hbrefactor is the only one of the three that tells you the line is there.</strong></p>
-    </div>
 
     <div class="cap">
       <h3>And knowing when to stop — an ambiguous rename</h3>
@@ -1451,11 +1423,11 @@ rename-dsl: LACRA -&gt; SELA
 <span class="l">   RETURN nVal + nModo</span></code></pre></div>
   <div class="code term ex-run"><button class="copy" type="button">Copy</button>
 <pre><code><span class="cmd">$ hbrefactor</span> usages app.hbp CONFERE
-app.ch:1: directive (#xcommand CONFERE, 1 marker(s))
-app.prg:5: directive (#xuncommand CONFERE, 2 marker(s)) - ORPHAN: removes no rule (dead directive)
+app.ch:1: directive (#xcommand CONFERE, 1 marker(s))  | #xcommand CONFERE &lt;x&gt; =&gt; Checa( &lt;x&gt;, 1 )
+app.prg:5: directive (#xuncommand CONFERE, 2 marker(s)) - ORPHAN: removes no rule (dead directive)  | #xuncommand CONFERE &lt;x&gt;, &lt;y&gt; =&gt; Checa( &lt;x&gt;, &lt;y&gt; )
 app.prg:9:4: application (#xcommand CONFERE, app.ch:1)  | CONFERE 1
-app.ch:1:11: in rule match (#xcommand CONFERE)
-app.prg:5:13: in rule match (#xuncommand CONFERE)
+app.ch:1:11: in rule match (#xcommand CONFERE)  | #xcommand CONFERE &lt;x&gt; =&gt; Checa( &lt;x&gt;, 1 )
+app.prg:5:13: in rule match (#xuncommand CONFERE)  | #xuncommand CONFERE &lt;x&gt;, &lt;y&gt; =&gt; Checa( &lt;x&gt;, &lt;y&gt; )
 5 result(s) for &#x27;CONFERE&#x27;</code></pre></div>
   <p class="ex-note muted">This command only <strong>reads</strong>. It never edits — and the suite fails the build if a single byte of the source moves.</p>
 </div>
@@ -1605,13 +1577,14 @@ query: cSaldo
 app.prg:3: declaration (local) in MAIN  | LOCAL cSaldo := &quot;1.234,00&quot;
 app.prg:3: write (local) in MAIN  | LOCAL cSaldo := &quot;1.234,00&quot;
 app.prg:11: read (local) in MAIN  | ? cSaldo
-app.prg:5: possible reference in string  | ? &quot;cSaldo&quot;
-4 result(s) for &#x27;cSaldo&#x27;</code></pre></div>
+3 result(s) for &#x27;cSaldo&#x27;</code></pre></div>
   <p class="ex-note muted">This command only <strong>reads</strong>. It never edits — and the suite fails the build if a single byte of the source moves.</p>
 </div>
 <!-- SITE-EX:21-data-in-stream:END -->
-    <p>The written string on line 5 is worth your attention: a string <em>you</em> wrote whose contents equal a name can be a call by name (<span class="mono">&amp;()</span>, <span class="mono">__mvGet</span>). The <span class="mono">TEXT … ENDTEXT</span> line that reads <span class="mono">cSaldo apurado no periodo</span> is <strong>not</strong> in the list. Inside a stream block your source stops being code: the preprocessor turns each raw line into a string, and a word in there matching one of your variables is a <em>coincidence</em>, with no mechanism by which it could ever name your variable. Reporting it would be noise — and noise you learn to skip is worse than nothing.</p>
-    <p>That silence is not the tool failing to look, and not a rule about how the string <em>looks</em>: the preprocessor stamps a stream line as data, so staying quiet is a fact it was <strong>told</strong>.</p>
+    <p>Line 5 of that file reads <span class="mono">? &quot;cSaldo&quot;</span> — a string whose contents happen to equal the name — and it is <strong>not</strong> in the list. Nothing about it is a reference: <span class="mono">cSaldo</span> is a local, and a local cannot be reached by name while your program runs. Comparing a string's text against the name you asked about, to decide what that string <em>is</em>, is the one thing this tool must never do.</p>
+    <h3>Where the line actually sits</h3>
+    <p>Harbour lets a program build code while it runs and use it in the next instant. No refactoring tool controls that, and this one does not pretend to. It splits cleanly instead: it <b class="emph">refuses where it cannot see</b> — a macro whose target is only known at run time is a hole in the reachable scope, and the command stops rather than promise a completeness it cannot have — and it <b class="emph">reports where it can see</b>, as with the <span class="mono">&amp;cLayout</span> string above, which the compiler itself resolves.</p>
+    <p>That second case is <strong>one form among many</strong>. A codeblock built from text, a call made by name through the runtime, a name assembled from pieces — none of those are seen, and none of them can be. <strong>No output of this tool should be read as “your dynamic code is covered.”</strong> The promise is narrower and firmer: <em>verified</em> means verified against what compilation can see. Where compilation sees nothing, you get a refusal, not a guess.</p>
   </div>
 </section>
 

@@ -23,6 +23,11 @@ type Local struct {
 	Range Intervalo `json:"range"`
 	Kind  string    `json:"kind,omitempty"`
 	Owner string    `json:"owner,omitempty"`
+	// `certainty` é o que separa esta ferramenta de um grep: um sítio
+	// `confirmed` veio da compilação; qualquer outro valor é a ferramenta
+	// dizendo que NÃO provou, e é o que o caso de `usages` precisa afirmar.
+	Certainty string `json:"certainty,omitempty"`
+	Text      string `json:"text,omitempty"`
 }
 
 type Diagnostico struct {
@@ -56,6 +61,14 @@ type Resultado struct {
 	Scope                *Escopo `json:"scope,omitempty"`
 	ApplicationSites     int     `json:"applicationSites,omitempty"`
 	DirectiveOccurrences int     `json:"directiveOccurrences,omitempty"`
+
+	// só no usages. `total` × `returned` + `truncated` existem porque a
+	// resposta pode ser cortada, e um consumidor que leia só `locations`
+	// concluiria "são estes" quando são "estes, dos N".
+	Query     string `json:"query,omitempty"`
+	Total     int    `json:"total,omitempty"`
+	Returned  int    `json:"returned,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
 }
 
 type Edicao struct {

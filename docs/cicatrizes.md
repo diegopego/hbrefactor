@@ -179,6 +179,61 @@ do Diego para reafirmar um ponto que ninguém tinha contestado.
 executar**, não qualificar. Se a nuance importa de verdade, ela aparece **no código** — não na
 resposta. *(A distinção "princípio × canal" não mudou uma linha do conserto.)*
 
+### 1.3e PROSA no lugar de MEDIDA — quatro empurrões numa sessão (2026-07-27)
+
+**O contexto:** revisão do intervalo da P20. A revisão em si funcionou — achou que o `col`
+entregue era inferência. O que falhou foi tudo o que veio **depois**: quatro vezes o Diego
+teve que empurrar, e **as quatro mudaram a resposta**. Nenhuma delas exigiu conhecimento que
+eu não tivesse; as quatro exigiam um comando que eu não rodei.
+
+| # | eu afirmei | a sonda que existia | o que ela custou |
+|---|---|---|---|
+| 1 | *"todo nó carrega o índice do token que o gerou"* | um dump: o `nBirthTok` varia com o lookahead (ora +1, ora +0) | mecanismo errado **já escrito na spec do roadmap** |
+| 2 | *"o incremento do `FOR` é fato ausente"* | a gramática: `hb_compExprNewPreInc( $2 )` reusa o nó do cabeçalho, e o canal `statements[]` já publica isso | uma classe inteira mal classificada, e uma decisão pedida ao Diego sobre ela |
+| 3 | *"bison não está instalado — nenhuma rota compila"* | `bison --version` → 3.8.2, em `/usr/bin`, no PATH | um bloqueio duro **inventado** |
+| 4 | *"sítio sem coluna é canto (macro, `-kt`)"* | um comando no corpus do core: **40%** dos sítios | decisão pedida ao Diego sobre o exemplo errado |
+
+**O padrão, e ele é o desconfortável:** nos quatro eu troquei uma sonda barata e decisiva por
+**leitura do fonte + dedução**. Ou seja, fiz exatamente o que a ferramenta tem proibido fazer
+— só que sobre o core, e em modo de projeto, onde a lei do §1 me parecia não alcançar. **A
+regra do fato não é sobre o produto; é sobre como se decide.**
+
+**Dois dos quatro violam regra que JÁ estava escrita.** O nº 2 é o gatilho §1.2/7 (observar em
+vez de perguntar), que nasceu do `LoadProject` (§1.3c). O nº 3 é o §1.3 (silêncio de busca não
+é evidência), aplicado a busca mas não a sonda — e a ironia é que o `TestExtrai` de
+`tests-go/docs/docs_test.go`, escrito por mim dois dias antes, existe **exatamente** para
+impedir que uma guarda muda passe por verde. Escrevi o controle positivo para o código e não o
+apliquei a mim.
+
+**O que o Diego disse, e é a régua:** *"há uma lição a ser tomada aqui sobre o quanto eu tive
+que guiar o claude a investigar com precisão. além de forçar a fazer a pergunta correta
+primeiro (TDD)."* O TDD deste repo nunca foi só sobre `expected/` — é sobre **a pergunta antes
+da solução**, e uma extensão de core tem o seu próprio `expected`: a **tabela de sondas**
+(§1.7/1), que diz o que o core responde HOJE, por classe, com o comando ao lado.
+
+**O sinal operacional:** empurrão do Diego = sonda pulada. Quando ele diz *"investigue com
+precisão"* ou *"decidir corretamente é o problema"*, a resposta certa não é um texto melhor —
+é `bash`.
+
+**A quinta, no fim da mesma sessão, e de natureza diferente das quatro.** Medi que
+`__mvGet( "x" )`, `Type( "x" )` e `hb_macroBlock( ... )` alcançam símbolo pelo nome sem acender
+`usesMacro`, e propus substituir o casamento de string por *"`calls[].sym` pertence a
+{ `__mvGet`, `Type`, `hb_macroBlock` }"* — chamando isso de **substituto honesto**. Não era. O
+símbolo vem resolvido pelo compilador (fato), mas **a lista é minha** (palpite), e a conclusão
+"esta função alcança símbolo por nome" é conhecimento sobre a RTL que ninguém no core sancionou.
+Era o gatilho 1 um nível acima do texto puro, e por isso não o reconheci.
+
+O Diego cortou sem rodeio: *"heurística é code smell e deve ser retirada mesmo. se houver forma
+de resolver através de alterações no core, aí sim, senão, o hbrefactor simplesmente não vai
+suportar. me recuso a ter heurística nele."* — e note o que a frase decide: eu havia proposto
+matar a heurística **se** houvesse substituto; a ordem é matar, e o substituto entra só se for
+fato do core. **Perder capacidade é aceitável; adivinhar não é.**
+
+A sonda seguinte achou a casa em dois minutos: `s_stdFunc`, em `src/compiler/hbfunchk.c` — a
+tabela onde o compilador já guarda o que sabe das funções da RTL, e onde o `TYPE` **já estava**.
+Ou seja, a pergunta que teria me poupado o erro não é "isto é texto ou símbolo?", é **"quem é
+dono deste conhecimento?"**. Virou §1.7/5.
+
 ### 1.4 A recusa falsa publicada — varrer o core antes de dizer "impossível" (2026-07-12)
 
 Recusei "o pp como motor de reescrita" (P7) olhando **só** o `.ppo` destrutivo, e
@@ -461,6 +516,45 @@ branco no fim (o envelope sai com um `hb_eol()` a mais). O medo do volume era re
 resposta a ele não era inverter a ordem.
 
 ---
+
+### 6.5 O quarto teste que eu não enumerei — portão fora do contrato é portão que não existe (2026-07-27)
+
+Ao remover a heurística de casamento de string (P22), enumerei os testes afetados do jeito
+que a lei manda: rodei o **contrato executável**, `make test`, e reportei ao Diego **três**
+quedas (casos 11, 73 e 125), com a análise de qual premissa cedia em cada uma.
+
+Faltava um **quarto**. O exemplo `09-string-guard` da landing page — e ele não era um teste
+qualquer: era o que sustentava a afirmação mais forte da página,
+
+> *"No fact can prove whether a given string is a call, so the tool refuses to decide for
+> you — it hands you the line and stops. **hbrefactor is the only one of the three that
+> tells you the line is there.**"*
+
+...que, no instante em que a heurística morreu, virou **propaganda de uma proteção
+inexistente**. E o caso por trás dela (`? Rodar( "Backup" )` com `RETURN &cNome + "()"`) é
+chamada por nome **de verdade**, que hoje renomeia e quebra em run time.
+
+**Ele só apareceu por acaso**, horas depois, porque fui mexer na documentação e rodei
+`make site-check` por outro motivo. Se a sessão tivesse terminado antes disso, a página
+seguiria mentindo — e o `make test` seguiria **verde**.
+
+**A causa não foi desatenção: foi o contrato.** `make test` era `run.sh` + `govet` +
+`gotest`. O `site-check` — que roda cada exemplo da página e prova exit, saída e
+imutabilidade dos fontes — estava **fora**, junto com o `lexdiff`. A lei diz *"contrato
+executável: `make test`"* (§3), e eu confiei nela; ela é que não cobria o portão das
+**afirmações que o usuário lê**.
+
+Custo de trazer para dentro, medido: **13,7s** (site-check) + **0,02s** (lexdiff), contra
+os ~2-3 min do `make test`. Não havia razão nenhuma para estarem fora além de ninguém ter
+olhado.
+
+**E uma segunda armadilha, dentro do próprio conserto:** pus os dois DEPOIS do `gotest`. A
+cadeia para no primeiro erro, e a fase tinha três vermelhos de TDD longevos na suíte Go —
+ou seja, os portões recém-adicionados **nunca rodariam** justamente na fase que os
+quebrara. Foram para antes do `gotest`.
+
+**A régua:** portão novo nasce DENTRO do `make test`; e se for barato, **antes** do alvo
+que costuma ficar vermelho por desenho. *(Régua em CLAUDE.md §3.)*
 
 ## 7. Regras revogadas (para não voltarem por engano)
 

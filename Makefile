@@ -57,10 +57,25 @@ $(BIN): src/hbrefactor.prg
 # paralelo por padrão (pool por-caso, teto nproc - B-infra; Etapa 2:
 # despacho+join em Harbour via bin/parrun, asserts de JSON via bin/tcheck);
 # JOBS=1 força o modo sequencial com saída ao vivo, para depurar um caso
+#
+# O `lexdiff` e o `site-check` entraram AQUI em 2026-07-27, e a razão é uma
+# cicatriz: ao remover um comportamento, enumerei os testes afetados rodando
+# `make test` e reportei três - faltava um QUARTO, o exemplo `09-string-guard`
+# da landing page, que anunciava ao leitor uma proteção que acabara de deixar de
+# existir. Ele só apareceu por acaso, dias depois no mesmo dia, porque fui mexer
+# na documentação. A lei diz "contrato executável: make test" (CLAUDE.md §3), e
+# o contrato não cobria o portão das afirmações que o USUÁRIO lê. Custo de trazer
+# para dentro: 13,7s + 0,02s, medido - não havia razão para estarem fora.
+# (O `ppcorpus` continua fora, e de propósito: é exploratório.)
 ## test        roda a suíte (contrato executável; JOBS=1 força sequencial)
 test: build bin/tcheck bin/parrun
 	@HB_BIN=$(HB_BIN) HBREFACTOR_HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) JOBS="$(JOBS)" tests/run.sh
 	@$(MAKE) --no-print-directory govet
+	# ANTES do gotest, e de propósito: a cadeia para no primeiro erro, e um
+	# vermelho de TDD longevo na suíte Go deixaria estes dois sem rodar - que é
+	# como o portão da página ficou mudo justamente na fase que o quebrou
+	@$(MAKE) --no-print-directory lexdiff
+	@$(MAKE) --no-print-directory site-check
 	@$(MAKE) --no-print-directory gotest
 
 # RETRATO do core: grava os .ppo/.ppt de cada caso. É o UNICO esperado que se
@@ -81,11 +96,17 @@ oracle: build
 #   make deps                 instala o Go e o resto
 #   make gotest               a suíte inteira
 #   make caso NOME=x          UM caso, com as provas da fixture dele
+# JOBS=1 tem de alcançar a suíte Go também: o contrato "paralelo x JOBS=1
+# byte-idêntico" é da INFRA (CLAUDE.md §3), e ele valia só metade da suíte -
+# o run.sh recebia JOBS e o `go test` seguia paralelo, enquanto o help anunciava
+# "test sequencial". `-p 1` serializa os pacotes, `-parallel 1` os t.Parallel()
+GOSEQ = $(if $(filter 1,$(JOBS)),-p 1 -parallel 1,)
+
 ## gotest      roda a suíte da classe A (Go; o formato para onde tudo migra)
 gotest: build
 	@command -v $(GO) > /dev/null 2>&1 || { echo "sem Go - rode 'make deps'"; exit 1; }
 	@cd tests-go && HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) \
-	   $(GO) test ./... -count=1 $(if $(VERBOSE),-v,)
+	   $(GO) test ./... -count=1 $(GOSEQ) $(if $(VERBOSE),-v,)
 
 # UM caso e TUDO sobre ele: a transformação e as três provas da fixture
 # (compila, vocabulário, retrato). É o comando do loop de migração - segundos,
@@ -100,9 +121,20 @@ caso: build
 	@cd tests-go && HB_BIN=$(HB_BIN) BIN=$(abspath $(BIN)) \
 	   $(GO) test ./suite -count=1 -v -run 'TestCasos/$(NOME)'
 
+# `gofmt -l` LISTA; `go fmt` REESCREVE. A versão anterior usava `go fmt` e tinha
+# os dois defeitos de um portão que edita: mexia na árvore do usuário como efeito
+# colateral de uma CONFERÊNCIA, e SE DESARMAVA - a 1a rodada falhava já com os
+# arquivos reformatados, a 2a passava. Medido em 2026-07-27: exit 2 depois exit 0,
+# sem ninguém consertar nada. Portão que se desarma sozinho é pior que portão
+# nenhum, porque dá a sensação de ter passado.
+GOFMT ?= $(dir $(GO))gofmt
+
 ## govet       gofmt + go vet dos testes (o compilador já é o portão de tipos)
 govet:
-	@cd tests-go && test -z "$$($(GO) fmt ./...)" || { echo "gofmt reformatou arquivos"; exit 1; }
+	@command -v $(GO) > /dev/null 2>&1 || { echo "sem Go - rode 'make deps'"; exit 1; }
+	@cd tests-go && out=$$($(GOFMT) -l .) && test -z "$$out" || { \
+	   echo "gofmt: arquivo(s) fora do formato (rode: $(GOFMT) -w tests-go)"; \
+	   echo "$$out"; exit 1; }
 	@cd tests-go && $(GO) vet ./...
 
 # suite EXPLORATORIA do PP (P-DOC): o corpus de diretivas REAIS do Harbour
@@ -157,7 +189,7 @@ site-serve:
 tmp-usage: tools/tmp-usage.sh
 	@tools/tmp-usage.sh
 
-## deps        instala as dependências EXTERNAS dos testes (node); --check só relata
+## deps        instala as dependências EXTERNAS (node, go, bison); --check só relata
 deps: tools/deps.sh
 	@tools/deps.sh
 

@@ -19,13 +19,13 @@ camada de controle está **fechada**, e a fila é o que sobrou nos três legados
 
 | formato | onde | quantos | estado |
 |---|---|---|---|
-| legado imperativo | `tests/run.sh` + `bin/parrun` + `tcheck.prg` | 127 units | 1021/0 |
+| legado imperativo | `tests/run.sh` + `bin/parrun` + `tcheck.prg` | 125 units | 1014/0 |
 | legado intermediário | `tests/casedir.sh` + `tests/cases/` | 12 casos | roda dentro do run.sh |
 | ~~ponte declarativa (bash)~~ | ~~`tests/scenarios.sh`~~ | **0** | **EXTINTO em 2026-07-27** |
-| **o destino** | `tests-go/suite/` (Go) | 10 casos | verde |
+| **o destino** | `tests-go/suite/` (Go) | 16 casos | verde |
 
-**`make test` verde: 1021/0 + `tests/docs` + `tests/suite`.**
-**Fila total: 139.** Os legados **só encolhem** — o hook `formato-de-teste.sh` barra
+**`make test` verde: 1014/0 + `tests/docs` + `tests/suite`.**
+**Fila total: 137.** Os legados **só encolhem** — o hook `formato-de-teste.sh` barra
 o commit que faça qualquer um deles crescer, e continua barrando a **ressurreição** do
 formato-ponte.
 
@@ -153,9 +153,62 @@ zero ocorrências hoje. Não foi trocada porque mexer nela ripplaria no `outputs
 `expected/` (ela é usada em 3 sítios), e churn sem prova é o que a lei do repo evita — mas
 ela é o próximo `UNTIL`.
 
+### Os dois primeiros units, e o que o formato mostrou de cara (units 8 e 9)
+
+**O `usages` de um LOCAL relata CINCO sítios em TRÊS posições, e ninguém sabia** — o
+`unit_9` afirmava que três deles existiam, com `envloc` (*"ache isto na lista"*), que por
+construção **não prova o que a ferramenta TAMBÉM disse**. A comparação do envelope inteiro
+trouxe os outros dois à luz no primeiro `make caso`.
+
+**Verificado no core antes de acusar a ferramenta** (`harbour -x`, o dump): a duplicação
+vem do **compilador**, não do relator. Para `nTotal` em `Main`, o dump traz
+`declarations: linha 5` e `occurrences: 5 write | 6 use | 6 ref | 13 read` — a declaração
+com inicializador é declaração E escrita, e a captura pelo codeblock chega em DOIS
+registros. A ferramenta projeta um sítio por registro. **O lado errado era o meu esperado**,
+e o caso migrado agora documenta o contrato real (e afirma que os 5 caem em 3 posições).
+
+> **Régua que isto confirma, e ela é o argumento inteiro da migração:** asserção do tipo
+> "ache isto na lista" prova um pedaço e **nunca** o que a ferramenta não disse. Ao migrar
+> um unit, o `total` do `usages` é o campo que mais surpreende — compute os sítios do dump,
+> não da leitura do fonte.
+
+**E puxando o fio, apareceu LACUNA DE CORE: a fase [P20](roadmap.md).** Perguntado se o
+achado estava certo ou pedia mudança no core *(Diego)*, a sonda respondeu: `occurrences[]`
+dá **`line` e não `col`**. Com N registros na mesma linha a ferramenta não sabe a qual token
+cada um pertence, e resolve todos pelo primeiro — em `nTotal := nTotal + nTotal` os tokens
+estão nas colunas 3/13/22 e o `usages` relata 3/3/3. **O `rename` escapa** porque edita
+todos os tokens do nome na linha e a recompilação prova; só o relato posicional depende do
+fato que falta. Casar o N-ésimo registro com o N-ésimo token seria inferência e **erraria**
+(a ordem dos registros é `use, ref, read`; a dos tokens é alvo-de-atribuição, leitura,
+leitura). **RESOLVIDO NO MESMO DIA**, por ordem do Diego (*"a lacuna do core tem que ser resolvida
+agora no quente"*) — e a pergunta seguinte dele (*"procure se deixou passar algo parecido
+nos outros testes"*) achou **mais dois canais com a lacuna idêntica**: `calls[]` e
+`sends[]`. A de `calls` é a que mais aparece em código real (chamada aninhada), e nenhum
+teste a via.
+
+O core ganhou `col` nos TRÊS canais de sítio (`ast-19 → ast-20`), a ferramenta o consome por
+`hb_HGetDef` nos três laços, e três casos travam os três. Detalhes e as medições na P20.
+
+E a varredura achou um **TERCEIRO**, de outra natureza: **statement continuado com `;`**.
+Ali não faltava coluna — a **linha estava errada** (o `line` do registro é a ÚLTIMA linha
+física do statement). Resolvido também, capturando a posição no REGISTRO e emitindo
+`tokLine` só quando difere, sem mexer no significado de `line`. Quatro casos travam as duas
+naturezas de defeito nos três canais.
+
+> **Régua que isto deixa, e ela é a lição da sessão:** achado de posição num canal do dump é
+> achado de **CLASSE** — varra os outros canais no mesmo passo, e depois varra de novo
+> procurando outra NATUREZA de erro no mesmo lugar. Foram três achados em cascata, e só o
+> primeiro veio de um teste: os outros dois vieram de perguntar *"onde mais?"*.
+> O `grep TokenCols(` em `src/hbrefactor.prg` lista os consumidores; sobraram dois usando a
+> resolução por linha (`hFunc["line"]` da definição de função, `declLine` da declaração), e
+> ali o nome aparece **uma vez** por construção.
+
+**Os dois repos estão EDITADOS E BUILDADOS, e NENHUM commitado** — commit no core é
+autorização por-commit, e ela não foi pedida ainda.
+
 ### PRÓXIMO PASSO
 
-O volume: **os 127 units de `tests/run.sh`** (`tools/unit-brief.py --fila` dá a lista; o
+O volume: **os 125 units de `tests/run.sh`** (`tools/unit-brief.py --fila` dá a lista; o
 `unit_0` sai por último, ele guarda a fixture `fix01`). **Os 12 de `tests/cases/` por último
 e com cuidado redobrado**, porque **o esperado deles foi GRAVADO de uma execução** e precisa
 ser reescrito do contrato, nunca copiado.

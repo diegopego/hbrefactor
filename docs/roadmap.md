@@ -183,7 +183,7 @@ edição.**
 > **Critério de pronto do passo 2 (mecânico), ATUALIZADO em 2026-07-27 com o destino
 > decidido:** `tests/run.sh` sem nenhum `unit_*`, **`tests/cases/` e `tests/scenarios/`
 > vazios**, `tests-go/suite/` cobrindo o que os três provavam, `make test` verde. Fila hoje:
-> **139** (127 units + 12 casos; os 9 cenários acabaram, e o `scenarios.sh` MORREU em
+> **137** (125 units + 12 casos; os 9 cenários acabaram, e o `scenarios.sh` MORREU em
 > 2026-07-27). Quando os dois que restam esvaziarem, morrem junto o `run.sh`, o
 > `casedir.sh`, o `parrun` e o `tcheck`. A fila e o que cada
 > teste virou ficam no handoff § 0.
@@ -882,6 +882,375 @@ testes do próprio pp está em [pp-corpus/METODO.md](pp-corpus/METODO.md) § 2b 
 `tests/hbpp/` (o pp vivo, caminho do P12). Achado recente que virou família:
 [pass-cycle.md](pp-corpus/pass-cycle.md) — *o pp esgota o comando antes de avançar de linha*
 (levantado pelo Diego, provado no fonte e nos três oráculos).
+
+### P23 — MACRO: a fronteira declarada, e a pesquisa que fica para depois *(aberto 2026-07-27; **PESQUISA — não bloqueia nada**)*
+
+**A decisão que a abre** *(Diego, 2026-07-27)*: macro é run time, e com o conhecimento atual do
+compilador **não dá para controlar**. A ferramenta é limitada nisso, do mesmo jeito que é
+limitada diante de um programa que compila código novo em run time e o usa em seguida. Fingir
+controle é pior que declarar o limite.
+
+**O que isto significa na prática, e é o produto todo:** `verified` quer dizer *"verificado
+contra o que a COMPILAÇÃO enxerga"*. Não é mentira — é **escopo**, e escopo só é honesto quando
+está **escrito onde o usuário lê**. Enquanto não estiver, o `verified` promete demais.
+
+**Escopo desta fase (documentação, não código)**
+- `docs/manual.md` e `CHANGELOG.md` dizem, na voz do programador Harbour: *o que a ferramenta
+  NÃO vê* — macro (`&`), `hb_macroBlock`, e chamada por nome via RTL (`__mvGet`, `Type`).
+- O mesmo limite vale para **memvar**, por decisão do Diego (*"memvar é um code smell; é
+  aceitável que sejamos limitados também"*).
+
+**O que a pesquisa avançada investigaria (nada disso é compromisso)**
+- operando de macro **constante** — o dump já traz `&( "x" )` e a cadeia
+  `MACRO(val=V)` → atribuição → `PLUS(STRING,STRING)`; o core poderia publicar o texto
+  resolvido, e aí o sítio deixa de ser desconhecido e vira fato;
+- a família RTL (`s_stdFunc` em `hbfunchk.c`, onde o `TYPE` já mora) marcando *"esta função
+  alcança símbolo por nome"* — de quebra o compilador ganharia aviso de acesso por nome, que é
+  armadilha real com `-gh`;
+- o que **nunca** será alcançável: texto vindo de parâmetro, arquivo, banco ou entrada.
+
+**Critério de pronto (mecânico)**: o limite escrito no manual e no CHANGELOG, com as três
+famílias nomeadas; nenhum código de recusa fundado em macro no fonte.
+
+### P22 — `possible reference in string` é HEURÍSTICA e MORRE *(aberto 2026-07-27; **EM CURSO**)*
+
+**A régua do Diego, 2026-07-27:** *"se o compilador é capaz de detectar, o hbrefactor trata"*
+— podendo estender o core, que é onde a AST nasce. **E o inverso:** *"está fora do escopo do
+hbrefactor lidar com fatos frágeis e de responsabilidade do desenvolvedor, como simplesmente
+colocar o nome de uma variável (sem usar técnicas de macro) dentro de uma string"*.
+
+**O que existe hoje é o lado errado dos dois.** [hbrefactor.prg:1032](../src/hbrefactor.prg)
+casa `Upper( hItem[ "text" ] ) == cUpMeth` sobre tokens de string — **§1.2 gatilho 1**, texto
+decidindo papel — e **não há um único selo `FATO-OK` no fonte**, então essa detecção nunca
+passou pelo portão do §1.1: ela é anterior a ele.
+
+**Errada nas DUAS direções, medido:**
+
+| sonda | resultado |
+|---|---|
+| `LOCAL a, b` / `a := "b"` (o exemplo do Diego) | reporta `s.prg:5: possible reference in string` — falso positivo, e sobre um `LOCAL` |
+| macro nomeando um `LOCAL` (`cN := "nX"`, `? &cN`) | **runtime: `Variable does not exist`** — macro NÃO alcança local, então o aviso acima é impossível de importar |
+| nome MONTADO (`cFn := "Acu" + "mula"`, `? &cFn`) | `rename` **sucede em silêncio**: `verified: 6 edit(s); pcode byte-identical`, exit 0 — e o programa quebra em runtime |
+
+O terceiro é o grave: *"pcode byte-identical"* é **verdade**, porque a quebra mora numa string,
+que a identidade de pcode não enxerga por construção. A verificação é honesta sobre o que
+verifica; o que mente é a palavra **verified** chegando ao usuário.
+
+**Os fatos que o compilador JÁ dá** (medidos no dump de `a.prg`):
+- `usesMacro` por função (`MAIN usesMacro = True`);
+- nós `MACRO` em `statements[]`, **posicionados** — as avaliações reais nas linhas 14 e 15.
+
+**AS 16 FORMAS DE MACRO, TESTADAS UMA A UMA** *(Diego, 2026-07-27: "existem muitas formas de
+se escrever macros. teste todas."; tabela completa no
+[backlog da sessão](backlog-2026-07-27.md) § 4)*. O resultado muda o escopo desta fase:
+
+1. **Toda forma com `&` produz UM nó `MACRO` e liga `usesMacro`** — 14 de 14, das mais óbvias
+   (`&cN`) às de canto (`&cN.`, `&cN := 9`, `M->&cN`, `FIELD->&cN`, `&cN[1]`, `o:&cF := 1`,
+   dentro de codeblock). O compilador é consistente, então o fato é confiável.
+2. Duas formas de operando: `val=<VAR>` (texto só existe em runtime) e `expr:LIST` (operando é
+   expressão, inclusive constante). `&"literal"` sem parênteses **não compila** (E0030).
+3. **Uma TERCEIRA família, invisível ao `usesMacro`: chamada por nome via função da RTL.**
+   `__mvGet( "x" )`, `Type( "x" )` e **`hb_macroBlock( ... )`** alcançam o símbolo pelo nome e
+   **não acendem `usesMacro` nem geram nó `MACRO`** — o único rastro é `calls[].sym`. O
+   `hb_macroBlock` é o pior: é o jeito moderno de montar codeblock a partir de string, o que
+   engine de relatório faz o dia inteiro. **É esta família que a heurística de string segura
+   hoje.**
+
+**DECISÃO DE ESCOPO — MACRO ESTÁ FORA, INTEIRA** *(Diego, 2026-07-27, e ela encerra o desenho
+do veredito)*: *"é sabido que macros são runtime, e não dá para controlar — não com o
+conhecimento atual que tenho do compilador. deixo para uma fase de pesquisa avançada. (...) tem
+que assumir que macros estão fora do nosso controle totalmente ao menos por enquanto"* — e a
+analogia que fecha o assunto: **o Harbour compila código novo em run time e o usa no instante
+seguinte**; uma ferramenta de refatoração não controla isso, e fingir que controla é pior do que
+dizer que não.
+
+Logo **NÃO existe recusa por alcance de macro**. Não porque seja difícil, mas porque o fato não
+existe e não vai existir por esforço nosso. O que existe é uma **limitação declarada** (ver
+[P23](#p23)). *(O caso `refuse-rename-macro-may-name-symbol`, escrito e vermelho, foi
+REMOVIDO — ele travava um veredito que não se constrói.)*
+
+**E o memvar entra na mesma sentença** *(Diego)*: *"memvar é um code smell. é aceitável que
+sejamos limitados também no tratamento dela."*
+
+**A ORDEM DO DIEGO, 2026-07-27 — e ela decide o resto:** *"heurística é code smell e deve ser
+retirada mesmo. se houver forma de resolver através de alterações no core, aí sim, senão, o
+hbrefactor simplesmente não vai suportar. me recuso a ter heurística nele."*
+
+Logo o casamento de string **morre incondicionalmente** — não "morre se houver substituto".
+E o substituto só é legítimo se for **fato do core**. Uma lista de `__mvGet`/`Type`/
+`hb_macroBlock` dentro do `src/hbrefactor.prg` seria a mesma heurística com roupa melhor:
+conhecimento NOSSO sobre a RTL, não fato dela.
+
+**E o core tem a casa desse fato, sondado:** `s_stdFunc` em `src/compiler/hbfunchk.c` — tabela
+das funções conhecidas da RTL (67 entradas, nome + aridade mín/máx), usada para checagem de
+argumentos em tempo de compilação. **`TYPE` já está nela.** O caminho é estender a
+`HB_FUNCINFO` com o fato *"esta função alcança símbolo pelo nome, no argumento N"*, preencher
+para a família, e o dump publicar isso por chamada. Quem sabe quais funções da RTL fazem acesso
+dinâmico é a RTL — e o compilador ganha junto a capacidade de avisar sobre acesso por nome, que
+é armadilha real com `-gh`/eliminação de código morto.
+
+**Se os mantenedores recusarem a extensão, a regra do Diego decide o resto:** o hbrefactor
+**não suporta** esse caso, e diz isso — nunca adivinha.
+
+**ACHADO AO MATAR A HEURÍSTICA — uma capacidade REAL estava escondida dentro dela.** Ao
+remover o casamento de string, o caso 73 (DSL real do contrib, `xhb/cstruct.ch`) caiu:
+`MEMBER x IS CTYPE_INT` deixava de ser relatado. Investigado antes de re-baselinar, e **não
+era heurística**: o dump carrega a derivação do token.
+
+```json
+tok: {"line": 9, "col": 10, "type": 41, "prov": "s", "text": "x",
+      "from": [{"app": 2, "marker": 1, "op": "stringify"}]}
+ppApplications[2].tokens: {"line": 9, "col": 10, "marker": 1, "text": "x", "generates": true}
+```
+
+O compilador **diz** que aquela string nasceu de *stringificar* o marcador 1 daquela
+aplicação, e a aplicação carrega o token de fonte com posição. A pergunta deixa de ser *"o
+texto desta string é igual ao nome?"* (texto decidindo papel) e passa a ser *"esta string foi
+PRODUZIDA por este token?"* — junção exata, zero inferência.
+
+**E o fato é MELHOR que a heurística era:** ela reportava a posição da string; o fato reporta
+**9:10, o token escrito** — que é o lugar que uma edição precisa tocar. Então o caso 73 não
+morre: ele muda de posição e ganha `certainty` de fato provado. **Preservar isto é parte do
+critério de pronto**, e a lição vale para as outras duas quedas (casos 11 e 125): antes de
+deixar um caso cair junto com a heurística, perguntar se o que ele provava tem fato por trás.
+
+**Escopo**
+- **Matar** o casamento por texto em string. O `a := "b"` do Diego passa a não produzir nada —
+  por construção, não por ajuste de limiar.
+- `usages`: sítio de **avaliação de macro** como kind próprio, com a posição do nó `MACRO`, e a
+  certeza dizendo que o nome resolvido é fato de runtime.
+- `rename`: o veredito considera macro **só** para símbolo alcançável por nome em runtime
+  (função, memvar/public/private, método/DATA) — **nunca `LOCAL`/static-local**, o que está
+  provado acima. A evidência da recusa é a posição das avaliações, não um casamento de string.
+- Sondar se o dump precisa crescer para dizer **o alcance** de uma avaliação (o módulo inteiro
+  × a expressão que ela compila) — e, se precisar, é extensão de core (§1.4).
+
+**E separar os códigos de recusa, que hoje são um só** *(Diego, 2026-07-27)*. O
+`RSN_TEXTUAL_FORCE` ("textual-refs-require-force") é o único da taxonomia com ação
+`ask-human-then-retry` — *"dá, falta consentimento"* —, e o `--force` é o portão dele. Mas ele
+cobre **três situações diferentes**, o que contradiz o §1.6 (*todo código de recusa diz o que
+FAZER*): um agente que o lê não sabe qual das três coisas fazer.
+
+| gatilho hoje | destino | o que o usuário tem de fazer |
+|---|---|---|
+| literal de string igual ao nome | **MORRE** com esta fase | — (é o `a := "b"`, e não é fato) |
+| linha `DYNAMIC <nome>` no `.hbx` | código **próprio** | *"regenere o `.hbx` com `-hbx=`"* |
+| avaliação de macro alcançando o símbolo | código **novo** desta fase | *"confirme que nenhuma destas avaliações nomeia este símbolo"* |
+
+Com isso o `--force` deixa de ser a muleta de uma heurística e passa a ser o que o nome
+promete: consentimento para um risco **provado**. *(A leitura textual do `.hbx` continua sendo
+gatilho 4 — o hbmk2 é quem gera e consome aquela lista — mas o FATO que ela reporta é real, e
+trocar o canal é item separado.)*
+
+**Critério de pronto (mecânico)**: caso com `a := "b"` provando saída **vazia**; caso com nome
+montado provando **recusa** com a posição da avaliação de macro; caso com `LOCAL` alcançado por
+macro provando que nada é relatado; `grep` do casamento de texto em string sem resultado no
+fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
+exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
+
+### P21 — o `col` do sítio vem do NÓ, não de contagem: a P20 entregou INFERÊNCIA *(aberto 2026-07-27; **A RESOLVER — regressão da P20**)*
+
+**Achado na revisão do próprio intervalo da P20.** A entrega dela reconstrói a coluna
+**contando**: `hb_compAstSiteCol()` casa o K-ésimo registro de um nome numa linha com o
+K-ésimo token daquele nome na mesma linha. Não existe vínculo entre um e outro — a ordem
+dos registros é a de **redução do parser**, a dos tokens é a de **escrita**. É §1.2 gatilho
+3 (*"se não é X então é Y"* sem fato que separe), e a ironia é que a própria P20 escreveu
+que essa contagem *"erraria"* antes de implementá-la.
+
+**As três provas, medidas (todas compilam limpo sob `-w3 -es2`):**
+
+| repro | verdade | o dump `ast-20` |
+|---|---|---|
+| `nTotal := 0 + Eval( {\| x \| nTotal += x }, 1 ) + nTotal` | write 3, use/ref 30, read 51 | use **3**, ref 30, read 51, write **51** |
+| `o:Description := o:Description + "!"` | escrita 5, leitura 22 | **5, 5** |
+| `FOR i := 1 TO 3` / `nSoma += i` / `NEXT` | o `use` do NEXT não tem token | `tokLine` 7 `col` **15** — o `i` do `nSoma += i` |
+
+Dois de quatro sítios errados no primeiro; a leitura nunca relatada no segundo (o nome
+manjado `_X` entra na contagem como outro símbolo); no terceiro, o incremento implícito do
+`FOR` recebendo a posição de um sítio alheio, e duas locations idênticas no relato. **Os
+três saem `certainty: "confirmed"`** — a ferramenta afirmando com a mesma confiança o que
+provou e o que contou.
+
+**O incremento do `FOR` NÃO é "fato ausente"** — e classificá-lo assim, como a primeira
+leitura fez, era observar a saída quebrada em vez de perguntar ao compilador. A gramática
+reusa o MESMO nó da variável do cabeçalho (`harbour.y`: `hb_compExprNewPreInc( $2 )`, onde
+`$2` é o `i` de `FOR i := ...`), e o canal `statements[]` do dump já publica isso:
+`{"et": "PREINC", "line": 8, "left": {"et": "VARIABLE", "line": 6, ...}}`. A posição
+verdadeira do incremento é o token do cabeçalho — **6:7** —, e o `line` 8 continua correto
+como "onde o compilador estava". Dois sítios num token só é a mesma forma da captura por
+codeblock, e é verdade. `make test` seguiu 1014/0: nenhuma fixture da P20 tem registro fora da ordem
+de escrita.
+
+**E o fallback agrava:** esgotada a contagem, `hb_compAstWriteSitePos()` cai em
+`hb_compAstNamePos()` (janela de 16 tokens para trás), que devolve o ÚLTIMO token daquele
+nome já consumido — foi de lá que saiu o `col 51` do write e o `col 15` do NEXT. Logo
+[ast-schema.md](ast-schema.md) § `col` e `tokLine` afirma falso em dois pontos: *"a âncora na
+linha limita o estrago"* e *"Fato ausente ≠ fato errado"*. O fato sai **errado**, não ausente.
+
+**O fato existe, e não é contagem** — mas ele está mais fundo do que a primeira leitura
+sugeriu, e a diferença importa:
+
+- **Sondado e DESCARTADO:** o `nBirthTok` do nó de expressão (`hb_compAstNodeBorn`,
+  compast.c:404) **não é o token do nome** — é o contador no nascimento do nó, deslocado
+  pelo lookahead do parser. Medido em `FOR i := 1 TO 3` / `nSoma += i`: o nó `VARIABLE I`
+  nasce com `tok` 12 (`:=`, sem coluna) enquanto o `i` é o token 11; `VARIABLE NSOMA` nasce
+  com 17 (`+=`) e o nome é o 16; e a leitura `i` nasce com 18, que *é* o nome. Ora +1, ora
+  +0. Ler o `nBirthTok` e procurar o nome perto dele é a mesma inferência com raio menor.
+- **O fato:** quem conhece o índice exato é o LEXER — `hb_comp_tokenGet()`
+  (complex.c:517) registra cada token no instante em que o compilador o puxa. Quando o
+  lexer entrega um IDENTIFIER ao parser, o índice daquele token é exato e conhecido. **O
+  trabalho é fazer esse índice VIAJAR** do lexer até o nó, e do nó até o registro do sítio
+  — não reconstruí-lo depois.
+
+**Escopo**
+- **Sonda primeiro** (§1.1), e ela ainda não terminou: por onde a posição do identificador
+  viaja até o nó. `YYSTYPE` de identificador é `char *` INTERNADO (compartilhado por todas
+  as ocorrências do nome), então pendurar a posição nele não serve. As duas saídas a
+  avaliar: estender o `YYSTYPE` do identificador (mexe em `harbour.y` e obriga o ritual dos
+  três arquivos do parser, §2) ou o lexer manter o índice do último IDENTIFIER entregue,
+  consumido por `hb_compAstNodeBorn`.
+- Core: `hb_compAstUse`/`CallAdd`/`SendAdd` recebem a posição pela cadeia acima.
+  **Deletar `hb_compAstSiteCol()`** e o `hb_compAstNamePos()` dos três recorders.
+  Onde a cadeia não alcança: **fato AUSENTE**, nunca a janela para trás. Schema
+  `ast-20 → ast-21`.
+- Ferramenta: um helper só (`SiteLine`/`SiteCols`) consumido pelos três laços **e pela
+  prosa** — hoje o idioma está copiado em três sítios, e foi por isso que a prosa ficou
+  para trás na P20 (ela segue imprimindo `hItem["line"]`). Sem `col`, **não** cair no
+  "primeiro token da linha" carimbado de `confirmed`.
+- Docs: corrigir as duas afirmações falsas do ast-schema.md e o *"erraria"* da P20.
+
+**Critério de pronto (mecânico)**: os três casos verdes
+(`usages-write-and-capture-on-one-line`, `usages-send-write-and-read-on-one-line`, e o do
+`FOR`/`NEXT`); `grep hb_compAstSiteCol` no core sem resultado; a prosa e o JSON dando a
+mesma linha e a mesma coluna para o statement continuado; `lexdiff` 0; `make test` verde.
+
+**Antes de escrever mais expected: a TABELA DE CLASSES DE SÍTIO.** Cada classe é uma
+pergunta ao compilador — *que posição ele tem para este sítio, e por quê* — respondida com
+sonda, ANTES de o expected existir. Sem ela, o expected do terceiro caso seria escrito da
+saída, que é o vício que esta fase existe para matar.
+
+| classe | exemplo | posição esperada | verificado |
+|---|---|---|---|
+| leitura/escrita comum | `nSoma += i` | o token do nome | ✅ (casos da P20) |
+| captura por codeblock (`use`+`ref`) | `{\| x \| nTotal += x }` | um token, DOIS sítios | ✅ caso escrito |
+| send-escrita (`_X`) + leitura | `o:X := o:X + "!"` | tokens distintos | ✅ caso escrito |
+| incremento implícito do `FOR` | `FOR i := 1 TO 3` … `NEXT` | o `i` do CABEÇALHO | ✅ provado na gramática + `statements[]` |
+| statement continuado com `;` | `cMsg + ;` | token na linha anterior | ✅ (P20) |
+| leitura da variável de macro | `? &cNome` | o token `&cNome` (10:5) | ✅ sondado — **e é um 4º defeito** |
+| símbolo de expansão de diretiva | `CMD_SOMA 5` → `nAcc += 5` | **ausente** — `prov != 's'` | ✅ sondado: o dump omite `col` e `tokLine`, correto |
+| sítio cujo token vem de INCLUDE | `METHOD` de `hbclass.ch` | **decisão pendente** | ✅ medido: **40% dos sítios** |
+| checagem `-kt` (`hb_compAstUseChk`) | `LOCAL x AS NUMERIC` | ? | ⬜ a sondar |
+
+**Sonda da variável de macro (o 4º defeito, medido 2026-07-27):** `LOCAL cNome := "nAcc"` na
+linha 6 e `? &cNome` na linha 10. O pp entrega **`&cNome` como UM token só**, `prov='s'`,
+coluna 5 — não existe token cujo texto seja `cNome` naquela linha. A janela para trás procura
+por `cNome`, não acha, e devolve a posição da DECLARAÇÃO: `usages cNome` responde **três
+sítios todos em 6:9**, e **a linha 10 desaparece** do find-all-references. Não é fato ausente
+(a posição existe, em 10:5): é fato errado, e é o mais visível dos quatro porque some com uma
+linha inteira. *(Não confundir com a P18, que é o símbolo DENTRO da string do macro — esse sim
+não tem posição.)*
+
+**Sonda da expansão de diretiva:** `#xcommand CMD_SOMA <v> => nAcc += <v>` em `k.ch` linha 1,
+usado em `k.prg` linha 8. O token `nAcc` resultante sai **`prov='i'`, `line: 1`** — a linha do
+`.ch` — e **sem coluna**, porque `hb_compAstToken()` faz `if( ! fMain ) iCol = -1`. Ou seja, a
+classe correta é **`include`**, não "sintetizado": o token foi ESCRITO, só que noutro arquivo.
+*(E repare na assimetria que fica: a LINHA de outro arquivo é preservada, a COLUNA é
+descartada — um consumidor que leia `line: 1` sem saber disso acha que é a linha 1 do `.prg`.)*
+
+**Sonda da procedência, no corpus do core (`tbrowse.prg`, 17.517 tokens, 3.718 sítios):**
+identificadores por procedência — **3.958 do fonte, 1.859 de include, 220 sintetizados**; e
+os sítios: **2.220 com `col` (59,7%) × 1.498 sem (40,3%)**. Em código Harbour real, que se
+constrói sobre DSL, o sítio sem posição no módulo **não é canto — é 40% da resposta**
+(§1.7/2). E o core **descarta um fato** ali: `hb_compAstToken()` faz `if( ! fMain ) iCol = -1`,
+jogando fora a posição que o token TEM no `.ch`. Para o compilador é defensável; para uma
+ferramenta de refatoração é a resposta à pergunta mais útil sobre aquele sítio — *"este uso
+nasce de uma diretiva, não está no seu arquivo, e você não o edita aqui"*.
+
+**Decisão pendente do Diego, e ela só vale para as classes AUSENTES** (as três últimas —
+o `FOR` saiu da lista): sem coluna, o que o `usages` relata? `certainty` é sobre a
+**referência**, não sobre a posição. Recomendação: **range de largura zero** (`start ==
+end`), que nenhum sítio com token pode ter e que o [`LocAdd`](../src/hbrefactor.prg) já
+produz quando não recebe coluna — sinal contratual, sem campo novo e sem `cli-3`.
+
+### P20 — `occurrences[]`, `calls[]` e `sends[]` dão LINHA e não COLUNA, e o `usages` aponta o lugar errado *(aberto 2026-07-27; **⚠ ENTREGUE 2026-07-27 `ast-20`, 4 casos — mas por INFERÊNCIA; ver [P21](#p21--o-col-do-sítio-vem-do-nó-não-de-contagem-a-p20-entregou-inferência)**)*
+
+> **Entregue no mesmo dia, por ordem do Diego** (*"a lacuna do core tem que ser resolvida
+> agora no quente"*), e **nos TRÊS canais de sítio** — a varredura que ele mandou fazer em
+> seguida (*"procure se deixou passar algo parecido"*) achou a lacuna idêntica em
+> `calls[]` e `sends[]`, e a de `calls` é a que mais aparece em código real.
+>
+> No CORE (`src/compiler/compast.c`): `hb_compAstSiteCol()` casa o K-ésimo sítio de um nome
+> numa linha com o K-ésimo token de fonte daquele nome na MESMA linha, e os três emissores
+> passam a escrever `col` (0-based, OPCIONAL — ausente, nunca adivinhado, quando o fluxo de
+> tokens não carrega o nome). Ele também desfaz o `_X` que o próprio compilador cria para
+> `o:x := v`, então o par escrita/leitura do mesmo membro numa linha resolve certo. Schema
+> `ast-19 → ast-20`. Na FERRAMENTA: `AstSchema()` acompanha e os três laços do `usages`
+> consomem o `col` por `hb_HGetDef`, caindo no caminho antigo quando o fato falta.
+>
+> | sonda | antes | agora |
+> |---|---|---|
+> | `n := n + n` | 3, 3, 3 | **3, 13, 22** |
+> | `Dobro( Dobro( 2 ) ) + Dobro( 3 )` | 8, 8, 8 | **8, 15, 30** |
+> | `? o:Description, o:Description` | 7, 7 | **7, 22** |
+>
+> **E um TERCEIRO defeito, de outra natureza, achado na mesma varredura: STATEMENT
+> CONTINUADO.** Ali não faltava a coluna — a **linha estava errada**. O `line` de um sítio é
+> a linha em que o compilador estava, e num statement continuado com `;` isso é a ÚLTIMA
+> linha física; o sítio está numa anterior. O uso de `cMsg` em `OutStd( "x" + ; / cMsg + ; /
+> "y" )` saía na linha do `"y" )`, coluna 0, com o texto de outra linha. **Nenhum teste via.**
+>
+> Resolvido sem mexer no significado de `line` (que consumidores usam para correlacionar
+> canais): os três recorders passam a **capturar a posição do token no momento do REGISTRO**,
+> pela mesma janela para trás que as `declarations` já usavam, e o dump emite `tokLine` **só
+> quando ela difere** de `line`. Ausência de `tokLine` significa "é a mesma", nunca "não sei".
+> Medido: o sítio continuado sai em **44:11** com o texto `cMsg + ;` (era 45:0 com `"y" )`).
+>
+> Quatro casos travam os três canais e as duas naturezas de defeito
+> (`usages-many-sites-on-one-line`, `usages-nested-calls-on-one-line`,
+> `usages-two-sends-on-one-line`, `usages-continued-statement`). `make test` 1014/0,
+> `lexdiff` 0 divergências, caso 122 casando `ast-20 == ast-20`. Controle negativo rodado:
+> com o `col` ignorado, o caso reprova nomeando as colunas erradas.
+
+**Achado ao migrar o `unit_9`** — apareceu porque o formato de caso compara o envelope
+INTEIRO; o teste legado usava `envloc` (*"ache isto na lista"*), que não podia vê-lo.
+
+**O buraco:** cada registro de `occurrences[]` traz `sym`/`scope`/`access`/`block` e **`line`
+— nunca `col`** ([docs/ast-schema.md](ast-schema.md) § occurrences). Com N registros na mesma
+linha, a ferramenta não tem como dizer a QUAL token cada um pertence, e resolve todos pelo
+primeiro token do nome naquela linha.
+
+**Repro (compila limpo sob `-w3 -es2`):**
+
+```
+PROCEDURE Main()
+   LOCAL nTotal
+   nTotal := 1
+   nTotal := nTotal + nTotal
+   ? nTotal
+   RETURN
+```
+
+Os três tokens da 4ª linha estão nas colunas **3, 13 e 22** (0-based). O dump traz três
+registros (`use`, `ref`, `read`), todos com `line` e sem `col`, e o `usages` relata os três
+em **3, 3, 3** — dois sítios apontando para o lugar errado. Quem consome (IDE, agente) pula
+para a coluna errada, ou vê "três usos no mesmo ponto".
+
+**E a ferramenta NÃO pode se virar sozinha:** casar o N-ésimo registro com o N-ésimo token é
+inferência, e **erraria** — medido: a ordem dos registros é `use, ref, read` enquanto a dos
+tokens é *alvo-de-atribuição, leitura, leitura*. §1.2, gatilho 3 (*"se não é X então é Y"*
+sem fato que separe). **LACUNA REAL → extensão de core.**
+
+**O `rename` NÃO é afetado, e a razão importa:** ele não mapeia registro→token — edita
+**todos** os tokens daquele nome na linha e a recompilação prova (`editCount` 6,
+`pcode-identical` no repro acima). Só o relato posicional depende do fato que falta.
+*(Não confundir com a [P18](#), que é o símbolo emitido pelo macro-unwrap: lá falta posição
+no token; aqui o token TEM posição e o que falta é o vínculo do registro com ele.)*
+
+**Critério de pronto (mecânico)**: `occurrences[]` ganha `col` apontando o token daquele
+registro (campo NOVO — o schema sobe de versão, e `AstSchema()` acompanha); o `usages` do
+repro passa a relatar 3, 13, 22; caso novo em `tests-go/suite/` com a fixture do repro,
+provando as três colunas distintas; o caso `usages-local-scope-aware` continua verde
+(lá a linha tem UM token, então as colunas não mudam); `lexdiff` 0; `make test` verde.
 
 ### P19 — o `#pragma` muda a SEMÂNTICA de uma região, e o dump não conta *(aberto 2026-07-15; **A RESOLVER**)*
 

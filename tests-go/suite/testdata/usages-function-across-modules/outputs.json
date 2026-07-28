@@ -1,0 +1,44 @@
+[
+  {
+    "schema": "cli-2",
+    "command": "usages",
+    "argv": [ "usages", "fix01.hbp", "Dupla", "--json" ],
+    "status": "ok",
+    "exit": 0,
+    "reason": null,
+    "action": null,
+    "detail": "2 result(s) for 'Dupla'",
+    "diagnostics": [],
+    "result": {
+      "query": "Dupla",
+      "total": 2,
+      "returned": 2,
+      "truncated": false,
+      "locations": [
+        {
+          "uri": "file://<CWD>/a.prg",
+          "range": {
+            "start": { "line": 9, "character": 19 },
+            "end": { "line": 9, "character": 24 }
+          },
+          "kind": "call",
+          "owner": "MAIN",
+          "certainty": "confirmed",
+          "text": "Eval( bAcum, Dupla( i ) )"
+        },
+        {
+          "uri": "file://<CWD>/b.prg",
+          "range": {
+            "start": { "line": 4, "character": 9 },
+            "end": { "line": 4, "character": 14 }
+          },
+          "kind": "definition (function)",
+          "owner": null,
+          "certainty": "confirmed",
+          "text": "FUNCTION Dupla( nV )"
+        }
+      ]
+    },
+    "edits": []
+  }
+]

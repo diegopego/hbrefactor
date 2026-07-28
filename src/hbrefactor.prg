@@ -118,6 +118,15 @@
 STATIC s_hPpProbe := NIL
 STATIC s_hPpHit := NIL
 
+// P21: fonte dos ARQUIVOS DE REGRA (.ch), por caminho resolvido. Um sítio que
+// mora num header precisa do `text` daquela linha como qualquer outro - sem
+// ele a IDE e o agente têm de reabrir o arquivo, que é o trabalho que o campo
+// existe para poupar. Cache porque um header como o hbclass.ch registra dezenas
+// de regras e o laço passaria por ele uma vez por token; seguro porque o único
+// consumidor (RuleSiteHits) é caminho de LEITURA - nenhum comando que edita
+// passa por aqui
+STATIC s_hRuleSrc := { => }
+
 // A.1: modo de máquina. `s_lJson` liga o envelope; `s_aDiag` acumula o que sem
 // ele iria para o stderr em prosa. Estado global porque a saída é global - o
 // alternativo seria passar um "contexto" por 12 comandos e 300 sítios de recusa
@@ -488,7 +497,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-19"
+   RETURN "ast-20"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -576,6 +585,12 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL aDecl, aSite, cCur, nState, hOwnV
    LOCAL cAtSpec := NIL, aAtParts, cAtFile, cAtPath, nAtLine, nAtCol0, hResAt
    LOCAL cKind          // A.1: o rótulo que a prosa E o JSON usam (uma fonte)
+   LOCAL nCol0          // ast-20: a coluna DO sítio (0-based), ou NIL
+   // ast-20: a LINHA do sítio. O `line` do registro é a linha em que o
+   // compilador estava — num statement continuado com `;` isso é a ÚLTIMA
+   // linha física, e o sítio está numa anterior. `tokLine` só vem quando
+   // DIFERE, então a ausência dele significa "é a mesma", nunca "não sei"
+   LOCAL nSiteLn
    // P3 (adr-003:60-63): --at resolve o PAPEL do site (generates/genrule já
    // usados pelo rename) - usages passa a ESTREITAR por ele, não só extrair
    // o nome. lAtPp = o site é mecânica de pp (marker/descarte/palavra de
@@ -840,7 +855,16 @@ STATIC FUNCTION Usages( aArgs )
                nHits++
                cKind := hItem[ "access" ] + " (" + hItem[ "scope" ] + ;
                         iif( hItem[ "block" ], ", codeblock", "" ) + ")"
-               LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cName ), ;
+               // ast-20: a occurrence traz a coluna DELA. Antes vinha só a
+               // linha, e N ocorrências do mesmo nome numa linha caíam todas
+               // no PRIMEIRO token - dois dos três sítios de `n := n + n`
+               // apontavam o lugar errado. Chave OPCIONAL (o símbolo entregue
+               // por macro não tem posição): sem ela, o caminho antigo, que
+               // acerta o caso de token único e é o que sempre foi.
+               nCol0 := hb_HGetDef( hItem, "col", NIL )
+               nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
+               LocAdd( aLoc, cPath, nSiteLn, ;
+                       iif( nCol0 == NIL, TokenCols( hAst, nSiteLn, cName ), { nCol0 + 1 } ), ;
                        Len( cName ), cKind, hFunc[ "name" ], "confirmed", aSrc )
                Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cKind + " in " + ;
                   hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
@@ -851,7 +875,13 @@ STATIC FUNCTION Usages( aArgs )
             IF ! lAtPp .AND. Upper( hItem[ "sym" ] ) == cUp
                nHits++
                cKind := "call" + iif( hItem[ "block" ], " (codeblock)", "" )
-               LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cName ), ;
+               // ast-20, mesmo fato do laço de occurrences: chamada aninhada
+               // (`F( F( x ) ) + F( y )`) põe N sítios numa linha, e sem a
+               // coluna DELES todos caíam no primeiro token
+               nCol0 := hb_HGetDef( hItem, "col", NIL )
+               nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
+               LocAdd( aLoc, cPath, nSiteLn, ;
+                       iif( nCol0 == NIL, TokenCols( hAst, nSiteLn, cName ), { nCol0 + 1 } ), ;
                        Len( cName ), cKind, hFunc[ "name" ], "confirmed", aSrc )
                Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cKind + " in " + ;
                   hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
@@ -877,7 +907,13 @@ STATIC FUNCTION Usages( aArgs )
                // A CERTEZA é a 1a palavra do rótulo (possible/confirmed/
                // guaranteed/excluded) - vira campo, separada do "send"
                IF ! aVerd[ 2 ]
-                  LocAdd( aLoc, cPath, hItem[ "line" ], TokenCols( hAst, hItem[ "line" ], cMethTok ), ;
+                  // ast-20: a coluna DESTE send. O core desfaz o `_X` que ele
+                  // mesmo cria para `o:x := v`, então o par escrita/leitura do
+                  // mesmo membro numa linha também resolve certo
+                  nCol0 := hb_HGetDef( hItem, "col", NIL )
+                  nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
+                  LocAdd( aLoc, cPath, nSiteLn, ;
+                          iif( nCol0 == NIL, TokenCols( hAst, nSiteLn, cMethTok ), { nCol0 + 1 } ), ;
                           Len( cMethTok ), "send", hFunc[ "name" ], FirstWord( aVerd[ 1 ] ), aSrc )
                ENDIF
                Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + aVerd[ 1 ] + ;
@@ -983,44 +1019,41 @@ STATIC FUNCTION Usages( aArgs )
          NEXT
       ENDIF
 
-      // referências possíveis em strings: tokens tipo 41 cujo conteúdo é
-      // exatamente o nome (call-by-name) - do próprio stream do compilador.
-      // Posições já respondidas pelo passe de declaração acima (a string de
-      // registro É o artefato da declaração) não se repetem aqui.
-      // O IsDataTok SUPRIME o que é dado de bloco de stream (§ P16(a)); vem
-      // DEPOIS do casamento do nome de propósito - ele pode ter de andar a
-      // cadeia de clone até a origem selada, e só interessa para o token que
-      // já é candidato
-      FOR EACH hItem IN hAst[ "tokens" ]
-         IF ! lAtPp .AND. hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
-            ! IsDataTok( hAst, hItem ) .AND. ;
-            ( hItem[ "col" ] == NIL .OR. ;
-              ! hb_HHasKey( hDone, hb_ntos( hItem[ "line" ] ) + "|" + hb_ntos( hItem[ "col" ] ) ) )
-            nHits++
-            // o ÚNICO caso de `possible` aqui: casamento em string não é
-            // ocorrência registrada pelo compilador - pode ser chamada por nome
-            cKind := "possible reference in string"
-            LocAdd( aLoc, cPath, hItem[ "line" ], ;
-                    iif( hItem[ "col" ] == NIL, {}, { hItem[ "col" ] + 1 } ), ;
-                    Len( cMethTok ), cKind, NIL, "possible", aSrc )
-            Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cKind + ;
-                    SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
-         ENDIF
-      NEXT
+      // P22 (Diego, 2026-07-27): AQUI havia o `possible reference in string` -
+      // um laço sobre os tokens de string casando `Upper( hItem["text"] ) ==
+      // cUpMeth`. Ele MORREU, e a razão não é que errava pouco:
+      //
+      //   - era §1.2 gatilho 1 em estado puro (TEXTO decidindo PAPEL), sem um
+      //     único selo `FATO-OK` no fonte: anterior ao portão do §1.1;
+      //   - errava nas DUAS direções, medido. Falso positivo: `LOCAL a, b` com
+      //     `a := "b"` relatava a string - e macro nem alcança LOCAL (`&cN`
+      //     nomeando um local morre com "Variable does not exist"). Falso
+      //     negativo: nome MONTADO (`"Acu" + "mula"`) passava, e o rename
+      //     sucedia imprimindo `verified ... pcode byte-identical` sobre um
+      //     programa quebrado - a ferramenta cometendo o pecado que ela existe
+      //     para impedir, e assinando embaixo.
+      //
+      // A régua: *"heurística é code smell e deve ser retirada mesmo. se houver
+      // forma de resolver através de alterações no core, aí sim, senão, o
+      // hbrefactor simplesmente não vai suportar. me recuso a ter heurística
+      // nele."* - e o nome de uma variável dentro de uma string comum é fato
+      // frágil, de responsabilidade do desenvolvedor, FORA do escopo.
+      //
+      // O que fica no lugar é fato de compilação, e vive no veredito do rename:
+      // `usesMacro` + os nós `MACRO` posicionados (ver MacroReach).
 
       // o nome pode ser palavra de DSL de pp (consumida antes do yylex e
       // portanto invisível em tokens[]): diretivas e aplicações (ast-2).
       // P3: irrelevante quando o site resolvido É um identificador comum
       // (lAtSym) - vocabulário de pp não tem nada a ver com aquele símbolo
       IF ! lAtSym
-         nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ) )
+         nHits += DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, Len( cName ), hProj )
       ENDIF
 
       // o nome citado DENTRO do texto das regras (match[]/result[], B4g):
       // keyword de match, identificador em result, palavra de restrição
       IF ! lAtSym
-         nHits += RuleSiteHits( hAst, cUp, aRuleSeen, aLoc )
+         nHits += RuleSiteHits( hAst, cUp, aRuleSeen, aLoc, hProj )
       ENDIF
 
       // sites do NOME DE MARKER que atravessam diretivas (B4d): posições
@@ -4191,14 +4224,20 @@ STATIC FUNCTION RenameFunction( aArgs )
          ENDIF
          nTotal += Len( aE )
       ENDIF
-      // strings que citam o nome (call-by-name possível): relato, nunca edição
-      FOR EACH hItem IN hAst[ "tokens" ]
-         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUpOld
-            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string equal to '" + cOld + "' - possible call by name (will NOT be changed)" )
-         ENDIF
-      NEXT
+      // P22: aqui havia o gêmeo da heurística do `usages` - casar o TEXTO de um
+      // token de string contra o nome velho e AVISAR. Morreu pela mesma razão
+      // (§1.2 gatilho 1, sem selo, errado nas duas direções) e por uma segunda,
+      // que só apareceu ao medir: era OVER-CLAIM. Sem filtro de dona, uma
+      // consulta por `Classe:membro` reportava a string de OUTRA classe com o
+      // mesmo nome de membro (medido no fixture do caso 73: `MEMBER x` em duas
+      // estruturas, e as duas saíam).
+      //
+      // O que NÃO entra no lugar: recusa por alcance de MACRO. Decisão de
+      // escopo do Diego (2026-07-27): macro é run time e está fora do controle
+      // da ferramenta, do mesmo jeito que está um programa que compila código
+      // novo em run time e o usa em seguida. `verified` passa a significar
+      // "verificado contra o que a COMPILAÇÃO enxerga" - o que é escopo, não
+      // mentira, DESDE QUE escrito onde o usuário lê (fase P23, documentação).
    NEXT
 
    // .hbx: exports DYNAMIC gerados pelo hbmk2 (não editamos; regenerar)
@@ -5559,42 +5598,20 @@ STATIC FUNCTION StreamHasIdent( hAst, cUp )
    RETURN .F.
 
 // ---------------------------------------------------------------------------
-// P16(a) - o token é DADO de um bloco de stream? FATO do ast-18: o item from
-// op "stream" é o selo que o pp grava no instante em que fabrica a string a
-// partir de uma linha crua do fonte (TEXT/ENDTEXT, #pragma __text|__stream|
-// __cstream) - nenhuma leitura de FORMA (o `col == 0` seria réplica de
-// gramática). Uma regra de pp pode re-escanear e CLONAR essa string; o clone
-// aponta a aplicação, e o token que a aplicação consumiu carrega o selo -
-// a cadeia inteira é de fato declarado.
+// P16(a) - AQUI vivia o `IsDataTok`: dado o selo `op:"stream"` do ast-18, ele
+// dizia se um token de string era DADO de bloco de stream (TEXT/ENDTEXT,
+// #pragma __text|__stream|__cstream), atravessando ate' a cadeia de clone que
+// uma regra de pp cria ao re-escanear.
 //
-// USO: SUPRESSÃO, jamais busca. Uma string ESCRITA igual a um nome pode virar
-// chamada-por-nome (&()/__mvGet) e por isso o usages a relata; uma linha de
-// bloco de stream igual a um nome NÃO tem esse mecanismo - é dado impresso. O
-// selo deixa o usages CALAR sobre o dado por FATO, sem casar TEXTO para
-// afirmar identidade (gatilho 1) e sem inferir data-ness pela coluna.
+// Ele MORREU com o unico consumidor que tinha: a heuristica de casamento de
+// string (P22). O selo existia para SUPRIMIR o falso positivo dela - "esta
+// palavra igual ao nome e' dado impresso, nao referencia". Sem a heuristica nao
+// ha' o que suprimir, e funcao sem consumidor e' codigo que ninguem confere.
+//
+// O FATO NAO SE PERDEU: `op:"stream"` continua no dump, e a fase P23 (pesquisa
+// de macro) o lista como material. Quem voltar a precisar dele reescreve o
+// consumo - o que nao se faz e' manter caminho vivo sem caso que o exercite.
 // ---------------------------------------------------------------------------
-
-STATIC FUNCTION IsDataTok( hAst, hTok )
-
-   LOCAL hFrom, hApp, hTA, cPart
-
-   FOR EACH hFrom IN hb_HGetDef( hTok, "from", {} )
-      IF hFrom[ "op" ] == "stream"
-         RETURN .T.
-      ENDIF
-      IF hFrom[ "op" ] == "clone" .AND. hFrom[ "app" ] != NIL
-         hApp  := hAst[ "ppApplications" ][ hFrom[ "app" ] + 1 ]
-         cPart := SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] )
-         FOR EACH hTA IN hApp[ "tokens" ]
-            IF hb_HGetDef( hTA, "marker", 0 ) == hFrom[ "marker" ] .AND. ;
-               hTA[ "text" ] == cPart .AND. IsDataTok( hAst, hTA )
-               RETURN .T.
-            ENDIF
-         NEXT
-      ENDIF
-   NEXT
-
-   RETURN .F.
 
 // ---------------------------------------------------------------------------
 // P16(b) - módulo sensível a POSIÇÃO. O valor de um define DINÂMICO de linha
@@ -7128,9 +7145,17 @@ STATIC FUNCTION RuleTag( hRule )
    RETURN "#" + hRule[ "kind" ] + " " + ;
           iif( hRule[ "head" ] == NIL, "<headless>", hRule[ "head" ] )
 
+// P21: onde a regra está ESCRITA - a linha da CABEÇA, não a de registro. Numa
+// diretiva continuada com `;` elas diferem, e citar a de registro manda o leitor
+// para a linha de continuação. Um só lugar decide isso, então a citação da
+// aplicação, a chave de deduplicação e o relato da diretiva não divergem
 STATIC FUNCTION RuleWhere( hRule )
+
+   LOCAL hHead := RuleHeadTok( hRule )
+
    RETURN iif( hRule[ "file" ] == NIL, "builtin", ;
-               hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) )
+               hRule[ "file" ] + ":" + ;
+               hb_ntos( iif( hHead == NIL, hRule[ "line" ], hHead[ "line" ] ) ) )
 
 // ---------------------------------------------------------------------------
 // palavras de DSL no usages - definição (diretiva) e aplicações da palavra.
@@ -7140,9 +7165,10 @@ STATIC FUNCTION RuleWhere( hRule )
 // mesmo funil (hb_pp_patternReplace).
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen )
+STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen, hProj )
 
    LOCAL hRule, hApp, hTok, nHits := 0, cKey, lHead, cWhat
+   LOCAL hHead, nRLine, aRCol      // P21: a posição da CABEÇA ESCRITA da regra
 
    // definição: a diretiva (o mesmo .ch registra a regra em cada módulo
    // que o inclui - dedupe global por arquivo+linha+tipo). `cWhat` é a
@@ -7168,10 +7194,23 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
                         hb_ntos( hRule[ "markers" ] ) + " marker(s))" + ;
                         iif( IsRuleDel( hRule ) .AND. hRule[ "undoes" ] == NIL, ;
                              " - ORPHAN: removes no rule (dead directive)", "" )
-               Prose( hRule[ "file" ] + ":" + hb_ntos( hRule[ "line" ] ) + ": " + cWhat + hb_eol() )
-               // a location vive no ARQUIVO DA REGRA (o .ch), não no módulo;
-               // sem coluna byte-exata (a prosa também só cita a linha)
-               LocAdd( aLoc, hRule[ "file" ], hRule[ "line" ], {}, 0, cWhat, NIL, "confirmed", NIL )
+               // P21: a posição é a da CABEÇA ESCRITA (match[]), não a linha de
+               // registro - numa diretiva continuada elas diferem, e a linha de
+               // registro faz o relato apontar a continuação. Com a cabeça vem
+               // também a COLUNA, então o sítio deixa de ser largura zero: para
+               // quem procurou a palavra, o lugar dela é o token dela
+               hHead := RuleHeadTok( hRule )
+               nRLine := iif( hHead == NIL, hRule[ "line" ], hHead[ "line" ] )
+               aRCol := iif( hHead == NIL .OR. hb_HGetDef( hHead, "col", NIL ) == NIL, ;
+                             {}, { hHead[ "col" ] + 1 } )
+               Prose( hRule[ "file" ] + ":" + hb_ntos( nRLine ) + ": " + cWhat + ;
+                      SrcLine( RuleSrc( hProj, hRule[ "file" ] ), nRLine ) + hb_eol() )
+               // a location vive no ARQUIVO DA REGRA (o .ch), não no módulo.
+               // P21: o `text` vem do fonte DAQUELE arquivo - era o segundo
+               // sítio que apontava arquivo e linha reais e não mostrava a linha
+               LocAdd( aLoc, hRule[ "file" ], nRLine, aRCol, ;
+                       iif( Empty( aRCol ), 0, Len( hHead[ "text" ] ) ), ;
+                       cWhat, NIL, "confirmed", RuleSrc( hProj, hRule[ "file" ] ) )
             ENDIF
          ENDIF
       ENDIF
@@ -7219,7 +7258,51 @@ STATIC FUNCTION DslHits( hAst, cUp, cModFile, aSrc, aDefSeen, aLoc, cPath, nLen 
 // no ARQUIVO DA REGRA (não no módulo), por isso não entra nas Location[].
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen, aLoc )
+// P21: o token ESCRITO da cabeça de uma regra. O `line` do registro é a linha
+// em que o pp REGISTROU a regra - numa diretiva continuada com `;` isso é a
+// ÚLTIMA linha física, e a cabeça está numa anterior. Medido numa diretiva de
+// duas linhas (cabeça na primeira, resultado depois do `;` na segunda): o
+// registro diz a segunda, e o match[0] traz a cabeça na primeira, com coluna.
+// É a mesma classe do statement continuado, no canal das
+// diretivas - e o fato certo já vem no dump; era a ferramenta que lia o campo
+// errado. NIL quando a regra não tem cabeça literal (translate por marcador)
+STATIC FUNCTION RuleHeadTok( hRule )
+
+   LOCAL hTok
+
+   IF hRule[ "head" ] == NIL
+      RETURN NIL
+   ENDIF
+   FOR EACH hTok IN hRule[ "match" ]
+      IF hb_HGetDef( hTok, "role", "" ) == "literal" .AND. ;
+         Upper( hb_HGetDef( hTok, "text", "" ) ) == Upper( hRule[ "head" ] )
+         RETURN hTok
+      ENDIF
+   NEXT
+
+   RETURN NIL
+
+// P21: as linhas do arquivo de uma regra, resolvido pelo PROJETO (o hbmk2 é a
+// fonte de verdade de include path, §1.2 - nada de busca nossa). NIL quando a
+// regra é builtin, quando o header não resolve ou quando não existe: aí o sítio
+// sai sem `text`, que é o fato ("não tenho o fonte"), nunca um texto inventado
+STATIC FUNCTION RuleSrc( hProj, cFile )
+
+   LOCAL cPath
+
+   IF hProj == NIL .OR. cFile == NIL
+      RETURN NIL
+   ENDIF
+   IF hb_HHasKey( s_hRuleSrc, cFile )
+      RETURN s_hRuleSrc[ cFile ]
+   ENDIF
+   cPath := ResolveInclude( hProj, cFile )
+   s_hRuleSrc[ cFile ] := iif( cPath == NIL .OR. ! hb_vfExists( cPath ), NIL, ;
+      hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) ) )
+
+   RETURN s_hRuleSrc[ cFile ]
+
+STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen, aLoc, hProj )
 
    LOCAL hRule, hTok, cSide, nHits := 0, cKey, cWhat, cWhere
 
@@ -7251,13 +7334,20 @@ STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen, aLoc )
                                 ":" + hb_ntos( hTok[ "line" ] ) ) + ;
                            iif( hTok[ "col" ] == NIL, "", ;
                                 ":" + hb_ntos( hTok[ "col" ] + 1 ) ) )
-            Prose( cWhere + ": " + cWhat + hb_eol() )
+            // P21: o preview da linha, como TODO outro sítio tem. Sem ele o
+            // sítio de regra era o único sem, e a régua do caso 137 ("o
+            // envelope carrega tudo o que a prosa tem") ficava verdadeira por
+            // AMBOS os canais estarem incompletos - paridade em cima de um
+            // buraco. Um só lugar decide o texto, então os dois não divergem
+            Prose( cWhere + ": " + cWhat + ;
+                   SrcLine( RuleSrc( hProj, hRule[ "file" ] ), hTok[ "line" ] ) + hb_eol() )
             // a location vive no ARQUIVO DA REGRA (.ch), com posição do token
             // do match/result; builtin ou sem linha não posiciona -> só relato
             IF hRule[ "file" ] != NIL .AND. hTok[ "line" ] != NIL
                LocAdd( aLoc, hRule[ "file" ], hTok[ "line" ], ;
                        iif( hTok[ "col" ] == NIL, {}, { hTok[ "col" ] + 1 } ), ;
-                       Len( hTok[ "text" ] ), cWhat, NIL, "confirmed", NIL )
+                       Len( hTok[ "text" ] ), cWhat, NIL, "confirmed", ;
+                       RuleSrc( hProj, hRule[ "file" ] ) )
             ENDIF
          NEXT
       NEXT

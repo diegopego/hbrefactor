@@ -20,6 +20,75 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
+## 2026-07-27 — it stopped guessing about your strings, and it now says plainly what it cannot see
+
+### A variable's name inside an ordinary string is just a string
+
+Until now, this reported a "possible reference":
+
+```harbour
+LOCAL a, b
+
+a := "b"        // an ordinary string that happens to read like a name
+```
+
+```
+$ hbrefactor usages app.hbp b --func Main
+app.prg:3: declaration (local) in MAIN  | LOCAL a, b
+app.prg:6: write (local) in MAIN  | b := 1
+app.prg:8: read (local) in MAIN  | ? a, b
+```
+
+Three results now, where there were four. The fourth was the tool comparing the *text*
+of a string against the name you asked about — and a local variable cannot be reached by
+name at run time at all, so that report could never have meant anything. The same match
+also made `rename` stop and demand `--force` over strings that had nothing to do with
+your symbol. Both are gone.
+
+**What you lose:** if you really do keep a symbol's name in a string and reach it by name
+later, the tool no longer points at that string. That is deliberate — see the next
+section for where the line now sits.
+
+### What it does not see, said out loud
+
+Harbour lets a program build code while it runs and use it immediately. No refactoring
+tool controls that, and this one does not pretend to:
+
+- **it refuses where it cannot see.** A macro whose target it cannot prove — `&cVar`,
+  where the name is only known at run time — is a hole in the reachable scope, and the
+  command stops instead of guessing:
+
+  ```
+  $ hbrefactor rename app.hbp app.prg:6:12 mNova
+  hbrefactor: the dynamic scope of MAIN has holes:
+    - MAIN (app.prg) uses macro '&'
+  hbrefactor: scope with holes - code outside the static graph may see 'mOutra'; refusing
+  ```
+
+- **it reports where it can see.** When the compiler can say that a string re-expands a
+  given memvar, you get told where — and the string is never edited.
+
+That second case is **one form among many**. Codeblocks built from text, and calls made
+by name through the runtime, are not seen. **No result from this tool should be read as
+"your dynamic code is covered."** What it promises is narrower and firmer: *verified*
+means verified against what compilation can see.
+
+### A command from a header now points at where it is written
+
+A site that comes from a `#command` or `#xcommand` used to be reported at the line where
+the preprocessor finished registering the directive — for a directive continued with `;`,
+that is its **last** line, which is not where the name is. It now points at the head, with
+its column, and shows you that line:
+
+```
+$ hbrefactor usages app.hbp MENUITEM
+menu.ch:7: directive (#command MENUITEM, 4 marker(s))  | #command MENUITEM <label> ACTION <act> AT <row>, <col> => ;
+app.prg:5:4: application (#command MENUITEM, menu.ch:7)  | MENUITEM "Sair" ACTION QOut( "x" ) AT 1, 2
+```
+
+Sites whose name is written inside a header now carry that header's line as preview too,
+so you can see what you are looking at without opening the file.
+
 ## 2026-07-22 → 07-23 — what it can see but must never touch, it now tells you about
 
 The rule has never moved: hbrefactor edits only what the compiler can prove, and it does

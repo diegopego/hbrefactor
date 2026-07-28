@@ -1,0 +1,9 @@
+PROCEDURE Main()
+
+   LOCAL nTotal
+
+   nTotal := 1
+   nTotal := nTotal + nTotal
+   QOut( nTotal )
+
+   RETURN

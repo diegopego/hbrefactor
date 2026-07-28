@@ -284,34 +284,6 @@ done
 
 
 
-unit_8() {
-echo "case 8: usages of a function across modules"
-D=$(fresh case8)
-( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > out.log 2>&1 )
-RC=$?
-check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-"$TCHECK" envloc "$D/out.log" b.prg:5 "definition (function)"
-check "definition found in b.prg"  $?
-"$TCHECK" envloc "$D/out.log" a.prg:10 "call in MAIN"
-check "call found in a.prg (Main)" $?
-
-}
-
-unit_9() {
-echo "case 9: usages of a local variable (scope-aware, incl. codeblock)"
-D=$(fresh case9)
-( cd "$D" && "$BIN" usages fix01.hbp nTotal --func Main --json > out.log 2>&1 )
-RC=$?
-check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-"$TCHECK" envloc "$D/out.log" a.prg:5 "declaration (local) in MAIN"
-check "declaration listed"         $?
-"$TCHECK" envloc "$D/out.log" a.prg:6 "ref (detached, codeblock) in MAIN"
-check "detached codeblock capture listed" $?
-"$TCHECK" envloc "$D/out.log" a.prg:13 "read (local) in MAIN"
-check "read listed"                $?
-
-}
-
 unit_10() {
 echo "case 10: rename-function across modules + idempotence (A->B->A)"
 D=$(fresh case10)
@@ -330,29 +302,6 @@ check "idempotence: A->B->A restores sources" $?
 
 }
 
-unit_11() {
-echo "case 11: string literal with the function name (refuse without --force)"
-D=$(fresh case11)
-printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n' >> "$D/a.prg"
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --json > out.log 2>&1 )
-RC=$?
-check "exit != 0 without --force"  $([ $RC -ne 0 ] && echo 0 || echo 1)
-"$TCHECK" enveq "$D/out.log" reason textual-refs-require-force
-check "refusa por referencia textual (reason)" $?
-"$TCHECK" envhas "$D/out.log" diagnostics "string equal to 'Dupla' - possible call by name"
-check "warning classifies exact-name string" $?
-( cd "$D" && "$BIN" usages fix01.hbp Dupla --json > usages.log 2>&1 )
-"$TCHECK" envhas "$D/usages.log" result "possible reference in string"
-check "usages reports the string reference" $?
-( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --force > out2.log 2>&1 )
-RC=$?
-check "exit 0 with --force"        $([ $RC -eq 0 ] && echo 0 || echo 1)
-grep -q '"Dupla"' "$D/a.prg"
-check "string left untouched"      $?
-grep -q "FUNCTION Dobrar( nV )" "$D/b.prg"
-check "definition renamed"         $?
-
-}
 
 unit_12() {
 echo "case 12: STATIC FUNCTION renamed inside its module only"
@@ -1925,12 +1874,27 @@ check "fixcst/c1.prg (cstruct REAL) clean under -w3 -es2" $?
 check "usages Ponto:x sobre o DSL real exit 0" $?
 grep -q "possible send (dynamic dispatch, receiver unknown) in USACST  | p:x := 1" "$D/px.log"
 check "ESCRITA p:x := 1 listada (fato 11) como possible honesto" $?
-grep -q "possible reference in string  | MEMBER x IS CTYPE_INT" "$D/px.log"
-check "MEMBER x (registro por stringify) listado como possible honesto" $?
+# P22: aqui havia `grep "possible reference in string  | MEMBER x IS CTYPE_INT"`,
+# e ele travava um OVER-CLAIM. A heuristica de string casava
+# `Upper(hItem["text"]) == cUpMeth` sem NENHUM filtro de dona - e este fixture
+# tem `MEMBER x` em DUAS estruturas (Ponto na linha 9, Tela na linha 14). A
+# consulta era `Ponto:x` e as duas eram relatadas: a ferramenta dizia que o
+# membro da Tela era possivel referencia ao Ponto:x.
+#
+# Atribuir um `MEMBER` a uma estrutura exigiria conhecer o agrupamento
+# `C STRUCTURE ... END C STRUCTURE`, que e' semantica de DSL - proibida (§1).
+# Entao a resposta honesta para consulta QUALIFICADA e' nao relatar:
+! grep -q "MEMBER x IS CTYPE_INT" "$D/px.log"
+check "Ponto:x NAO reivindica o MEMBER (atribuir a estrutura exigiria semantica de DSL)" $?
 ! grep -qE "excluded|confirmed" "$D/px.log"
 check "classe de RUNTIME nunca gera excluded/confirmed (o teto é da linguagem)" $?
 ( cd "$D" && "$BIN" usages c1.hbp x > x.log 2>&1 )
 check "consulta crua x também exit 0 (regras de pp criadas por expansão não quebram)" $?
+# ... e o sitio NAO se perde: a consulta crua o traz pelo canal de FATO, no
+# token ESCRITO (9:11) e nomeando a regra que o consome - informacao que a
+# heuristica nao tinha (ela apontava a string, com certeza `possible`)
+grep -q "c1.prg:9:11: name through pp rule (#xcommand MEMBER, cstruct.ch:62)  | MEMBER x IS CTYPE_INT" "$D/x.log"
+check "o MEMBER x vem pelo FATO (derivacao do pp), no token escrito e com a regra" $?
 
 }
 
@@ -3997,7 +3961,11 @@ D=$(fresha4 case121c)
 check "usages da palavra: exit 0" $?
 grep -q "orph.prg:5: directive (#xuncommand FUNDEIA, 2 marker(s)) - ORPHAN: removes no rule (dead directive)" "$D/u.log"
 check "o #un... ORFAO e RELATADO (removeu regra nenhuma)" $?
-grep -q "orph.ch:1: directive (#xcommand FUNDEIA, 1 marker(s))$" "$D/u.log"
+# a asserção é "sem rótulo de órfão", e ela se escreve assim - a versão antiga
+# ancorava em fim de linha ($), o que provava a ausência do rótulo por tabela:
+# qualquer coisa acrescentada à linha (o preview do fonte, P21) a quebrava sem
+# que o fato tivesse mudado
+grep -q "orph.ch:1: directive (#xcommand FUNDEIA, 1 marker(s))" "$D/u.log" && ! grep "orph.ch:1: directive" "$D/u.log" | grep -q "ORPHAN"
 check "a diretiva que CRIA a regra nao leva o rotulo de orfao" $?
 D=$(freshun case121d)
 ( cd "$D" && "$BIN" usages un.hbp LACRA > u.log 2>&1 )
@@ -4320,51 +4288,6 @@ freshdado() { # freshdado <case-name> -> bloco de stream com palavra homonima de
    echo "$d"
 }
 
-unit_125() {
-echo "case 125: P16(a) - op:\"stream\" SUPRIME o dado; a ferramenta NUNCA busca texto no dado"
-# O relato "possible reference in string" existe para um MECANISMO real: uma
-# string ESCRITA igual a um nome pode virar chamada-por-nome (&(), __mvGet), e
-# por isso a ferramenta a relata. A MESMA palavra como linha de um bloco de
-# stream NAO tem esse mecanismo - e' dado impresso, coincidencia de letras. O
-# fato op:"stream" (ast-18) deixa a ferramenta SABER, por FATO, que a linha e'
-# dado, e CALAR sobre ela - sem NUNCA buscar o texto do nome dentro do dado
-# (isso seria gatilho 1: casar TEXTO para afirmar identidade). A heuristica
-# antiga (varrer o dado atras do nome, "occurrence in data") FOI REMOVIDA.
-D=$(freshdado case125)
-# linhas COMPUTADAS do fonte (cicatriz 6.3), nunca contadas na mao
-LWRITTEN=$(grep -n 'cIsca := "Farol"' "$D/dado.prg" | cut -d: -f1)
-LSTREAM=$(grep -nx 'Farol' "$D/dado.prg" | cut -d: -f1)
-
-( cd "$D" && "$BIN" usages dado.hbp Farol > us.log 2>&1 )
-check "usages sai com exit 0" $?
-# a string ESCRITA igual ao nome -> RELATADA (o mecanismo de chamada-por-nome e' real)
-grep -q "dado.prg:$LWRITTEN: possible reference in string" "$D/us.log"
-check "a string ESCRITA igual ao nome sai como 'possible reference in string'" $?
-# a MESMA palavra como linha de bloco de stream -> SILENCIO: o fato op:\"stream\"
-# suprime (dado, sem mecanismo). SEM o fato, a linha (inteira == o nome)
-# dispararia "reference in string" - um falso positivo que o ast-17 abriu.
-! grep -q "dado.prg:$LSTREAM:" "$D/us.log"
-check "a linha do bloco de stream e' SILENCIADA por FATO (op:\"stream\" -> dado, nao referencia)" $?
-# ... e o caminho FUNDO do selo: o eco.prg re-escaneia o que o pp fabricou no
-# modo de stream (`QOut( "<linha>" )` volta para a fila e a regra do modulo o
-# CLONA). Ali o token que chega ao parser carrega SO' op:"clone" - o selo fica
-# UM SALTO ATRAS, no token que a aplicacao consumiu (medido: 0 selos em
-# tokens[], 1 em ppApplications[]). Este check e' o portao da RECURSAO de
-# IsDataTok: amputada a recursao, esta linha volta a sair como referencia.
-LECO=$(grep -nx 'Farol' "$D/eco.prg" | cut -d: -f1)
-! grep -q "eco.prg:$LECO:" "$D/us.log"
-check "a linha de bloco CLONADA por regra tambem e' silenciada (o selo esta' um salto atras - so' a recursao o alcanca)" $?
-# a heuristica antiga NAO existe mais: a ferramenta nao busca texto no dado
-! grep -q "occurrence in data" "$D/us.log"
-check "nenhum 'occurrence in data' (a busca de texto no dado foi REMOVIDA)" $?
-# a definicao e a chamada seguem intactas (o conserto nao come o relato real)
-grep -q "dado.prg:.*definition (function)" "$D/us.log"
-check "a definicao da funcao segue relatada" $?
-
-# régua do caso 64: nenhuma palavra da fixture na ferramenta
-! grep -qiE "\bFarol\b|\bcIsca\b|\bApoio\b|\bEco\b|\bTrilha\b" "$HERE/../src/hbrefactor.prg"
-check "régua do caso 64: nenhuma palavra da fixture fixdado na ferramenta" $?
-}
 
 freshpos() { # freshpos <case-name> -> modulo que expande __LINE__ (P16 b - sensibilidade a posicao)
    local d="$HERE/tmp/$1"
@@ -4614,7 +4537,7 @@ CT=$(awk -v n="$LT" 'NR==n { print index($0, "nPasso") }' "$D/pos.prg")
 check "modulo sem #ifdef desligado: NENHUM aviso de alcance (o portao nao vira ruido)" $?
 }
 
-ALL_UNITS="0 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
+ALL_UNITS="0 10 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 38 39 40 41 42 43 44 45 46 47 48 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 126 127 128 130 131 132 133 134 135 136 137 138 140 141"
 
 # ---------------------------------------------------------------------------
 # B-infra: pool dinamico por-caso (docs/testes-paralelos.md; Etapa 2 -

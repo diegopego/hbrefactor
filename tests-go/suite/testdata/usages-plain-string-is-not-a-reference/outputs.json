@@ -1,0 +1,34 @@
+[
+  {
+    "schema": "cli-2",
+    "command": "usages",
+    "argv": [ "usages", "s.hbp", "b", "--func", "Main", "--json" ],
+    "status": "ok",
+    "exit": 0,
+    "reason": null,
+    "action": null,
+    "detail": "3 result(s) for 'b'",
+    "diagnostics": [],
+    "result": {
+      "query": "b",
+      "total": 3,
+      "returned": 3,
+      "truncated": false,
+      "locations": [
+        { "uri": "file://<CWD>/s.prg",
+          "range": { "start": { "line": 2, "character": 12 }, "end": { "line": 2, "character": 13 } },
+          "kind": "declaration (local)", "owner": "MAIN", "certainty": "confirmed",
+          "text": "LOCAL a, b" },
+        { "uri": "file://<CWD>/s.prg",
+          "range": { "start": { "line": 5, "character": 3 }, "end": { "line": 5, "character": 4 } },
+          "kind": "write (local)", "owner": "MAIN", "certainty": "confirmed",
+          "text": "b := 1" },
+        { "uri": "file://<CWD>/s.prg",
+          "range": { "start": { "line": 7, "character": 8 }, "end": { "line": 7, "character": 9 } },
+          "kind": "read (local)", "owner": "MAIN", "certainty": "confirmed",
+          "text": "? a, b" }
+      ]
+    },
+    "edits": []
+  }
+]

@@ -1,0 +1,10 @@
+PROCEDURE Main()
+
+   LOCAL a, b
+
+   a := "b"
+   b := 1
+
+   QOut( a, b )
+
+   RETURN

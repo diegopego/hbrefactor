@@ -28,19 +28,19 @@
         {
           "start":
           {
-            "line": 7,
-            "character": 0
+            "line": 6,
+            "character": 9
           },
           "end":
           {
-            "line": 7,
-            "character": 0
+            "line": 6,
+            "character": 17
           }
         },
         "kind": "directive (#command MENUITEM, 4 marker(s))",
         "owner": null,
         "certainty": "confirmed",
-        "text": null
+        "text": "#command MENUITEM <label> ACTION <act> AT <row>, <col> => ;"
       },
       {
         "uri": "file://<CWD>/a.prg",
@@ -57,7 +57,7 @@
             "character": 11
           }
         },
-        "kind": "application (#command MENUITEM, menu.ch:8)",
+        "kind": "application (#command MENUITEM, menu.ch:7)",
         "owner": null,
         "certainty": "confirmed",
         "text": "MENUITEM \"Abrir\" ACTION AbreCoisa( nTotal ) AT 5, 10"
@@ -77,7 +77,7 @@
             "character": 11
           }
         },
-        "kind": "application (#command MENUITEM, menu.ch:8)",
+        "kind": "application (#command MENUITEM, menu.ch:7)",
         "owner": null,
         "certainty": "confirmed",
         "text": "MENUITEM \"Sair\" ;"
@@ -100,7 +100,7 @@
         "kind": "in rule match (#command MENUITEM)",
         "owner": null,
         "certainty": "confirmed",
-        "text": null
+        "text": "#command MENUITEM <label> ACTION <act> AT <row>, <col> => ;"
       },
       {
         "uri": "file://<CWD>/b.prg",
@@ -117,7 +117,7 @@
             "character": 11
           }
         },
-        "kind": "application (#command MENUITEM, menu.ch:8)",
+        "kind": "application (#command MENUITEM, menu.ch:7)",
         "owner": null,
         "certainty": "confirmed",
         "text": "MENUITEM \"Sub\" ACTION QOut( nQtd ) AT 7, 12"

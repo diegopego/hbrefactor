@@ -1,0 +1,2 @@
+c.prg(9) >? cMsg<
+#command >QOut( cMsg )<
