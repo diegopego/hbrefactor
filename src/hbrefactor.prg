@@ -497,7 +497,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-20"
+   RETURN "ast-21"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -855,19 +855,20 @@ STATIC FUNCTION Usages( aArgs )
                nHits++
                cKind := hItem[ "access" ] + " (" + hItem[ "scope" ] + ;
                         iif( hItem[ "block" ], ", codeblock", "" ) + ")"
-               // ast-20: a occurrence traz a coluna DELA. Antes vinha só a
-               // linha, e N ocorrências do mesmo nome numa linha caíam todas
-               // no PRIMEIRO token - dois dos três sítios de `n := n + n`
-               // apontavam o lugar errado. Chave OPCIONAL (o símbolo entregue
-               // por macro não tem posição): sem ela, o caminho antigo, que
-               // acerta o caso de token único e é o que sempre foi.
+               // ast-21: a posição do sítio é a do TOKEN que o compilador
+               // ligou a ele - não uma coluna reconstruída aqui. Chaves
+               // OPCIONAIS: sem `col` não existe posição no módulo (nome
+               // escrito num header, símbolo entregue por macro), e o sítio
+               // sai de largura zero. Procurar "o token com este nome nesta
+               // linha" seria adivinhar: a linha pode ter um homônimo escrito
+               // que nada tem a ver com este sítio.
                nCol0 := hb_HGetDef( hItem, "col", NIL )
                nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
                LocAdd( aLoc, cPath, nSiteLn, ;
-                       iif( nCol0 == NIL, TokenCols( hAst, nSiteLn, cName ), { nCol0 + 1 } ), ;
+                       iif( nCol0 == NIL, {}, { nCol0 + 1 } ), ;
                        Len( cName ), cKind, hFunc[ "name" ], "confirmed", aSrc )
-               Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cKind + " in " + ;
-                  hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+               Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + cKind + " in " + ;
+                  hFunc[ "name" ] + SrcLine( aSrc, nSiteLn ) + hb_eol() )
             ENDIF
          NEXT
 
@@ -875,16 +876,16 @@ STATIC FUNCTION Usages( aArgs )
             IF ! lAtPp .AND. Upper( hItem[ "sym" ] ) == cUp
                nHits++
                cKind := "call" + iif( hItem[ "block" ], " (codeblock)", "" )
-               // ast-20, mesmo fato do laço de occurrences: chamada aninhada
-               // (`F( F( x ) ) + F( y )`) põe N sítios numa linha, e sem a
-               // coluna DELES todos caíam no primeiro token
+               // ast-21, mesmo fato do laço de occurrences: chamada aninhada
+               // (`F( F( x ) ) + F( y )`) põe N sítios numa linha, e cada um
+               // sai no token que o parser deu ao nó DELE
                nCol0 := hb_HGetDef( hItem, "col", NIL )
                nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
                LocAdd( aLoc, cPath, nSiteLn, ;
-                       iif( nCol0 == NIL, TokenCols( hAst, nSiteLn, cName ), { nCol0 + 1 } ), ;
+                       iif( nCol0 == NIL, {}, { nCol0 + 1 } ), ;
                        Len( cName ), cKind, hFunc[ "name" ], "confirmed", aSrc )
-               Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + cKind + " in " + ;
-                  hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+               Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + cKind + " in " + ;
+                  hFunc[ "name" ] + SrcLine( aSrc, nSiteLn ) + hb_eol() )
             ENDIF
          NEXT
 
@@ -901,23 +902,25 @@ STATIC FUNCTION Usages( aArgs )
                nHits++
                aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDecl, hInter, hAst ), ;
                                      cClass, hItem[ "block" ], cUpMeth, hGraph )
+               // ast-21: a posição DESTE send. O core desfaz o `_X` que ele
+               // mesmo cria para `o:x := v`, então o par escrita/leitura do
+               // mesmo membro numa linha também resolve certo. Resolvida
+               // FORA do IF: a prosa relata o sítio mesmo quando ele fica de
+               // fora das Location[], e tem de apontar a mesma linha.
+               nCol0 := hb_HGetDef( hItem, "col", NIL )
+               nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
                // excluded é não-referência PROVADA: fica no relato (com o
                // rótulo) mas fora das Location[] do --json - o editor
                // (find all references via extensão) não deve listá-lo.
                // A CERTEZA é a 1a palavra do rótulo (possible/confirmed/
                // guaranteed/excluded) - vira campo, separada do "send"
                IF ! aVerd[ 2 ]
-                  // ast-20: a coluna DESTE send. O core desfaz o `_X` que ele
-                  // mesmo cria para `o:x := v`, então o par escrita/leitura do
-                  // mesmo membro numa linha também resolve certo
-                  nCol0 := hb_HGetDef( hItem, "col", NIL )
-                  nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
                   LocAdd( aLoc, cPath, nSiteLn, ;
-                          iif( nCol0 == NIL, TokenCols( hAst, nSiteLn, cMethTok ), { nCol0 + 1 } ), ;
+                          iif( nCol0 == NIL, {}, { nCol0 + 1 } ), ;
                           Len( cMethTok ), "send", hFunc[ "name" ], FirstWord( aVerd[ 1 ] ), aSrc )
                ENDIF
-               Prose( cModFile + ":" + hb_ntos( hItem[ "line" ] ) + ": " + aVerd[ 1 ] + ;
-                  " in " + hFunc[ "name" ] + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+               Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + aVerd[ 1 ] + ;
+                  " in " + hFunc[ "name" ] + SrcLine( aSrc, nSiteLn ) + hb_eol() )
             ENDIF
          NEXT
       NEXT

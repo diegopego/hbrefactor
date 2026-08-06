@@ -12,6 +12,65 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
+## 0-28. A SESSÃO DE 2026-07-28 — a P21 entregou o MECANISMO, e a fila mudou de dono
+
+**Frente ativa: não é mais a migração da suíte, é a POSIÇÃO DO SÍTIO.** A P21 fechou:
+a coluna de um sítio deixou de ser CONTADA e passa a vir do parser. Detalhes e as
+medições no `docs/roadmap.md` (P21); aqui só o que faz tropeçar.
+
+**Estado dos dois repos: EDITADOS, BUILDADOS, NADA COMMITADO.** `make test`: legado
+**1001/0**, `lexdiff` **100/0**, Go **19/20**. O único vermelho é
+`usages-site-from-include` — **TDD da [P24](roadmap.md), escrito antes do conserto**,
+igual aos três que abriram esta sessão. Não é regressão.
+
+### O mecanismo, em uma frase (para não re-derivar)
+
+O lexer carimba cada símbolo com o índice do token que o inicia; o **bison carrega o
+carimbo na pilha de localizações**, em passo com os valores semânticos; a ação lê `@N`
+e entrega o token ao nó; a geração de código diz em que nó está; o registro do sítio
+lê o token do nó. **`%locations` com `HB_COMP_YYLTYPE` = índice de token.**
+
+> **A sonda achou uma TERCEIRA saída, e as duas que o roadmap listava eram piores.**
+> "Estender o `YYSTYPE` do identificador" assustava pelo ripple em dezenas de `$N` —
+> **por este caminho nenhum `$N` mudou de tipo**. E "o lexer guarda o último
+> IDENTIFIER entregue" seria a mesma inferência com raio menor: o lookahead do parser
+> não garante que o último entregue seja o do símbolo que reduz. **Régua: quando duas
+> saídas parecem ruins, a pergunta certa é o que a FERRAMENTA (aqui, o bison) já
+> mantém para essa necessidade** — era literalmente para isto que a pilha de
+> localizações existe.
+
+### ONDE VOCÊ VAI TROPEÇAR (custou 2 diagnósticos errados nesta sessão)
+
+- **O build do core é `make core`, e SÓ ele** *(Diego, 2026-08-06)*. Nada de
+  incremental, nem para o `harbour` nem para o `hbmk2`: o make do core não rastreia
+  `#include`, então editar um header sai **exit 0 sem recompilar nada** e a medição
+  seguinte responde do binário velho — cheguei a inventar uma teoria sobre a gramática
+  para explicar um binário que não tinha a mudança. `make core` apaga os dois
+  binários, faz `make clean && make`, **regenera o parser quando o `.y` mudou** (é
+  dependência do Makefile, não um `if`) e confere que os dois relincaram. `make
+  core-check` roda só as conferências, em 1s. CLAUDE.md §2,
+  [cicatrizes §5.1](cicatrizes.md).
+- **`tools/pcode-identity.sh` NÃO foi rodado** — exige um `harbour` STOCK e não há um
+  na máquina. As mudanças são todas guardadas por `fAst`, então o pcode com `-x`
+  desligado é o mesmo por construção; mas **a afirmação da página aos mantenedores
+  merece a medição antes do PR**, e mexi no parser. Fica como pendência do commit.
+- **A suíte para no primeiro erro**: com o vermelho de TDD da P24 no `gotest`, ele é o
+  ÚLTIMO da cadeia, então legado/lexdiff/docs ainda rodam. Se algum dia o vermelho for
+  de um alvo anterior, tudo depois dele emudece.
+
+### O que a P21 mudou na FERRAMENTA (e por que dois testes velhos caíram)
+
+- a **prosa** passou a usar a linha do SÍTIO: ela dizia `c.prg:7` enquanto o `--json`
+  dizia 6, para o mesmo statement continuado;
+- o fallback **"primeiro token da linha"** morreu nos três laços. Sem `col`, range de
+  largura zero — nunca um homônimo escrito na mesma linha carimbado de `confirmed`.
+
+Os dois units re-baselinados (`run.sh` 2456 e 2927) afirmavam a prosa velha; o nome de
+um deles descrevia o defeito como contrato (*"guaranteed no site da última linha
+física"*). **Decisão do Diego, pedida site a site** (§3).
+
+---
+
 ## 0. O ESTADO EXATO (2026-07-27, fim da sessão) — **a linguagem foi DECIDIDA: Go**
 
 **A frente ativa é a FASE A.1 passo 2** — a migração da suíte. A escolha da linguagem da

@@ -1048,7 +1048,136 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P21 — o `col` do sítio vem do NÓ, não de contagem: a P20 entregou INFERÊNCIA *(aberto 2026-07-27; **A RESOLVER — regressão da P20**)*
+### P24 — o sítio que veio de DIRETIVA não tem onde ser apontado, e são 40% deles *(aberto 2026-07-28; **A FAZER — `ast-22`; autorizada pelo Diego em 2026-07-27**)*
+
+**O que falta.** Um sítio cujo nome foi escrito num `.ch` sai sem posição: o token
+tem `prov:"i"`, e `hb_compAstToken()` faz `if( ! fMain ) iCol = -1` — a coluna de
+outro arquivo não é coluna deste. Correto para o compilador; para uma ferramenta de
+refatoração é a resposta à pergunta mais útil sobre aquele sítio, e **medido no
+`tbrowse.prg` do core são 40,3% dos sítios** (2.220 com `col` × 1.498 sem), porque
+código Harbour real se constrói sobre DSL.
+
+**Sonda feita (2026-07-27/28), e ela mudou o desenho.** A primeira leitura supunha
+que a cadeia `token → from[].app → ppApplications[app]` já estava publicada. **Não
+está**: o `from[]` só nasce para artefato de operação do pp — colagem, stringify,
+clone (`hb_pp_fromAdd`, ppcore.c:783/808, `cOp` ∈ `c/p/s/d/D/m`). O `nAcc` que a
+regra copia do próprio resultado é token COMUM: sai `{"line":1,"col":null,
+"prov":"i","text":"nAcc"}`, **sem `from`**. Medido no fixture `usages-site-from-include`.
+
+**Mas o fato existe e está a uma linha de distância**: `pState->iDrvApp`
+(ppcore.c:1680) é o índice da aplicação corrente, posto assim que
+`hb_pp_trackApply()` registra o `ppApplications[]` — é dele que as entradas de
+derivação já se servem. O que falta é estampá-lo nos tokens de resultado COMUNS, não
+descobri-lo.
+
+**Escopo**
+- **pp**: estampar cada token de resultado de uma aplicação com o índice dela,
+  na mesma tabela lateral por identidade de token que o `pFrom` já usa
+  (`hb_pp_posFind`) — nunca por texto. API pública nova no feitio das que existem
+  (`hb_pp_tokenAppGet`), seguindo §1.2: **NUNCA mudar a saída de um comando/consulta
+  existente**, sempre um canal novo.
+- **compast**: publicar `"app": N` no token do canal `tokens[]`. Schema
+  `ast-21 → ast-22`. Nada muda em `col`/`tokLine`: sítio sem token no módulo continua
+  sem posição, e é o consumidor que decide o que mostrar.
+- **ferramenta**: sítio sem `col` cujo token tem `app` sai na posição da CABEÇA da
+  aplicação (`ppApplications[app].tokens[0]`, que já traz `line`/`col`/`len`) — o
+  lugar que o programador de fato escreveu e onde uma edição precisaria tocar. Sem
+  `app`, segue de largura zero.
+- **régua que não afrouxa**: nada de "a aplicação que está na mesma linha do sítio" —
+  duas diretivas numa linha (`CMD_A 1 ; CMD_B 2`) tornam isso adivinhação. É o
+  índice ou é nada.
+
+**Critério de pronto (mecânico)**: `usages-site-from-include` verde (uso em `6:3..11`,
+a entrada do `.ch` com `text`); um caso com **DUAS aplicações na mesma linha** provando
+que cada sítio vai para a sua (o caso que a régua acima existe para travar);
+`grep '"app"' `no dump do fixture com resultado; `lexdiff` 0; `make test` verde.
+
+**Fora de escopo** (some junto se alguém confundir): publicar a coluna do token no
+`.ch`. A pergunta que a ferramenta responde é *"onde eu edito"*, e a resposta é a
+aplicação no `.prg` — o `.ch` já sai como entrada própria do relato.
+
+### P21 — o `col` do sítio vem do NÓ, não de contagem: a P20 entregou INFERÊNCIA *(aberto 2026-07-27; **MECANISMO ENTREGUE 2026-07-27 `ast-21` — 3 DECISÕES DO DIEGO ABERTAS, ver § abaixo**)*
+
+> **O mecanismo explicado do zero**: [posicao-do-sitio.md](posicao-do-sitio.md).
+> Aqui fica o registro da fase; lá, o porquê de cada elo.
+
+**O que foi entregue (core + ferramenta):** a contagem morreu e a
+posição do sítio passa a vir do PARSER. O mecanismo não é nenhuma das duas saídas que
+esta fase listou — a sonda achou uma terceira, e ela é a que o bison existe para dar:
+
+- **`%locations` com `HB_COMP_YYLTYPE` = índice do token** (`hbcompdf.h`). O lexer
+  carimba cada símbolo que entrega (`hb_compAstTokMark`), o bison carrega os carimbos
+  na pilha de localizações **em passo com os valores semânticos**, e a ação lê `@N`.
+  **Nenhum `$N` mudou de tipo** — era esse o custo que assustava na saída "estender o
+  `YYSTYPE` do identificador", e ele simplesmente não existe por este caminho.
+  `YYLLOC_DEFAULT` vira UMA atribuição; a pilha cresce 8 bytes por símbolo.
+- **`HB_AST_AT( expr, @N )`** em 13 sítios da gramática entrega o token ao nó.
+- **`HB_EXPR_USE` marca o nó que está sendo gerado** (`hb_compAstExprUse`), e o
+  registro do sítio lê o token do nó marcado. Com `-x` desligado é um teste de flag
+  já em cache e a mesma chamada indireta de sempre.
+- **Onde a geração lê o nome de OUTRO nó** — as otimizações de operador
+  (`x := x + y` → `x += y`) e a chamada otimizada, que leem o nome direto do filho —
+  o sítio diz de quem ele é (`hb_compAstVarFind`, `HB_AST_SITE_BEGIN`). Sem isso o
+  fato saía **ausente**, não errado: foi assim que a captura por codeblock apareceu.
+- **`hb_compAstSiteCol()` DELETADO**, e com ele a janela para trás nos três
+  recordadores. Sem token: **fato ausente**.
+- **Ferramenta**: a prosa passou a usar a linha do SÍTIO (`tokLine`), que era a
+  lacuna nomeada aqui — ela dizia `c.prg:7` enquanto o `--json` dizia 6. E o
+  **fallback "primeiro token da linha" foi removido** dos três laços: sem `col`,
+  range de largura zero, nunca um homônimo da mesma linha carimbado de `confirmed`.
+
+**Medido (as três provas desta fase, todas compilando sob `-w3 -es2`):**
+
+| repro | ast-20 dizia | ast-21 diz | verdade |
+|---|---|---|---|
+| `nTotal := 0 + Eval( {\| x \| nTotal += x }, 1 ) + nTotal` | use 3, ref 30, read 51, write **51** | use 30, ref 30, read 51, write 3 | ✅ |
+| `o:Description := o:Description + "!"` | **5, 5** (leitura nunca relatada) | 5 e 22 | ✅ |
+| `FOR i := 1 TO 3` / `nSoma += i` / `NEXT` | `tokLine` 7 `col` **15** (sítio alheio) | `line` 8, `tokLine` 6, `col` 7 | ✅ |
+| `Dobro( Dobro( 2 ) ) + Dobro( 3 )` | 8, 15, 30 (por contagem) | 8, 15, 30 (por fato) | ✅ |
+
+`make test`: legado **999/2**, `lexdiff` **100 concordantes / 0 divergências**, Go
+**18/20**. Os 4 vermelhos são as três decisões abaixo — nenhum é defeito de mecanismo.
+
+#### As três decisões do Diego — TOMADAS em 2026-07-27
+
+**(1) `nTotal := nTotal + nTotal` — a expectativa da P20 era FABRICADA.** O
+compilador otimiza `var := var <op> exp` para `var <op>= exp`
+(`hb_compExprUseAssign`, HB_EA_REDUCE) e **libera o nó do operando do meio**. Sobram
+**3 registros para 3 tokens**, e eles não são 1:1: `use`+`ref` descrevem o alvo
+(col 3, o mesmo token, como na captura por codeblock) e `read` a ponta direita
+(col 22). **O token do meio (col 13) não tem sítio nenhum** — e nunca teve; a P20
+lhe deu uma coluna por contar 1º/2º/3º. Provado com nomes distintos: `nTotal := nA +
+nB` sai read 13 / read 18 / write 3, tudo exato; `nTotal := nB + nTotal` (que não
+otimiza) sai 13/18/3.
+**DECIDIDO — estender o core** (*"perder uma ocorrência escrita num
+find-all-references é regressão de produto"*): `hb_compAstFoldedRead()` registra a
+leitura do operando ANTES de o reduce liberar o nó. A linha passa a sair
+`read 13 / use 3 / ref 3 / read 22` — os **três tokens escritos cobertos**, com o
+alvo em dois registros no mesmo token (a mesma forma da captura por codeblock). O
+caso foi reescrito à mão para esse contrato.
+
+**(2) Dois units do `run.sh` afirmam a PROSA VELHA** (2456 e 2927), e o nome do
+segundo descreve o defeito como se fosse contrato: *"guaranteed no site da última
+linha física"*. Eles esperam `q1.prg:93` e o preview `.T. }` — a última linha física
+de um statement continuado. A prosa agora aponta a linha ESCRITA, igual ao `--json`.
+São teste PRÉ-EXISTENTE (§3 do CLAUDE.md).
+**DECIDIDO — re-baselinar os dois**, e o vizinho deles reforça: a asserção de
+`run.sh:2910` já cobrava do `annotate` a **linha ESCRITA** (*"89 - a linha ESCRITA,
+não a do declLine"*). A prosa do `usages` era a única peça fora de passo.
+
+**(3) O sítio vindo de INCLUDE — a "decisão pendente" desta fase, agora com número.**
+O caso `usages-site-from-include` pede o uso em `6:3..11` (o token `CMD_SOMA` da
+aplicação). Hoje sai `6:0..0`. **O fato NÃO está publicado**: o token `nAcc` do `.ch`
+sai `prov:"i"`, sem `col` (o core descarta coluna de outro arquivo) e **sem `from`**,
+então não há como ligá-lo à aplicação. A cadeia honesta existe e é curta —
+token → `from[].app` → `ppApplications[app].tokens[0]`, que JÁ traz `line/col/len`
+— e a sonda de 2026-07-28 mostrou que **nem esse elo existe**: `from[]` só nasce para
+artefato de operação do pp, e o token comum copiado do resultado da regra não tem
+nenhum. O fato está em `pState->iDrvApp`, a uma estampa de distância.
+**DECIDIDO — abrir a fase agora**: virou a
+**[P24](#p24--o-sítio-que-veio-de-diretiva-não-tem-onde-ser-apontado-e-são-40-deles)**
+(`ast-22`), com escopo e critério escritos. `usages-site-from-include` fica vermelho
+até lá, e é o único vermelho da P21.
 
 **Achado na revisão do próprio intervalo da P20.** A entrega dela reconstrói a coluna
 **contando**: `hb_compAstSiteCol()` casa o K-ésimo registro de um nome numa linha com o

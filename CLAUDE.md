@@ -208,13 +208,28 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
 
 ## 2. Core e toolchain
 
-- **Buildar o core após editar — 3 armadilhas** *(Diego, 2026-07-11. [cic §5.1])*:
-  (a) mudança no compilador exige rebuildar `harbour` **E** `hbmk2` (o hbmk2 EMBUTE o
-  compilador); (b) o `make` mente "up to date" e não relinca → apagar os binários
-  (`rm bin/linux/gcc/harbour bin/linux/gcc/hbmk2`) e refazer; (c) `HB_REBUILD_PARSER=yes`
-  regenera o `obj/<plat>/harboury.c`, **não** os `harbour.yyc`/`.yyh` commitados — copiar
-  à mão e commitar os três juntos (`.y` + `.yyc` + `.yyh`), conferindo que um rebuild
-  default carrega a feature.
+- **BUILD DO CORE É SEMPRE LIMPO — `make core`, e nada de incremental** *(Diego,
+  2026-08-06: "não se deve usar a compilação incremental para evitar surpresas. isso se
+  aplica ao harbour e ao hbmk2")*. O `make` do core **não rastreia `#include`**: editar
+  um header — ou um `.c` que outro inclui, como o `include/hbexprb.c` — e rodar `make`
+  sai **exit 0 sem recompilar nada**, e a medição seguinte responde do binário VELHO.
+  Não é ruído: é o modo de falha que produz diagnóstico inventado, porque a ferramenta
+  roda e responde. **Nunca `make` no core direto; nunca "apago só os `.o` que eu acho
+  que mudaram".** *([cic §5.1])*
+  - `make core` apaga os dois binários, `make clean && make`, e **CONFERE que `harbour`
+    e `hbmk2` relincaram** — build que "passou" sem produzir binário novo reprova. O
+    hbmk2 **EMBUTE** o compilador, por isso são os dois sempre.
+  - **Mora no Makefile, não num script** *(Diego, 2026-08-06: "é preferível do que ter
+    scripts espalhados")*. `make core-check` roda só as conferências, em 1s, e responde
+    a pergunta cujo NÃO responder custou os dois diagnósticos: *o binário que eu estou
+    medindo é o do fonte de agora?* É contra ele que os controles negativos rodam.
+  - Ele também fecha a armadilha do parser: `HB_REBUILD_PARSER=yes` regenera o
+    `obj/<plat>/harboury.c`, **não** os `harbour.yyc`/`.yyh` **commitados** (que são o
+    que um checkout limpo usa). Mudou o `harbour.y`, o script regenera e regrava os dois
+    — **commitar os três juntos** (`.y` + `.yyc` + `.yyh`).
+  - **Controle positivo barato do ritual do parser**: rodar o bison **sem mudança
+    nenhuma** e diferenciar contra o `.yyc` commitado; divergir só nos `#line` e no
+    include guard prova que a sua versão é a que gerou o commitado. *([cic §5.1e])*
 - **Exportar `HB_BIN` ao invocar a ferramenta fora do Makefile**: sem ele o `HbMk2Bin()`
   cai no hbmk2 do sistema e o sintoma é o enganoso "o projeto não compila". *([cic §5.2])*
 - **Ferramenta do core: PROBE, nunca memória**: antes de consumir a saída de um utilitário,

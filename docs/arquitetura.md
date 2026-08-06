@@ -42,6 +42,17 @@ verificação independente — recompila antes/depois, compara byte a byte
 3. Refatoração é operação de PROJETO — altitude do hbmk2, não do compilador.
 4. Editor ≠ verificador só existe com o motor fora.
 
+## Como a POSIÇÃO de um sítio viaja (ast-21)
+
+O lexer carimba cada símbolo com o índice do token que o inicia; o **bison carrega
+o carimbo na sua pilha de localizações**, em passo com os valores semânticos; a
+ação da regra lê `@N` e entrega o token ao nó; a geração de código diz em que nó
+está; o registro do sítio lê o token do nó. **Nenhuma etapa adivinha.**
+
+Explicação completa — inclusive por que contar tokens numa linha é inferência, e
+por que o `nBirthTok` do nó não serve — em
+[posicao-do-sitio.md](posicao-do-sitio.md).
+
 ## Pontos de gancho (mapa)
 
 | Fato | Gancho | Onde |

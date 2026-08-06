@@ -637,7 +637,7 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
     { "sym": "NTOTAL", "scope": "local"|"detached"|"static"|"memvar"|
                         "field"|"memvar_implicit",
       "line": 12,     // ATENÇÃO: statement continuado → ÚLTIMA linha física
-      "col": 13,      // ast-20: coluna 0-based DESTE sítio (ver § abaixo)
+      "col": 13,      // ast-21: coluna 0-based DESTE sítio (ver § abaixo)
       "access": "read"|"write"|"ref"|"use",
       "block": false, // true = dentro de corpo de codeblock
       "filewide": true /* só quando static file-wide */ } ],
@@ -670,14 +670,14 @@ nó — tipam o receptor pelo bloco EXATO); `ALIASVAR/ALIASEXPR` → `alias`+`va
 `expr`; `SETGET` → `var`+`expr`; `MACRO` → `val`+`expr`; `RTVAR` → `val`.
 Folhas com `val`: VARIABLE, FUNNAME, STRING (+ NUMERIC/LOGICAL/DATE).
 
-### `col` e `tokLine` nos três canais de SÍTIO (ast-20)
+### `col` e `tokLine` nos três canais de SÍTIO (ast-21)
 
 `occurrences[]`, `calls[]` e `sends[]` carregam a posição do token daquele sítio.
 **Duas chaves, ambas OPCIONAIS** — ler com `hb_HGetDef`:
 
 | chave | o que é | quando aparece |
 |---|---|---|
-| `col` | coluna **0-based** do token do sítio | quando a posição é conhecida |
+| `col` | coluna **0-based** do token do sítio | quando o sítio TEM token escrito neste módulo |
 | `tokLine` | linha **física** do token do sítio | **só quando difere de `line`** |
 
 **`line` NÃO mudou de significado** e nunca vai mudar: é a linha em que o
@@ -688,29 +688,51 @@ por ela continua funcionando. Quem quer o **lugar** do sítio lê
 **Dois problemas distintos, ambos medidos antes do conserto:**
 
 1. **N sítios do mesmo nome numa linha eram indistinguíveis** — o consumidor
-   resolvia todos pelo PRIMEIRO token. `n := n + n` saía em 3/3/3 (reais 3/13/22);
+   resolvia todos pelo PRIMEIRO token. `n := n + n` saía em 3/3/3;
    `Dobro( Dobro( 2 ) ) + Dobro( 3 )` em 8/8/8 (reais 8/15/30);
    `? o:Description, o:Description` em 7/7 (reais 7/22).
 2. **Statement continuado com `;`**: `line` é a ÚLTIMA linha física do statement,
    e o sítio está numa anterior. O uso de `cMsg` em `OutStd( "x" + ; / cMsg + ; /
    "y" )` saía na linha do `"y" )`, coluna 0, com o texto errado.
 
-**Nenhuma das duas posições é adivinhada**, e elas vêm de caminhos diferentes:
+> **O mecanismo inteiro, explicado**: [posicao-do-sitio.md](posicao-do-sitio.md) —
+> por onde a posição viaja, a saída que não serve e por quê, e os três lugares
+> onde a cadeia se rompe. Aqui fica só o CONTRATO.
 
-- **`col` na mesma linha**: o K-ésimo sítio de um nome numa linha casa com o
-  K-ésimo token de fonte daquele nome na **mesma** linha. A âncora na linha limita
-  o estrago — nome que o fluxo não traz deixa o fato ausente e não desloca nenhum
-  outro sítio.
-- **`tokLine` + `col`**: capturados quando o sítio é **REGISTRADO**, pela mesma
-  janela para trás que as `declarations` já usavam. É o que resolve o continuado,
-  onde não há token nenhum na linha do registro.
+**A posição vem do PARSER, e é o mesmo fato para os dois problemas.** O lexer
+carimba cada símbolo que entrega com o índice do token que o inicia; o bison
+carrega os carimbos na pilha de localizações, em passo com os valores semânticos;
+a ação da regra lê `@N` e sabe o token que escreveu aquele nome. A geração de
+código diz em que nó está, e o registro do sítio lê o token do nó. **Não há
+contagem, nem aritmética de lookahead, nem busca por nome no fluxo de tokens** —
+e por isso a ordem em que o compilador registra os sítios (que é a de REDUÇÃO)
+não precisa coincidir com a ordem em que os nomes foram escritos.
+
+> **O `ast-20` fazia isso por CONTAGEM** — casava o K-ésimo registro de um nome
+> numa linha com o K-ésimo token daquele nome na mesma linha — e essa versão
+> desta seção afirmava duas coisas FALSAS: que *"a âncora na linha limita o
+> estrago"* e que o fato saía ausente em vez de errado. Saía **errado**: em
+> `nTotal := 0 + Eval( {| x | nTotal += x }, 1 ) + nTotal` o alvo da atribuição
+> era relatado na coluna da leitura da ponta direita.
 
 Mensagem escrita como atribuição (`o:x := v`) é registrada sob o nome manjado `_X`
 do próprio compilador enquanto o token lê `X`; o core desfaz esse prefixo — é ele
 lendo o próprio registro, não chutando sobre o fonte.
 
-**Fato ausente ≠ fato errado**: sem nenhuma das duas posições (símbolo entregue por
-macro, cuja posição o pp não tem — P18), as chaves simplesmente não vêm.
+**Fato ausente, e ele é comum.** As chaves não vêm quando o sítio não tem token
+escrito **neste módulo**:
+
+- nome que chega por **diretiva/include** (`#xcommand ... => nAcc += <v>`): o token
+  existe, mas no `.ch` — e `hb_compAstToken()` descarta a coluna de outro arquivo.
+  Medido no `tbrowse.prg` do core: **40,3% dos sítios**, porque código Harbour real
+  se constrói sobre DSL;
+- símbolo entregue por **macro**, cuja posição o pp não tem (P18);
+- nome que o **próprio compilador** inventa (enumerador de `FOR EACH`, `Self`
+  implícito), que não foi escrito por ninguém.
+
+Nesses casos o consumidor recebe `line` e nada mais, e é isso que ele deve
+relatar — **procurar "o token com este nome nesta linha" é adivinhar**: a linha
+pode conter um homônimo escrito que nada tem a ver com aquele sítio.
 
 Semânticas importantes:
 - `stmt` = statement-expressão completo; `push` = expressão empurrada em

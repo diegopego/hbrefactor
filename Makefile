@@ -17,11 +17,24 @@ GO     ?= $(shell command -v go 2>/dev/null || echo $(HOME)/.local/go/bin/go)
 HBMK2  := $(HB_BIN)/hbmk2
 BIN    := bin/hbrefactor
 
+# o core, para o alvo `core`. Tudo derivado da MESMA fonte única - <plat>/<comp>
+# saem do próprio HB_BIN (.../bin/linux/gcc), nunca de um chute.
+HB_CORE   ?= $(shell sh tools/hbenv.sh --print HB_CORE)
+CORE_COMP  = $(notdir $(HB_BIN))
+CORE_PLAT  = $(notdir $(patsubst %/,%,$(dir $(HB_BIN))))
+CORE_SRC   = $(HB_CORE)/src/compiler
+CORE_OBJ   = $(CORE_SRC)/obj/$(CORE_PLAT)/$(CORE_COMP)
+CORE_Y     = $(CORE_SRC)/harbour.y
+CORE_YYC   = $(CORE_SRC)/harbour.yyc
+CORE_BINS  = $(HB_BIN)/harbour $(HB_BIN)/hbmk2
+# o schema que o FONTE declara agora - é contra ele que os binários são conferidos
+CORE_SCHEMA = $(shell sed -n 's/^\#define HB_AST_SCHEMA  *"\(ast-[0-9]*\)".*/\1/p' $(CORE_SRC)/compast.c)
+
 # `make` sem argumento mostra o help (convenção comum) - nunca dispara um build
 # por engano. `make build` continua compilando.
 .DEFAULT_GOAL := help
 
-.PHONY: build test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
+.PHONY: build core core-check test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
 
 # RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
 # bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
@@ -30,6 +43,60 @@ RC ?= $(HOME)/.bashrc $(HOME)/.zshrc
 
 ## build       compila a ferramenta em bin/hbrefactor
 build: hooks $(BIN)
+
+## core        rebuilda o harbour-core LIMPO (harbour + hbmk2) - o unico jeito
+# BUILD INCREMENTAL DO CORE NAO SE USA (Diego, 2026-08-06): o make dele nao
+# rastreia `#include`, entao editar um header sai exit 0 SEM RECOMPILAR NADA e a
+# medicao seguinte responde do binario VELHO. Vale para os dois: o hbmk2 EMBUTE o
+# compilador. CLAUDE.md §2, cicatrizes §5.1.
+core: $(CORE_YYC)
+	@echo "core: $(HB_CORE)  ($(CORE_PLAT)/$(CORE_COMP))  branch: $$(git -C $(HB_CORE) rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+	@[ "$$(git -C $(HB_CORE) rev-parse --abbrev-ref HEAD 2>/dev/null)" = feature/compiler-ast-dump ] || \
+		echo "core: AVISO - o branch esperado e' feature/compiler-ast-dump"
+	@# os binarios somem ANTES: sem isso o make relata "up to date" e nao relinca
+	rm -f $(CORE_BINS)
+	cd $(HB_CORE) && $(MAKE) clean >/dev/null && $(MAKE) -j$(if $(JOBS),$(JOBS),8)
+	@$(MAKE) --no-print-directory core-check
+
+# o parser COMMITADO e' o que um checkout limpo usa; HB_REBUILD_PARSER=yes
+# regenera so' o artefato de build (obj/**/harboury.c) e deixa os .yyc/.yyh para
+# tras. Aqui e' dependencia de verdade - e e' disto que o make e' feito.
+# Gerado de dentro do obj/ com o caminho relativo que o make do core usaria, para
+# que os `#line` batam byte a byte com um build HB_REBUILD_PARSER=yes.
+$(CORE_YYC): $(CORE_Y)
+	@command -v bison >/dev/null || { echo "core: harbour.y mudou e nao ha bison no PATH" >&2; exit 1; }
+	@echo "core: harbour.y > harbour.yyc - regenerando ($$(bison --version | head -1))"
+	@mkdir -p $(CORE_OBJ)
+	cd $(CORE_OBJ) && bison -d -oharboury.c ../../../harbour.y
+	cp $(CORE_OBJ)/harboury.c $(CORE_YYC)
+	cp $(CORE_OBJ)/harboury.h $(CORE_SRC)/harbour.yyh
+	@echo "core: COMMITE OS TRES JUNTOS (.y + .yyc + .yyh)"
+
+## core-check  confere que harbour+hbmk2 estao em passo com o fonte (sem rebuildar)
+# Alvo proprio porque a conferencia vale sozinha - responde em 1s "o binario que
+# estou medindo e' o do fonte de agora?", que e' a pergunta cujo NAO responder
+# custou dois diagnosticos errados. E' tambem o que torna a guarda TESTAVEL: os
+# tres controles negativos (binario velho, ausente, schema fora de passo) se
+# rodam contra ele, nao contra um rebuild de minutos.
+core-check:
+	$(call core-check-one,$(HB_BIN)/harbour)
+	$(call core-check-one,$(HB_BIN)/hbmk2)
+	@echo "core: ok - $$($(HB_BIN)/harbour -build 2>&1 | head -1)  [$(CORE_SCHEMA)]"
+
+# as conferencias de UM binario. Build que "passou" sem produzir binario novo e'
+# exatamente o modo de falha que este alvo existe para matar, entao ele e'
+# VERIFICADO, nao presumido. As tres tem controle negativo rodado.
+define core-check-one
+	@[ -x $(1) ] || { echo "core: FALHOU - $(1) nao existe apos o build" >&2; exit 1; }
+	@[ ! $(1) -ot $(CORE_Y) ] || { echo "core: FALHOU - $(1) e' mais VELHO que o fonte; nao relincou" >&2; exit 1; }
+	@# o CONJUNTO de versoes dentro do binario tem de ser exatamente {SCHEMA}:
+	@# sobrou outra = objeto velho linkado junto. Extrai os tokens em vez de casar
+	@# a linha - no hbmk2 a string mora colada a outras, e um `grep -x` responderia
+	@# "nao tem" sobre um binario correto (medido).
+	@got=$$(strings $(1) | grep -oE 'ast-[0-9]+' | sort -u | tr '\n' ' '); \
+	 [ "$$got" = "$(CORE_SCHEMA) " ] || \
+	   { echo "core: FALHOU - $(1) carrega [$${got% }], o fonte declara '$(CORE_SCHEMA)'" >&2; exit 1; }
+endef
 
 # a lista sai dos comentários `## <alvo> <descrição>` dos próprios alvos:
 # uma fonte de verdade só, senão a ajuda envelhece caladinha

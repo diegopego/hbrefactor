@@ -2452,8 +2452,8 @@ grep -q "q1.prg:82: possible send (dynamic dispatch, receiver unknown, codeblock
 check "bloco lendo detached de binding único: possible pleno (RE.3)" $?
 grep -q "q1.prg:85: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN" "$D/ms.log"
 check "parâmetro de bloco (união dos Evals): possible pleno (RE.3)" $?
-grep -q "q1.prg:90: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN" "$D/ms.log"
-check "param de bloco em statement continuado: o mesmo possible" $?
+grep -q "q1.prg:89: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bCont := {| oCont | oCont:Soma( 6 ), ;" "$D/ms.log"
+check "param de bloco em statement continuado: o mesmo possible, na linha ESCRITA (89, nao a 90 do fim do statement)" $?
 grep -q "q1.prg:93: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN" "$D/ms.log"
 check "bloco que sai da função (leitura fora de Eval): possible honesto" $?
 grep -q "q1.prg:96: possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN" "$D/ms.log"
@@ -2923,8 +2923,8 @@ echo "-prgflag=-kt" >> "$D/fixb7b.hbp"
 check "usages exit 0" $?
 grep -q "guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN  | bPar := {| oPar AS CLASS MOEDA | oPar:Soma( 2 ) }" "$D/u1.log"
 check "q1:85 (semente 86): param de bloco anotado, imposto por Eval - guaranteed" $?
-grep -q "guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN  | .T. }" "$D/u1.log"
-check "q1:89-90 (semente 86, continuado): guaranteed no site da última linha física" $?
+grep -q "guaranteed send (receiver AS CLASS MOEDA imposed by -kt checks, codeblock) in MAIN  | bCont := {| oCont AS CLASS MOEDA | oCont:Soma( 6 ), ;" "$D/u1.log"
+check "continuado (semente 86): guaranteed no site da linha ESCRITA, com o preview dela - nao a ultima linha fisica" $?
 grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bSolto" "$D/u1.log" && \
    grep -q "possible send (dynamic dispatch, receiver unknown, codeblock) in MAIN  | bMulti" "$D/u1.log"
 check "venenos seguem possible honesto" $?

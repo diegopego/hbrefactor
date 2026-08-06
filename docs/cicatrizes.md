@@ -439,6 +439,50 @@ Provado na fase RD (`_HB_INLINESELF`, core `da61c647cb`):
 - **(c)** `HB_REBUILD_PARSER=yes` regenera o `obj/<plat>/harboury.c` (artefato de build),
   **NÃO** o `harbour.yyc`/`.yyh` **commitados**. Sem copiar à mão, um checkout limpo
   (build default, sem a flag) usa a **gramática velha**.
+- **(d) MUDAR UM HEADER (ou um `.c` INCLUÍDO) NÃO RECOMPILA NADA** *(2026-07-27, P21)*.
+  O make do core não rastreia `#include`: editei `include/hbexprop.h` e `include/hbexprb.c`
+  (que o `src/compiler/exproptb.c` inclui), rodei `make`, ele saiu **0**, e o `.o` era o
+  de duas horas antes. **O sintoma é o pior possível: a medição roda, responde, e a
+  resposta é do código velho** — perdi dois diagnósticos assim, um deles inventando uma
+  teoria sobre a gramática para explicar um binário que não tinha a mudança.
+
+  **POR QUE ele mente, e o mecanismo importa para não achar que foi azar:** o make
+  decide recompilar comparando DATAS — se `foo.c` é mais novo que `foo.o`, refaz. O
+  make do core **só declara essa dependência para o `.c`**; ele não sabe quais headers
+  cada `.c` inclui. Editar um header, então, não muda **nada que o make olhe**: ele
+  confere os `.c`, vê que nenhum mudou, e diz "nada a fazer". Não é um erro de build,
+  que berra — é a ferramenta rodando normal e respondendo com o código de horas antes.
+
+  **VEREDITO DO DIEGO (2026-08-06), e ele encerra as armadilhas (a)/(b)/(d) de uma vez:**
+  *"não se deve usar a compilação incremental para evitar surpresas. isso se aplica ao
+  harbour e ao hbmk2."* A minha régua da véspera — *"apague os `.o` certos"* — era
+  disciplina, e disciplina é exatamente o que falha; ela ainda pedia que eu ADIVINHASSE
+  quais objetos o header alcança. **O build é limpo, ponto**, e virou portão:
+  `make core` — **no Makefile do hbrefactor, não num script à parte** (*"é preferível
+  do que ter scripts espalhados"*, Diego): apaga os dois binários, roda
+  `make clean && make` e **CONFERE que os dois relincaram** (build que "passou" sem
+  binário novo reprova), mais o schema declarado pelo fonte dentro dos dois. As
+  conferências têm alvo próprio (`make core-check`, 1s) — é o que as torna TESTÁVEIS
+  sem um rebuild de minutos. É o §1.6 aplicado a mim: regra nova sem portão novo é
+  regra que eu violo de novo.
+
+  *Ganho que só apareceu ao mover para o make:* a sincronização do parser deixou de ser
+  um `if` de shell e virou **dependência** (`harbour.yyc: harbour.y`) — que é aquilo de
+  que o make é feito. Regenera quando e só quando precisa, e a receita reproduz o
+  `.yyc` commitado byte a byte.
+
+  *Nota de método, e ela quase passou:* meu primeiro controle negativo do script
+  "falhou corretamente" — e era **falso**, porque a cópia no scratchpad não achava o
+  `hbenv.sh` e morria antes de chegar na guarda. A segunda tentativa neutralizou o build
+  mas não o `rm -f` dos binários, então **apagou os binários de verdade** e o controle
+  positivo reprovou por outro motivo. Só a terceira, neutralizando os dois e rodando
+  A(fresco)/B(velho)/C(ausente), provou a guarda. **Sonda que responde o que eu queria
+  ouvir é a que mais precisa de controle positivo** (§1.3e).
+- **(e) O ritual do parser tem CONTROLE POSITIVO barato** *(2026-07-27)*: rodar o bison
+  **sem nenhuma mudança** e diferenciar contra o `.yyc` commitado. Se só divergirem os
+  `#line` e o include guard, a sua versão de bison é a mesma que gerou o commitado e o
+  diff da regeneração vai ser só a sua mudança. Gerar de `src/compiler/obj/<plat>/gcc/`
+  com `bison -d -oharboury.c ../../../harbour.y` reproduz até os caminhos dos `#line`.
 
 ### 5.2 O "projeto não compila" que era o hbmk2 errado (fase P2a)
 

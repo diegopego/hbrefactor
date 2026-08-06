@@ -1,0 +1,2 @@
+m.prg(7) >? o:Description<
+#command >QOut( o:Description )<
