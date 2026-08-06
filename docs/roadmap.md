@@ -189,7 +189,7 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
 
-## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO *(aberta 2026-08-06, por medição; posição do Diego: lock por projeto)*
+## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 entregue 2026-08-06; W.2 aberta; W.3 bloqueada)**
 
 **O achado que abre a fase.** Todo comando dispara `hbmk2 <alvos> -hbcmp -rebuild -prgflag=-x<tmp>/`
 ([`AstDumps`](../src/hbrefactor.prg)) **sem `-workdir`** — e no modo `-hbcmp` o hbmk2 escreve os
@@ -202,7 +202,7 @@ Contraste medido: no **build completo** sem `-inc`, o hbmk2 usa `/tmp/hbmk_XXXX.
 invocação** e apagado no fim (duas invocações seguidas → `hbmk_tfk7lc.dir`, `hbmk_9lyhcz.dir`). O
 isolamento existe no hbmk2; o modo que nós usamos é justamente o que não o tem.
 
-### Fase W.1 — `-workdir` PRÓPRIO em todo hbmk2 que a ferramenta dispara
+### Fase W.1 — `-workdir` PRÓPRIO em todo hbmk2 que a ferramenta dispara — **✅ ENTREGUE 2026-08-06**
 
 **Escopo.** `AstDumps` (e qualquer outra chamada de hbmk2 sem workdir explícito) passa
 `-workdir=<nosso tmp>` — a raiz da fase H (`$TMPDIR/hbrefactor/...`), nunca o projeto. O
@@ -215,6 +215,21 @@ pontos para o comando que roda em TODOS.
 cenário em arranjos diferentes) e um teste assim passa por sorte. Suíte verde sem re-baseline.
 
 **Por que primeiro:** independe do lock e do `-inc`, e é o único item que conserta dano ao usuário.
+
+> **✅ FEITO — e o portão não precisou ser inventado: precisou ser DESARMADO DE VOLTA.** O destino
+> passou a ser `<cTmp>/hbmk`, e o `cTmp` já era único por invocação (`WorkDir`, mkdir atômico).
+> Critério verificado nos quatro comandos (`usages`, `call-graph`, `dump`, `find-dynamic-calls`):
+> `.hbmk/` ausente e `git status` do projeto vazio; controle negativo com o binário anterior: 8
+> arquivos no `.hbmk` do usuário e 2 sujos no `git status`.
+>
+> **O achado que valeu mais que a correção:** o portão do §5 do `tests/README.md` (*"artefato novo
+> no projeto reprova"*) **já existia e já varria a árvore inteira** — e não pegava por causa de uma
+> isenção global no harness, `lixoDeBuild = {".hbmk/"}`, justificada como *"não é a ferramenta
+> sujando o projeto: é o toolchain sendo o toolchain"*. Plausível e **falsa**: o hbmk2 aceita
+> `-workdir`, e sem `-inc` no build completo ele nem cria `.hbmk`. **Regra viva com isenção
+> escrita por mim é regra que eu desarmei** — e o conserto foi remover a isenção, o que devolve a
+> cobertura aos casos TODOS de uma vez. Anti-vacuidade: com o binário anterior, `rename-local`
+> reprova nomeando `.hbmk/linux/gcc/{a,b}.{c,o}`.
 
 ### Fase W.2 — LOCK POR PROJETO *(posição do Diego: a ferramenta cuida da concorrência)*
 
