@@ -50,10 +50,12 @@ lê o token do nó. **`%locations` com `HB_COMP_YYLTYPE` = índice de token.**
   dependência do Makefile, não um `if`) e confere que os dois relincaram. `make
   core-check` roda só as conferências, em 1s. CLAUDE.md §2,
   [cicatrizes §5.1](cicatrizes.md).
-- **`tools/pcode-identity.sh` NÃO foi rodado** — exige um `harbour` STOCK e não há um
-  na máquina. As mudanças são todas guardadas por `fAst`, então o pcode com `-x`
-  desligado é o mesmo por construção; mas **a afirmação da página aos mantenedores
-  merece a medição antes do PR**, e mexi no parser. Fica como pendência do commit.
+- **A prova de pcode agora RODA: `make pcode-identity`** *(resolvido 2026-08-06)*. Ela
+  exigia um `harbour` STOCK que não existia na máquina, e por isso a afirmação mais
+  importante do PR passou semanas sem quem a medisse. O stock virou **dependência do
+  projeto**, como o do branch: worktree de `upstream/master` em `harbour-stock`,
+  provisionado e buildado pelo `make`. **889/889 `.hrb` byte-idênticos, 0 divergentes**
+  — com o parser regenerado e `%locations` ligado, que era justamente a dúvida.
 - **A suíte para no primeiro erro**: com o vermelho de TDD da P24 no `gotest`, ele é o
   ÚLTIMO da cadeia, então legado/lexdiff/docs ainda rodam. Se algum dia o vermelho for
   de um alvo anterior, tudo depois dele emudece.

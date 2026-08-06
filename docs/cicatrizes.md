@@ -484,6 +484,35 @@ Provado na fase RD (`_HB_INLINESELF`, core `da61c647cb`):
   diff da regeneração vai ser só a sua mudança. Gerar de `src/compiler/obj/<plat>/gcc/`
   com `bison -d -oharboury.c ../../../harbour.y` reproduz até os caminhos dos `#line`.
 
+### 5.1b `grep -q` dentro de pipeline com `pipefail` MENTE (2026-08-06)
+
+`set -o pipefail` + `strings bin | grep -qE ...`: o `-q` fecha o pipe no primeiro
+casamento, o `strings` leva **SIGPIPE**, e o **pipeline sai não-zero mesmo tendo
+CASADO**. A guarda responde *"não tem"* sobre um binário que tem — e essa é a direção
+perigosa: ela deixa passar exatamente o que existe para barrar.
+
+Peguei porque rodei os **três** cenários errados e não só o certo: as mensagens não
+batiam com o caso (o cenário "os dois são o remendado" acusava o REMENDADO de não ter
+o dump, nomeando o binário que tem). O cenário "certo" tinha passado **pelo motivo
+errado**, e sozinho não teria denunciado nada.
+
+Régua: em script com `pipefail`, nada de `-q` em pipeline — **substituição de comando**
+(`x=$(... | grep -oE ...)` e testa `-n`/`-z`), que não sofre do problema. E o controle
+de uma guarda é rodar **todas** as direções, conferindo que cada uma dá a mensagem
+DELA; exit não-zero não prova que a guarda certa mordeu. *(Prima do §1.3e: sonda que
+responde o que eu queria ouvir é a que mais precisa de controle.)*
+
+**E a régua virou PORTÃO, porque cicatriz é prosa (§1.6):**
+[`tests-go/shell/pipefail_test.go`](../tests-go/shell/pipefail_test.go) varre todo `.sh`
+do repo e reprova a forma — pipeline + consumidor que fecha cedo + status consumido, em
+script com `pipefail` —, apontando arquivo:linha e o conserto. Em Go, com o extrator
+tendo **teste próprio** (`TestClassifica`, 4 positivos e 5 negativos): guarda em bash
+cujo regex pare de casar passa verde e calada, e este repo já pagou por isso. Controle
+negativo rodado: reintroduzi a linha exata que quebrou e ele a acusou. A varredura da
+época achou **uma só** outra ocorrência da forma, no `anti-heuristica.sh`, e ela é
+**segura** — descarta o status com `|| true` e decide pelo conteúdo, que é o idioma
+certo quando se quer o valor.
+
 ### 5.2 O "projeto não compila" que era o hbmk2 errado (fase P2a)
 
 Sem `HB_BIN` exportado, o `HbMk2Bin()` cai no hbmk2 do **sistema** (`/usr/local/bin`, sem

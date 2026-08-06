@@ -8,9 +8,11 @@
 # smoketest/hbrefactor-occ.prg as reference; tests/ keeps the behaviour
 # contract the new tool must honour case by case.
 
-# HB_BIN vem da FONTE ÚNICA (tools/hbenv.sh), a mesma que os scripts leem -
-# um lugar só decide onde está o harbour-core. Override sempre vence:
-#   make test HB_BIN=/outro/caminho/bin/linux/gcc
+# SÃO DOIS TOOLCHAINS, e os dois vêm da FONTE ÚNICA (tools/hbenv.sh), que
+# documenta o papel de cada um:
+#   HB_BIN    o do BRANCH - compila, analisa e verifica. TODO o trabalho.
+#   STOCK_BIN o de upstream/master - NÃO trabalha; existe para ser COMPARADO.
+# Override sempre vence:  make test HB_BIN=/outro/caminho/bin/linux/gcc
 HB_BIN ?= $(shell sh tools/hbenv.sh --print HB_BIN)
 # o Go dos testes: instalado por `make deps` em ~/.local/go (do site oficial)
 GO     ?= $(shell command -v go 2>/dev/null || echo $(HOME)/.local/go/bin/go)
@@ -27,6 +29,15 @@ CORE_OBJ   = $(CORE_SRC)/obj/$(CORE_PLAT)/$(CORE_COMP)
 CORE_Y     = $(CORE_SRC)/harbour.y
 CORE_YYC   = $(CORE_SRC)/harbour.yyc
 CORE_BINS  = $(HB_BIN)/harbour $(HB_BIN)/hbmk2
+
+# O STOCK: o harbour de upstream/master, SEM os remendos do branch. Ele e'
+# dependencia do projeto tanto quanto o do branch (Diego, 2026-08-06) - e' a
+# BASE da unica prova que a proposta aos mantenedores faz: com os switches
+# desligados, o compilador remendado gera pcode identico ao do Harbour de
+# fabrica. Worktree em vez de clone: compartilha os objetos e garante que a
+# base e' exatamente aquela contra a qual o diff e' medido.
+HB_STOCK   ?= $(shell sh tools/hbenv.sh --print HB_STOCK)
+STOCK_BIN   = $(shell sh tools/hbenv.sh --print HB_STOCK_BIN)/harbour
 # o schema que o FONTE declara agora - é contra ele que os binários são conferidos
 CORE_SCHEMA = $(shell sed -n 's/^\#define HB_AST_SCHEMA  *"\(ast-[0-9]*\)".*/\1/p' $(CORE_SRC)/compast.c)
 
@@ -34,7 +45,7 @@ CORE_SCHEMA = $(shell sed -n 's/^\#define HB_AST_SCHEMA  *"\(ast-[0-9]*\)".*/\1/
 # por engano. `make build` continua compilando.
 .DEFAULT_GOAL := help
 
-.PHONY: build core core-check test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
+.PHONY: build core core-check stock stock-check pcode-identity test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
 
 # RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
 # bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
@@ -82,6 +93,41 @@ core-check:
 	$(call core-check-one,$(HB_BIN)/harbour)
 	$(call core-check-one,$(HB_BIN)/hbmk2)
 	@echo "core: ok - $$($(HB_BIN)/harbour -build 2>&1 | head -1)  [$(CORE_SCHEMA)]"
+
+## stock       builda o harbour STOCK (upstream/master) - a base da prova de pcode
+# Forca o rebuild. Para so' provisionar quando faltar, use `make pcode-identity`,
+# que tem o binario como dependencia.
+stock:
+	rm -f $(STOCK_BIN)
+	@$(MAKE) --no-print-directory $(STOCK_BIN)
+
+# provisiona e builda. Mesma regra do core: build LIMPO, e conferido.
+$(STOCK_BIN):
+	@# a base do diff so' e' um fato depois do fetch (CLAUDE.md §4)
+	cd $(HB_CORE) && git fetch upstream
+	@if [ -d $(HB_STOCK) ]; then 		echo "stock: atualizando o worktree para upstream/master"; 		git -C $(HB_STOCK) checkout --detach upstream/master; 	else 		echo "stock: criando o worktree em $(HB_STOCK)"; 		git -C $(HB_CORE) worktree add --detach $(HB_STOCK) upstream/master; 	fi
+	cd $(HB_STOCK) && $(MAKE) clean >/dev/null 2>&1 || true
+	cd $(HB_STOCK) && $(MAKE) -j$(if $(JOBS),$(JOBS),8)
+	@$(MAKE) --no-print-directory stock-check
+
+## stock-check confere que o harbour stock existe e NAO carrega o dump
+# O controle que importa: um "stock" que carregue `ast-N` nao e' stock - o
+# worktree escorregou para o branch, e a prova de impacto zero viraria uma
+# comparacao do binario com ele mesmo, passando verde e provando NADA.
+stock-check:
+	@[ -x $(STOCK_BIN) ] || { echo "stock: FALHOU - $(STOCK_BIN) nao existe; rode make stock" >&2; exit 1; }
+	@! strings $(STOCK_BIN) | grep -qE '^ast-[0-9]+$$' || 		{ echo "stock: FALHOU - o binario carrega o dump; isto NAO e' o stock" >&2; exit 1; }
+	@echo "stock: ok - $$($(STOCK_BIN) -build 2>&1 | head -1)  (upstream/master $$(git -C $(HB_STOCK) rev-parse --short HEAD))"
+
+## pcode-identity  prova: sem os switches, o pcode e' IDENTICO ao do stock
+# A afirmacao mais importante da proposta aos mantenedores - um mantenedor que
+# desconfie dela nao le o resto. Era medida a mao, e por isso nunca era remedida.
+# Depende dos DOIS toolchains: o stock e' construido se faltar, e o do branch e'
+# conferido (nao rebuildado - `make core` e' quem faz isso).
+pcode-identity: $(STOCK_BIN)
+	@$(MAKE) --no-print-directory stock-check
+	@$(MAKE) --no-print-directory core-check
+	bash tools/pcode-identity.sh $(STOCK_BIN) $(HB_BIN)/harbour
 
 # as conferencias de UM binario. Build que "passou" sem produzir binario novo e'
 # exatamente o modo de falha que este alvo existe para matar, entao ele e'

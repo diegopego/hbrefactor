@@ -230,6 +230,22 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
   - **Controle positivo barato do ritual do parser**: rodar o bison **sem mudança
     nenhuma** e diferenciar contra o `.yyc` commitado; divergir só nos `#line` e no
     include guard prova que a sua versão é a que gerou o commitado. *([cic §5.1e])*
+- **SÃO DOIS TOOLCHAINS, e QUAL SE USA QUANDO está escrito em CÓDIGO, não aqui**
+  *(Diego, 2026-08-06: "mais importante ainda é que esteja escrito em código que se usa
+  os dois toolchains e quando usar cada um")*. A fonte única
+  [`tools/hbenv.sh`](tools/hbenv.sh) define os dois e documenta o papel de cada um no
+  lugar onde todo consumidor lê:
+  - **branch** (`HB_BIN`, `make core`) — compila, analisa e verifica: **todo** o
+    trabalho. Reconhece-se por carregar `ast-N`;
+  - **stock** (`HB_STOCK_BIN`, `make stock`) — worktree de `upstream/master`; **não
+    trabalha**, existe para ser COMPARADO. Reconhece-se por **não** carregar `ast-N`.
+  - **Confundir os dois não dá erro, dá VERDE FALSO** — medir o remendado contra ele
+    mesmo prova nada e passa. Por isso o papel é **conferido em execução**, não confiado
+    a quem chama: `make core-check`, `make stock-check`, e o próprio
+    `pcode-identity.sh` **recusa** argumentos trocados. O `hbenv.sh` recusa `HB_STOCK ==
+    HB_CORE`.
+  - `make pcode-identity` constrói o stock se faltar e mede. Em 2026-08-06, com o parser
+    regenerado e `%locations` ligado: **889/889 `.hrb` byte-idênticos, 0 divergentes**.
 - **Exportar `HB_BIN` ao invocar a ferramenta fora do Makefile**: sem ele o `HbMk2Bin()`
   cai no hbmk2 do sistema e o sintoma é o enganoso "o projeto não compila". *([cic §5.2])*
 - **Ferramenta do core: PROBE, nunca memória**: antes de consumir a saída de um utilitário,
