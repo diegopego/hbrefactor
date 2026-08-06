@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@424ad29 -->
+<!-- changelog-baseline: hbrefactor@4a70134 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 424ad29..HEAD   (see § Maintaining this file, at the end). -->
+     To resume:  git log 4a70134..HEAD   (see § Maintaining this file, at the end). -->
 
 # Changelog
 
@@ -19,6 +19,97 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-06 — every result now points at the exact word, not at the line
+
+Ask where a name is used and you get a list of places. Each place has a line **and a
+column** — and until now the column was often wrong when the same name appeared more
+than once on one line.
+
+```harbour
+nTotal := 0 + Eval( {| x | nTotal += x }, 1 ) + nTotal
+```
+
+Three occurrences, three columns: 3, 30 and 51. Here is what you get now:
+
+```
+$ hbrefactor usages app.hbp nTotal --func Main --json
+  declaration (local)          line 2 column 9
+  use (detached, codeblock)    line 4 column 30
+  ref (detached, codeblock)    line 4 column 30
+  read (local)                 line 4 column 51
+  write (local)                line 4 column 3
+  read (local)                 line 6 column 5
+```
+
+The assignment target is at column 3, where you wrote it. Before, it was reported at
+column 51 — on top of the *read* at the other end of the line. If your editor jumps to
+these positions, it was taking you to the wrong word.
+
+**Why it was wrong, in one sentence:** the position used to be worked out by counting
+("the 2nd result on this line must be the 2nd occurrence on this line"), and the order in
+which the compiler records results is the order in which it walks your expression, not
+the order in which you typed it. For an assignment, the target is recorded last.
+
+**What else this fixes:**
+
+- **a statement continued with `;`** is reported on the line you wrote the name on, not
+  on the last physical line of the statement. The preview text matches, too:
+
+  ```
+  app.prg:6: read (local) in MAIN  | cMsg + ;
+  ```
+
+- **writing and reading the same member on one line** — `o:Description :=
+  o:Description + "!"` — now gives you two places, at columns 5 and 22. The read used to
+  be missing entirely.
+
+- **a name folded away by an optimisation stays visible.** When you write
+  `nTotal := nTotal + nB`, the compiler rewrites it internally and the middle `nTotal`
+  disappears from its own bookkeeping. It no longer disappears from your results: all
+  three words you typed are listed, because a rename has to touch all three.
+
+**The honest limit, and it is a big one:** a name that was written in an **`.ch` header**
+— anything coming from a `#command`/`#xcommand` you or your libraries define — still has
+no column, and comes back as a zero-width position. In real Harbour code that is roughly
+**40% of all uses**, because Harbour is written on top of directives. Zero width is the
+tool telling you *"I know this use exists, I do not know where to point"* — it is never a
+guess. Making those point at the directive that produced them is the next piece of work.
+
+Details: [docs/posicao-do-sitio.md](docs/posicao-do-sitio.md).
+
+## 2026-07-14 → 08-06 — the tool answers in a contract a program can read (retroactive entry)
+
+*Grouped after the fact: this capability landed over several releases and never got an
+entry of its own.*
+
+Every command takes `--json` and answers with the same envelope, so an editor — or an
+agent driving the tool for you — never has to scrape prose:
+
+```
+$ hbrefactor usages app.hbp nTotal --func Main --json
+schema    cli-2
+exit      0
+argv      ['usages', 'app.hbp', 'nTotal', '--func', 'Main', '--json']
+```
+
+- **`exit`** is there because it is **not** derivable from the rest: a `verify` that finds
+  your build broken answers `status: "ok"` (the check ran fine) with exit code 1 (the
+  verdict is bad). Reading the JSON out of a pipe used to give you the opposite
+  conclusion of running it in a shell.
+- **`argv`** is the invocation that produced this answer, so a stored result still says
+  what question it answered.
+- **A refusal carries a reason code**, not just a sentence — `textual-refs-require-force`,
+  `old-name-shadowed-by-codeblock-param`, and so on. The code tells you what to *do*:
+  stop and ask a human, or repeat with the flag, or fix your project.
+- **Compiler errors come back as `diagnostics[]`** instead of leaking onto stderr.
+
+**Also in this window: `rename` stopped refusing names that are perfectly legal.** The
+tool used to pre-judge a new name with its own check, and that check was stricter than
+the compiler: renaming a local to `while` was rejected, though Harbour accepts it. The
+pre-judgement is gone — the name is applied, the project is recompiled, and the compiler
+has the last word. If it does not compile, you get the error and your files back
+untouched.
 
 ## 2026-07-27 — it stopped guessing about your strings, and it now says plainly what it cannot see
 
