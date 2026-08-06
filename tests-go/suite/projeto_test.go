@@ -32,18 +32,22 @@ func novo(t *testing.T, nome string) *Projeto {
 	return &Projeto{t: t, art: art, dir: dir}
 }
 
-// O build do Harbour deixa o seu diretório incremental onde compila — o build
-// do próprio usuário faz igual, e é por isso que ele está no .gitignore. Não é
-// a ferramenta sujando o projeto: é o toolchain sendo o toolchain. Fica AQUI, e
-// não declarado por caso, senão 148 casos repetiriam um fato sobre o hbmk2.
-var lixoDeBuild = []string{".hbmk/"}
+// [ISENÇÃO REMOVIDA — fase W.1, 2026-08-06] Aqui havia `lixoDeBuild = {".hbmk/"}`,
+// que dispensava o `.hbmk` do projeto da regra do §5. A justificativa escrita era
+// *"não é a ferramenta sujando o projeto: é o toolchain sendo o toolchain"* — e ela
+// era plausível e ERRADA. Medido: o hbmk2 aceita `-workdir` (o `annotate` já usava),
+// e no build completo sem `-inc` ele nem cria `.hbmk` — usa `/tmp/hbmk_XXXX.dir/`,
+// único por invocação. O toolchain oferecia o isolamento; nós é que não pedíamos.
+// Com o `-workdir` no `AstDumps`, a isenção morre e a regra volta a valer para os
+// casos TODOS de uma vez — que é o portão desta fatia. Se voltar a sujar, 148 casos
+// reprovam nomeando o arquivo.
 
 // Cria declara um artefato que ESTE caso espera ver no projeto (§5) — um
 // arquivo que a FERRAMENTA cria e o caso afirma. Fica no caso, não no harness.
 func (p *Projeto) Cria(prefixos ...string) { p.cria = append(p.cria, prefixos...) }
 
 func (p *Projeto) declarado(nome string) bool {
-	for _, pre := range append(lixoDeBuild, p.cria...) {
+	for _, pre := range p.cria {
 		if nome == pre || strings.HasPrefix(nome, pre) {
 			return true
 		}

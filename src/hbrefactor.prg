@@ -421,14 +421,24 @@ STATIC FUNCTION HbMk2Bin()
 // ---------------------------------------------------------------------------
 // dumps - o hbmk2 compila o projeto repassando -x<dir>/ a cada módulo
 // (-rebuild: dump sempre fresco mesmo com -inc no projeto)
+//
+// -workdir OBRIGATÓRIO (W.1): sem ele, o hbmk2 em modo -hbcmp escreve os .c/.o
+// intermediários em `.hbmk/<plat>/<comp>` DENTRO do projeto do usuário - com ou
+// sem -inc, medido em diretório virgem (a linha do compilador sai `-o.hbmk/...`).
+// Ou seja: a ferramenta escrevia na árvore de quem ela só deveria LER, no mesmo
+// diretório que o build DELE usa. O destino fica sob o cTmp, que já é único por
+// invocação (WorkDir), então cada execução tem o seu e nenhuma vê a da outra.
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION AstDumps( hProj, cTmp )
 
    LOCAL cOut := "", cErr := ""
+   LOCAL cWork := hb_DirSepAdd( cTmp ) + "hbmk"
 
+   hb_DirBuild( cWork )
    IF hb_processRun( HbMk2Bin() + " " + StrTran( hProj[ "spec" ], ",", " " ) + ;
-                     " -hbcmp -rebuild -q '-prgflag=-x" + hb_DirSepAdd( cTmp ) + ;
+                     " -hbcmp -rebuild -q -workdir=" + cWork + ;
+                     " '-prgflag=-x" + hb_DirSepAdd( cTmp ) + ;
                      "'",, @cOut, @cErr ) != 0
       // sob o contrato, o erro do compilador é DADO (diagnostics[]), não texto
       // cru no stderr - senão o `2>&1` do consumidor mistura ao envelope e o
