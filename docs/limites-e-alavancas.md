@@ -71,6 +71,15 @@ estaticamente conhecidos.
   símbolos por FATO; com `ordKey()`/`DBOI_EXPRESSION`
   (dbfcdx1.c:8217/dbfntx1.c:6962), UDF em índice real vira verificável
   PARA OS DADOS QUE SE TEM.
+  **[NOTA 2026-08-06, após `b18801e`]** A fatia *"nome de variável/função dentro
+  de string COMUM"* saiu do **ESCOPO** por decisão do Diego — *"fato frágil, de
+  responsabilidade do desenvolvedor"*. A alavanca em si continua correta (compilar
+  a string é o COMPILADOR respondendo, nunca heurística); o que sumiu foi o alvo
+  principal dela. Cuidado com a leitura apressada: validar a alavanca
+  tecnicamente e concluir que o caso voltou ao escopo é confundir FATO com
+  POLÍTICA. De pé continuam a fatia de DADOS (`ordKey()`/`DBOI_EXPRESSION`,
+  acima) e a de DSL, onde o token da string tem PROVENIÊNCIA de expansão (o caso
+  73 sobreviveu ao `b18801e` justamente por isso).
 - **F. Validação de tradução.** Verificador de equivalência POR
   TRANSFORMAÇÃO (corpo extraído = mesmas instruções realocadas + cola) —
   quase-prova específica sem resolver equivalência geral (indecidível).

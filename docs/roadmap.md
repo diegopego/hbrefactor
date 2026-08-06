@@ -110,11 +110,59 @@ heurística; include transitivo a quebra). Quem decide o que recompilar é o **`
 (sondado 2026-07-13: tocando 1 de 3 módulos, **só o dump dele é regravado**); o fecho
 transitivo de include vem do **`harbour -gd`** (P8).
 
+**TABELA DE SONDAS — o `-inc` responde sobre o `.c`, NÃO sobre o dump** *(medido
+2026-08-06; §1.7.1: a sonda antes do mecanismo)*. Comando de todas as linhas:
+`hbmk2 p.hbp -hbcmp -q -prgflag=-x<dir>/` com `-inc` no `.hbp`, projeto de 3 módulos
+(um deles com `#include` próprio):
+
+| classe de caso | o core responde HOJE |
+|---|---|
+| nada editado *(controle)* | nada regravado ✅ |
+| 1 de 3 módulos editado, mtime normal | só o dump dele ✅ *(confirma a sonda de 2026-07-13)* |
+| módulo editado, mtime **igual** ao do artefato | **nada regravado — o dump fica VELHO** |
+| só o **include** editado | nada regravado *(esperado: o fecho é do `-gd`)* |
+| **dump apagado**, `.c` em dia | **não regenera** — só com `-rebuild` |
+
+**Medir por mtime do `.ast.json`, nunca por md5**: md5 não distingue *"não recompilou"* de
+*"recompilou e deu igual"*, e normalizar o estado entre casos é obrigatório (mtime futuro de
+um caso contamina o seguinte — a primeira rodada desta tabela saiu errada por isso).
+
+**Consequência para o desenho da fatia:** delegar ao `-inc` **não elimina** a heurística de
+mtime que esta fatia proíbe — muda o DONO dela, e o dono decide sobre OUTRO artefato (o
+`.c`; o `.ast.json` é efeito colateral do `-prgflag=-x`, e nada no incremental o observa —
+por isso apagar o dump não o traz de volta). Os dois furos não são canto: mtime igual é o
+regime de quem edita por MÁQUINA (a própria ferramenta aplicando um rename; o ciclo do
+agente da fase A), e dump ausente é o que acontece a cada limpeza de temporário (fase H).
+
+**EM ABERTO, e é a pergunta que abre a fatia:** *que fato o CORE pode dar sobre a
+correspondência dump↔fonte?* Explorar ANTES de projetar (§1.1) — e a resposta não pode ser
+staleness inventada aqui. Enquanto não houver esse fato, o `-rebuild` de hoje **fica**.
+
 **FATIA 3 — CANCELADA** (era paralelizar o `unused-locals`; o comando SAIU — ver fase L no
 arquivo).
 
 **PORTÃO:** resultado **byte-idêntico** ao modo de hoje — a mesma régua de equivalência que
 provou a P9 (suíte inteira verde nos dois modos).
+
+**PORTÃO DE PROCEDÊNCIA — se alguma fatia adotar o compilador IN-PROCESS** *(levantado
+2026-08-06)*. A alavanca `hb_compileFromBuf`/`hb_compMainExt` in-process, nomeada na
+[spec-a](spec-a-oraculo-para-agentes.md) § A.5 como caminho para a latência, é **outra** que
+a da fatia 2 (esta ataca re-analisar o que não mudou; aquela, pagar processo e I/O) e as duas
+podem coexistir. O que a in-process muda, e que não estava escrito: ela linka `libhbcplr`
+**na ferramenta**, e então o compilador que emite o VEREDITO passa a ser o de quando a
+FERRAMENTA foi buildada — não mais o do `HB_BIN` que gerou o dump. Hoje essa procedência sai
+de graça, invisível, porque o compilador é processo externo. Com a alavanca, exige-se:
+1. a ferramenta AFIRMAR na partida que o compilador linkado e o do `HB_BIN` são a mesma
+   versão, recusando alto quando não forem — a mesma régua do schema (§1.5 do CLAUDE.md:
+   não existe degradação por versão, existe toolchain fora de passo, e isso BERRA);
+2. caso de suíte que FALHE com os dois fora de passo (portão executável, §1.6 — regra sem
+   portão é regra que se viola de novo).
+
+Sem (1) e (2) a fatia não entra. A razão é a assimetria do ponto: analisador stale erra e
+alguém percebe; **verificador stale APROVA** — imprime `verified` sobre uma comparação feita
+pelo compilador errado. É o falso verde do `b18801e` pela outra ponta. Mecanismo já vivido:
+cicatriz (b) do §5.1 — o `make` reporta "up to date" e **não relinca** após reconstruir a
+`libhbcplr.a`, e o hbmk2, que embute a mesma lib, ficou stale exatamente assim.
 
 **Riscos honestos:** (i) cache é a classe de bug mais cara que existe, e *"agiu sobre fato
 velho"* é **exatamente** o que esta ferramenta promete nunca fazer — fail-closed em qualquer
