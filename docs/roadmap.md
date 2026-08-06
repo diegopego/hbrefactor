@@ -118,21 +118,37 @@ transitivo de include vem do **`harbour -gd`** (P8).
 | classe de caso | o core responde HOJE |
 |---|---|
 | nada editado *(controle)* | nada regravado ✅ |
-| 1 de 3 módulos editado, mtime normal | só o dump dele ✅ *(confirma a sonda de 2026-07-13)* |
-| módulo editado, mtime **igual** ao do artefato | **nada regravado — o dump fica VELHO** |
-| só o **include** editado | nada regravado *(esperado: o fecho é do `-gd`)* |
+| 1 de 3 módulos editado, mtime > artefato | só o dump dele ✅ *(confirma a sonda de 2026-07-13)* |
+| módulo editado, mtime **dentro do mesmo segundo** do `.c` | **nada regravado — o dump fica VELHO** |
+| só o **include** (`.ch`) editado | **regrava o dump do dependente, e SÓ dele** ✅ |
 | **dump apagado**, `.c` em dia | **não regenera** — só com `-rebuild` |
 
-**Medir por mtime do `.ast.json`, nunca por md5**: md5 não distingue *"não recompilou"* de
-*"recompilou e deu igual"*, e normalizar o estado entre casos é obrigatório (mtime futuro de
-um caso contamina o seguinte — a primeira rodada desta tabela saiu errada por isso).
+**RESOLUÇÃO DA COMPARAÇÃO ≈ 1 SEGUNDO** *(medido; é o coração do furo)*. Com o `.prg` posto a
+`.c + N`: `0`, `1ms`, `100ms` → não recompila (3/3); `500ms` → instável (a fronteira do
+arredondamento); `999ms`, `1s`, `2s` → recompila (3/3). Logo **edição feita no mesmo segundo em
+que aquele módulo foi de fato recompilado é INVISÍVEL**, e o efeito é intermitente: quando a
+chamada anterior foi no-op, o `.c` é velho e a edição aparece. Instrumentado, dentro de um lock,
+sem concorrência nenhuma: `.c=…144.080` → edição `…144.395` → dump inalterado, sem a edição.
+
+**Como MEDIR isto sem se enganar** *(a tabela saiu errada duas vezes antes de sair certa)*:
+1. **mtime em NANOSSEGUNDOS** (`stat -c%y`), nunca em segundos (`%Y`) — as duas compilações
+   caem no mesmo segundo e o medidor reporta "não regravou" sobre algo que regravou;
+2. **nunca md5** — não distingue *"não recompilou"* de *"recompilou e deu igual"*;
+3. **o mtime do arquivo editado é a VARIÁVEL do caso**, e tem de ser setado explicitamente
+   (`touch -d`), senão o caso cai dentro da janela que ele mede e o resultado oscila;
+4. **reset entre casos** (`-rebuild` + mtime de TODOS os fontes num instante fixo no passado):
+   mtime futuro de um caso contamina o seguinte;
+5. `LC_ALL=C` ao converter timestamp (locale pt_BR usa vírgula decimal e quebra o `float()`).
 
 **Consequência para o desenho da fatia:** delegar ao `-inc` **não elimina** a heurística de
 mtime que esta fatia proíbe — muda o DONO dela, e o dono decide sobre OUTRO artefato (o
 `.c`; o `.ast.json` é efeito colateral do `-prgflag=-x`, e nada no incremental o observa —
-por isso apagar o dump não o traz de volta). Os dois furos não são canto: mtime igual é o
+por isso apagar o dump não o traz de volta). Nenhum dos dois furos é canto: o de mtime é o
 regime de quem edita por MÁQUINA (a própria ferramenta aplicando um rename; o ciclo do
 agente da fase A), e dump ausente é o que acontece a cada limpeza de temporário (fase H).
+**O que o `-inc` faz BEM e a fatia pode contar:** o fecho de include é dele — editar um `.ch`
+regrava o dump do dependente e só dele (3/3), porque o hbmk2 chama o `harbour -gd` para
+detectar headers na hora de decidir (`hbmk2.prg`, `_hbmk_...` de detecção de dependências).
 
 **EM ABERTO, e é a pergunta que abre a fatia:** *que fato o CORE pode dar sobre a
 correspondência dump↔fonte?* Explorar ANTES de projetar (§1.1) — e a resposta não pode ser
@@ -172,6 +188,65 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 **PRONTO da fase:** num projeto de dezenas de módulos, um comando que toca 1 módulo custa
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
+
+## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO *(aberta 2026-08-06, por medição; posição do Diego: lock por projeto)*
+
+**O achado que abre a fase.** Todo comando dispara `hbmk2 <alvos> -hbcmp -rebuild -prgflag=-x<tmp>/`
+([`AstDumps`](../src/hbrefactor.prg)) **sem `-workdir`** — e no modo `-hbcmp` o hbmk2 escreve os
+`.c`/`.o` intermediários em **`.hbmk/<plat>/<comp>/` DENTRO do projeto do usuário**, com ou sem
+`-inc` (medido em diretório virgem: `-o.hbmk/linux/gcc/` na linha do compilador, 4 arquivos
+deixados). Ou seja: **hoje a ferramenta escreve na árvore de quem ela deveria só ler**, e no
+mesmo diretório que o build do próprio usuário usa. Isto vale AGORA, não é custo futuro do `-inc`.
+
+Contraste medido: no **build completo** sem `-inc`, o hbmk2 usa `/tmp/hbmk_XXXX.dir/` — **único por
+invocação** e apagado no fim (duas invocações seguidas → `hbmk_tfk7lc.dir`, `hbmk_9lyhcz.dir`). O
+isolamento existe no hbmk2; o modo que nós usamos é justamente o que não o tem.
+
+### Fase W.1 — `-workdir` PRÓPRIO em todo hbmk2 que a ferramenta dispara
+
+**Escopo.** `AstDumps` (e qualquer outra chamada de hbmk2 sem workdir explícito) passa
+`-workdir=<nosso tmp>` — a raiz da fase H (`$TMPDIR/hbrefactor/...`), nunca o projeto. O
+`annotate` já faz isso (`-workdir=<tmp>/ktwork`): a fatia é estender o que já está certo em dois
+pontos para o comando que roda em TODOS.
+
+**Critério de pronto (mecânico).** Num projeto limpo, depois de qualquer comando da ferramenta:
+`.hbmk/` **não existe** no diretório do projeto, e `git status` do projeto sai vazio. Determinístico
+— *não* usar taxa de falha de corrida como critério: ela varia com timing (medi 3/3 e 0/3 do mesmo
+cenário em arranjos diferentes) e um teste assim passa por sorte. Suíte verde sem re-baseline.
+
+**Por que primeiro:** independe do lock e do `-inc`, e é o único item que conserta dano ao usuário.
+
+### Fase W.2 — LOCK POR PROJETO *(posição do Diego: a ferramenta cuida da concorrência)*
+
+**O argumento, medido.** 6 invocações simultâneas do comando de dump no mesmo projeto, 5 rodadas:
+**sem lock 9/30 falharam** (`exit=9`, *"Diretório de trabalho não pode ser criado"* — que chegaria
+ao usuário como o enganoso *"o projeto não compila"*, §5.2); **com `flock` por projeto, 0/30**.
+E o custo de serializar é desprezível quando o trabalho é incremental (~11 ms por comando contra
+~310 ms de `-rebuild`, 20 execuções com o trabalho verificado a cada uma).
+
+**Escopo.** Lock por PROJETO (chave = spec canônica), em torno da região que usa o workdir
+compartilhado. Espera com limite e recusa nomeada quando estoura — nunca espera infinita.
+
+**Critério de pronto (mecânico).** N invocações concorrentes do mesmo comando no mesmo projeto:
+**todas** com exit 0 e dumps completos, contra a taxa de falha reproduzível sem lock. Caso da
+suíte que FALHE sem o lock (senão passa por vacuidade).
+
+**Limite que o lock NÃO remove, e tem de estar escrito na entrega:** ele coordena **só quem o
+respeita**. O build do usuário (IDE, `make`, hbmk2 na mão) não sabe dele. Quem protege o usuário
+é a W.1, não a W.2 — e por isso a ordem é essa.
+
+### Fase W.3 — o `-inc` *(BLOQUEADA: depende do fato de correspondência da fase V)*
+
+**Não entra antes** de o core responder sobre correspondência dump↔fonte (fase V, fatia 2). Lock e
+workdir resolvem CONCORRÊNCIA; o furo de staleness é TEMPORAL e sobrevive aos dois — medido dentro
+de um lock, sem concorrência nenhuma, o dump ficou velho duas vezes seguidas. Ligar `-inc` antes
+disso troca segundos de espera por *"agiu sobre fato velho"*, que é o único defeito que esta
+ferramenta promete nunca ter.
+
+**Pista para o core** *(a favor da posição do Diego, com o alvo corrigido)*: o defeito a consertar
+no hbmk2/harbour **não é o `.ch`** — esse funciona (o `-inc` regrava o dump do dependente e só
+dele, 3/3, via `harbour -gd`). É a **resolução da comparação**, que é de ~1 segundo. Detecção por
+CONTEÚDO (hash do fonte que gerou o artefato) mata a classe inteira, e é fato, não heurística.
 
 ## A — A IA COMO CONSUMIDOR DE PRIMEIRA CLASSE (jamais FONTE de fato) — **ATIVA: A.2 entregue; A.1 ABERTA (Diego, 2026-07-24); A.3/A.4 em PORTÃO FECHADO**
 

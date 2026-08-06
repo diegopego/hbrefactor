@@ -203,6 +203,20 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
    deste conhecimento?** Se é a RTL, o fato mora no core — e o core costuma já ter a casa
    (ali era a `s_stdFunc` do `hbfunchk.c`, onde o `TYPE` já estava). Se ninguém no core pode
    ser dono, **a ferramenta não suporta o caso e diz isso**.
+6. **OS 5 PORQUÊS quando a causa não é óbvia** *(Diego, 2026-08-06)*. **O método dos 5 Porquês
+   (5 Whys)** — criado na Toyota Motor Corporation por **Taiichi Ohno** — consiste em perguntar
+   *"por quê?"* cinco vezes de forma consecutiva, cada resposta virando a pergunta seguinte,
+   para ir **além do sintoma superficial e achar a CAUSA RAIZ** da falha. Usar quando:
+   - um defeito reaparece (a correção anterior pegou o sintoma, não a raiz);
+   - se vai propor REGRA, PORTÃO ou capacidade nova — a cadeia diz se a necessidade é real
+     e onde ela nasceu, e às vezes mostra que a resposta certa é OUTRA (não a que eu já tinha
+     desenhado);
+   - se vai investir em algo caro, antes de investir.
+
+   **A régua:** a cadeia termina numa causa **acionável**, não numa lamentação — e cada elo é
+   FATO verificável, senão os cinco porquês viram cinco palpites empilhados, que é pior que
+   nenhum (§1.7.3: o dump manda, não a dedução). Se a raiz for "não medi", a resposta não é
+   escrever melhor — é **medir** (item 4 acima).
 
 ---
 
