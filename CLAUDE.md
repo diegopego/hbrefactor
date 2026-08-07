@@ -295,14 +295,11 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
 ## 3. Testes, suíte e corpus
 
 - **Contrato executável: `make test`** — deve permanecer verde.
-  > **EXCEÇÃO VIVA HOJE (Diego, 2026-08-06): há UM vermelho commitado de propósito** —
-  > `usages-site-from-include`, o TDD da P24. O padrão é o TDD ficar FORA do git até a
-  > entrega que o torna verde; aqui a frente ficou parada por tempo indeterminado, e
-  > **untracked morre num `git clean -fdx`** — perder o contrato é pior que um vermelho
-  > CONHECIDO. Ele se identifica na própria saída (`TDD DA P24 — vermelho POR DESENHO`).
-  > **Não ajuste o esperado dele para passar**; ele some quando a P24 entregar.
-  > Qualquer OUTRO vermelho é regressão. Detalhes:
-  > [`docs/retomada-posicao-do-sitio.md`](docs/retomada-posicao-do-sitio.md). Ele cobre `tests/run.sh`,
+  > *(Houve UM vermelho commitado de propósito entre 2026-08-06 e 08-07 — o TDD da P24,
+  > porque untracked morre num `git clean -fdx` e perder o contrato é pior que um
+  > vermelho conhecido. A entrega da P24 o tornou verde e a exceção morreu. O padrão
+  > continua sendo o TDD ficar FORA do git até a entrega que o torna verde; quando a
+  > frente for ficar parada, a troca acima é a que vale.)* Ele cobre `tests/run.sh`,
   `govet`, **`lexdiff`**, **`site-check`** e `gotest`, nesta ordem. *(Os dois do meio
   entraram em 2026-07-27: ao remover um comportamento eu enumerei os testes afetados
   rodando `make test`, reportei três, e **faltava um quarto** — o exemplo da landing page
@@ -374,6 +371,12 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
   completo, projeto real do corpus), nunca o do microbenchmark. O stress serve para achar
   a **curva** (quadrática × linear), não para dimensionar a notícia. *(Diego, 2026-07-13.
   [cic §3.1])*
+  - **E "anunciar" INCLUI a conversa em que se decide** *(2026-08-07, reincidência)*: um
+    número que sustenta *"vale a pena fazer isto"* já é anúncio, mesmo que morra no chat e
+    nunca chegue ao CHANGELOG. Foi assim que um "28×" de microbenchmark (só a etapa de
+    compilação, projeto que eu mesmo gerei) virou o argumento de uma fatia cujo ganho real
+    é **1,6×** — e o Diego aprovou ouvindo o número inflado. Ler o §4 como regra de
+    PUBLICAÇÃO é o erro: o estrago acontece antes, na priorização.
 - **"Tamanho típico de aplicação real" é uma afirmação sobre o mundo** — ou se mede no
   corpus, ou não se escreve. Afirmar sem medir é a heurística vestida de manchete.
 - **O projeto do benchmark tem de PASSAR**: conferir o **exit** E que ele **leu/analisou**
@@ -413,9 +416,22 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
   - **Inglês** (lido pelo usuário): mensagens da CLI, `docs/manual.md`, `site/index.html`,
     `CHANGELOG.md` e **toda string que a extensão VSCode mostra** (modais, placeholders,
     erros).
-  - **Português** (nossa conversa e nosso raciocínio): `CLAUDE.md`, `docs/roadmap.md`,
-    specs, `tests/*/README.md`, comentários do fonte, e a mensagem de commit **do
-    hbrefactor**. *([cic §4.1])*
+  - **Português** (nosso RACIOCÍNIO, não o produto): `CLAUDE.md`, `docs/roadmap.md`,
+    specs e `tests/*/README.md`. *([cic §4.1])*
+  - **REVISÃO (Diego, 2026-08-07): CÓDIGO e COMMIT são INGLÊS.** *"Este projeto,
+    internamente, usa inglês."* Saem do lado português e passam para o inglês: os
+    **comentários do fonte** (`src/hbrefactor.prg`, os testes Go) e a **mensagem de
+    commit do hbrefactor** — que antes era a única exceção contra o core, e deixou de
+    fazer sentido. A régua deixa de ser "quem lê" e passa a ser **o que é**: artefato do
+    projeto é inglês; documento de raciocínio nosso é português; a conversa é onde você
+    quiser.
+    **Vale do 2026-08-07 em diante.** O acervo em português fica como está — converter em
+    massa é decisão do Diego, não faxina de sessão. Arquivo misto durante a transição é
+    esperado e não é defeito.
+    *(Cuidado ao mexer nos testes Go: os IDENTIFICADORES da infra são portugueses
+    (`registra`, `Projeto`, `Roda`, `Recusa`, `Aponta`). Renomeá-los é refatoração à
+    parte; comentário novo em inglês ao lado deles é a transição, não inconsistência a
+    "consertar".)*
 - **TUDO no harbour-core é em INGLÊS**: código, comentário, documentação **e mensagem de
   commit** — o projeto é internacional e este branch é upstreamável (fase B6). *(Diego,
   2026-07-12. [cic §4.2])*

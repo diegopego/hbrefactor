@@ -188,9 +188,21 @@ hooks:
 		echo "hooks: pre-commit anti-binário ativado (core.hooksPath=.githooks)"; \
 	fi
 
+# A regra do projeto e' que todo .prg compila com -w3 -es2. So' que -es2 NAO
+# cobre tudo: medido em 2026-08-07, ele derruba o W0032 (dead store, exit 1) e
+# deixa passar o W0034 (STATIC nunca usada, exit 0) - e foi assim que uma funcao
+# morta ficou avisando build apos build sem nunca quebrar nada.
+# Entao a regra ganha PORTAO: qualquer linha "Warning" reprova o build. Sem pipe
+# no comando (o exit de um pipeline e' o do ultimo), e o log e' relido do arquivo.
 $(BIN): src/hbrefactor.prg
 	@mkdir -p bin
-	$(HBMK2) src/hbrefactor.prg -o$(BIN) -q0 -w3 -es2 -gtcgi
+	@$(HBMK2) src/hbrefactor.prg -o$(BIN) -q0 -w3 -es2 -gtcgi > bin/.build.log 2>&1; \
+		st=$$?; cat bin/.build.log; \
+		if [ $$st -ne 0 ]; then exit $$st; fi; \
+		if grep -q "Warning" bin/.build.log; then \
+			echo "build: FALHOU - o compilador avisou, e a regra do projeto e' build LIMPO (-w3 -es2)" >&2; \
+			rm -f $(BIN); exit 1; \
+		fi
 
 # paralelo por padrão (pool por-caso, teto nproc - B-infra; Etapa 2:
 # despacho+join em Harbour via bin/parrun, asserts de JSON via bin/tcheck);
