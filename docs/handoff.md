@@ -12,11 +12,11 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-> **A frente da POSIÇÃO DO SÍTIO tem retomada PRÓPRIA:**
-> [`retomada-posicao-do-sitio.md`](retomada-posicao-do-sitio.md) *(2026-08-06)*. Ela
-> nasceu separada porque duas sessões correram em paralelo neste repo e este arquivo é
-> superfície compartilhada — retomada que pode ser sobrescrita não retoma nada. Some
-> quando a P24 fechar.
+> **A sessão de 2026-08-06/07 tem retomada PRÓPRIA e ELA AINDA ESTÁ ABERTA:**
+> [`retomada-sessao.md`](retomada-sessao.md). Entregou P21 (`ast-21`), P24 (`ast-23`) e
+> P25; o mecanismo está em [`posicao-do-sitio.md`](posicao-do-sitio.md). Ela **só some
+> quando a última pendência dela fechar** — hoje: a P26, o `push` que não foi feito, e o
+> email placeholder do core. Leia-a antes de retomar aquela frente.
 
 ## 0-28. A SESSÃO DE 2026-07-28 — a P21 entregou o MECANISMO, e a fila mudou de dono
 

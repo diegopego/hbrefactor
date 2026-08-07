@@ -295,6 +295,25 @@ módulos: 12,35 s → 8,36 s). É ganho de verdade — e era a manchete honesta 
 É o mesmo pecado da REGRA DO FATO, do lado de fora: **afirmar sem medir é a heurística
 vestida de manchete.**
 
+**REINCIDIU em 2026-08-07 — e desta vez o número não chegou ao usuário, só ao Diego.**
+Medi o ganho do incremental (fase W.3) num projeto que **eu mesmo gerei**, 13 módulos
+minúsculos, **cronometrando só a etapa de compilação**: 6,197 s → 0,225 s, e daí saiu o
+"28×" com que apresentei a fatia. No corpus real (`contrib/xhb`, 42 módulos, comando
+completo) o ganho é **1,6×** — e foi esse que entrou no CHANGELOG, no manual e na página,
+porque a medição certa veio antes de publicar.
+
+**O que a reincidência ensina sobre a regra** (e é por isso que ela está aqui, e não só na
+conversa): o §4 diz *"o número que se anuncia é o do produto rodando como o usuário roda"*,
+e eu o li como regra de **PUBLICAÇÃO**. Não é. O microbenchmark já tinha feito o estrago
+**antes** de qualquer anúncio — ao entrar na conversa em que se decide o que fazer. **Um
+número que decide prioridade É um anúncio**, mesmo que morra na conversa: o Diego aprovou a
+fatia ouvindo um ganho inflado por um fator de ~17, e ela ter valido a pena por outros
+motivos foi sorte, não método.
+
+Agravante que fecha o caso: **a fatia 1 da fase V já tinha PREVISTO o teto** — geração ~35%
+do custo, análise ~50% —, num documento que eu havia lido nesta mesma sessão. O número certo
+não estava faltando; estava escrito, e eu produzi outro por medir a peça em vez do produto.
+
 ### 3.2 O benchmark que media um comando ABORTADO (2026-07-13, o mesmo erro na 3ª rodada)
 
 Ao re-medir "de verdade", publiquei uma tabela de 3 projetos — e um deles (`work/gtwvg`,
