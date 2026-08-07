@@ -182,7 +182,7 @@ PROCEDURE Main()
    IF VerboEscreve( s_cCmd ) .AND. Len( aArgs ) >= 2 .AND. ;
       ! ProjLock( aArgs[ 2 ], @pLock )
       nExit := Refuse( "another process is refactoring '" + aArgs[ 2 ] + ;
-                       "' - waited " + hb_ntos( LOCK_WAIT_MS / 1000 ) + "s", ;
+                       "' - waited " + hb_ntos( LockWaitMs() / 1000 ) + "s", ;
                        RSN_PROJECT_BUSY, ACT_RETRY_LATER )
    ENDIF
 
@@ -1214,6 +1214,24 @@ STATIC FUNCTION SnapDir( cSpec )
 // nada, ou deixar passar quem disputa.
 // ---------------------------------------------------------------------------
 
+// o teto, com override por ambiente. Existe por uma razão só: sem ele, o PORTÃO
+// desta fatia custaria 30 s de `make test` para exercitar UMA recusa - e portão
+// caro é portão que alguém desliga. Valor inválido ou ausente cai no default;
+// nunca falha por causa disto (é ajuste, não contrato).
+STATIC FUNCTION LockWaitMs()
+
+   LOCAL cVal := hb_GetEnv( "HBREFACTOR_LOCK_WAIT_MS" )
+   LOCAL nVal
+
+   IF ! Empty( cVal )
+      nVal := Val( cVal )
+      IF nVal > 0
+         RETURN nVal
+      ENDIF
+   ENDIF
+
+   RETURN LOCK_WAIT_MS
+
 STATIC FUNCTION LockPath( cSpec )
 
    LOCAL cBase := WorkRoot() + "lock"
@@ -1248,7 +1266,7 @@ STATIC FUNCTION ProjLock( cSpec, pFile )
       RETURN .T.
    ENDIF
 
-   nFim := hb_MilliSeconds() + LOCK_WAIT_MS
+   nFim := hb_MilliSeconds() + LockWaitMs()
    DO WHILE .T.
       IF hb_vfLock( pFile, 0, 1, HB_FLX_EXCLUSIVE )
          RETURN .T.

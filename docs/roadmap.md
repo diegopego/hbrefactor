@@ -189,7 +189,7 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
 
-## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 entregue 2026-08-06; W.2 aberta; W.3 bloqueada)**
+## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 e W.2 entregues 2026-08-06; W.3 bloqueada pela fase V)**
 
 **O achado que abre a fase.** Todo comando dispara `hbmk2 <alvos> -hbcmp -rebuild -prgflag=-x<tmp>/`
 ([`AstDumps`](../src/hbrefactor.prg)) **sem `-workdir`** — e no modo `-hbcmp` o hbmk2 escreve os
@@ -231,7 +231,48 @@ cenário em arranjos diferentes) e um teste assim passa por sorte. Suíte verde 
 > cobertura aos casos TODOS de uma vez. Anti-vacuidade: com o binário anterior, `rename-local`
 > reprova nomeando `.hbmk/linux/gcc/{a,b}.{c,o}`.
 
-### Fase W.2 — LOCK POR PROJETO *(posição do Diego: a ferramenta cuida da concorrência)*
+### Fase W.2 — LOCK POR PROJETO *(posição do Diego: a ferramenta cuida da concorrência)* — **✅ ENTREGUE 2026-08-06**
+
+> **✅ FEITO — e a fatia mudou de PROBLEMA no meio, por medição.** A justificativa escrita
+> abaixo (9/30 invocações falhando na criação do `.hbmk`) **já tinha sido resolvida pela W.1**:
+> com workdir próprio, 18 comandos de leitura simultâneos, zero falhas. O que sobrou é outro
+> problema, e é pior: **dois renames simultâneos no mesmo arquivo perdiam uma das refatorações
+> em 5 de 12 rodadas**. Não havia corrupção — a edição é fail-closed, o texto que não confere
+> derruba o comando e devolve o fonte byte a byte — havia **perda silenciosa de trabalho**, com
+> um envelope que mandava o agente parar: `unclassified` + `stop-and-report` + *"text on line 9
+> does not match what was expected"*. Ele lia *"pare e conte ao humano"* sobre algo que bastava
+> REFAZER.
+>
+> **Mecanismo 100% do core:** `hb_vfLock` sobre arquivo (`src/rtl/vfile.c`), que é lock de
+> região do SO — morre com o processo, então não existe lock órfão; `tests/flock.prg` do core é
+> o uso vivo. Constantes vêm de `#include "fileio.ch"` (o primeiro include que o fonte passa a
+> ter), nunca copiadas. Sentinela caseira (arquivo-PID, diretório-como-mutex) sobreviveria a um
+> `kill -9`, que é o modo de falha que interessa.
+>
+> **Medido depois:** 0 de 12 rodadas perdem refatoração; leitura não paga pedágio
+> (`usages`/`call-graph`/`dump` em ~0,4 s com o lock tomado); com o lock tomado, escrita espera
+> o teto (30,029 s medidos), recusa `project-busy-another-process`/`retry-later` e **não toca o
+> fonte**.
+>
+> **Portão:** `TestLockSerializaRenamesConcorrentes` (8 pares — com 5/12 de chance por rodada,
+> a probabilidade de oito passarem sem lock é ~0,7%) e
+> `TestLockRecusaComCodigoQuandoOutroProcessoSegura`. Anti-vacuidade conferida com o binário
+> anterior: o primeiro reprova com `refused/unclassified`, o segundo mostra que sem lock o
+> comando **edita o fonte** mesmo com outro processo segurando. O teste toma o lock com
+> `fcntl(F_SETLK)`, que é o que o Harbour usa — no Linux `flock()` e `fcntl()` são
+> independentes, e um lock de `flock` passaria despercebido pela ferramenta (teste verde sem
+> testar).
+>
+> **Por que estes dois testes não são casos de `TestCasos`:** o cenário que prova o lock tem
+> `locations` legitimamente não-determinísticas — o terceiro sítio de um nome sai em `8:14` ou
+> `8:11` conforme o outro rename já ter alongado aquela linha. **As duas respostas estão
+> certas** (cada comando relata o arquivo que leu), e congelar uma em `outputs.json` fixaria o
+> resultado de uma corrida. Isto foi MEDIDO antes de decidir: eu havia proposto mudar a spec do
+> formato para ordenar os envelopes, e a medição mostrou que a ordem nunca foi o problema — a
+> proposta foi retirada.
+>
+> **Superfície nova:** `HBREFACTOR_LOCK_WAIT_MS` (default 30000) — existe para o portão custar
+> 300 ms em vez de 30 s, porque portão caro é portão que alguém desliga.
 
 **O argumento, medido.** 6 invocações simultâneas do comando de dump no mesmo projeto, 5 rodadas:
 **sem lock 9/30 falharam** (`exit=9`, *"Diretório de trabalho não pode ser criado"* — que chegaria
