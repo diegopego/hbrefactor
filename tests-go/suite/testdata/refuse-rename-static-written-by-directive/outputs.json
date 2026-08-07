@@ -5,8 +5,8 @@
   "argv": [
    "rename",
    "app.hbp",
-   "app.prg:5:10",
-   "nTotalLinhas",
+   "app.prg:3:8",
+   "nTotal",
    "--json"
   ],
   "status": "refused",
@@ -31,7 +31,7 @@
       }
      }
     },
-    "detail": "'nLinhas' is also written by a preprocessor rule at cmdlog.ch:1:29 (in rule result (#xcommand CMD_LOG)) - the rename cannot succeed while the two disagree"
+    "detail": "'nLinhas' is named by a preprocessor rule - cmdlog.ch:1:29: in rule result (#xcommand CMD_LOG)"
    }
   ],
   "result": {},

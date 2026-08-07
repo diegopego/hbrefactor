@@ -35,17 +35,36 @@ hbrefactor reprovando qualquer `Warning`.
 
 ## 2. ⚠️ O QUE AINDA NÃO FECHOU — e é por isto que este arquivo existe
 
-### 2.1 A P27 — renomear o nome escrito no RESULTADO de uma regra
+### 2.1 A P28 — a diretiva que escreve um STATIC ou um MEMVAR *(nasceu nesta sessão)*
 
-Spec escrita, com a tabela de sondas, na [P27 do roadmap](roadmap.md). **Falta implementar.**
-Ela nasce destravada pela P24 (o sítio diz de qual aplicação veio, então o dump responde
-quais locais de quais módulos a regra liga) e pela P25 (a ferramenta já ACHA o outro lado; a
-P27 a faz EDITAR).
+Spec com a tabela de sondas na
+[P28 do roadmap](roadmap.md#p28--a-diretiva-que-escreve-um-static-ou-um-memvar). São TRÊS
+fatias, e a ordem foi decidida medindo os dois verbos por dentro.
 
-**Alcance decidido pelo Diego, duas vezes:** não há recusa por dono do arquivo — se o `.hbp`
-alcança a regra, edita, inclusive `.ch` do próprio Harbour. A responsabilidade é de quem
-refatora. O que a ferramenta deve é **relatar** que o arquivo é externo. `(builtin)` recusa,
-e não por política: não há arquivo.
+| fatia | o quê | estado |
+|---|---|---|
+| **1 — o relato** | recusa de `static`/`memvar` passa a dizer qual `.ch` escreve o nome | ✅ **ENTREGUE 2026-08-07** |
+| **2 — o static** | o motor da P27 alcança `static` e edita os dois lados | **A FAZER** |
+| **3 — o memvar** | idem para `private`/`public` | **A FAZER, e o tamanho é DESCONHECIDO** |
+
+**Fatia 1, entregue.** `DiagRuleWritesApplied()` emite a regra como `diagnostics[]` nas
+recusas dos dois verbos. O gatilho é **aplicação**, não menção: uma regra só REGISTRADA num
+módulo que nunca usa o comando não causou nada ali, e relatá-la foi o erro que matou o
+`DiagRuleWrites` antes. Casos: `refuse-rename-static-written-by-directive` e
+`refuse-rename-memvar-written-by-directive` (dois, porque são dois sítios de chamada — um
+não pega o outro emudecendo).
+
+**Fatia 2 é repetição de caminho já andado.** O `rename-static` tem a MESMA forma que o
+`rename-local` tinha: guardas, laço que junta posições, dedup. Foi daí que saiu o
+`LocalScan`; sai igual.
+
+**Fatia 3 é diferente, e por isso está por último.** O `rename-memvar` **não** é um coletor
+de posições: ele calcula o alcance de quem criou a variável, monta o grafo de funções que
+rodam com ela viva, recusa se o alcance tem buracos, e trata criação por macro. Antes de
+propor mecanismo é preciso **medir** se aquele alcance continua valendo com as edições do
+`.ch` dentro do conjunto. *(A suspeita do Diego de que "cada caso tem uma complexidade" se
+confirma AQUI — e não por falta de prova, como eu tinha escrito, mas porque o verbo faz
+muito mais coisa.)*
 
 ---
 

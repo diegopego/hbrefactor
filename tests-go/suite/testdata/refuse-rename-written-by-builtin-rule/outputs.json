@@ -1,0 +1,28 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "q.hbp",
+   "q.prg:7:10",
+   "Emite",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "name-written-by-builtin-rule",
+  "action": "stop-and-report",
+  "detail": "'QOut' named in a BUILTIN rule (#command ?) - there is no directive to edit",
+  "diagnostics": [
+   {
+    "code": "name-also-written-by-directive",
+    "severity": "warning",
+    "location": null,
+    "detail": "'QOut' is named by a preprocessor rule - (builtin): in rule result (#command ?)"
+   }
+  ],
+  "result": {},
+  "edits": []
+ }
+]

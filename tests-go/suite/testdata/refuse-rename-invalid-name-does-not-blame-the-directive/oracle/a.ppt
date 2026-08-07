@@ -1,0 +1,2 @@
+a.prg(7) >CMD_LOG "iniciando"<
+#xcommand >nLinhas += 1 ; OutStd( "iniciando" )<

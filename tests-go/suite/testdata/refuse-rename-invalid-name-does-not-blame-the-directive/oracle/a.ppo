@@ -1,0 +1,11 @@
+#line 3 "a.prg"
+PROCEDURE Main()
+
+   LOCAL nLinhas := 0
+
+   nLinhas += 1 ; OutStd( "iniciando" )
+
+   OutStd( hb_ntos( nLinhas ) )
+   Outro()
+
+   RETURN

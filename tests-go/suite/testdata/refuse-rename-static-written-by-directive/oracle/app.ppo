@@ -1,0 +1,10 @@
+#line 3 "app.prg"
+STATIC nLinhas := 0
+
+PROCEDURE Main()
+
+   nLinhas += 1 ; OutStd( "iniciando" )
+
+   OutStd( hb_ntos( nLinhas ) )
+
+   RETURN

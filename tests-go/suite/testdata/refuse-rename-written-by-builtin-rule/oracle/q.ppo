@@ -1,0 +1,11 @@
+PROCEDURE Main()
+
+   QOut( "hi" )
+
+   RETURN
+
+FUNCTION QOut( cText )
+
+   OutStd( cText )
+
+   RETURN NIL

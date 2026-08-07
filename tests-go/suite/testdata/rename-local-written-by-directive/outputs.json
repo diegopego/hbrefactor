@@ -1,0 +1,71 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:5:10",
+   "nTotalLinhas",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 2 binding site(s) + 1 directive occurrence(s); all 1 module(s) byte-identical (-gh -l)",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "rule-written",
+   "old": "nLinhas",
+   "new": "nTotalLinhas",
+   "editCount": 3,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 9
+      },
+      "end": {
+       "line": 4,
+       "character": 16
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 8,
+       "character": 20
+      },
+      "end": {
+       "line": 8,
+       "character": 27
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/cmdlog.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 28
+      },
+      "end": {
+       "line": 0,
+       "character": 35
+      }
+     }
+    }
+   ],
+   "applicationSites": 2,
+   "directiveOccurrences": 1
+  },
+  "edits": []
+ }
+]

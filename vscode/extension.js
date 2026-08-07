@@ -309,12 +309,17 @@ async function saveAll() { await vscode.workspace.saveAll(false); }
 // papel estrutural do site + escopo declarado da função dona) e despacha
 // para o rename-* específico por dentro, com saída byte-idêntica. Substitui
 // os comandos por-kind (Local/Static/Function/Dsl/PpMarker, DESCONTINUADOS):
-// a taxonomia é do compilador, não uma escolha remontada na UX. Os fluxos de
-// confirmação (--edit-rules quando o nome é citado em diretiva, --force
-// quando há strings/HB_FUNC) chegam pela MESMA mensagem do CLI - o rename
-// delega ao rename-* que já as emite, então há um único ponto de confirmação.
-// Posição sem identificador de compilação: o CLI recusa nomeando a exceção
-// (degrade honesto, nunca palpite).
+// a taxonomia é do compilador, não uma escolha remontada na UX. O fluxo de
+// confirmação (--force quando há strings/HB_FUNC) chega pela MESMA mensagem do
+// CLI - o rename delega ao rename-* que já a emite, então há um único ponto de
+// confirmação. Posição sem identificador de compilação: o CLI recusa nomeando a
+// exceção (degrade honesto, nunca palpite).
+//
+// P27: havia aqui um segundo confirm, para --edit-rules, quando o nome era
+// citado dentro de uma diretiva. A flag deixou de existir - uma diretiva que o
+// projeto compila é editada como qualquer outro arquivo dele -, e o modal foi
+// junto. O que o usuário passa a receber é o AVISO no relatório: quais sítios de
+// regra foram tocados, e quando o arquivo não mora na árvore do projeto.
 async function cmdRename() {
   const c = await ctx();
   if (!c) return;
@@ -328,16 +333,6 @@ async function cmdRename() {
   const at = atSpec(c.file, pos.line, pos.character);
   const flags = [];
   let res = await runWrite(['rename', c.spec, at, novo], c.cwd, `rename @ ${at} -> ${novo}`);
-  // o nome é citado DENTRO de regra de pp: --edit-rules edita as diretivas junto
-  if (res.code !== 0 && /--edit-rules/.test(res.stderr + res.stdout)) {
-    report(`rename @ ${at} -> ${novo} (named in a pp rule)`, res);
-    const go = await vscode.window.showWarningMessage(
-      'The name is used INSIDE preprocessor rule(s) (the directives are named in the output). Edit the directives too?',
-      'Proceed (--edit-rules)', 'Cancelar');
-    if (go !== 'Proceed (--edit-rules)') return;
-    flags.push('--edit-rules');
-    res = await runWrite(['rename', c.spec, at, novo, ...flags], c.cwd, `rename @ ${at} -> ${novo}`);
-  }
   // strings/HB_FUNC iguais ao nome NÃO são editadas: o CLI pede --force
   if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
     report(`rename @ ${at} -> ${novo} (textual references)`, res);

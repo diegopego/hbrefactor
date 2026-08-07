@@ -20,6 +20,91 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
+## 2026-08-07 — renaming a variable your `#xcommand` writes
+
+You have a header with something like this, and dozens of places using it:
+
+```harbour
+// log.ch
+#xcommand LOG <cMsg> => nLines += 1 ; OutStd( <cMsg> )
+```
+
+That `nLines` is not a word of your command — nobody types it at a call site. It is a
+**variable the directive writes into your code**, and the compiler binds it to the
+`LOCAL nLines` of whoever used `LOG`. Two sides of one variable, and until now only
+one of them could be renamed:
+
+- renaming the `LOCAL` in your `.prg` edited your module, recompiled, saw the pcode
+  change and rolled back — correct, and no help at all;
+- putting the cursor on the `nLines` in the header got you *"is not a match word of any
+  project pp rule"* — true, and useless.
+
+**Now it is one rename, from either end.** Put the cursor on the `LOCAL` or on the name
+inside the header; both edit the module *and* the directive, and both prove it the same
+way — every module of your project compiles to byte-identical pcode, or nothing is
+written:
+
+```
+$ hbrefactor rename app.hbp app.prg:5:10 nTotalLines
+rename-rule-written: nLines -> nTotalLines
+  app.prg:5:10
+  app.prg:9:21
+  log.ch:1:29
+verified: 2 binding site(s) + 1 directive occurrence(s); all 1 module(s) byte-identical (-gh -l)
+```
+
+**What it does NOT do, and this is the part worth trusting.** It does not rename by
+name. A `LOCAL nLines` in some other function that never uses `LOG` is a different
+variable, and it is left alone — the tool follows what the directive actually *binds*
+in your compiled code, which the compiler records for it. If your command is used in
+five modules, all five are renamed together, because the header ties them.
+
+**When it cannot do it, it now tells you why.** If the name binds to a `STATIC` or to a
+`PRIVATE`/`PUBLIC`, the rename still fails and undoes itself — but instead of only
+"the pcode changed", it names the header:
+
+```
+warning: 'nLinhas' is named by a preprocessor rule - log.ch:1:29: in rule result (#xcommand LOG)
+```
+
+It only says that when the command is actually *used* in that module. A header that merely
+defines a command you never call had nothing to do with the failure, and you will not see
+it blamed.
+
+**Honest limit:** the name has to bind to a `LOCAL` for the rename itself. If the directive writes a name
+that lands on a PRIVATE/PUBLIC or a FIELD, the tool refuses and says so, because
+those names live in the pcode and the byte-identical proof would not apply.
+
+**And when there is no file to edit, it says exactly that.** Harbour's own `?` command
+is compiled *into* the preprocessor: if you define your own `QOut`, no rename can make
+the two sides agree, because there is no directive file. You get
+`name-written-by-builtin-rule` and nothing is touched — not a vague failure.
+
+### One permission you no longer have to give
+
+Renaming something named inside a directive used to stop and ask you to repeat the
+command with `--edit-rules`. **That flag is gone**, and if you have it in a script you
+can drop it.
+
+The reason is that it was asking permission for something ordinary. Renaming a function
+declared in one file and called in four others edits all five, and never asked — a
+`.ch` your project compiles is one more file of that same build, checked by the same
+proof. The toll was about the file's *extension*, not about any risk.
+
+**What you get instead is the report.** Every rule site the rename touched is named in
+the output, and if the directive lives outside your project's folder, you are told so
+with the full path — because that file is shared with anything else on your machine
+that includes it, and that is your call to make, not the tool's:
+
+```
+warning: the directive is in '/opt/shared/lib.ch', outside the project's directory -
+this project compiles it, so it IS edited; the file does not live in the project's tree
+```
+
+The tool deliberately says nothing about *which other projects* read that header. It
+cannot know — they may be in another repository, on another machine — and a list that
+only found whatever happened to sit on this disk would read as complete when it is not.
+
 ## 2026-08-07 — it stops writing in your project, and two refactorings stop stepping on each other
 
 Three things you can feel, all of them about the tool behaving itself around your

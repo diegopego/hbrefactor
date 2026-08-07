@@ -51,8 +51,19 @@ relata() {  # relata <rotulo> <regex-egrep>  -- acumula em SAIDA (SEM subshell:
 
 relata "gatilho 1 - comparação de TEXTO para decidir PAPEL/IDENTIDADE (o dump tem id/número?)" \
    'Upper\([^)]*\) *== *Upper\(|== *Left\(|\bLeft\([^)]*\) *==|\$ *(cUp|cNome|cName)'
-relata "gatilho 2 - CONSTANTE MÁGICA de gramática (réplica de regra do compilador)" \
-   '(Len|hb_BLen)\([^)]*\) *(>=|>|<=|<) *[0-9]+'
+# O gatilho 2 (CONSTANTE MÁGICA de gramática) tinha regra aqui e foi APAGADA
+# em 2026-08-07, por ordem do Diego, depois de medir: `(Len|hb_BLen)(...) <op> N`
+# acusava 54 linhas do fonte e NENHUMA era heurística - todas contam argumentos
+# da CLI (`aArgs`), partes de uma posição `arquivo:linha:coluna` (`aAtParts`) ou
+# itens de uma lista. E o que ela mirava já não existe: a aritmética de
+# abreviação dBase (`>= 4`) morreu quando a ferramenta passou a PERGUNTAR ao pp
+# (PpHeadHit); a única ocorrência que restou no fonte está dentro de um
+# comentário, descrevendo o comportamento removido.
+#
+# Portão que erra em 100% dos casos não protege: ele treina quem trabalha aqui a
+# contorná-lo, e aí os outros gatilhos perdem a força junto. O gatilho 2 continua
+# valendo como REGRA no CLAUDE.md - o que ele não tem mais é mecanismo, e isso
+# está dito lá em voz alta em vez de fingido por um regex que só faz ruído.
 # O gatilho 5 é CASAR arquivo por basename (dois .ch homônimos colidem), não
 # EXIBIR o basename. `Refuse( "text in " + hb_FNameNameExt( cPath ) + ... )` lê
 # e escreve pelo caminho CANÔNICO e só encurta o nome na mensagem - acusá-lo era

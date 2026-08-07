@@ -760,7 +760,7 @@ Every classic refactoring, re-seated on the compiler's facts; each one verified
 
 | Command | What it does |
 |---|---|
-| `rename` | Point the cursor at a name; it renames the *symbol* — local, parameter, static, memvar, function, method, a class's data member (`VAR`/`DATA`), even a preprocessor directive word or match-marker. **You don't classify the target**: the kind comes from the compiler's fact at that position, not from picking one of eight commands. It renames the symbol, never the text. |
+| `rename` | Point the cursor at a name; it renames the *symbol* — local, parameter, static, memvar, function, method, a class's data member (`VAR`/`DATA`), a preprocessor directive word or match-marker, and a variable your directive **writes** into the code it generates (from either end: the `LOCAL` in your `.prg` or the name inside the `.ch`; both edit both sides). **You don't classify the target**: the kind comes from the compiler's fact at that position, not from picking one of eight commands. It renames the symbol, never the text. |
 | `usages` | Every reference to a symbol, scope-aware, with honest certainty labels; homonyms of other classes excluded by fact. Peek them right inside VSCode. |
 | `extract-function` | Pull a range of lines into a new function — or a new METHOD when you're inside one; the locals it needs move with it. |
 | `inline-local` | Fold a variable back into its uses — purity judged by the compiler's own tree. |

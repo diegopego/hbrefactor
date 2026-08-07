@@ -407,7 +407,7 @@ edição.**
 
 **A contradição que se fecha:** a ferramenta **proíbe comparação de texto no MOTOR e obriga
 comparação de texto no CONSUMIDOR**. A extensão decide **fluxo** casando prosa (`/--force/`,
-`/--edit-rules/`, `/no compile-time identifier/` — `vscode/extension.js`), e já **quebrou
+`/no compile-time identifier/`, `/BROKEN/` — `vscode/extension.js`), e já **quebrou
 calada** quando a CLI foi traduzida. É o **mesmo padrão da fase L** (*"o compilador SABE e
 joga o fato fora numa string"*), agora com a ferramenta fazendo isso com a **própria saída**.
 
@@ -1135,7 +1135,131 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P27 — o nome escrito no RESULTADO de uma regra também se renomeia *(aberto 2026-08-07; **A FAZER**; destravada pela P24)*
+### P28 — a diretiva que escreve um STATIC ou um MEMVAR *(aberto 2026-08-07; **fatia 1 ENTREGUE, fatias 2-3 A FAZER**; resto da P27)*
+
+**O caso.** A P27 renomeia o nome que a diretiva escreve **quando ele liga a um LOCAL**.
+Ligando a outra coisa, ela recusa. Eu escrevi essa recusa dizendo *"só um LOCAL pode ser
+provado byte-idêntico"* — e o Diego mandou não supor. **A suposição estava errada.**
+
+**TABELA DE SONDAS** *(§1.7.1 — medida em 2026-08-07, ANTES do mecanismo)*
+
+| escopo | com a diretiva escrevendo o nome | **controle positivo** (mesmo escopo, SEM diretiva) |
+|---|---|---|
+| `local` | ✅ P27: edita os dois lados, `pcode-identical` | — |
+| `static` | ❌ `verification-failed-rolled-back`, **`diagnostics[] VAZIO`** | ✅ `ok`, `proof: pcode-identical` |
+| `private` | ❌ `verification FAILED ... the number of symbols/functions changed`, **vazio** | ✅ `ok`, `proof: pcode-identical` ("symbol renamed") |
+| `public` | ❌ idem `private`, **vazio** | *(mesmo verbo do private — `rename-memvar`)* |
+| `field` | — | **fora**: `no rename verb covers RDD fields` (área de trabalho, não símbolo do módulo) |
+
+**O que os controles provam, e é o oposto do que eu escrevi:** `rename-static` e
+`rename-memvar` **já renomeiam e já têm prova própria**. Não falta provabilidade — falta o
+motor da P27 alcançar aqueles verbos. A dificuldade que o Diego supôs se confirma **só** no
+`FIELD`, e ali a ferramenta já recusa em todo lugar, por outra razão.
+
+**E há um segundo buraco, maior, na mesma medição:** os três recusam com
+`diagnostics[]` **vazio**. É exatamente a lacuna que a P25 fechou para `local` — a recusa
+não conta o que a ferramenta já sabe — **ainda aberta para todo o resto**. Foi o que os 5
+porquês do `DiagRuleWrites` acharam: o diagnóstico estava pendurado no VERBO em vez de no
+FATO, então disparava onde virou coincidência e calava onde é a causa.
+
+**Escopo — TRÊS fatias, e a ordem saiu de ler os dois verbos por dentro**
+
+**Fatia 1 — o relato. ✅ ENTREGUE 2026-08-07.** `DiagRuleWritesApplied()` emite a regra como
+`diagnostics[]` nas recusas de `rename-static` e `rename-memvar`. O gatilho é
+**APLICAÇÃO**, não menção: regra só REGISTRADA num módulo que nunca usa o comando não causou
+nada ali — relatá-la assim mesmo foi o erro que matou o `DiagRuleWrites`. Um helper só para
+os dois sítios, porque mudam pelo mesmo motivo; os verbos seguem tão diferentes quanto são.
+Casos: `refuse-rename-static-written-by-directive` e `refuse-rename-memvar-written-by-directive`.
+
+**Fatia 2 — o static.** O motor da P27 passa a colher sítio de `static`, delegando ao verbo
+que já sabe fazê-lo, como faz com `LocalScan`. A prova é a **daquele** verbo, não uma nova.
+Baixo risco: o `rename-static` tem a mesma forma que o `rename-local` tinha (guardas, laço
+de posições, dedup) — é de onde o `LocalScan` foi extraído.
+
+**Fatia 3 — o memvar. Tamanho DESCONHECIDO, e é por isso que está por último.** O
+`rename-memvar` não é um coletor de posições: calcula o alcance de quem criou a variável,
+monta o grafo de funções que rodam com ela viva, recusa em alcance com buracos, e trata
+criação por macro. **Medir primeiro** se aquele alcance continua valendo com as edições do
+`.ch` no conjunto — sem isso, qualquer mecanismo proposto é suposição.
+
+- `FIELD` continua fora, com a recusa que já existe.
+- **Cuidado medido no `public`:** o nome é visível a outros módulos e alcançável por macro
+  em runtime. O `rename-memvar` já tem o portão de referência textual (`--force`,
+  `RSN_TEXTUAL_FORCE`); a P28 **não** o afrouxa.
+
+**Critério de pronto (mecânico)**: caso com `#xcommand` escrevendo um `STATIC` — rename
+edita os dois lados e sai `ok`; idem para `PRIVATE`; caso `FIELD` recusando com o código que
+já existe; caso provando `diagnostics[]` **não vazio** na recusa de `static`/`memvar` que a
+edição conjunta não cobrir; `make test` verde.
+
+### P27 — o nome escrito no RESULTADO de uma regra também se renomeia *(aberto 2026-08-07; **✅ ENTREGUE 2026-08-07**; destravada pela P24)*
+
+**ENTREGUE.** As duas direções chegam ao mesmo motor (`RenameRuleWritten`), porque o
+conjunto de edição é UM SÓ: os tokens do result no `.ch` + as locais que as APLICAÇÕES
+daquela regra ligam, em todos os módulos. Quem diz quais locais é o core — a P24
+estampou no sítio o índice da aplicação, então `occurrences[].app` responde *"esta
+referência foi escrita por AQUELA aplicação"*. Homônima em função que não usa o comando
+não tem `app` e fica de fora (metade negativa do caso
+`rename-directive-result-from-the-header`). Prova: `.hrb -gh -l` de todos os módulos
+byte-idêntico — o `.ppo` NÃO entra, porque aqui a expansão muda de propósito.
+
+**O que mudou em relação à spec abaixo, e por quê**
+
+1. **O `--edit-rules` MORREU** *(Diego, 2026-08-07)*. Ele não estava na spec da P27, mas
+   era o portão do irmão (`rename-function`), e manter um caminho com pedágio e outro sem
+   seria incoerência entregue de propósito. As três justificativas caíram, cada uma numa
+   medição: não protegia o projeto (o oráculo verifica), não podia proteger outros
+   projetos (**"achar um projeto vizinho é pura sorte; e se estiverem em outro
+   repositório, em outro computador"** — logo qualquer varredura seria sorte lida como
+   resposta), e não protegia nem *"a edição sai do arquivo que você apontou"*, porque
+   **"uma ferramenta de refatoração comumente refatora uma declaração que tem uso em
+   diversos outros prgs do mesmo hbp"**. O caso **74b** executa esse argumento: um `.hbp`,
+   três módulos, os três editados sem cerimônia.
+2. **O veto por dono do arquivo (`ProjectOwnsFile`) saiu dos três caminhos de edição de
+   diretiva**, virando `DiagExternalRule` (relato com o caminho). Além de contrariar a
+   régua do Diego, ele perguntava *"onde o arquivo MORA?"*, que não responde *"quem mais o
+   LÊ"* — medido: header ao lado do próprio `.hbp` passava pelo guard e quebrava um
+   vizinho. **Isto inverteu o caso 119(1)**, da P-AUDIT/A1, que agora afirma o contrário.
+3. **A P25 virou o caso de SUCESSO da P27** (`rename-local-written-by-directive`): a
+   mesma fixture, o mesmo comando, veredito `refused` → `ok`. Era o que a P27 prometia
+   ("a P25 o deixa VISÍVEL; a P27 o torna EDITÁVEL").
+   > **Eu relatei que o `DiagRuleWrites` tinha ficado sem cenário, e estava ERRADO** — o
+   > Diego perguntou o que ele era e a sonda derrubou a minha frase. Ele é alcançável: o
+   > roteamento da P27 desvia só a local que a regra LIGA; homônima em módulo que inclui o
+   > header sem usar o comando segue pelo `rename-local`. **E a sonda achou defeito pior
+   > que o código morto que eu supunha**: naquele caminho o aviso terminava em *"the rename
+   > cannot succeed while the two disagree"* — DIAGNÓSTICO, não fato, e falso ali (nada
+   > discorda; o rename caiu por `E0030`, causa que estava no `diagnostics[]` ao lado).
+   > A cláusula sobreviveu porque o único cenário em que alguém a rodava era o que a P27
+   > passou a RESOLVER; o que sobrou chegando lá é justo o caso sobre o qual ela mentia.
+   > **E os 5 porquês (ordem do Diego: provar a necessidade antes de manter o código)
+   > reprovaram o helper inteiro.** Elo 5: para `local` não sobrou nenhum caso em que a
+   > diretiva seja a causa — a P27 levou todos; e para `static`/`memvar`, onde ela É a
+   > causa, ele nunca foi chamado (medido: `diagnostics[]` vazio). **Raiz: o diagnóstico
+   > estava pendurado no VERBO em vez de no FATO.** O `DiagRuleWrites` foi REMOVIDO (79
+   > linhas), a recusa deixou de arrastar coincidência, e o fato volta onde é causal — é a
+   > [P28](#p28--a-diretiva-que-escreve-um-static-ou-um-memvar). O que ficou no lugar do
+   > comentário é o caso `refuse-rename-invalid-name-does-not-blame-the-directive`, que
+   > reprova a volta do aviso não-causal. **Régua: aviso declara o fato dele; a causa é de
+   > quem recusou.**
+4. **O `(builtin)` e o `--edit-rules` saíram do `unclassified`**: `RSN_RULE_BUILTIN`
+   (`stop-and-report` — não é política, é física: não há arquivo). E o sítio de regra, que
+   o `rename-function` cuspia com `OutErr` cru, virou `diagnostics[]` — sob `--json` ele
+   caía FORA do envelope, e a recusa dizia "sites above" sem sites acima.
+
+**Régua do Diego que ficou desta sessão** *(vale além da P27)*: **especificação em CÓDIGO
+(teste) é preferível a prosa (comentário)**, e **comentário sobre um teste apodrece — se o
+histórico precisa existir, ele mora JUNTO do teste, não no fonte**. Os comentários que eu
+tinha escrito no `hbrefactor.prg` com essa narrativa foram encolhidos e a história está nos
+casos 74, 119 e nos três casos novos.
+
+**Limite honesto entregue:** o nome tem de ligar a um **LOCAL**. Ligando a
+memvar/private/public/field, a ferramenta **recusa nomeando o escopo** — aqueles nomes
+existem no pcode e a prova byte-idêntica não se aplica.
+
+---
+
+*(spec original, como foi escrita antes de executar)*
 
 **O caso.** Uma diretiva do projeto escreve um nome no código que gera:
 

@@ -1375,10 +1375,9 @@ fatia 2). Classe embrulhada de FORA do projeto fica `possible` honesto.
   do marker) muda a expansão e recusa AQUI, honesto (caso 82). O
   `.ppo`/`.ppt` gravam SEMPRE ao lado do fonte (independe de `-o`/cwd) —
   preservar um `.ppo` pré-existente do usuário.
-- **rename-function `--edit-rules` (B4g, upgrade do caso 74)**: nome
-  citado dentro de regra do projeto → recusa ACIONÁVEL nomeando
-  diretiva+posição (sem o flag, ANTES de qualquer edição — regra nunca
-  aplicada não dispara o oráculo e ficaria órfã em silêncio); com o flag,
+- **rename-function + diretiva (B4g, caso 74; o `--edit-rules` MORREU na
+  P27)**: nome citado dentro de regra do projeto → os sítios são
+  RELATADOS (`diagnostics[]`) e
   os tokens de `match[]`/`result[]` entram no conjunto de edições e
   passam pelo MESMO oráculo (mapa de símbolos + rollback + execução).
   Builtin ou token sem posição → recusa nomeando o motivo.

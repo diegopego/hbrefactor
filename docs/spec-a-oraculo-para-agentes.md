@@ -43,8 +43,8 @@ inferência, recompilar-e-reverter, genérico > específico.
 
 - Dos 12 comandos, só `usages`, `projects-of` e `annotate` têm `--json` — e escrevem num
   **arquivo**, nunca em stdout. Os outros oito só falam prosa.
-- A extensão VSCode decide **fluxo** casando prosa: `/--force/`, `/--edit-rules/`, `/no
-  compile-time identifier/` (`vscode/extension.js`). Já **quebrou calada** quando a CLI foi
+- A extensão VSCode decide **fluxo** casando prosa: `/--force/`, `/no compile-time
+  identifier/`, `/BROKEN/` (`vscode/extension.js`). Já **quebrou calada** quando a CLI foi
   traduzida.
 - `Refuse()` (`src/hbrefactor.prg`) é funil ÚNICO e achata numa frase três coisas distintas.
 - `usages` sai **`EXIT_REFUSED` com zero resultados** — o consumidor não distingue "não há usos"
@@ -93,7 +93,7 @@ cosmética: é o que decide se o agente **relata** ou **contorna**.
 | classe | `status` | exit | o que o agente deve fazer | códigos |
 |---|---|---|---|---|
 | **recusa de política** — seria incorreto | `refused` | 1 | **PARE. Conte ao humano.** | `verification-failed-rolled-back`, `ambiguous-position`, `no-fact-at-position`, `homonym-not-unique` |
-| **recusa acionável** — é possível, falta consentimento | `refused` | 1 | **Peça ao humano e repita com a flag.** | `textual-refs-require-force`, `rule-edit-required` |
+| **recusa acionável** — é possível, falta consentimento | `refused` | 1 | **Peça ao humano e repita com a flag.** | `textual-refs-require-force` *(o `rule-edit-required` estava previsto aqui para o `--edit-rules`; a flag morreu na P27 — editar diretiva do projeto deixou de precisar de consentimento, então a classe ficou com um código só)* |
 | **ambiente quebrado** — não é recusa, é o toolchain | `refused` | 1 | **Não é sobre a refatoração.** Conserte o projeto. | `project-does-not-compile`, `project-unresolved`, `dump-missing`, `schema-mismatch` |
 | **resposta vazia legítima** — não é recusa nenhuma | **`ok`** | **0** | Siga: a resposta é "não há". | — |
 
@@ -117,19 +117,23 @@ só existe.**
 | suíte | **17** sítios usando `--json <arquivo>` |
 | extensão | **2 fluxos** que escrevem num temp e leem de volta (`ownerOf`, `cmdUsages` — `tmpJson()`/`readFileSync`/`unlinkSync`) |
 
-**(c) O alvo real do A.1, contado: os regexes de PROSA da extensão são QUATRO.**
+**(c) O alvo real do A.1, contado: os regexes de PROSA da extensão são TRÊS.**
 
 ```
-extension.js:235  /no compile-time identifier/
-extension.js:280  /--edit-rules/
-extension.js:290  /--force/
-extension.js:368  /BROKEN/          <- escrito por mim na A.2, em 2026-07-13
+extension.js:287  /no compile-time identifier/
+extension.js:337  /--force/
+extension.js:412  /BROKEN/          <- escrito por mim na A.2, em 2026-07-13
 ```
+
+*(Eram quatro; o `/--edit-rules/` morreu na P27 junto com a flag. Não conte isso como
+progresso do A.1: o regex sumiu porque a decisão que ele mediava deixou de existir, não
+porque a extensão passou a ler campo. Os três que ficam decidem fluxo casando prosa, e é
+esse o alvo.)*
 
 **A entrega do `verify` AUMENTOU a dívida em um.** Para oferecer o rollback no `BROKEN`, o
 primeiro consumidor do comando novo já casa texto em inglês para decidir fluxo — e vai quebrar
 calado no dia em que alguém reescrever a mensagem. **Não é argumento retórico sobre o futuro: é
-uma linha de código.** O critério de pronto do A.1 mata as quatro.
+uma linha de código.** O critério de pronto do A.1 mata as três.
 
 ---
 
@@ -214,7 +218,7 @@ do §T, e não é coincidência que tenha reaparecido.)*
 
 #### 2.5.1 O que os DOIS precisam igualmente (e é a maior parte)
 
-- **Nenhuma decisão de fluxo por prosa.** Hoje a extensão casa `/--force/`, `/--edit-rules/`,
+- **Nenhuma decisão de fluxo por prosa.** Hoje a extensão casa `/--force/`,
   `/no compile-time identifier/`, `/BROKEN/` — e eu faria o mesmo, pior. `reason` + `action`
   como campos servem aos dois **exatamente igual**.
 - **Aviso é DADO, não prosa no stderr.** *(Buraco da primeira versão desta seção, achado ao ler

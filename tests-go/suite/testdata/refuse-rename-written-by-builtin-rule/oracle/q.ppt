@@ -1,0 +1,2 @@
+q.prg(3) >? "hi"<
+#command >QOut( "hi" )<

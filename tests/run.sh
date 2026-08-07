@@ -1922,32 +1922,57 @@ check "rename-local através do açúcar exit 0" $([ $RC -eq 0 ] && echo 0 || ec
 grep -q "CONTA mm" "$D/sf1.prg" && grep -q "mm := Dobro( mm )" "$D/sf1.prg" && \
    grep -q "byte-identical" "$D/rl.log"
 check "rename editou o site do comando e verificou byte-idêntico" $?
-( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Duplo > rf.log 2>&1 )
-RC=$?
-check "rename-function com o nome no CORPO da regra: recusa ACIONÁVEL (exit != 0)" $([ $RC -ne 0 ] && echo 0 || echo 1)
-# B4g: a recusa deixou de ser cega - nomeia diretiva+posição (match[]/
-# result[] do ast-5) ANTES de qualquer edição e oferece --edit-rules
-grep -q "suga.ch:2:" "$D/rf.log" && grep -q "in rule result (#xcommand DOBRA)" "$D/rf.log" && \
-   grep -q -- "--edit-rules" "$D/rf.log" && grep -q "FUNCTION Dobro( n )" "$D/sf1.prg" && \
-   grep -q "Dobro( <v> )" "$D/suga.ch"
-check "recusa NOMEIA diretiva+posição, oferece --edit-rules; nada editado" $?
-# --edit-rules: a diretiva entra no conjunto de edições e passa pelo MESMO
-# oráculo (mapa de símbolos + rollback); execução idêntica fecha o contrato
+# P27 (2026-08-07): a diretiva do projeto e' editada SEM flag nenhuma.
+#
+# Ate aqui era preciso repetir o comando com --edit-rules, e o portao caiu
+# porque nao havia fato atras dele. O argumento que o matou e' do Diego, e o
+# proprio caso 74b abaixo o executa: renomear uma declaracao usada em varios
+# arquivos do MESMO projeto e' o que uma ferramenta de refatoracao faz o dia
+# inteiro, e ninguem pede permissao por isso. Um .ch que o projeto compila e'
+# mais um arquivo daquela compilacao, coberto pelo MESMO oraculo. Cobrar
+# pedagio dele era regra sobre a EXTENSAO do arquivo, nao sobre fato.
+#
+# (As outras duas defesas do portao ja tinham caido antes, cada uma numa
+# medicao: ele nao protegia o projeto - o oraculo verifica -, e nao podia
+# proteger OUTROS projetos, porque saber se existem nao e' possivel daqui
+# (outro repositorio, outra maquina); qualquer varredura seria sorte lida
+# como resposta.)
 cp "$D/sf1.prg" "$D/sf1.antes"; cp "$D/suga.ch" "$D/suga.antes"
 ( cd "$D" && rm -rf .hbmk && "$HB_BIN/hbmk2" sf1.prg -oapp -gtcgi -q0 -main=UsaS > /dev/null 2>&1 && ./app > saida_antes.txt 2>/dev/null )
-( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Duplo --edit-rules > rf2.log 2>&1 )
+( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Duplo > rf.log 2>&1 )
 RC=$?
-check "rename-function --edit-rules exit 0" $([ $RC -eq 0 ] && echo 0 || echo 1)
+check "rename-function com o nome no CORPO da regra: exit 0 SEM flag (P27)" $([ $RC -eq 0 ] && echo 0 || echo 1)
 grep -q "FUNCTION Duplo( n )" "$D/sf1.prg" && grep -q "Duplo( <v> )" "$D/suga.ch" && \
-   grep -q "verified" "$D/rf2.log"
-check "--edit-rules editou fonte E diretiva; oráculo verificou" $?
+   grep -q "verified" "$D/rf.log"
+check "editou fonte E diretiva; oráculo verificou" $?
+# o sitio na diretiva continua RELATADO - some o pedagio, nao o relato; e ele
+# e' DADO (diagnostics[] sob --json), nunca prosa perdida no stderr
+grep -q "suga.ch:2:" "$D/rf.log" && grep -q "in rule result (#xcommand DOBRA)" "$D/rf.log"
+check "o sítio na diretiva é RELATADO (some o pedágio, não o relato)" $?
+! grep -q -- "--edit-rules" "$D/rf.log"
+check "nenhuma menção ao portão morto na saída" $?
 ( cd "$D" && rm -rf .hbmk && "$HB_BIN/hbmk2" sf1.prg -oapp2 -gtcgi -q0 -main=UsaS > /dev/null 2>&1 && ./app2 > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
-check "execução idêntica após o rename com --edit-rules" $?
-( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Dobro --edit-rules > rf3.log 2>&1 )
+check "execução idêntica após o rename" $?
+( cd "$D" && "$BIN" rename sf1.hbp sf1.prg:3:10 Dobro > rf3.log 2>&1 )
 RC=$?
 cmp -s "$D/sf1.prg" "$D/sf1.antes" && cmp -s "$D/suga.ch" "$D/suga.antes" && [ $RC -eq 0 ]
 check "ida-e-volta A->B->A byte-exata (fonte e diretiva)" $?
+
+# 74b - o argumento do Diego, EXECUTAVEL: um .hbp, tres modulos, a funcao
+# definida num e chamada nos outros dois. O rename edita os TRES sem pedir
+# nada. E' contra este numero que o pedagio do .ch nao se sustentava.
+D2="$HERE/tmp/case74b"; rm -rf "$D2"; mkdir -p "$D2"
+printf 'FUNCTION Dobro( n )\n   RETURN n * 2\n' > "$D2/lib.prg"
+printf 'PROCEDURE Um()\n   OutStd( hb_ntos( Dobro( 2 ) ) )\n   RETURN\n' > "$D2/um.prg"
+printf 'PROCEDURE Dois()\n   OutStd( hb_ntos( Dobro( 3 ) ) )\n   RETURN\n' > "$D2/dois.prg"
+printf 'lib.prg\num.prg\ndois.prg\n' > "$D2/p.hbp"
+( cd "$D2" && "$HB_BIN/harbour" lib.prg -n -q0 -w3 -es2 > /dev/null 2>&1 )
+check "fixture do 74b compila limpo sob -w3 -es2" $?
+( cd "$D2" && "$BIN" rename p.hbp lib.prg:1:10 Duplo > r.log 2>&1 )
+check "rename de declaração usada em 3 módulos do MESMO projeto: exit 0, sem flag" $?
+grep -q "Duplo" "$D2/lib.prg" && grep -q "Duplo" "$D2/um.prg" && grep -q "Duplo" "$D2/dois.prg"
+check "os TRÊS arquivos editados sem cerimônia (a régua que matou o pedágio do .ch)" $?
 
 }
 
@@ -3772,16 +3797,32 @@ echo "case 119: P-AUDIT/A1 - a fronteira do projeto e o .hbp, NUNCA o cwd do pro
 "$HB_BIN/harbour" "$HERE/fixout/proj/a.prg" -n -q0 -w3 -es2 -s -I"$HERE/fixout/shared" > /dev/null 2>&1
 check "fixout/proj/a.prg clean under -w3 -es2" $?
 
-# (1) A DIRECAO PERIGOSA: o include mora FORA do projeto mas DENTRO do cwd.
-# Antes: editado em silencio ("verified"). Agora: recusa nomeando o arquivo.
+# (1) O include mora FORA da arvore do projeto, e o projeto o COMPILA.
+#
+# Este sitio ja teve as duas respostas erradas antes da certa. Primeiro editava
+# EM SILENCIO dizendo "verified" (o furo do cwd, acima). Dai ganhou um VETO por
+# dono do arquivo - e o veto perguntava "onde o arquivo MORA?", que nao responde
+# "quem mais o LE": um header ao lado do proprio .hbp passava pelo guard e
+# quebrava um vizinho do mesmo jeito.
+#
+# P27 (Diego, 2026-08-07): o que um projeto compila e' regido pelo .hbp e pelas
+# flags com que o compilador rodou, e refatorar isso e' decisao de quem refatora
+# - "se o programador decidiu mudar uma biblioteca, a responsabilidade e' dele".
+# Entao edita, e o que a ferramenta DEVE e' relatar: o caminho, e que o arquivo
+# nao mora na arvore do projeto. Relato, nunca veto.
+#
+# E ele NAO fala de outros projetos que leiam o mesmo header: saber se existem
+# nao e' possivel daqui (outro repositorio, outra maquina), e uma varredura que
+# so acha o que por acaso esta neste disco seria lida como completa.
 D=$(freshout case119a)
 ( cd "$D" && "$BIN" rename proj/fixout.hbp proj/a.prg:5:4 FIXA > r.log 2>&1 )
-[ $? -ne 0 ]
-check "include compartilhado FORA do projeto: recusa (antes: editava e dizia 'verified')" $?
-grep -q "outside the project's directory" "$D/r.log"
-check "a recusa nomeia o fato (nao e um erro de verificacao generico)" $?
-grep -q "TRAVA" "$D/shared/lib.ch" && ! grep -q "FIXA" "$D/shared/lib.ch"
-check "o include compartilhado ficou INTACTO" $?
+check "include compartilhado FORA do projeto: EDITA (o .hbp o compila) - P27" $?
+grep -q "outside the project's directory" "$D/r.log" && grep -q "shared/lib.ch" "$D/r.log"
+check "o aviso nomeia o caminho e diz que o arquivo é externo à árvore" $?
+grep -q "FIXA" "$D/shared/lib.ch" && ! grep -q "TRAVA" "$D/shared/lib.ch"
+check "o include foi de fato editado (relato não é veto)" $?
+! grep -qi "refusing" "$D/r.log"
+check "nenhuma recusa por dono do arquivo sobrou na saída" $?
 
 # (2) A RECUSA FALSA: o MESMO projeto, a MESMA regra, invocado de OUTRO cwd.
 # Antes: "outside the project directory" - o menu.ch do proprio projeto.

@@ -73,7 +73,12 @@ conta?". *(Catálogo de erros, 2026-07-12 — cada gatilho tem um cadáver embai
 1. **Comparação de TEXTO para decidir PAPEL/IDENTIDADE** (`Upper(a) == Upper(b)`, prefixo,
    `Left()`, `$`) quando o dump já tem número/id/índice.
 2. **Constante mágica de gramática** (`>= 4`, `Len() > N`) — é réplica de regra do
-   compilador.
+   compilador. **NADA VERIFICA ISTO** *(Diego, 2026-08-07: "apague")*: o hook tinha uma
+   regra e ela foi medida — acusava **54 linhas do fonte, nenhuma heurística** (contagem de
+   `aArgs`, de `aAtParts`, de listas), e o alvo dela já estava morto (a aritmética de
+   abreviação dBase virou pergunta ao pp, no `PpHeadHit`). **Portão que erra em 100% dos
+   casos não protege — treina a contorná-lo, e leva os outros gatilhos junto.** Aqui a régua
+   é minha atenção, e é o gatilho mais frágil da lista por causa disso.
 3. **"se não é X, então é Y"** sem um fato que SEPARE X de Y.
 4. **Re-implementar resolução/busca que o core faz** (achar include, casar nome, expandir).
 5. **Casar arquivo por BASENAME** em vez de caminho canônico.

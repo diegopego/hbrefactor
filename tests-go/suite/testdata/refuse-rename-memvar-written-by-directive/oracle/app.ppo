@@ -1,0 +1,12 @@
+#line 3 "app.prg"
+MEMVAR nLinhas
+
+PROCEDURE Main()
+
+   PRIVATE nLinhas := 0
+
+   nLinhas += 1 ; OutStd( "iniciando" )
+
+   OutStd( hb_ntos( nLinhas ) )
+
+   RETURN
