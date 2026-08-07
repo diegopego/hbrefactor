@@ -178,18 +178,20 @@ core**. É a MESMA regra, e eu vinha aplicando só de um lado: dentro de `src/hb
 eu paro no gatilho, mas ao **projetar** uma extensão de core eu lia o fonte, deduzia e
 propunha — que é exatamente a heurística que o projeto existe para matar, feita por mim.
 
-1. **Antes de propor MECANISMO, a TABELA DE SONDAS.** Toda extensão de core nasce de uma
-   tabela: **cada classe de caso × o que o core responde HOJE × o comando que produziu a
-   resposta**. Sem ela, o mecanismo é palpite bem escrito — e ele vai para a spec com cara
-   de fato. É o mesmo TDD do `expected/` (§3): **a pergunta primeiro, a solução depois**.
-   *(Custou um mecanismo errado já escrito no roadmap: eu li `nBirthTok` como "o índice do
-   token do nome" e um dump de 30 segundos mostrou que ele varia com o lookahead.)*
-2. **Medir a DISTRIBUIÇÃO antes de desenhar para o canto.** "É caso raro" é afirmação sobre
-   o mundo, e vale a régua do §4: ou se mede no corpus, ou não se escreve. *(Eu classifiquei
-   "sítio sem coluna" como canto; no corpus do core são 40% dos sítios, porque código real é
+> **É a [§1.8](#18-exercite-o-código-antes-de-opinar--e-experimente-para-matar-a-sua-tese)
+> aplicada ao CORE** — lá está a regra geral; aqui, o que ela exige quando o alvo é o
+> compilador, e os cadáveres que só aparecem nesse terreno.
+
+1. **A TABELA DE SONDAS é a forma que a §1.8 toma aqui:** cada classe de caso × o que o
+   core responde HOJE × o comando que produziu a resposta. Sem ela o mecanismo vai para a
+   spec com cara de fato. *(Custou um mecanismo errado já escrito no roadmap: li
+   `nBirthTok` como "o índice do token do nome", e um dump de 30 segundos mostrou que ele
+   varia com o lookahead.)*
+2. **"É caso raro" é afirmação sobre o mundo** — ou se mede no corpus, ou não se escreve.
+   *(Classifiquei "sítio sem coluna" como canto; são 40% dos sítios, porque código real é
    construído sobre DSL.)*
 3. **Ler o FONTE não substitui PERGUNTAR ao binário.** Comentário e struct dizem o que o
-   autor pretendia; o dump diz o que sai. Quando os dois discordam, quem manda é o dump.
+   autor pretendia; o dump diz o que sai. Discordando, manda o dump.
 4. **Empurrão do Diego = sonda pulada.** Quando ele diz "investigue com precisão" ou
    "decida corretamente", a leitura certa **não** é "responda melhor" — é **"existe uma
    medição barata que eu não fiz"**. A resposta é rodar a sonda, não argumentar melhor.
@@ -227,6 +229,34 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
    dizia que o problema era do teste. É prima da §1.3e com uma torção — não houve silêncio,
    houve resposta clara e errada, e o controle que faltava não era sobre o alvo, era sobre o
    instrumento. *([cic §5.1c])*
+
+### 1.8 EXERCITE O CÓDIGO ANTES DE OPINAR — e experimente para MATAR a sua tese
+
+*(Diego, 2026-08-07, e o custo adicional é ACEITO de propósito: "vai custar mais, vai demorar
+mais, mas vai trazer respostas assertivas com embasamento".)*
+
+**Tudo que envolve código exige exercitá-lo antes** — ler código alheio, propor código novo,
+corrigir, estimar, opinar, planejar. O ciclo é **experimente → veja se o prognóstico mudou →
+decida se explora mais → só então apresente**; apresentar antes de medir é a ordem invertida
+do §1.1 aplicada ao meu raciocínio. O escopo é largo de propósito: lista de casos que obrigam
+seria só os erros da sessão que a gerou, e fronteira eu disputo de boa-fé.
+
+**A postura é ADVERSARIAL:** o experimento existe para DERRUBAR o que eu ia dizer. Se ele só
+confirma, quase sempre escolhi o errado — o certo é o que me contradiria. **Comando que não
+podia dar outro resultado não é experimento, é enfeite.**
+
+**Escolher e parar:** o mais barato que pode me contradizer, não o mais completo — e, havendo
+suíte, **aplicar de verdade** (mude, rode, conte, reverta) é o mais honesto. **Pare quando o
+prognóstico parar de mudar.** Ao apresentar: a afirmação, o comando, o resultado — e **dizer
+o que caiu**, porque argumento derrubado é resultado, e é o que impede decisão sobre premissa
+morta. *(Prima do §4: "anunciar" inclui a conversa em que se decide.)*
+
+> **ESTA REGRA NÃO TEM PORTÃO EXECUTÁVEL, e é a mais frágil da §1.** Ela governa a minha
+> prosa, que nada no repo verifica. Pelo §1.6 isso a torna uma regra que eu vou violar de
+> novo — o único freio é eu apresentar o comando junto da afirmação, e o Diego notar quando
+> não vier. *(Dois cadáveres de 2026-08-07: afirmei que uma IDE recorta `text[start:end]` e a
+> extensão **nunca lê `text`** — o consumidor era invenção minha; e estimei "38 expectativas"
+> onde eram **67**. Narrativa em [cic §1.8].)*
 
 ---
 

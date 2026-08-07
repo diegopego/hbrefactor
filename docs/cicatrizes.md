@@ -234,6 +234,41 @@ tabela onde o compilador já guarda o que sabe das funções da RTL, e onde o `T
 Ou seja, a pergunta que teria me poupado o erro não é "isto é texto ou símbolo?", é **"quem é
 dono deste conhecimento?"**. Virou §1.7/5.
 
+### 1.8 TRÊS ARGUMENTOS MEUS, MORTOS POR UM COMANDO CADA (2026-08-07)
+
+*(A narrativa da [§1.8 do CLAUDE.md](../CLAUDE.md). O Diego pediu: "experimente cada
+argumento seu com código, e a partir de seu prognóstico, determine se vale a pena explorar
+mais, e só então dê seu diagnóstico".)*
+
+Eu propunha consertar o campo `text` do envelope (a P26) e tinha três argumentos. Os três
+eram prosa bem escrita. Nenhum sobreviveu ao primeiro comando.
+
+**(1) "Uma IDE pinta `text[start:end]`" — CONSUMIDOR INVENTADO.** Era o argumento central, e
+eu ilustrei com um exemplo de IDE que eu mesmo imaginei. Este repo **tem** um consumidor
+real: `vscode/extension.js`. Um grep mostrou que ele monta
+`vscode.Location(uri, range.start)` e deixa o editor abrir o arquivo — **nunca lê `text`**.
+O defeito era real; a vítima, não.
+
+**(2) "38 expectativas mudariam" — ERRADO POR 20×.** O número saiu de uma heurística minha
+sobre os `outputs.json`. Aplicando de verdade: **67** falhas no desenho ingênuo, **3** no
+desenho separado. O Diego decidiria sobre o meu número.
+
+**(3) "O legado não assere o preview" — ERAM 67 ASSERÇÕES.** Eu tinha feito `grep -c text` e
+olhado quatro linhas do resultado. Isso não é medição; é leitura com cara de medição.
+
+**E um quarto, de outra natureza:** afirmei que prosa e JSON eram caminhos separados, então
+mudar um não tocaria o outro. `SrcLine()` chamava `SrcText()`. Uma leitura da função inteira
+teria mostrado.
+
+**O que a sequência ensina, e é o motivo da regra:** o experimento que vale é o que **pode me
+contradizer**. Os quatro caíram porque eu finalmente rodei o comando que tinha chance de
+derrubá-los — e a decisão certa (o alcance da P26, cortado pela morte anunciada da prosa)
+saiu dessa exploração, não do argumento. **Argumento derrubado é resultado**; o estrago mora
+em apresentá-lo como fato e deixar o Diego decidir sobre premissa morta.
+
+*(A régua do §1.8 não tem portão executável — ela governa a minha prosa. O freio é apresentar
+o comando junto da afirmação.)*
+
 ### 1.4 A recusa falsa publicada — varrer o core antes de dizer "impossível" (2026-07-12)
 
 Recusei "o pp como motor de reescrita" (P7) olhando **só** o `.ppo` destrutivo, e
