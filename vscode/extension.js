@@ -144,19 +144,62 @@ function run(args, cwd) {
   });
 }
 
+// o envelope de máquina (--json), quando o comando falou o contrato. NULL para
+// quem ainda responde só prosa - o chamador então segue pelo caminho antigo
+function envelopeOf(res) {
+  const txt = (res.stdout || '').trim();
+  if (!txt.startsWith('{')) return null;
+  try {
+    const env = JSON.parse(txt);
+    return env && env.status ? env : null;
+  } catch (e) { return null; }
+}
+
 function report(title, res) {
   const ch = out();
+  const env = envelopeOf(res);
   ch.appendLine('--- ' + title);
-  if (res.stdout) ch.append(res.stdout);
+  // sob --json o stdout é o envelope: despejar o JSON cru no canal do usuário
+  // troca uma frase legível por uma linha de máquina. O que ele quer ler é o
+  // `detail`; o resto do envelope serve ao FLUXO, não a ele
+  if (env) {
+    if (env.detail) ch.appendLine(env.detail);
+    (env.diagnostics || []).forEach(d => ch.appendLine('  ' + (d.message || JSON.stringify(d))));
+  } else if (res.stdout) ch.append(res.stdout);
   if (res.stderr) ch.append(res.stderr);
   if (res.error && !res.stdout && !res.stderr) ch.appendLine('[error] ' + res.error);
   ch.show(true);
   if (res.code !== 0) {
     // a mensagem do CLI (stderr/stdout) explica; sem ela, o erro do execFile
     // (ex.: "spawn hbrefactor ENOENT" = binário não encontrado) é o que ajuda
-    const first = (res.stderr || res.stdout || res.error || 'failed')
-      .split('\n').find(l => l.trim()) || res.error || 'failed';
+    const first = (env && env.detail) ||
+      (res.stderr || res.stdout || res.error || 'failed')
+        .split('\n').find(l => l.trim()) || res.error || 'failed';
     vscode.window.showWarningMessage('hbrefactor: ' + first.trim());
+  }
+}
+
+// Comando que ESCREVE no projeto, falando o contrato de máquina (--json).
+//
+// Existe por causa de um código de recusa que a fase W.2 criou: quando outro
+// processo está refatorando o mesmo projeto, a ferramenta espera a vez e, se
+// estourar o teto, recusa com `retry-later`. Essa é a única recusa que não é
+// sobre o pedido nem sobre o projeto - o pedido continua válido, só chegou
+// junto com outro -, e tratá-la como as demais mandaria o usuário chamar um
+// humano por algo que bastava repetir. A DECISÃO VEM DO CAMPO `action`, nunca
+// de casar a prosa: a mensagem é para o humano ler, não para a extensão
+// interpretar.
+async function runWrite(args, cwd, title) {
+  let res = await run([...args, '--json'], cwd);
+  for (;;) {
+    const env = envelopeOf(res);
+    if (!env || env.action !== 'retry-later') return res;
+    report(title, res);
+    const go = await vscode.window.showWarningMessage(
+      env.detail || 'Another process is refactoring this project.',
+      'Try again', 'Cancel');
+    if (go !== 'Try again') return res;
+    res = await run([...args, '--json'], cwd);
   }
 }
 
@@ -278,7 +321,7 @@ async function cmdRename() {
   const pos = c.editor.selection.active;
   const at = atSpec(c.file, pos.line, pos.character);
   const flags = [];
-  let res = await run(['rename', c.spec, at, novo], c.cwd);
+  let res = await runWrite(['rename', c.spec, at, novo], c.cwd, `rename @ ${at} -> ${novo}`);
   // o nome é citado DENTRO de regra de pp: --edit-rules edita as diretivas junto
   if (res.code !== 0 && /--edit-rules/.test(res.stderr + res.stdout)) {
     report(`rename @ ${at} -> ${novo} (named in a pp rule)`, res);
@@ -287,7 +330,7 @@ async function cmdRename() {
       'Proceed (--edit-rules)', 'Cancelar');
     if (go !== 'Proceed (--edit-rules)') return;
     flags.push('--edit-rules');
-    res = await run(['rename', c.spec, at, novo, ...flags], c.cwd);
+    res = await runWrite(['rename', c.spec, at, novo, ...flags], c.cwd, `rename @ ${at} -> ${novo}`);
   }
   // strings/HB_FUNC iguais ao nome NÃO são editadas: o CLI pede --force
   if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
@@ -297,7 +340,7 @@ async function cmdRename() {
       'Proceed (--force)', 'Cancelar');
     if (go !== 'Proceed (--force)') return;
     flags.push('--force');
-    res = await run(['rename', c.spec, at, novo, ...flags], c.cwd);
+    res = await runWrite(['rename', c.spec, at, novo, ...flags], c.cwd, `rename @ ${at} -> ${novo}`);
   }
   report(`rename @ ${at} -> ${novo}`, res);
 }
@@ -311,7 +354,7 @@ async function cmdReorderParams() {
     prompt: `New parameter order for ${word} (names separated by commas)` });
   if (!ordem) return;
   await saveAll();
-  const res = await run(['reorder-params', c.spec, word, ordem], c.cwd);
+  const res = await runWrite(['reorder-params', c.spec, word, ordem], c.cwd, `reorder-params ${word}`);
   report(`reorder-params ${word} (${ordem})`, res);
 }
 
@@ -328,7 +371,7 @@ async function cmdExtractFunction() {
   const nome = await vscode.window.showInputBox({ prompt: `Name of the new function (lines ${first}-${last})` });
   if (!nome) return;
   await saveAll();
-  const res = await run(['extract-function', c.spec, c.file, `${first}-${last}`, nome], c.cwd);
+  const res = await runWrite(['extract-function', c.spec, c.file, `${first}-${last}`, nome], c.cwd, `extract-function -> ${nome}`);
   report(`extract-function ${first}-${last} -> ${nome}`, res);
 }
 
@@ -363,7 +406,7 @@ async function cmdVerify() {
   const c = await projCtx();
   if (!c) return;
   await saveAll();
-  const res = await run(['verify', c.spec], c.cwd);
+  const res = await runWrite(['verify', c.spec], c.cwd, 'verify');
   report('verify', res);
   // BROKEN é o único veredito adverso: só aí faz sentido oferecer o rollback.
   // Reverter um CHANGED destruiria trabalho legítimo - o pcode muda em toda

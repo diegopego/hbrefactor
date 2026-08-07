@@ -279,6 +279,25 @@ cenário em arranjos diferentes) e um teste assim passa por sorte. Suíte verde 
 >
 > **Superfície nova:** `HBREFACTOR_LOCK_WAIT_MS` (default 30000) — existe para o portão custar
 > 300 ms em vez de 30 s, porque portão caro é portão que alguém desliga.
+>
+> **⚠️ O selo veio CEDO DEMAIS, e o conserto está junto** *(2026-08-06, mesma sessão)*. Marquei
+> a fatia entregue com o motor pronto e a superfície não — e o §5 é explícito: *"expô-la é
+> escopo da fase que a entrega, não fase adiável"*. A recusa `retry-later` não existia para o
+> consumidor de uso diário: a extensão não lia `reason` nem `action` em lugar nenhum, então
+> dois refactors colidindo no VSCode viravam uma falha genérica, e o usuário chamaria um humano
+> por algo que bastava repetir. **Fechado:** `runWrite()` no funil dos comandos de escrita
+> (`rename`, `reorder-params`, `extract-function`, `verify`), decidindo por **campo** e nunca
+> por prosa, com a repetição OFERECIDA (nunca automática); `report()` mostra o `detail` legível
+> em vez do envelope cru. Portão: `tests-go/vscode/` + `vscode/test-envelope.js` (17 checks,
+> técnica do caso 71 — o harness EXTRAI as funções reais do `extension.js` e as EXECUTA; um
+> teste que só casasse texto provaria que a fonte *parece* certa, não que ela É). Anti-vacuidade:
+> trocar `env.action !== 'retry-later'` por um regex sobre o stdout faz o portão reprovar.
+>
+> **E o portão do FORMATO me barrou no caminho** *(vale registrar porque funcionou)*: escrevi o
+> teste como `unit_142` no `run.sh`, e o hook `formato-de-teste.sh` recusou o commit — *"o diff
+> staged faz o formato LEGADO crescer"*. Estava certo: teste novo não nasce no formato que está
+> sendo migrado. Refeito como pacote Go próprio (`tests-go/vscode/`), no padrão de
+> `tests-go/shell/` e `tests-go/docs/` — que é onde mora o que não é caso de transformação.
 
 **O argumento, medido.** 6 invocações simultâneas do comando de dump no mesmo projeto, 5 rodadas:
 **sem lock 9/30 falharam** (`exit=9`, *"Diretório de trabalho não pode ser criado"* — que chegaria
