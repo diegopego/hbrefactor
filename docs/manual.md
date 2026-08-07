@@ -1005,6 +1005,25 @@ stock Harbour.
 3. **VSCode (optional):** install `vscode/hbrefactor-0.13.0.vsix` and point
    `hbrefactor.hbBin` at your `HB_BIN`.
 
+### Two refactorings at once
+
+Commands that **write** take a lock on the project, so two of them never edit the
+same sources at the same time — you can fire one from the editor while another
+runs in a terminal, and neither loses work. The second one waits its turn.
+
+If the wait runs out, the command is **refused and nothing is edited**, with a
+reason that says the project is busy and an action that says *retry* — repeating
+it is the whole fix. The default wait is 30 seconds; raise it when a single
+command in your project takes longer than that:
+
+```
+hbrefactor.lockWaitMs        # VSCode setting (milliseconds)
+HBREFACTOR_LOCK_WAIT_MS=60000 hbrefactor rename …    # or the environment
+```
+
+Read-only commands (`usages`, `call-graph`, `dump`, …) never wait: they take no
+lock, and you can run as many as you like while a refactoring is in flight.
+
 ---
 
 ## What it never does

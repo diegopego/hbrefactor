@@ -154,6 +154,10 @@ STATIC s_hRuleSrc := { => }
 STATIC s_lJson := .F.
 STATIC s_aDiag := {}
 STATIC s_cCmd  := ""
+
+// W.3: onde os .ast.json deste projeto vivem (o -workdir persistente). Escrita
+// pelo AstDumps, lida pelo ReadAst - vazia antes do primeiro dump
+STATIC s_cAstDir := ""
 // a invocação INTEIRA, para o envelope levar o par comando/resultado junto
 // (Diego, 2026-07-26). Sem ela, quem lê um envelope solto - num log, num
 // pipeline, na fila de um agente que disparou vários comandos - sabe o VERBO
@@ -467,15 +471,114 @@ STATIC FUNCTION HbMk2Bin()
 // invocação (WorkDir), então cada execução tem o seu e nenhuma vê a da outra.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// W.3 - o diretório de trabalho PERSISTENTE do projeto.
+//
+// Não é cache nosso: é o `-workdir` do hbmk2, que é onde o toolchain guarda o
+// trabalho de um build incremental (`.hbmk/<plat>/<comp>` quando ele escolhe
+// sozinho). O dump vai para LÁ, ao lado do `.c` e do `.o`, porque ele é
+// artefato de build como os outros - e aí `-inc`/`-rebuild`/`-clean` passam a
+// valer sobre ele sem regra nossa. Fica sob a raiz da fase H, nunca dentro do
+// projeto do usuário (W.1).
+//
+// A chave é a mesma do snapshot e do lock, e pela mesma razão registrada lá:
+// caminho canônico + spec, nunca o basename.
+// ---------------------------------------------------------------------------
+STATIC FUNCTION AstDir( hProj )
+
+   LOCAL cBase := WorkRoot() + "ast"
+   LOCAL cKey := hb_DirSepAdd( hb_cwd() ) + hProj[ "spec" ], cTok
+
+   // AS FLAGS ENTRAM NA CHAVE, e não é detalhe: o dump é função do fonte E de
+   // como ele foi compilado - o mesmo módulo sob `-D` ou `-kt` diferente
+   // produz outro dump (medido: 5877 x 6108 bytes). A procedência cobre os
+   // ARQUIVOS; quem cobre as flags é a chave, senão um projeto que ganha uma
+   // flag reusa o dump de antes dela e a resposta sai do mundo anterior.
+   // (Custou 5 casos da suíte: o teste acrescenta `-prgflag=-kt` ao .hbp e
+   // espera o veredito mudar - os fontes seguem idênticos.)
+   FOR EACH cTok IN hProj[ "flags" ]
+      cKey += " " + cTok
+   NEXT
+
+   hb_DirBuild( cBase )
+
+   RETURN hb_DirSepAdd( cBase ) + hb_MD5( cKey )
+
+// os MÓDULOS cujo dump não serve mais, pelo veredito do CORE
+// (`harbour --ast-fresh`). A ferramenta não compara nada: ela pergunta e
+// obedece - a regra do que conta como "corresponde" mora junto do código que
+// ESCREVEU a procedência. Devolve nomes de módulo (`w7`), não caminhos de
+// dump: é o nome do módulo que nomeia os artefatos do builder, e derivá-lo do
+// dump com hb_FNameName daria `w7.ast` - a dupla extensão come o nome, e o
+// erro é silencioso (some-se com um arquivo que não existe e o build segue
+// achando que está tudo em dia).
+STATIC FUNCTION AstStale( hProj, cWork )
+
+   LOCAL cPath, cDump, cArgs := "", cOut := "", cErr := "", cLine, cMod
+   LOCAL aStale := {}, nAt
+
+   FOR EACH cPath IN hProj[ "files" ]
+      cMod  := hb_FNameName( cPath )
+      cDump := hb_DirSepAdd( cWork ) + cMod + ".ast.json"
+      IF ! hb_vfExists( cDump )
+         AAdd( aStale, cMod )               // ausente é o caso que o -inc NÃO vê
+      ELSE
+         cArgs += " " + cDump
+      ENDIF
+   NEXT
+   IF Empty( cArgs )
+      RETURN aStale
+   ENDIF
+
+   // O CANAL RESPONDE POR PRESENÇA, não por rótulo: o core imprime UMA LINHA
+   // POR DUMP QUE NÃO SERVE (`<dump><TAB><motivo>`) e cala sobre os que servem.
+   // Não há prefixo a classificar - a linha existir É o fato. (Foi assim que
+   // este trecho ficou: a primeira versão comparava o RÓTULO no começo de cada
+   // linha para separar as duas respostas, e o portão anti-heurística barrou o
+   // commit pelo gatilho 1 - decidir PAPEL comparando texto. Estava certo, e o
+   // conserto foi no formato do core, nunca um selo aqui.)
+   // exit != 0 é VEREDITO ("algum não serve"), nunca falha de execução.
+   hb_processRun( HarbourBin() + " --ast-fresh" + cArgs,, @cOut, @cErr )
+   FOR EACH cLine IN hb_ATokens( StrTran( cOut, Chr( 13 ), "" ), Chr( 10 ) )
+      IF ( nAt := At( Chr( 9 ), cLine ) ) > 0
+         cLine := Left( cLine, nAt - 1 )                  // o dump é o 1º campo
+         cLine := SubStr( cLine, RAt( hb_ps(), cLine ) + 1 )
+         AAdd( aStale, Left( cLine, Len( cLine ) - Len( ".ast.json" ) ) )
+      ENDIF
+   NEXT
+
+   RETURN aStale
+
 STATIC FUNCTION AstDumps( hProj, cTmp )
 
    LOCAL cOut := "", cErr := ""
-   LOCAL cWork := hb_DirSepAdd( cTmp ) + "hbmk"
+   LOCAL cWork := AstDir( hProj )
+   LOCAL aStale, cDump, cInc
 
+   HB_SYMBOL_UNUSED( cTmp )
    hb_DirBuild( cWork )
+   s_cAstDir := cWork
+
+   // 1. o que já está lá ainda serve? Tudo em dia = nada a fazer, e é este o
+   //    caso comum de quem roda dois comandos seguidos no mesmo projeto
+   aStale := AstStale( hProj, cWork )
+   IF Empty( aStale )
+      RETURN .T.
+   ENDIF
+
+   // 2. o `.c` é o que o `-inc` do hbmk2 observa: removê-lo é como se diz a ELE
+   //    que aquele módulo precisa voltar. É assim que o veredito do core (que
+   //    olha CONTEÚDO) comanda o incremental do builder (que olha relógio) sem
+   //    que nenhum dos dois precise saber do outro.
+   FOR EACH cDump IN aStale                 // cDump é o nome do MÓDULO (ver AstStale)
+      cInc := hb_DirSepAdd( cWork ) + cDump
+      hb_vfErase( cInc + ".c" )
+      hb_vfErase( cInc + ".ast.json" )
+   NEXT
+
    IF hb_processRun( HbMk2Bin() + " " + StrTran( hProj[ "spec" ], ",", " " ) + ;
-                     " -hbcmp -rebuild -q -workdir=" + cWork + ;
-                     " '-prgflag=-x" + hb_DirSepAdd( cTmp ) + ;
+                     " -hbcmp -inc -q -workdir=" + cWork + ;
+                     " '-prgflag=-x" + hb_DirSepAdd( cWork ) + ;
                      "'",, @cOut, @cErr ) != 0
       // sob o contrato, o erro do compilador é DADO (diagnostics[]), não texto
       // cru no stderr - senão o `2>&1` do consumidor mistura ao envelope e o
@@ -503,11 +606,41 @@ STATIC FUNCTION AstDumps( hProj, cTmp )
       RETURN .F.
    ENDIF
 
+   // 3. e o resultado se CONFERE: o incremental do builder decide por relógio,
+   //    e o relógio tem resolução de ~1 s. Um dump que continue stale aqui é o
+   //    caso que ele não enxerga - e aí não se insiste, recompila-se o projeto
+   //    inteiro. Fail-closed: o caro é aceitável, o fato velho não.
+   IF ! Empty( AstStale( hProj, cWork ) )
+      IF hb_processRun( HbMk2Bin() + " " + StrTran( hProj[ "spec" ], ",", " " ) + ;
+                        " -hbcmp -rebuild -q -workdir=" + cWork + ;
+                        " '-prgflag=-x" + hb_DirSepAdd( cWork ) + ;
+                        "'",, @cOut, @cErr ) != 0
+         IF s_lJson
+            Diag( "compiler-error", ErrLines( cOut + cErr ), NIL )
+         ELSE
+            OutErr( ErrLines( cOut + cErr ) )
+         ENDIF
+         RETURN .F.
+      ENDIF
+      // ainda stale depois de um rebuild completo é contradição do toolchain,
+      // não estado do projeto: dizer isso, jamais seguir sobre fato incerto
+      IF ! Empty( AstStale( hProj, cWork ) )
+         OutErr( "hbrefactor: the AST dump does not match the sources even " + ;
+                 "after a full rebuild - the harbour on HB_BIN may be out of " + ;
+                 "step with this tool" + hb_eol() )
+         RETURN .F.
+      ENDIF
+   ENDIF
+
    RETURN .T.
 
 STATIC FUNCTION ReadAst( cTmp, cModPath )
 
-   LOCAL cPath := hb_DirSepAdd( cTmp ) + hb_FNameName( cModPath ) + ".ast.json"
+   // W.3: os dumps vivem no diretório de trabalho PERSISTENTE do projeto, não
+   // no scratch da invocação. `s_cAstDir` é escrita pelo AstDumps, que é sempre
+   // quem roda antes - a dependência já existia de fato; agora está dita.
+   LOCAL cPath := hb_DirSepAdd( iif( Empty( s_cAstDir ), cTmp, s_cAstDir ) ) + ;
+                  hb_FNameName( cModPath ) + ".ast.json"
    LOCAL hAst := hb_jsonDecode( hb_MemoRead( cPath ) )
    LOCAL cGot
 
@@ -1152,6 +1285,10 @@ STATIC FUNCTION DumpOnly( aArgs )
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "the project does not compile" )
    ENDIF
+   // W.3: o diretório que se REPORTA é onde os dumps estão de fato (o workdir
+   // persistente do projeto), nunca o scratch da invocação - quem consome este
+   // caminho vai procurar arquivo nele
+   cTmp := AstDir( hProj )
    Prose( "dumps em: " + cTmp + hb_eol() )
 
    RETURN Ok( "dumps written", { "dir" => cTmp, ;
@@ -3446,7 +3583,13 @@ STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag, lAst )
       cFlags += " " + cTok
    NEXT
    IF hb_defaultValue( lAst, .F. )
-      cFlags += " -x" + hb_DirSepAdd( cTmp )
+      // W.3: o dump pós-edição vai para o MESMO diretório de trabalho do
+      // projeto, não para o scratch da invocação - senão passam a existir dois
+      // lugares com dumps do mesmo módulo, e quem lê escolhe errado (foi o que
+      // aconteceu: 22 casos da suíte leram o dump PRÉ-edição). Sobrescrever é o
+      // certo: depois da edição o fonte é outro, e o dump novo é o que vale;
+      // se houver rollback, a procedência denuncia na próxima invocação.
+      cFlags += " -x" + hb_DirSepAdd( AstDir( hProj ) )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
       cOut := cErr := ""

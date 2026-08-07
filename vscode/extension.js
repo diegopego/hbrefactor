@@ -127,6 +127,12 @@ function run(args, cwd) {
     if (hb) { const p = hb.replace(/^~/, os.homedir()); env.HBREFACTOR_HB_BIN = p; env.HB_BIN = p; }
     const inc = cfg().get('includePaths');
     if (inc) env.INCLUDE = inc.replace(/~/g, os.homedir());
+    // teto da espera pelo lock de projeto (W.2): quanto vale a pena esperar
+    // outro processo antes de recusar com "retry". O default do CLI serve para
+    // projeto comum; num projeto grande um único comando demora mais que a
+    // espera, e aí a recusa viraria rotina em vez de exceção
+    const lockMs = cfg().get('lockWaitMs');
+    if (lockMs) env.HBREFACTOR_LOCK_WAIT_MS = String(lockMs);
     const bin = resolveBin();
     // maxBuffer alto: call-graph/usages num projeto grande passa do default de
     // 1 MB do execFile e o erro (ERR_CHILD_PROCESS_STDOUT_MAXBUFFER) chegava

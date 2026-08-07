@@ -46,6 +46,11 @@
           "type": "string",
           "default": "",
           "description": "Diretórios extras de #include separados por ':' (vira a env INCLUDE do compilador harbour). Útil quando headers de contrib não estão no include/ da instalação. Ex.: ~/devel/harbour-core/harbour/contrib/hbct:~/devel/harbour-core/harbour/contrib/xhb"
+        },
+        "hbrefactor.lockWaitMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "How long to wait, in milliseconds, when another process is already refactoring the same project. Commands that WRITE take a per-project lock, so two refactorings never overwrite each other; when the wait runs out the command is refused with a code that means \"retry\", and nothing is edited. Raise it for large projects, where a single command takes longer."
         }
       }
     }

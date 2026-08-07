@@ -195,7 +195,7 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
 
-## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 e W.2 entregues 2026-08-06; W.3 DESBLOQUEADA pela fase X)**
+## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **✅ CONCLUÍDA (W.1, W.2 e W.3 entregues 2026-08-06/07)**
 
 **O achado que abre a fase.** Todo comando dispara `hbmk2 <alvos> -hbcmp -rebuild -prgflag=-x<tmp>/`
 ([`AstDumps`](../src/hbrefactor.prg)) **sem `-workdir`** — e no modo `-hbcmp` o hbmk2 escreve os
@@ -316,7 +316,46 @@ suíte que FALHE sem o lock (senão passa por vacuidade).
 respeita**. O build do usuário (IDE, `make`, hbmk2 na mão) não sabe dele. Quem protege o usuário
 é a W.1, não a W.2 — e por isso a ordem é essa.
 
-### Fase W.3 — o `-inc` *(DESBLOQUEADA 2026-08-06: a fase X entregou o fato; ver critério abaixo)*
+### Fase W.3 — o `-inc` — **✅ ENTREGUE 2026-08-07**
+
+> **✅ FEITO, e a forma é a do TOOLCHAIN, não nossa** *(desenho do Diego)*: o dump vai para o
+> `-workdir` do hbmk2, ao lado do `.c` e do `.o`, porque é artefato de build como os outros —
+> e aí `-inc`/`-rebuild`/`-clean` valem sobre ele sem regra nossa. Não existe "cache do
+> hbrefactor": existe diretório de trabalho, persistente por projeto, sob a raiz da fase H.
+>
+> **O ciclo:** (1) o **harbour** diz quais dumps ainda correspondem (`--ast-fresh`, lendo a
+> procedência que ele mesmo escreveu); (2) o hbrefactor remove o `.c` dos que não correspondem
+> — que é como se diz ao `-inc` que aquele módulo precisa voltar; (3) o **hbmk2** recompila só
+> esses; (4) confere de novo e cai para rebuild completo se algo ainda divergir (fail-closed).
+> Nenhuma regra de comparação no hbrefactor: ele pergunta e obedece.
+>
+> **O GANHO É MODESTO, e o número honesto é do produto rodando** (§4): num projeto real de 42
+> módulos (`contrib/xhb`), `usages` vai de **5,14 s para 3,25-3,59 s** — ~1,6x. Não são os "28x"
+> que eu havia estimado: aquilo era microbenchmark da etapa de compilação. E o resultado
+> **confirma a fatia 1 desta fase**, que já dizia que cache de dump ataca no máximo metade: a
+> geração é ~35% do custo do `usages`, a análise ~50%. **O objetivo da fase V continua
+> aberto** — custo proporcional ao que se tocou exige tornar incremental o FATO ANALISADO
+> (fatia 2), não só o dump.
+>
+> **A chave do workdir inclui as FLAGS**, e não é detalhe: o dump é função do fonte E de como
+> ele foi compilado. Sem isso, um projeto que ganha `-kt` reusa o dump de antes dela — custou 5
+> casos da suíte antes de eu ver.
+>
+> **Portão** (`tests-go/suite/incremental_test.go`): resultado idêntico com e sem
+> reaproveitamento; edição com **mtime devolvido byte a byte** ao valor anterior é vista; dump
+> apagado volta sozinho; projetos com flags diferentes não compartilham trabalho.
+> **Anti-vacuidade por sabotagem:** remover a verificação de procedência derruba dois deles;
+> remover as flags da chave derruba o quarto. *(A primeira tentativa de sabotar as flags não
+> derrubou nada — o build tinha falhado sob `-es2` e o binário era o antigo. Sabotagem que não
+> compila não prova coisa alguma.)*
+>
+> **Quatro correções que a suíte arrancou**, todas de desenho meu: uma global `s_cAstDir` fazia
+> o dump PÓS-edição ser lido do lugar errado (22 casos); a chave sem flags (5 casos); o comando
+> `dump` reportando o scratch em vez de onde os dumps estão (casos 65 e 82); e a régua do caso
+> 64, que peguei escrevendo *"apagá-lo"* num comentário — `apag` casa como palavra porque `á`
+> não é caractere de palavra em `LC_ALL=C`. Esta última só apareceu depois de descobrir que **o
+> `grep` do meu shell não é o do `make test`** (aqui é uma função que delega para `ugrep`), e
+> passei várias medições afirmando que a régua estava limpa enquanto o teste dizia o contrário.
 
 **Não entra antes** de o core responder sobre correspondência dump↔fonte (fase V, fatia 2). Lock e
 workdir resolvem CONCORRÊNCIA; o furo de staleness é TEMPORAL e sobrevive aos dois — medido dentro

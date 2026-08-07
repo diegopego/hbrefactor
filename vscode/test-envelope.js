@@ -72,5 +72,16 @@ check('a repetição é OFERECIDA ao usuário, nunca automática',
 check('report imprime env.detail quando há envelope',
   /if \(env\) \{[\s\S]{0,200}?env\.detail/.test(src));
 
+// 5. o teto da espera é CONFIGURÁVEL, e a config chega ao CLI pela env que ele lê
+check('a extensão lê a configuração lockWaitMs',
+  /cfg\(\)\.get\('lockWaitMs'\)/.test(src));
+check('e a repassa na env que o CLI consulta',
+  /env\.HBREFACTOR_LOCK_WAIT_MS\s*=/.test(src));
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const conf = pkg.contributes.configuration.properties['hbrefactor.lockWaitMs'];
+check('package.json declara a configuração (sem isso ela não aparece nas Settings)', !!conf);
+check('com default explícito, para o usuário ver o valor vigente',
+  !!conf && typeof conf.default === 'number', conf ? '-> ' + conf.default : '');
+
 console.log('\n' + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);
