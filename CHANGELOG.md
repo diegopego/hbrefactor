@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@4a70134 -->
+<!-- changelog-baseline: hbrefactor@e3efe33 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log 4a70134..HEAD   (see § Maintaining this file, at the end). -->
+     To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
 # Changelog
 
@@ -19,6 +19,55 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-07 — it stops writing in your project, and two refactorings stop stepping on each other
+
+Three things you can feel, all of them about the tool behaving itself around your
+build.
+
+**It no longer leaves anything in your project.** Every command compiles your code to
+answer you, and until now that compilation dropped its intermediate `.c` and `.o`
+files into `.hbmk/` **inside your project** — the same directory your own build uses.
+So a `hbrefactor usages` could leave your tree dirty, and a build of yours running at
+the same time could fail for no reason you could see. Now the work happens in the
+tool's own directory:
+
+```
+$ git status --porcelain     # after any hbrefactor command
+$                            # nothing. It reads your project; it does not furnish it.
+```
+
+**Two refactorings at once no longer lose work.** Fire one from the editor while
+another runs in a terminal — or let an agent fire several — and they take turns
+instead of overwriting each other. Before, the second one would find the file already
+changed under it, refuse, and roll back: nothing was corrupted, but the work was
+silently gone. Measured on two renames in the same file: **one of them was lost in 5
+of 12 runs; now, in none.**
+
+If the wait runs out, the command is refused and **nothing is edited**, with a reason
+that says the project is busy and an action that says *retry* — repeating it is the
+whole fix. Default wait is 30 s; raise it for large projects:
+
+```
+hbrefactor.lockWaitMs                # VSCode setting (milliseconds)
+HBREFACTOR_LOCK_WAIT_MS=60000 …      # or the environment
+```
+
+Read-only commands (`usages`, `call-graph`, `dump`) never wait and never take a turn.
+
+**Commands got faster when you run several in a row.** The tool used to recompile the
+whole project on every single command. Now it reuses what is still valid and redoes
+only what changed. On a real 42-module project, `usages` went from **5.1 s to about
+3.3 s**.
+
+The honest limit: that is ~1.6×, not the order-of-magnitude you might hope for.
+Generating the compiler's view of your code is only about a third of the work — the
+analysis that follows is the other half, and it is still redone in full. Reuse is also
+decided by **content**, never by timestamps: edit a file and restore its clock, or
+delete the tool's own work, and the next command still answers about your code as it
+is right now.
+
+Details: [docs/roadmap.md](docs/roadmap.md) § W and § X.
 
 ## 2026-08-06 — every result now points at the exact word, not at the line
 

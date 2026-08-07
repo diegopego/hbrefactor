@@ -1,7 +1,7 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@424ad29 · harbour-core@4c02f40f44 (feature/compiler-ast-dump)
+  baseline: hbrefactor@e3efe33 · harbour-core@9d42e27866 (feature/compiler-ast-dump)
     — this round closed the gap between "never edits what it cannot prove" and "never
       keeps quiet about it either":
       * IT NOW REPORTS THE UNVERIFIABLE THING YOUR EDIT REACHES (new section "What it
@@ -907,8 +907,12 @@ does** — never build a guess inside the tool.
      suite 1017/0 + ppcorpus 118/0;
      rough edges: cases 88 (@ref, PARAMETERS AS), commit c127b1f (same-basename limit);
      speed item: commits 226eaf6 (measured end to end: xhb 43 modules, 12.35s -> 8.36s)
-     + core 1c062d88e6, and phase V slice 1 (where the time goes: dump generation ~58%
-     of call-graph but only ~35% of usages, where ANALYSIS dominates);
+     + core 1c062d88e6, phase V slice 1 (where the time goes: dump generation ~58%
+     of call-graph but only ~35% of usages, where ANALYSIS dominates), and phase W.3
+     + X (e3efe33 + core d697557901/fe4ee457f6/9d42e27866: the export is reused when
+     the sources still match it, decided by CONTENT via `harbour --ast-fresh` - measured
+     on contrib/xhb, 42 modules: usages 5.14s -> 3.25-3.59s, ~1.6x, which is the ~35%
+     slice 1 predicted);
      toolchain-in-step item: commit 1d407df + core 2c980299d1 (exact schema, the
      enumerated version list and the 23 degradation gates removed; case 122);
      limits doc (limites-e-alavancas.md: irreducible maybe, library openness). -->
@@ -940,16 +944,20 @@ stock compiler.
 - The per-call `-kt` check has a cost in very hot loops (so it's opt-in), and it doesn't
   cover pass-by-reference (`@x`) or legacy `PARAMETERS x AS ...` — those sites are never
   labeled `guaranteed`.
-- **You wait for the project, not for your edit.** Acting on facts has a price: before
-  touching anything, every command has the compiler re-export your **whole project**,
-  from scratch — deliberately, so it can never act on a stale fact. Renaming one variable
-  costs the same wait as renaming twenty, and on a big codebase that is real, in the tens
-  of seconds. *(It used to be worse: the export grew as the **square** of a module's
-  preprocessor expansions, and fixing that took about a third off every command on real
-  Harbour code. What's left is the honest price of exporting everything, and making it
-  proportional to what you **touched** is the next thing worth doing here.)* Don't take
-  our word for the size of it — time a command against your own biggest project before
-  you commit to the tool.
+- **You still wait for the project, though less than you did.** Acting on facts has a
+  price: to answer anything, the compiler has to export what it knows about your code.
+  The tool now **reuses the export that is still valid and redoes only what changed** —
+  on a real 42-module project a command went from 5.1 s to about 3.3 s. But renaming one
+  variable still costs more than it should: exporting was only about a third of that
+  wait, and the analysis that follows is redone in full every time. Making the cost
+  proportional to what you **touched** needs that analysis to become incremental too,
+  and that is the next thing worth doing here. *(It used to be worse still: the export
+  grew as the **square** of a module's preprocessor expansions, and fixing that took
+  about a third off every command.)* What reuse never does is guess: it is decided by
+  the **content** of your files, not by their clock — edit a file and restore its
+  timestamp to the second, or delete the tool's own working copy, and the next command
+  still answers about your code as it is right now. Don't take our word for the size of
+  it — time a command against your own biggest project before you commit to the tool.
 - **The tool and the compiler branch must be in step.** The tool requires the *exact*
   dump version the branch emits today. Build one without the other and every command
   refuses, telling you which version each side speaks and to rebuild. It will never
