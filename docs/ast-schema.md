@@ -162,11 +162,50 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
 { "schema": "ast-13",          // versão emitida hoje (ast-1→...→ast-13)
   "generator": "Harbour 3.2.0dev (...)",
   "module": "core.prg",          // nome capturado no PARSE (não o -o)
+  "provenance": {...},           // ast-22: DE QUE este dump foi feito (§ abaixo)
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
   "kt": false,                   // ast-7: compilado com -kt? (anotações
                                  // impostas em runtime - camada guaranteed)
   "tokens": [...], "functions": [...] }
 ```
+
+### `provenance` — de que o dump foi feito (ast-22)
+
+```jsonc
+"provenance": {
+  "sum": "fnv1a64",              // o algoritmo, nomeado: quem compara tem de
+                                 // calcular O MESMO, e adivinhar não é opção
+  "files": [                     // TODOS os arquivos que o compilador LEU
+    { "path": "m.prg", "size": 115, "sum": "45a9ac2775bbd192" },
+    { "path": "a.ch",  "size":  56, "sum": "abd3ede22738a271" },
+    { "path": "b.ch",  "size":  15, "sum": "9cb453b3a96a8bbd" }
+  ],
+  "defines": [                   // os -D da linha de comando
+    { "name": "LIGA_C" },        // sem "value" quando o -D não deu um
+    { "name": "MODO", "value": "2" }
+  ] }
+```
+
+**Para que existe.** A pergunta do consumidor é *"este dump ainda corresponde aos
+fontes?"*, e até o `ast-21` a única evidência disponível era o **timestamp** — que
+mente de duas formas medidas: edição dentro do mesmo segundo da compilação é
+invisível (o build incremental compara com resolução de ~1 s), e dump apagado não
+deixa rastro nenhum. Com a procedência, a resposta é **comparação de fatos**: o
+artefato diz de que bytes nasceu, e quem for usá-lo recalcula e confere.
+
+- **A lista é a do compilador** (`incfiles`, a mesma que o `-gd` reporta): já vem
+  com include **transitivo** e já respeita **compilação condicional** — `.ch` dentro
+  de `#ifdef` falso não entra, e entra quando o `-D` o toma. Não é lista nossa.
+- **`defines` está aqui porque os mesmos bytes com `-D` diferente produzem
+  legitimamente outro dump** (medido: 5877 × 6108 bytes no mesmo fonte). Identidade
+  é *{arquivos + conteúdo + flags}*, nunca só o conteúdo.
+- **`sum` é FNV-1a 64-bit, não md5**, e a razão é estrutural: o md5 do core mora em
+  `libhbrtl`, e linká-lo no compilador arrastaria a runtime inteira
+  (`hb_fileExtOpen`, `hb_parc`, `hb_retclen`…) para dentro do `harbour`, que é enxuto
+  de propósito. Não é criptografia — o adversário é *"o arquivo mudou"*, não um
+  falsificador.
+- **`unreadable: true`** no lugar de `size`/`sum` quando o arquivo não pôde ser lido:
+  ausência declarada, nunca um checksum errado.
 
 ## `tokens[]` — o stream que o compilador consumiu
 

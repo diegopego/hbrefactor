@@ -195,7 +195,7 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
 
-## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 e W.2 entregues 2026-08-06; W.3 bloqueada pela fase X)**
+## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 e W.2 entregues 2026-08-06; W.3 DESBLOQUEADA pela fase X)**
 
 **O achado que abre a fase.** Todo comando dispara `hbmk2 <alvos> -hbcmp -rebuild -prgflag=-x<tmp>/`
 ([`AstDumps`](../src/hbrefactor.prg)) **sem `-workdir`** — e no modo `-hbcmp` o hbmk2 escreve os
@@ -297,7 +297,7 @@ suíte que FALHE sem o lock (senão passa por vacuidade).
 respeita**. O build do usuário (IDE, `make`, hbmk2 na mão) não sabe dele. Quem protege o usuário
 é a W.1, não a W.2 — e por isso a ordem é essa.
 
-### Fase W.3 — o `-inc` *(BLOQUEADA: depende do fato de procedência — fase X)*
+### Fase W.3 — o `-inc` *(DESBLOQUEADA 2026-08-06: a fase X entregou o fato; ver critério abaixo)*
 
 **Não entra antes** de o core responder sobre correspondência dump↔fonte (fase V, fatia 2). Lock e
 workdir resolvem CONCORRÊNCIA; o furo de staleness é TEMPORAL e sobrevive aos dois — medido dentro
@@ -315,7 +315,55 @@ CONTEÚDO (hash do fonte que gerou o artefato) mata a classe inteira, e é fato,
 procedência no dump, a pergunta *"este dump corresponde a este fonte?"* deixa de ser inferida
 por timestamp e passa a ser comparação de fato com fato. Enquanto isso, o `-rebuild` fica.
 
-## X — PROCEDÊNCIA DO DUMP: o artefato declara DE ONDE VEIO *(aberta 2026-08-06 por sonda; desbloqueia a W.3 e a fatia 2 da fase V)*
+## X — PROCEDÊNCIA DO DUMP: o artefato declara DE ONDE VEIO — **✅ ENTREGUE 2026-08-06 (`ast-22`)**
+
+> **✅ FEITO.** O `-x` grava `provenance` no dump: `sum` (o algoritmo, nomeado), `files[]`
+> (cada arquivo lido, com `size` e `sum`) e `defines[]` (os `-D` da linha de comando). Os seis
+> itens do critério, verificados:
+> 1. a lista bate com o `-gd` — `['m.prg','a.ch','b.ch']` dos dois lados;
+> 2. mudar **um byte** de `b.ch` mudou só o `sum` dele (`9cb453b3…` → `9caa11b3…`);
+> 3. `c.ch` fora do `#ifdef` falso; entra com `-DLIGA_C`;
+> 4. `-D` diferente → `defines: [LIGA_C]` na procedência;
+> 5. **o caso que motivou a fase**: editar com o mtime devolvido byte a byte ao valor anterior
+>    (`2026-08-06 22:22:40.058996476` nos dois) e a procedência dizer NÃO SERVE
+>    (`45a9ac2775bbd192` × `f04d4e8e73d50e48`);
+> 6. `AstSchema()` em `ast-22`, caso 122 verde, 1001 asserts do `run.sh` verdes, `lexdiff` 100/0.
+>
+> **Duas decisões de implementação, com o porquê medido:**
+> - **checksum próprio (FNV-1a 64) em vez de `hb_md5file`** — o md5 do core mora em
+>   `libhbrtl`, e `hbmd5.o` precisa de `hb_fileExtOpen`, `hb_fileRead`, `hb_parc`,
+>   `hb_retclen`… O `harbour` não linka a RTL (medido: nem `hb_fsOpen` nem `hb_itemNew` estão
+>   no binário), e arrastá-la mataria a fase B6. Não é criptografia: o adversário é *"o arquivo
+>   mudou"*. **Escolha do Diego entre três alternativas apresentadas.**
+> - **o rastreamento de includes passa a ligar com `-x`**, não só com `-gd` (`ppcomp.c`): a
+>   lista só era coletada quando alguém pedia dependências, e sem isso a procedência sairia
+>   VAZIA — que é pior que ausente, porque parece resposta.
+>
+> **Portão:** `TestProcedenciaListaOsArquivosQueOCompiladorLeu` e
+> `TestProcedenciaPegaEdicaoComMtimeIdentico` (`tests-go/suite/provenance_test.go`). O teste
+> **recalcula o FNV-1a por conta própria**: se o core trocar de algoritmo sem trocar o campo
+> `sum`, ele reprova — que é o aviso que se quer.
+>
+> **ANTI-VACUIDADE, provada em cinco cenários** *(verde não prova nada sem o vermelho ao lado)*:
+>
+> | cenário | o portão |
+> |---|---|
+> | core que emite `"files": []` — **o binário real das 22:45**, guardado pelo `make core` | reprova |
+> | campo `provenance` ausente (formato `ast-21`) | reprova |
+> | lista a MAIS (`c.ch` sem `-D`) | reprova |
+> | lista a MENOS (o transitivo `b.ch` sumindo) | reprova |
+> | `sum` errado | reprova |
+> | **controle: procedência correta** | **passa** |
+>
+> Os três do meio usam um `harbour` FALSO, e a distinção não é detalhe: eles provam que o
+> **teste discrimina**, não que o core está certo — isso quem prova são os critérios 1-5 acima,
+> medidos com o binário real. Duas provas de naturezas diferentes, e nenhuma substitui a outra:
+> uma diz que o compilador faz a coisa certa, a outra que o portão perceberia se ele parasse.
+>
+> **O que isto NÃO faz:** a ferramenta ainda não CONSOME a procedência. Isso é a W.3, e agora
+> ela está desbloqueada.
+
+### Como era, antes de a fase existir *(o registro que a sonda produziu)*
 
 **O que ela resolve.** Hoje a única evidência de que um `.ast.json` corresponde ao fonte é o
 **timestamp** — e a fase W mediu que essa evidência mente em duas situações, nenhuma delas
