@@ -40,11 +40,11 @@ construir inferência. *(Diego, 2026-07-08.)*
   absorvido pelo `usages`); ao consumir fatos de pp, operar sobre o genérico
   (cabeça/kind/marker), nunca por DSL/família conhecida.
 
-### 1.1 O PORTÃO DE AUTORIZAÇÃO — a ordem não se pula
+### 1.1 A AUTORIZAÇÃO POR-CASO — a ordem não se pula
 
 Heurística e réplica são **PROIBIDAS por padrão**, e a exploração do core vem **ANTES**
 de projetar a solução. *(Diego, 2026-07-12; a regra já existia e eu a quebrava assim
-mesmo — o que faltava não era regra, era PORTÃO. [cic §1.1])*
+mesmo — o que faltava não era regra, era um mecanismo que RECUSA. [cic §1.1])*
 
 1. **Explore primeiro se o core pode dar o fato.** Projetar a solução na ferramenta e só
    depois perguntar isso é ordem invertida: quando a solução já está desenhada, a
@@ -52,8 +52,8 @@ mesmo — o que faltava não era regra, era PORTÃO. [cic §1.1])*
 2. **Se o core pode → o core faz.**
 3. **Se o core NÃO pode → isso é uma RECUSA**, e recusa exige varredura registrada (§1.3).
 4. **Só então, e SÓ COM AUTORIZAÇÃO EXPLÍCITA DO DIEGO PARA AQUELE CASO**, pode existir
-   heurística no hbrefactor. Portão por-caso, igual ao de commit: aprovar um não aprova o
-   próximo.
+   heurística no hbrefactor. Autorização POR-CASO, igual à de commit: aprovar uma não
+   aprova a próxima.
 
 **Como pedir:** (a) o fato que falta, (b) a varredura feita no core, (c) por que o core
 não pode dar, (d) a heurística proposta e **onde ela erra**.
@@ -137,7 +137,7 @@ se **BERRA**, nunca se degrada. *(Diego, 2026-07-13. [cic §2.1])*
 
 - O schema é **EXATO** (`AstSchema()`, um só lugar), não piso e jamais lista enumerada —
   divergiu, recusa alta nomeando as duas versões.
-- **Nenhum portão de degradação por versão** ("dump sem o canal X degrada para possible"):
+- **Nenhuma DEGRADAÇÃO por versão** ("dump sem o canal X degrada para possible"):
   degradar rebaixaria o **VEREDITO** por causa de um build velho, **calado**.
 - A suíte **sempre roda no schema corrente**; o **caso 122** fica vermelho no instante em
   que core e ferramenta divergirem.
@@ -164,9 +164,23 @@ consumidor": é o que **mais precisa** de um oráculo de fato.
   de recusa diz o que FAZER: *"pare e conte ao humano"* × *"repita com a flag"* × *"seu projeto
   não compila"*.
 - **Corolário do lado da CRIAÇÃO:** contra o modo de falha de um contribuidor heurístico (que é
-  o que eu sou), o que funciona neste repo é **portão EXECUTÁVEL**, não documento — o hook
+  o que eu sou), o que funciona neste repo é **PORTÃO**, não documento — o hook
   `anti-heuristica.sh`, a régua-grep do caso 64, o schema que berra. **Regra nova sem portão
   novo é regra que eu vou violar de novo.**
+
+  > **PORTÃO, definido — e a palavra é RESERVADA a isto** *(Diego, 2026-08-07: "o próprio
+  > termo portão parece estar criando confusão")*: **um mecanismo que RODA e REPROVA.** Hook
+  > que barra o commit, teste que fica vermelho, alvo do `make` que sai não-zero, compilador
+  > que recusa. Três perguntas, e as três têm de ser sim: *roda sozinho? falha quando a regra
+  > é violada? já vi essa falha acontecer?*
+  >
+  > **Se precisa de adjetivo, não é portão.** "Portão executável" é redundante; "portão de
+  > degradação" (um caminho que DEIXA passar) e "portão de autorização" (um protocolo entre
+  > mim e o Diego) eram a mesma palavra para conceitos opostos, e foi assim que eu escrevi
+  > *"não tem portão executável"* — contradição em termos — dias depois de escrever esta
+  > seção. **A palavra não era o problema: eram três conceitos num rótulo só.** Os outros dois
+  > perderam a palavra; regra sem mecanismo diz **"nada verifica isto"**, que é exato e mais
+  > duro.
 
 ### 1.7 A lei vale para o MEU RACIOCÍNIO, não só para o código da ferramenta
 
@@ -251,7 +265,7 @@ prognóstico parar de mudar.** Ao apresentar: a afirmação, o comando, o result
 o que caiu**, porque argumento derrubado é resultado, e é o que impede decisão sobre premissa
 morta. *(Prima do §4: "anunciar" inclui a conversa em que se decide.)*
 
-> **ESTA REGRA NÃO TEM PORTÃO EXECUTÁVEL, e é a mais frágil da §1.** Ela governa a minha
+> **ESTA REGRA NÃO TEM PORTÃO — nada verifica isto, e ela é a mais frágil da §1.** Ela governa a minha
 > prosa, que nada no repo verifica. Pelo §1.6 isso a torna uma regra que eu vou violar de
 > novo — o único freio é eu apresentar o comando junto da afirmação, e o Diego notar quando
 > não vier. *(Dois cadáveres de 2026-08-07: afirmei que uma IDE recorta `text[start:end]` e a

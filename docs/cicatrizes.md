@@ -266,7 +266,7 @@ derrubá-los — e a decisão certa (o alcance da P26, cortado pela morte anunci
 saiu dessa exploração, não do argumento. **Argumento derrubado é resultado**; o estrago mora
 em apresentá-lo como fato e deixar o Diego decidir sobre premissa morta.
 
-*(A régua do §1.8 não tem portão executável — ela governa a minha prosa. O freio é apresentar
+*(A régua do §1.8 não tem portão — nada verifica a minha prosa. O freio é apresentar
 o comando junto da afirmação.)*
 
 ### 1.4 A recusa falsa publicada — varrer o core antes de dizer "impossível" (2026-07-12)
@@ -303,7 +303,7 @@ trabalho e é normal; não existe esta busca de compatibilidade"*.
 
 O dump é gerado **na hora**, a cada comando, pelo `harbour` do `HB_BIN`. Logo **não
 existe "dump antigo"**: existe **toolchain fora de passo** — que é erro de build, e erro
-de build se **BERRA**, nunca se degrada. Um portão de degradação por versão rebaixaria o
+de build se **BERRA**, nunca se degrada. Uma degradação por versão rebaixaria o
 **VEREDITO** por causa de um build velho, **calado** — o oposto do produto.
 
 Saíram **5 funções e 23 sítios** de compatibilidade. **Nada** na suíte dependia deles:

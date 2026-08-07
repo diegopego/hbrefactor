@@ -11,7 +11,7 @@ Você vai auditar o `src/hbrefactor.prg` inteiro procurando **um único tipo de
 defeito**: código que decide por **heurística, inferência ou réplica de lógica do
 core**, em vez de agir sobre FATO da AST do compilador.
 
-**Leia antes de começar, nesta ordem:** `CLAUDE.md` (§ PORTÃO DE AUTORIZAÇÃO e
+**Leia antes de começar, nesta ordem:** `CLAUDE.md` (§ AUTORIZAÇÃO POR-CASO e
 § GATILHOS da REGRA DO FATO), `docs/ast-schema.md` (o que o dump JÁ dá — metade dos
 achados morre aqui: o fato existia e a ferramenta não o usou), e
 `docs/pp-corpus/ROADMAP.md` (a narrativa dos erros REAIS já cometidos: `ast-14`,
