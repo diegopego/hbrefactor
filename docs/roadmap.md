@@ -154,6 +154,12 @@ detectar headers na hora de decidir (`hbmk2.prg`, `_hbmk_...` de detecção de d
 correspondência dump↔fonte?* Explorar ANTES de projetar (§1.1) — e a resposta não pode ser
 staleness inventada aqui. Enquanto não houver esse fato, o `-rebuild` de hoje **fica**.
 
+> **A pergunta foi sondada e virou a fase [X — PROCEDÊNCIA DO DUMP](#x--procedência-do-dump-o-artefato-declara-de-onde-veio)**
+> *(2026-08-06)*. Resposta curta da tabela: o core **já sabe** a lista exata de arquivos que
+> compõem cada módulo (`-gd`, com transitivo e respeitando `#ifdef`), e o que falta é o dump
+> **declarar** isso com identidade de conteúdo. Esta fatia depende da X — sem ela, tornar o fato
+> analisado incremental é apostar no relógio.
+
 **FATIA 3 — CANCELADA** (era paralelizar o `unused-locals`; o comando SAIU — ver fase L no
 arquivo).
 
@@ -189,7 +195,7 @@ PROJETO, não do módulo) — se tiver, isso é **limite honesto a registrar**, 
 proporcional a **1 módulo** — com equivalência byte-idêntica provada contra o `-rebuild` de
 hoje.
 
-## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 e W.2 entregues 2026-08-06; W.3 bloqueada pela fase V)**
+## W — ISOLAMENTO: o diretório de trabalho é NOSSO, e o projeto do usuário fica INTACTO — **ATIVA (W.1 e W.2 entregues 2026-08-06; W.3 bloqueada pela fase X)**
 
 **O achado que abre a fase.** Todo comando dispara `hbmk2 <alvos> -hbcmp -rebuild -prgflag=-x<tmp>/`
 ([`AstDumps`](../src/hbrefactor.prg)) **sem `-workdir`** — e no modo `-hbcmp` o hbmk2 escreve os
@@ -291,7 +297,7 @@ suíte que FALHE sem o lock (senão passa por vacuidade).
 respeita**. O build do usuário (IDE, `make`, hbmk2 na mão) não sabe dele. Quem protege o usuário
 é a W.1, não a W.2 — e por isso a ordem é essa.
 
-### Fase W.3 — o `-inc` *(BLOQUEADA: depende do fato de correspondência da fase V)*
+### Fase W.3 — o `-inc` *(BLOQUEADA: depende do fato de procedência — fase X)*
 
 **Não entra antes** de o core responder sobre correspondência dump↔fonte (fase V, fatia 2). Lock e
 workdir resolvem CONCORRÊNCIA; o furo de staleness é TEMPORAL e sobrevive aos dois — medido dentro
@@ -303,6 +309,72 @@ ferramenta promete nunca ter.
 no hbmk2/harbour **não é o `.ch`** — esse funciona (o `-inc` regrava o dump do dependente e só
 dele, 3/3, via `harbour -gd`). É a **resolução da comparação**, que é de ~1 segundo. Detecção por
 CONTEÚDO (hash do fonte que gerou o artefato) mata a classe inteira, e é fato, não heurística.
+
+**A pista virou fase: [X — PROCEDÊNCIA DO DUMP](#x--procedência-do-dump-o-artefato-declara-de-onde-veio)**
+*(2026-08-06, depois da tabela de sondas)*. A W.3 **desbloqueia quando a X entregar**: com a
+procedência no dump, a pergunta *"este dump corresponde a este fonte?"* deixa de ser inferida
+por timestamp e passa a ser comparação de fato com fato. Enquanto isso, o `-rebuild` fica.
+
+## X — PROCEDÊNCIA DO DUMP: o artefato declara DE ONDE VEIO *(aberta 2026-08-06 por sonda; desbloqueia a W.3 e a fatia 2 da fase V)*
+
+**O que ela resolve.** Hoje a única evidência de que um `.ast.json` corresponde ao fonte é o
+**timestamp** — e a fase W mediu que essa evidência mente em duas situações, nenhuma delas
+rara: edição dentro do mesmo segundo em que aquele módulo foi compilado (a comparação do
+`hbmk2 -inc` tem resolução de ~1 s), e dump apagado com o `.c` em dia (o incremental decide
+sobre o `.c`; nada observa o `.ast.json`). Enquanto isso valer, ligar o `-inc` troca segundos
+de espera por *"agiu sobre fato velho"* — o único defeito que esta ferramenta promete nunca ter.
+
+**A raiz, e por que delegar não resolveu.** A fatia 2 da fase V proíbe *inventar staleness na
+ferramenta* e delega ao `hbmk2 -inc`. Só que o hbmk2 **também** decide por mtime, e sobre outro
+artefato: delegar não eliminou a heurística — **mudou o dono dela**. O que falta não é um dono
+melhor; é um **fato**.
+
+### Tabela de sondas *(medida 2026-08-06, §1.7.1: a sonda antes do mecanismo)*
+
+| pergunta | o core responde HOJE | comando |
+|---|---|---|
+| existe lista dos arquivos lidos? | **sim**: `out/m.c: m.prg a.ch b.ch` | `harbour m.prg -sm -gd -i. -o<tmp>/` |
+| inclui include **transitivo**? | **sim** — `b.ch`, puxado por `a.ch` | idem |
+| inclui include **não tomado**? | **não** — `c.ch` fora do `#ifdef` falso | idem |
+| …e entra quando tomado? | **sim** — `m.prg a.ch b.ch c.ch` | `… -DLIGA_C` |
+| `-D` muda o dump? | **sim** — 5877 × 6108 bytes | `harbour … -x<dir>/`, com e sem `-D` |
+| há **segunda fonte** para cruzar? | **não** — o `.ppt` sai com 4 linhas, sem citar include | `harbour … -p+` |
+| custo de hashear projeto real | **0,022 s** para 726 `.prg` / 4,5 MB | `find … -exec md5sum {} +` |
+
+**O que a tabela trava:** (a) o fato EXISTE e é exato — o core já sabe a lista certa, com
+transitivo e respeitando condicional; ele só não a põe no dump; (b) identidade não é só os
+bytes do `.prg`, é **{arquivos lidos + conteúdo de cada + flags}**, porque o mesmo fonte com
+`-D` diferente é legitimamente outro dump; (c) hashear é de graça perto de qualquer etapa deste
+pipeline; (d) `-gd` é a **única** autoridade sobre composição de módulo — não há como cruzar
+duas fontes, o que ele diz é o que há.
+
+**Escopo.** O `-x` grava no `.ast.json` a **procedência**: cada arquivo que o compilador leu
+(o `.prg` e os includes, transitivos inclusive), com tamanho e hash do conteúdo, mais a
+identidade das flags que valiam na compilação. Trabalho no `harbour-core`
+(branch `feature/compiler-ast-dump`); commit lá segue sob autorização por-commit.
+
+**Critério de pronto (mecânico).**
+1. O dump de um módulo traz a procedência completa, e ela bate com o que o `-gd` lista para o
+   mesmo módulo e as mesmas flags — as duas fontes concordando é o que prova que não inventamos
+   a lista.
+2. Mudar **um byte** de um `.ch` transitivo muda a procedência do dump do dependente, **e só
+   dele**.
+3. Include **não tomado** não aparece na procedência; passa a aparecer quando o `-D` o toma.
+4. Compilar o mesmo fonte com `-D` diferente produz procedências distintas.
+5. **O caso que hoje engana o `-inc` é detectado**: editar dentro do mesmo segundo em que o
+   módulo foi compilado, e a comparação de procedência dizer *não serve* — com o mtime idêntico.
+   É este item que fecha a W.3; sem ele a fase não entregou nada.
+6. Schema novo em `AstSchema()`, caso 122 verde, `make test` verde sem re-baseline.
+
+**O que NÃO entra aqui:** ligar o `-inc`. Isso continua sendo a W.3, e só faz sentido depois
+que a procedência existir — a fase X entrega o FATO, não o consumo dele.
+
+**Alternativa considerada e recusada:** obter a lista com o `ModuleDeps()` que a ferramenta já
+tem (ele roda exatamente este `-sm -gd`) e hashear do nosso lado, sem tocar no core. Funciona, e
+é honesto registrar que funciona. Recusada porque seria a ferramenta reconstruindo uma decisão
+que o compilador já toma — e as duas divergem no dia em que o pp mudar, caladas. É a regra do
+§1.2: reutilizar o core vence esperteza nossa, e "zero mudança no core" é sinal de alerta, não
+virtude.
 
 ## A — A IA COMO CONSUMIDOR DE PRIMEIRA CLASSE (jamais FONTE de fato) — **ATIVA: A.2 entregue; A.1 ABERTA (Diego, 2026-07-24); A.3/A.4 em PORTÃO FECHADO**
 
