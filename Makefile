@@ -29,6 +29,8 @@ CORE_OBJ   = $(CORE_SRC)/obj/$(CORE_PLAT)/$(CORE_COMP)
 CORE_Y     = $(CORE_SRC)/harbour.y
 CORE_YYC   = $(CORE_SRC)/harbour.yyc
 CORE_BINS  = $(HB_BIN)/harbour $(HB_BIN)/hbmk2
+# fora da arvore do core, para o `make clean` dele nao alcancar
+CORE_KEEP  = $(dir $(HB_CORE)).core-keep
 
 # O STOCK: o harbour de upstream/master, SEM os remendos do branch. Ele e'
 # dependencia do projeto tanto quanto o do branch (Diego, 2026-08-06) - e' a
@@ -64,9 +66,32 @@ core: $(CORE_YYC)
 	@echo "core: $(HB_CORE)  ($(CORE_PLAT)/$(CORE_COMP))  branch: $$(git -C $(HB_CORE) rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
 	@[ "$$(git -C $(HB_CORE) rev-parse --abbrev-ref HEAD 2>/dev/null)" = feature/compiler-ast-dump ] || \
 		echo "core: AVISO - o branch esperado e' feature/compiler-ast-dump"
-	@# os binarios somem ANTES: sem isso o make relata "up to date" e nao relinca
+	@# O REBUILD NAO PODE DEIXAR A ARVORE SEM COMPILADOR. Antes, `rm` + `clean` +
+	@# `make` abriam uma janela de ~2min30 sem harbour/hbmk2: qualquer outra
+	@# sessao (ou a extensao do VSCode) que invocasse a ferramenta ali batia num
+	@# binario ausente, e o sintoma e' o enganoso "o projeto nao compila" (§5.2).
+	@# E se o build FALHASSE, a janela nao fechava mais.
+	@# Os binarios de agora sao guardados FORA da arvore do core (o `clean` nao os
+	@# alcanca) e devolvidos ao lugar logo apos o clean: eles seguem servindo
+	@# durante todo o rebuild, e o link no fim os substitui - janela de
+	@# milissegundos em vez de minutos. Build que falha deixa os velhos de pe'.
+	@mkdir -p $(CORE_KEEP)
+	@cp -p $(CORE_BINS) $(CORE_KEEP)/ 2>/dev/null || true
+	@# somem para o make relincar: com o binario presente ele relata "up to date"
 	rm -f $(CORE_BINS)
-	cd $(HB_CORE) && $(MAKE) clean >/dev/null && $(MAKE) -j$(if $(JOBS),$(JOBS),8)
+	cd $(HB_CORE) && $(MAKE) clean >/dev/null
+	@mkdir -p $(HB_BIN)
+	@cp -p $(CORE_KEEP)/harbour $(CORE_KEEP)/hbmk2 $(HB_BIN)/ 2>/dev/null || true
+	@# `cp -p` preserva o mtime VELHO; o stamp e' tirado depois, entao um binario
+	@# que nao foi relincado sai mais VELHO que ele. E' a prova exata de que o
+	@# link aconteceu AGORA - mais forte que comparar com o fonte, que um binario
+	@# restaurado poderia enganar.
+	@touch $(CORE_KEEP)/stamp
+	cd $(HB_CORE) && $(MAKE) -j$(if $(JOBS),$(JOBS),8)
+	@for b in $(CORE_BINS); do \
+		[ "$$b" -nt $(CORE_KEEP)/stamp ] || \
+			{ echo "core: FALHOU - $$b nao foi relincado neste build (e' o de antes)" >&2; exit 1; }; \
+	done
 	@$(MAKE) --no-print-directory core-check
 
 # o parser COMMITADO e' o que um checkout limpo usa; HB_REBUILD_PARSER=yes

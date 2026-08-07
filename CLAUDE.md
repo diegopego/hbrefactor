@@ -230,9 +230,14 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
   Não é ruído: é o modo de falha que produz diagnóstico inventado, porque a ferramenta
   roda e responde. **Nunca `make` no core direto; nunca "apago só os `.o` que eu acho
   que mudaram".** *([cic §5.1])*
-  - `make core` apaga os dois binários, `make clean && make`, e **CONFERE que `harbour`
-    e `hbmk2` relincaram** — build que "passou" sem produzir binário novo reprova. O
-    hbmk2 **EMBUTE** o compilador, por isso são os dois sempre.
+  - `make core` faz `make clean && make` e **CONFERE que `harbour` e `hbmk2` relincaram
+    NESTE build** (mais forte que comparar com o fonte: a prova é um stamp tirado no
+    início). O hbmk2 **EMBUTE** o compilador, por isso são os dois sempre.
+  - **Limpo NÃO quer dizer sem compilador**: os binários de agora são guardados fora da
+    árvore e devolvidos ao lugar logo após o `clean`, então seguem servindo durante todo
+    o rebuild — e **um build que falha deixa os velhos de pé**. Antes eram ~2min30 sem
+    `harbour`, e o sintoma para quem esbarrasse na janela era o enganoso *"o projeto não
+    compila"* (§5.2). Medido: 90 compilações durante um `make core`, **0 falhas**.
   - **Mora no Makefile, não num script** *(Diego, 2026-08-06: "é preferível do que ter
     scripts espalhados")*. `make core-check` roda só as conferências, em 1s, e responde
     a pergunta cujo NÃO responder custou os dois diagnósticos: *o binário que eu estou

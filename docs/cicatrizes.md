@@ -471,6 +471,18 @@ Provado na fase RD (`_HB_INLINESELF`, core `da61c647cb`):
   que o make é feito. Regenera quando e só quando precisa, e a receita reproduz o
   `.yyc` commitado byte a byte.
 
+  **A janela que a regra abriu, e o conserto** *(2026-08-06, quando o Diego avisou que
+  havia outra sessão rodando em paralelo)*: build limpo apagava os binários por ~2min30,
+  e nesse intervalo qualquer outra sessão — ou a extensão do VSCode — batia num compilador
+  ausente, com o sintoma enganoso do §5.2. Pior: build que FALHASSE deixava a árvore sem
+  compilador nenhum. Conserto: guardar os binários FORA da árvore (onde o `clean` não
+  alcança) e devolvê-los logo após o `clean`; o link no fim os substitui. Janela de
+  milissegundos, e falha não desarma ninguém. **De brinde, a guarda ficou mais forte**:
+  com `cp -p` preservando o mtime velho e um stamp tirado depois, "foi relincado agora?"
+  passa a ser exato — comparar com o fonte, como antes, um binário restaurado enganaria.
+  Os três controles foram rodados: 90 compilações durante o rebuild sem uma falha, build
+  quebrado de propósito deixando o compilador servindo, e o stamp acusando os restaurados.
+
   *Nota de método, e ela quase passou:* meu primeiro controle negativo do script
   "falhou corretamente" — e era **falso**, porque a cópia no scratchpad não achava o
   `hbenv.sh` e morria antes de chegar na guarda. A segunda tentativa neutralizou o build
