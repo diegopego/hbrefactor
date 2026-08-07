@@ -12,6 +12,12 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
+> **A frente da POSIÇÃO DO SÍTIO tem retomada PRÓPRIA:**
+> [`retomada-posicao-do-sitio.md`](retomada-posicao-do-sitio.md) *(2026-08-06)*. Ela
+> nasceu separada porque duas sessões correram em paralelo neste repo e este arquivo é
+> superfície compartilhada — retomada que pode ser sobrescrita não retoma nada. Some
+> quando a P24 fechar.
+
 ## 0-28. A SESSÃO DE 2026-07-28 — a P21 entregou o MECANISMO, e a fila mudou de dono
 
 **Frente ativa: não é mais a migração da suíte, é a POSIÇÃO DO SÍTIO.** A P21 fechou:
