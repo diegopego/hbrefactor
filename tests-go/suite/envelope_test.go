@@ -1,5 +1,10 @@
 package suite
 
+import (
+	"strings"
+	"testing"
+)
+
 // O envelope da CLI (schema cli-2) como TIPO, para o caso afirmar sobre ele com
 // o compilador junto: `env.Result.EditCoutn` não compila, e um campo que o
 // contrato não tem não chega a virar teste verde.
@@ -99,6 +104,33 @@ type Envelope struct {
 //
 // Achatar em "" é de propósito: um caso que pede recusa e recebe sucesso falha
 // mostrando `""/""`, e não some por comparar dois ponteiros nulos.
+// Aponta fails unless the site covers EXACTLY the given word inside `linha` -
+// the line of the FILE, which is where a site's `range` is measured.
+//
+// It exists so a case needs no magic number: the expected column comes out of
+// the text itself, so the reader sees "points at the word CMD_SOMA" instead of
+// "column 3..11". And on failure it shows what the site ACTUALLY sliced - a
+// site with no position slices "" and the reader gets it at once.
+func (l *Local) Aponta(t *testing.T, linha, palavra string) {
+	t.Helper()
+
+	quero := strings.Index(linha, palavra)
+	if quero < 0 {
+		t.Errorf("%s: a linha %q não contém %q", l.Kind, linha, palavra)
+		return
+	}
+	ini, fim := l.Range.Start.Character, l.Range.End.Character
+	if ini == quero && fim == quero+len(palavra) {
+		return
+	}
+	recorte := "<fora da linha>"
+	if ini >= 0 && fim <= len(linha) && ini <= fim {
+		recorte = linha[ini:fim]
+	}
+	t.Errorf("%s: aponta %q (col %d..%d), quero %q (col %d..%d)\n  linha: %s",
+		l.Kind, recorte, ini, fim, palavra, quero, quero+len(palavra), linha)
+}
+
 func (e Envelope) Recusa() (reason, action string) {
 	if e.Status != "refused" {
 		return "", ""

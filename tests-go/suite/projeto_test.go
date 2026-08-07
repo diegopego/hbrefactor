@@ -46,6 +46,26 @@ func novo(t *testing.T, nome string) *Projeto {
 // arquivo que a FERRAMENTA cria e o caso afirma. Fica no caso, não no harness.
 func (p *Projeto) Cria(prefixos ...string) { p.cria = append(p.cria, prefixos...) }
 
+// Linha returns a line of a project file, 0-based, as it sits on disk.
+//
+// It exists because a site's `range` is ABSOLUTE in the file while the `text`
+// the envelope carries comes WITHOUT the leading blanks - composing the two
+// yields garbage (see P26). Until that is settled, a position assertion
+// anchors on the file, which is the truth the user's editor shows.
+func (p *Projeto) Linha(arquivo string, n int) string {
+	p.t.Helper()
+
+	b, err := os.ReadFile(filepath.Join(p.dir, arquivo))
+	if err != nil {
+		p.t.Fatalf("não li %s: %v", arquivo, err)
+	}
+	linhas := strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
+	if n < 0 || n >= len(linhas) {
+		p.t.Fatalf("%s tem %d linhas, pedi a %d", arquivo, len(linhas), n)
+	}
+	return linhas[n]
+}
+
 func (p *Projeto) declarado(nome string) bool {
 	for _, pre := range p.cria {
 		if nome == pre || strings.HasPrefix(nome, pre) {

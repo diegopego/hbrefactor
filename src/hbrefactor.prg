@@ -677,7 +677,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-22"
+   RETURN "ast-23"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -737,6 +737,44 @@ STATIC FUNCTION WorkDir()
 // coluna exata de um símbolo numa linha, direto dos tokens do compilador
 // (0-based no dump; devolve lista de colunas 1-based, vazia se nenhum token
 // com coluna cobre o símbolo naquela linha)
+// ast-23: WHERE a site is - and what the core knows differs by case:
+//
+//   `col`   the name is written in THIS module; the position is its own;
+//   `app`   the name was written by a DIRECTIVE (almost always in a `.ch`).
+//           The place the programmer would actually edit is that directive's
+//           APPLICATION, which `ppApplications` publishes with line, column
+//           and length. That is 40% of the sites in real Harbour code, and
+//           they used to come out with no position at all;
+//   neither  there is nowhere to point (a symbol handed over by a macro, a
+//           name the compiler made up): zero width, the honest signal.
+//
+// The application index comes from the CORE - never "the one on the same
+// line", which two directives on one line would turn into a guess.
+//
+// Returns { nLine, aCols, nLen } for LocAdd.
+STATIC FUNCTION SitePos( hAst, hItem, nLen )
+
+   LOCAL nCol0 := hb_HGetDef( hItem, "col", NIL )
+   LOCAL nApp, hApp, hTok
+
+   IF nCol0 != NIL
+      RETURN { hb_HGetDef( hItem, "tokLine", hItem[ "line" ] ), { nCol0 + 1 }, nLen }
+   ENDIF
+
+   nApp := hb_HGetDef( hItem, "app", NIL )
+   IF nApp != NIL .AND. nApp >= 0 .AND. ;
+      nApp < Len( hb_HGetDef( hAst, "ppApplications", {} ) )
+      hApp := hAst[ "ppApplications" ][ nApp + 1 ]
+      IF ! Empty( hApp[ "tokens" ] )
+         hTok := hApp[ "tokens" ][ 1 ]
+         IF hb_HGetDef( hTok, "col", NIL ) != NIL
+            RETURN { hTok[ "line" ], { hTok[ "col" ] + 1 }, hTok[ "len" ] }
+         ENDIF
+      ENDIF
+   ENDIF
+
+   RETURN { hItem[ "line" ], {}, 0 }
+
 STATIC FUNCTION TokenCols( hAst, nLine, cSym )
 
    LOCAL aCols := {}, hTok
@@ -765,12 +803,11 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL aDecl, aSite, cCur, nState, hOwnV
    LOCAL cAtSpec := NIL, aAtParts, cAtFile, cAtPath, nAtLine, nAtCol0, hResAt
    LOCAL cKind          // A.1: o rótulo que a prosa E o JSON usam (uma fonte)
-   LOCAL nCol0          // ast-20: a coluna DO sítio (0-based), ou NIL
-   // ast-20: a LINHA do sítio. O `line` do registro é a linha em que o
-   // compilador estava — num statement continuado com `;` isso é a ÚLTIMA
-   // linha física, e o sítio está numa anterior. `tokLine` só vem quando
-   // DIFERE, então a ausência dele significa "é a mesma", nunca "não sei"
-   LOCAL nSiteLn
+   // ast-23: { linha, colunas, tamanho } do sítio, resolvido por SitePos() -
+   // um lugar só para os três laços. O `line` do registro é a linha em que o
+   // compilador estava; num statement continuado com `;` isso é a ÚLTIMA linha
+   // física, e o sítio está numa anterior
+   LOCAL aPos, nSiteLn
    // P3 (adr-003:60-63): --at resolve o PAPEL do site (generates/genrule já
    // usados pelo rename) - usages passa a ESTREITAR por ele, não só extrair
    // o nome. lAtPp = o site é mecânica de pp (marker/descarte/palavra de
@@ -1042,11 +1079,10 @@ STATIC FUNCTION Usages( aArgs )
                // sai de largura zero. Procurar "o token com este nome nesta
                // linha" seria adivinhar: a linha pode ter um homônimo escrito
                // que nada tem a ver com este sítio.
-               nCol0 := hb_HGetDef( hItem, "col", NIL )
-               nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
-               LocAdd( aLoc, cPath, nSiteLn, ;
-                       iif( nCol0 == NIL, {}, { nCol0 + 1 } ), ;
-                       Len( cName ), cKind, hFunc[ "name" ], "confirmed", aSrc )
+               aPos := SitePos( hAst, hItem, Len( cName ) )
+               nSiteLn := aPos[ 1 ]
+               LocAdd( aLoc, cPath, nSiteLn, aPos[ 2 ], aPos[ 3 ], ;
+                       cKind, hFunc[ "name" ], "confirmed", aSrc )
                Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + cKind + " in " + ;
                   hFunc[ "name" ] + SrcLine( aSrc, nSiteLn ) + hb_eol() )
             ENDIF
@@ -1059,11 +1095,10 @@ STATIC FUNCTION Usages( aArgs )
                // ast-21, mesmo fato do laço de occurrences: chamada aninhada
                // (`F( F( x ) ) + F( y )`) põe N sítios numa linha, e cada um
                // sai no token que o parser deu ao nó DELE
-               nCol0 := hb_HGetDef( hItem, "col", NIL )
-               nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
-               LocAdd( aLoc, cPath, nSiteLn, ;
-                       iif( nCol0 == NIL, {}, { nCol0 + 1 } ), ;
-                       Len( cName ), cKind, hFunc[ "name" ], "confirmed", aSrc )
+               aPos := SitePos( hAst, hItem, Len( cName ) )
+               nSiteLn := aPos[ 1 ]
+               LocAdd( aLoc, cPath, nSiteLn, aPos[ 2 ], aPos[ 3 ], ;
+                       cKind, hFunc[ "name" ], "confirmed", aSrc )
                Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + cKind + " in " + ;
                   hFunc[ "name" ] + SrcLine( aSrc, nSiteLn ) + hb_eol() )
             ENDIF
@@ -1087,17 +1122,16 @@ STATIC FUNCTION Usages( aArgs )
                // mesmo membro numa linha também resolve certo. Resolvida
                // FORA do IF: a prosa relata o sítio mesmo quando ele fica de
                // fora das Location[], e tem de apontar a mesma linha.
-               nCol0 := hb_HGetDef( hItem, "col", NIL )
-               nSiteLn := hb_HGetDef( hItem, "tokLine", hItem[ "line" ] )
+               aPos := SitePos( hAst, hItem, Len( cMethTok ) )
+               nSiteLn := aPos[ 1 ]
                // excluded é não-referência PROVADA: fica no relato (com o
                // rótulo) mas fora das Location[] do --json - o editor
                // (find all references via extensão) não deve listá-lo.
                // A CERTEZA é a 1a palavra do rótulo (possible/confirmed/
                // guaranteed/excluded) - vira campo, separada do "send"
                IF ! aVerd[ 2 ]
-                  LocAdd( aLoc, cPath, nSiteLn, ;
-                          iif( nCol0 == NIL, {}, { nCol0 + 1 } ), ;
-                          Len( cMethTok ), "send", hFunc[ "name" ], FirstWord( aVerd[ 1 ] ), aSrc )
+                  LocAdd( aLoc, cPath, nSiteLn, aPos[ 2 ], aPos[ 3 ], ;
+                          "send", hFunc[ "name" ], FirstWord( aVerd[ 1 ] ), aSrc )
                ENDIF
                Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + aVerd[ 1 ] + ;
                   " in " + hFunc[ "name" ] + SrcLine( aSrc, nSiteLn ) + hb_eol() )
@@ -3180,9 +3214,6 @@ STATIC FUNCTION TakeJsonFlag( aArgs )
 
    RETURN aOut
 
-STATIC FUNCTION IsJson()
-   RETURN s_lJson
-
 // O CANAL HUMANO. Sob `--json` ele CALA: a regra é "um envelope em stdout, e
 // nada mais ali" - prosa misturada ao JSON quebra qualquer parser. O humano
 // não perde nada, porque sem `--json` nada muda.
@@ -3520,6 +3551,7 @@ STATIC FUNCTION RenameLocal( aArgs )
 
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
+      DiagRuleWrites( hAst, cOld, hProj )
       RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
@@ -3527,6 +3559,7 @@ STATIC FUNCTION RenameLocal( aArgs )
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
+         DiagRuleWrites( hAst, cOld, hProj )
          RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback", ;
                         RSN_VERIFY_FAILED )
       ENDIF
@@ -7593,6 +7626,40 @@ STATIC FUNCTION RuleSrc( hProj, cFile )
       hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) ) )
 
    RETURN s_hRuleSrc[ cFile ]
+
+// P25: the refusal that TELLS what the tool already knows.
+//
+// Renaming a LOCAL that a directive also writes - a rule whose RESULT spells
+// the variable, so the header keeps the old name after the module is edited -
+// is refused by verification, rightly. But all the programmer saw was "the
+// pcode changed", while the cause is one `usages` away. This is not a new
+// fact: it is a fact NOT TOLD.
+//
+// Reuses the SAME extraction `usages` does (RuleSiteHits), so that "where does
+// a rule write this name?" never has two answers.
+STATIC PROCEDURE DiagRuleWrites( hAst, cName, hProj )
+
+   LOCAL aLoc := {}, aSeen := {}, aL
+
+   IF hAst == NIL .OR. cName == NIL
+      RETURN
+   ENDIF
+   IF RuleSiteHits( hAst, Upper( cName ), aSeen, aLoc, hProj ) == 0
+      RETURN
+   ENDIF
+
+   FOR EACH aL IN aLoc
+      // LspLoc, like EVERY location in the envelope - the consumer decodes ONE
+      // shape. Inventing another one here made the consumer pay for our haste
+      // (caught by the hand-written expectation, 2026-08-07)
+      Diag( "name-also-written-by-directive", ;
+            "'" + cName + "' is also written by a preprocessor rule at " + ;
+            aL[ 1 ] + ":" + hb_ntos( aL[ 2 ] ) + ":" + hb_ntos( aL[ 3 ] + 1 ) + ;
+            " (" + aL[ 5 ] + ") - the rename cannot succeed while the two disagree", ;
+            LspLoc( aL[ 1 ], aL[ 2 ], aL[ 3 ] + 1, hb_BLen( cName ) ) )
+   NEXT
+
+   RETURN
 
 STATIC FUNCTION RuleSiteHits( hAst, cUp, aRuleSeen, aLoc, hProj )
 

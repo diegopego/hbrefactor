@@ -1135,7 +1135,118 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P24 — o sítio que veio de DIRETIVA não tem onde ser apontado, e são 40% deles *(aberto 2026-07-28; **A FAZER — `ast-22`; autorizada pelo Diego em 2026-07-27**)*
+### P26 — `text` e `range` do mesmo sítio NÃO COMPÕEM *(aberto 2026-08-07; **A RESOLVER**)*
+
+**Achado ao reescrever um caso para falar em CÓDIGO em vez de número mágico** (ordem do
+Diego, 2026-08-07: *"tudo em um teste deveria estar claro usando código"*). A asserção
+passou a recortar a palavra pelo `range` — e o recorte veio errado.
+
+**O fato, medido** (`usages nAcc --json`, fixture `usages-site-from-include`):
+
+| sítio | `text` que o envelope traz | `text[start:end]` | linha real do arquivo `[start:end]` |
+|---|---|---|---|
+| `declaration (local)` | `LOCAL nAcc := 0` | `c :=` | `nAcc` |
+| `use (local)` | `CMD_SOMA 5` | *fora do texto* | `CMD_SOMA` |
+| `read (local)` | `? nAcc` | *fora do texto* | `nAcc` |
+
+O `range` é **absoluto no arquivo** (correto — é a posição de edição). O `text` vem
+**sem os espaços da esquerda**. Um consumidor que use os dois juntos — que é exatamente
+o que uma IDE faz ao destacar o trecho dentro do preview — pinta os caracteres errados,
+ou estoura o fim da string.
+
+**Por que nenhum teste pegava:** todos comparavam número contra número (`col == 3`) e
+`text` contra `text`. Nenhum compunha os dois. A régua que isto deixa é a do §3 levada a
+sério — asserção que fala em CÓDIGO (*"aponta a palavra `CMD_SOMA`"*) exercita a relação
+entre os campos; asserção que fala em número exercita cada campo isolado.
+
+**A decisão é do Diego, e não é óbvia:**
+- **(a) `text` passa a ser a linha CRUA.** Os dois campos compõem, e o consumidor recorta.
+  Custo: muda o `text` de todo sítio indentado — muitos `outputs.json` e a prosa.
+- **(b) `text` continua aparado e o contrato DECLARA que ele é só para leitura humana**,
+  nunca base de coordenada. Custo zero em código, mas o consumidor tem de reabrir o
+  arquivo para destacar — que é o trabalho que o campo existe para poupar.
+
+Recomendo **(a)**: o campo nasceu para a IDE e o agente decidirem sem reabrir o arquivo,
+e aparado ele não serve para isso. Mas é mudança de contrato publicado.
+
+**Contorno em vigor:** `Projeto.Linha()` na suíte ancora a asserção no ARQUIVO, que é a
+verdade que o editor do usuário vê.
+
+### P25 — a recusa não conta o que a ferramenta JÁ SABE *(aberto 2026-08-07; **EM CURSO**)*
+
+**O sintoma, medido.** Um `LOCAL nLinhas` no `.prg` e um `#xcommand LOG <cMsg> => nLinhas
++= 1` num header. O programador vê a declaração, renomeia — é a refatoração mais natural
+que existe, e nada no `.prg` lhe diz que um header também escreve aquele nome. A
+ferramenta edita os tokens do módulo, recompila, o pcode muda, e reverte. Certo. Só que o
+que ele recebe é:
+
+```
+status   refused
+reason   verification-failed-rolled-back
+detail   verification FAILED: app.hrb changed - rollback
+diagnostics: []
+```
+
+**O `diagnostics` VAZIO é a lacuna.** A causa está a um comando de distância — o `usages`
+do mesmo nome lista `log.ch:1:34` e `log.ch:2:45`, *"in rule result (#xcommand LOG)"* —,
+mas a recusa não a menciona, e o programador não tem como saber que existe essa pergunta
+a fazer. Ele conclui *"a ferramenta não conseguiu"*, quando o certo é *"o nome também é
+escrito ali, e é isso que precisa mudar junto"*.
+
+**Não é fato novo: é FATO NÃO CONTADO.** `RuleSiteHits()` já extrai exatamente essas
+ocorrências (lado `match` e lado `result` de `ppRules`), e é o que o `usages` usa. Falta
+chamá-la no caminho da recusa e emitir o resultado como `diagnostics[]`.
+
+**Por que agora, e por que importa mais para o agente:** o §1.6 diz que a recusa tem de
+ser legível para o agente **RELATAR**, não contornar — e uma recusa que não nomeia a causa
+empurra o LLM de volta para a substituição de texto, que é o modo de falha que esta
+ferramenta existe para eliminar.
+
+**Escopo**
+- Helper `DiagRuleWrites( hAst, cName, hProj )`: reusa `RuleSiteHits()` e emite um
+  `diagnostics[]` por ocorrência, com `location` (arquivo, linha, coluna) e o código
+  `name-also-written-by-directive`.
+- Chamado quando um `rename` **recusa por verificação/compilação** e o nome tem
+  ocorrência em regra. Só na recusa: no sucesso seria ruído.
+- **Não muda o veredito** — a recusa continua sendo a mesma, pelo mesmo motivo. Muda só
+  o que ela CONTA.
+
+**Critério de pronto (mecânico)**: caso na suíte com `#xcommand` escrevendo um local, o
+rename recusando com `diagnostics[]` **não vazio** apontando o `.ch` com linha e coluna;
+o `reason` e o `exit` **inalterados**; `make test` verde.
+
+**Fora de escopo:** renomear o nome escrito no RESULTADO da regra (fazer o rename
+funcionar nesse caso). O `rename-dsl` cobre o lado do CASAMENTO — cabeça, palavra-chave
+secundária, restrição — e recusa o resto com motivo próprio (*"is not a match word of any
+project pp rule"*). Ampliar isso é outra fase, e não foi pedida.
+
+### P24 — o sítio que veio de DIRETIVA não tem onde ser apontado, e são 40% deles *(aberto 2026-07-28; **✅ ENTREGUE 2026-08-07, `ast-23`**)*
+
+**O que foi entregue.** O token que uma regra escreve **plainly no seu resultado** (o
+`nAcc` de `#xcommand CMD_SOMA <v> => nAcc += <v>`) não vinha de marcador nenhum, então
+nunca teve `from`-item — e ficava sem qualquer ligação com a diretiva que o escreveu. O
+pp passa a estampá-lo com o índice da aplicação corrente, e o dump publica isso em dois
+lugares: no token (`app`) e **no próprio sítio**, que é o que o consumidor precisa (o
+sítio não expõe qual token é).
+
+A ordem já era favorável e foi verificada, não suposta: `hb_pp_patternReplace()` chama
+`hb_pp_trackApply()` **antes** de expandir o resultado, então `iDrvApp` na hora do clone
+é o **desta** aplicação.
+
+Sítio sem `col` mas com `app` passa a sair na posição da **cabeça da aplicação**
+(`ppApplications[app].tokens[0]`, que já trazia linha/coluna/tamanho) — o lugar que o
+programador de fato editaria. Na ferramenta, os três laços passaram a usar **um helper
+só** (`SitePos()`), que era dívida da P21.
+
+**Régua mantida:** o índice vem do core, nunca *"a aplicação que está na mesma linha"* —
+duas diretivas numa linha tornariam isso adivinhação.
+
+**Impacto zero conferido:** a estampa é guardada por `fTrackPos`, que só liga sob `-x`
+(`cmdcheck.c`). `make pcode-identity`: **889/889 `.hrb` byte-idênticos, 0 divergentes**.
+
+**Nota de numeração:** esta fase reservava o `ast-22`, consumido pela fase X (procedência
+de ARQUIVO) que entregou antes. São eixos diferentes: a X pergunta *se um dump ainda
+corresponde ao fonte*; a P24, *que diretiva escreveu este nome*.
 
 **O que falta.** Um sítio cujo nome foi escrito num `.ch` sai sem posição: o token
 tem `prov:"i"`, e `hb_compAstToken()` faz `if( ! fMain ) iCol = -1` — a coluna de
@@ -1164,7 +1275,9 @@ descobri-lo.
   (`hb_pp_tokenAppGet`), seguindo §1.2: **NUNCA mudar a saída de um comando/consulta
   existente**, sempre um canal novo.
 - **compast**: publicar `"app": N` no token do canal `tokens[]`. Schema
-  `ast-21 → ast-22`. Nada muda em `col`/`tokLine`: sítio sem token no módulo continua
+  `ast-22 → ast-23` — **o `ast-22` foi consumido pela fase X** (procedência de ARQUIVO),
+  que entregou primeiro; são eixos diferentes e não se bloqueiam.
+  Nada muda em `col`/`tokLine`: sítio sem token no módulo continua
   sem posição, e é o consumidor que decide o que mostrar.
 - **ferramenta**: sítio sem `col` cujo token tem `app` sai na posição da CABEÇA da
   aplicação (`ppApplications[app].tokens[0]`, que já traz `line`/`col`/`len`) — o
@@ -1263,7 +1376,7 @@ artefato de operação do pp, e o token comum copiado do resultado da regra não
 nenhum. O fato está em `pState->iDrvApp`, a uma estampa de distância.
 **DECIDIDO — abrir a fase agora**: virou a
 **[P24](#p24--o-sítio-que-veio-de-diretiva-não-tem-onde-ser-apontado-e-são-40-deles)**
-(`ast-22`), com escopo e critério escritos. `usages-site-from-include` fica vermelho
+(`ast-23`), com escopo e critério escritos. `usages-site-from-include` fica vermelho
 até lá, e é o único vermelho da P21.
 
 **Achado na revisão do próprio intervalo da P20.** A entrega dela reconstrói a coluna
