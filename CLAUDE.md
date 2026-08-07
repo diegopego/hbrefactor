@@ -217,6 +217,16 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
    FATO verificável, senão os cinco porquês viram cinco palpites empilhados, que é pior que
    nenhum (§1.7.3: o dump manda, não a dedução). Se a raiz for "não medi", a resposta não é
    escrever melhor — é **medir** (item 4 acima).
+7. **"EU RODEI E PASSA" × "O TESTE REPROVA" → a primeira pergunta é sobre o INSTRUMENTO**
+   *(2026-08-07)*. Antes de duvidar do dado, duvide de estar rodando o mesmo programa:
+   `type -a <cmd>`. Neste ambiente o `grep` do shell interativo é uma **função** que delega
+   para o `ugrep`, e o `make test` chama o `/usr/bin/grep` — os dois discordam em `-w` sobre
+   acento, e eu relatei **seis medições seguidas** dizendo que a régua estava limpa enquanto
+   o teste dizia o contrário. Vale para tudo que o shell intercepta (função, alias, wrapper,
+   PATH), e **vale em dobro quando o meu resultado é o cômodo**: ali cada medição "limpa" me
+   dizia que o problema era do teste. É prima da §1.3e com uma torção — não houve silêncio,
+   houve resposta clara e errada, e o controle que faltava não era sobre o alvo, era sobre o
+   instrumento. *([cic §5.1c])*
 
 ---
 

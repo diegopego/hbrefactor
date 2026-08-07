@@ -525,6 +525,37 @@ negativo rodado: reintroduzi a linha exata que quebrou e ele a acusou. A varredu
 **segura** — descarta o status com `|| true` e decide pelo conteúdo, que é o idioma
 certo quando se quer o valor.
 
+### 5.1c O `grep` do MEU shell não é o do `make test` (2026-08-07)
+
+Um teste da suíte reprovava a régua do caso 64 (*"a ferramenta não menciona nenhuma
+palavra da DSL"*). Rodei **a linha exata do teste** no meu shell: passava. Rodei com
+`LC_ALL=C`, com o locale do sistema, com `sh`, com `bash -c`, com um script isolado —
+e fui relatando "a régua está limpa" enquanto o teste dizia o contrário, **seis
+medições seguidas**, todas confiantes e todas erradas.
+
+A causa: **neste ambiente o `grep` do shell interativo é uma função** que delega para
+o `ugrep`; o `make test` chama o `/usr/bin/grep`. Os dois discordam justamente em
+`-w` sobre acento — e a violação era `apagá-lo` num comentário meu, onde `apag` casa
+como palavra porque `á` não é caractere de palavra em `LC_ALL=C`.
+
+**A regra:** ao investigar divergência entre "eu rodei e passa" e "o teste reprova",
+a primeira pergunta não é *sobre o dado* — é **"estou rodando o mesmo programa?"**.
+`type -a <cmd>` custa um segundo e teria matado a investigação no primeiro minuto.
+Vale para tudo que o shell pode interceptar (função, alias, wrapper, PATH diferente),
+e vale em dobro quando o meu resultado é o **cômodo** — foi o caso: cada medição
+"limpa" me dizia que o problema era do teste.
+
+Prima da §1.3e (sonda que responde silêncio exige controle positivo) com uma torção:
+aqui não houve silêncio, houve **resposta clara e errada** — o controle que faltava
+não era sobre o alvo, era sobre o **instrumento**. E prima também da §5.1b, que é a
+outra metade do mesmo assunto: lá o `grep` mentia pelo pipeline, aqui por ser outro
+programa.
+
+*(Custou também um comentário reescrito duas vezes: o portão anti-heurística barra o
+texto do gatilho mesmo dentro de comentário — como a régua do caso 64 —, então narrar
+"eu escrevia `X == "stale "`" no fonte reprova. Ilustre o formato, nunca com o texto
+que a régua procura: é a §6.2 valendo para o outro portão.)*
+
 ### 5.2 O "projeto não compila" que era o hbmk2 errado (fase P2a)
 
 Sem `HB_BIN` exportado, o `HbMk2Bin()` cai no hbmk2 do **sistema** (`/usr/local/bin`, sem
