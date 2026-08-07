@@ -1135,7 +1135,7 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P26 — `text` e `range` do mesmo sítio NÃO COMPÕEM *(aberto 2026-08-07; **A RESOLVER**)*
+### P26 — `text` e `range` do mesmo sítio NÃO COMPÕEM *(aberto 2026-08-07; **✅ ENTREGUE 2026-08-07**)*
 
 **Achado ao reescrever um caso para falar em CÓDIGO em vez de número mágico** (ordem do
 Diego, 2026-08-07: *"tudo em um teste deveria estar claro usando código"*). A asserção
@@ -1169,8 +1169,41 @@ entre os campos; asserção que fala em número exercita cada campo isolado.
 Recomendo **(a)**: o campo nasceu para a IDE e o agente decidirem sem reabrir o arquivo,
 e aparado ele não serve para isso. Mas é mudança de contrato publicado.
 
-**Contorno em vigor:** `Projeto.Linha()` na suíte ancora a asserção no ARQUIVO, que é a
-verdade que o editor do usuário vê.
+**ENTREGUE — saída (a), com o alcance CORTADO por um fato do próprio roadmap.**
+
+`SrcText()` deixou de aparar: o `text` do envelope é a linha **verbatim**, e
+`text[start:end]` volta a recortar a palavra. `SrcLine()` (prosa) apara por conta própria,
+então a prosa não mudou uma vírgula.
+
+**O que a exploração derrubou, e vale mais que a entrega:**
+
+- *"uma IDE pinta `text[start:end]`"* — **FALSO** para o consumidor real deste repo. A
+  extensão VSCode monta `vscode.Location(uri, range.start)` e deixa o editor abrir o
+  arquivo; ela **nunca lê `text`**. O exemplo que sustentava o argumento era um consumidor
+  inventado.
+- *"38 expectativas mudariam"* e *"o legado não assere o preview"* — **ERRADOS**, medidos
+  aplicando de verdade: tirar o aparo dos dois canais dava **67** falhas no legado.
+- **O argumento que sobreviveu não é meu**: a [spec-a § 2.5.0](spec-a-oraculo-para-agentes.md)
+  diz que um consumidor de máquina que precise **reabrir o arquivo** reprova o critério da
+  §4. Com o `text` aparado, é exatamente o que ele precisa fazer para saber quais
+  caracteres o sítio cobre. A IDE não sofre porque o editor abre o arquivo por ela; o
+  agente sofre.
+
+**Delimitador: BOA IDEIA, LUGAR ERRADO** *(Diego propôs `<text>` ou `` `text` ``)*. Medido
+nas fixtures: `<` aparece 53 vezes e `>` 72 (a DSL usa `<v>` o tempo todo); backtick, zero.
+Então seria backtick. Mas **dentro do valor JSON ele desloca todos os índices em 1 e desfaz
+o conserto** — a string JSON já é delimitada por aspas. O delimitador pertence a quem
+RENDERIZA (extensão, MCP), não ao dado.
+
+**E a prosa não ganhou delimitador porque ela vai MORRER** *(Diego, e confirmado na
+[A.1 passo 3](#a1--contrato-de-máquina-na-cli): "a prosa é arrasto → deletada; a flag
+`--json` some")*. Enclausurar a prosa custaria **72 asserções do legado** para decorar um
+canal condenado. O corte veio do roadmap, não de estimativa minha.
+
+**Custo real:** 2 linhas de fonte, 7 `text` em 3 casos do casedir, 25 em 7 casos da suíte
+Go — **todos derivados do FONTE** de cada caso (a linha verbatim *é* a linha do arquivo),
+nunca gravados de execução. Um caso (`usages-continued-statement`) comparava o preview
+aparado na mão e passou a comparar a linha do arquivo, apontando a palavra.
 
 ### P25 — a recusa não conta o que a ferramenta JÁ SABE *(aberto 2026-08-07; **EM CURSO**)*
 

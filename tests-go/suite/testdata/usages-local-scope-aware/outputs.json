@@ -24,7 +24,7 @@
           "kind": "declaration (local)",
           "owner": "MAIN",
           "certainty": "confirmed",
-          "text": "LOCAL nTotal := 0"
+          "text": "   LOCAL nTotal := 0"
         },
         {
           "uri": "file://<CWD>/a.prg",
@@ -35,7 +35,7 @@
           "kind": "write (local)",
           "owner": "MAIN",
           "certainty": "confirmed",
-          "text": "LOCAL nTotal := 0"
+          "text": "   LOCAL nTotal := 0"
         },
         {
           "uri": "file://<CWD>/a.prg",
@@ -46,7 +46,7 @@
           "kind": "use (detached, codeblock)",
           "owner": "MAIN",
           "certainty": "confirmed",
-          "text": "LOCAL bAcum := {| x | nTotal += x }"
+          "text": "   LOCAL bAcum := {| x | nTotal += x }"
         },
         {
           "uri": "file://<CWD>/a.prg",
@@ -57,7 +57,7 @@
           "kind": "ref (detached, codeblock)",
           "owner": "MAIN",
           "certainty": "confirmed",
-          "text": "LOCAL bAcum := {| x | nTotal += x }"
+          "text": "   LOCAL bAcum := {| x | nTotal += x }"
         },
         {
           "uri": "file://<CWD>/a.prg",
@@ -68,7 +68,7 @@
           "kind": "read (local)",
           "owner": "MAIN",
           "certainty": "confirmed",
-          "text": "? \"Total:\", nTotal   // nTotal no comentario nao deve mudar"
+          "text": "   ? \"Total:\", nTotal   // nTotal no comentario nao deve mudar"
         }
       ]
     },

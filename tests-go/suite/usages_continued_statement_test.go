@@ -19,21 +19,28 @@ func init() {
 	registra("usages-continued-statement", func(t *testing.T, p *Projeto) {
 		env := p.Roda("usages", "c.hbp", "cMsg", "--func", "Main")
 
+		// The statement spans lines 6..8 of the file; `cMsg` is written on the
+		// MIDDLE one. The compiler records the site on the line it was standing
+		// on - the last physical one - so the report has to correct for that,
+		// which is what `tokLine` is for.
+		const escrita = 5 // 0-based, the `cMsg + ;` line
+		linha := p.Linha("c.prg", escrita)
+
 		var achou bool
-		for _, l := range env.Result.Locations {
-			if l.Text != "cMsg + ;" {
+		for i := range env.Result.Locations {
+			l := &env.Result.Locations[i]
+			if l.Range.Start.Line != escrita {
 				continue
 			}
 			achou = true
-			// 0-based: linha 6 do arquivo, coluna 11
-			if l.Range.Start.Line != 5 || l.Range.Start.Character != 11 {
-				t.Errorf("o sítio continuado está em %d:%d, quero 5:11 (0-based) — "+
-					"a linha do statement é a 7, mas o sítio é escrito na 6",
-					l.Range.Start.Line, l.Range.Start.Character)
+			if l.Text != linha {
+				t.Errorf("the site's preview is %q, want the file's own line %q", l.Text, linha)
 			}
+			l.Aponta(t, linha, "cMsg")
 		}
 		if !achou {
-			t.Error("nenhum sítio com o texto da linha continuada — o relato aponta outra linha")
+			t.Errorf("no site on the line the name is written on (%q) - "+
+				"the report points somewhere else", linha)
 		}
 	})
 }

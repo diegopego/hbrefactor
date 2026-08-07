@@ -37,7 +37,7 @@
      "kind": "declaration (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "LOCAL nTotal"
+     "text": "   LOCAL nTotal"
     },
     {
      "uri": "file://<CWD>/p.prg",
@@ -54,7 +54,7 @@
      "kind": "write (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "nTotal := 1"
+     "text": "   nTotal := 1"
     },
     {
      "uri": "file://<CWD>/p.prg",
@@ -71,7 +71,7 @@
      "kind": "read (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "nTotal := nTotal + nTotal"
+     "text": "   nTotal := nTotal + nTotal"
     },
     {
      "uri": "file://<CWD>/p.prg",
@@ -88,7 +88,7 @@
      "kind": "use (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "nTotal := nTotal + nTotal"
+     "text": "   nTotal := nTotal + nTotal"
     },
     {
      "uri": "file://<CWD>/p.prg",
@@ -105,7 +105,7 @@
      "kind": "ref (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "nTotal := nTotal + nTotal"
+     "text": "   nTotal := nTotal + nTotal"
     },
     {
      "uri": "file://<CWD>/p.prg",
@@ -122,7 +122,7 @@
      "kind": "read (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "nTotal := nTotal + nTotal"
+     "text": "   nTotal := nTotal + nTotal"
     },
     {
      "uri": "file://<CWD>/p.prg",
@@ -139,7 +139,7 @@
      "kind": "read (local)",
      "owner": "MAIN",
      "certainty": "confirmed",
-     "text": "? nTotal"
+     "text": "   ? nTotal"
     }
    ]
   },

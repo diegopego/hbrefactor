@@ -60,7 +60,7 @@
         "kind": "application (#command MENUITEM, menu.ch:7)",
         "owner": null,
         "certainty": "confirmed",
-        "text": "MENUITEM \"Abrir\" ACTION AbreCoisa( nTotal ) AT 5, 10"
+        "text": "   MENUITEM \"Abrir\" ACTION AbreCoisa( nTotal ) AT 5, 10"
       },
       {
         "uri": "file://<CWD>/a.prg",
@@ -80,7 +80,7 @@
         "kind": "application (#command MENUITEM, menu.ch:7)",
         "owner": null,
         "certainty": "confirmed",
-        "text": "MENUITEM \"Sair\" ;"
+        "text": "   MENUITEM \"Sair\" ;"
       },
       {
         "uri": "file://<CWD>/menu.ch",
@@ -120,7 +120,7 @@
         "kind": "application (#command MENUITEM, menu.ch:7)",
         "owner": null,
         "certainty": "confirmed",
-        "text": "MENUITEM \"Sub\" ACTION QOut( nQtd ) AT 7, 12"
+        "text": "   MENUITEM \"Sub\" ACTION QOut( nQtd ) AT 7, 12"
       }
     ]
   },

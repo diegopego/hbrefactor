@@ -24,7 +24,7 @@
           "kind": "call",
           "owner": "MAIN",
           "certainty": "confirmed",
-          "text": "Eval( bAcum, Dupla( i ) )"
+          "text": "      Eval( bAcum, Dupla( i ) )"
         },
         {
           "uri": "file://<CWD>/b.prg",

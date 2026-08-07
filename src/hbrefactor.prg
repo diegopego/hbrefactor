@@ -2955,9 +2955,21 @@ STATIC PROCEDURE LocAdd( aLoc, cPath, nLine, aCols, nLen, cKind, cOwner, cCertai
 // arquivo para completar a resposta (reler é DECIDIR, e isso reprova o critério
 // de matar da fase A.3). Diego, 2026-07-24: *"a prosa é apenas um dos argumentos
 // de saída"*.
+// P26: the source line VERBATIM - the envelope's `text` is a machine field.
+//
+// It used to be AllTrim()med, while `range` counts columns of the FILE. A
+// consumer doing the obvious thing, text[start:end], got the wrong characters,
+// always shifted by the indentation - and silently: no error, just the wrong
+// slice. The IDE never noticed because it hands `range` to the editor and lets
+// it open the file; the MACHINE consumer is the one that pays, and reopening
+// the file is exactly what spec-a § 2.5.0 says must not be needed.
+//
+// Trimming is PRESENTATION, and presentation belongs to whoever renders: one
+// call away for a consumer that wants it, impossible to undo for one that
+// wants to compose. SrcLine() (the prose) trims for itself.
 STATIC FUNCTION SrcText( aSrc, nLine )
    RETURN iif( aSrc != NIL .AND. nLine >= 1 .AND. nLine <= Len( aSrc ), ;
-               AllTrim( aSrc[ nLine ] ), NIL )
+               aSrc[ nLine ], NIL )
 
 // a 1a palavra de um rótulo - o SendVerdict devolve "confirmed send (...)",
 // "possible send (...)"; a certeza é a 1a palavra, e vira campo próprio
@@ -3190,7 +3202,7 @@ STATIC FUNCTION SrcLine( aSrc, nLine )
 
    LOCAL cText := SrcText( aSrc, nLine )
 
-   RETURN iif( cText == NIL, "", "  | " + cText )
+   RETURN iif( cText == NIL, "", "  | " + AllTrim( cText ) )
 
 // ---------------------------------------------------------------------------
 // A.1 - o contrato de máquina (spec-a §2.2/2.5). Ver o cabeçalho do arquivo.

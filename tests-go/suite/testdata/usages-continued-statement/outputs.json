@@ -18,19 +18,19 @@
         { "uri": "file://<CWD>/c.prg",
           "range": { "start": { "line": 2, "character": 9 }, "end": { "line": 2, "character": 13 } },
           "kind": "declaration (local)", "owner": "MAIN", "certainty": "confirmed",
-          "text": "LOCAL cMsg := \"abc\"" },
+          "text": "   LOCAL cMsg := \"abc\"" },
         { "uri": "file://<CWD>/c.prg",
           "range": { "start": { "line": 2, "character": 9 }, "end": { "line": 2, "character": 13 } },
           "kind": "write (local)", "owner": "MAIN", "certainty": "confirmed",
-          "text": "LOCAL cMsg := \"abc\"" },
+          "text": "   LOCAL cMsg := \"abc\"" },
         { "uri": "file://<CWD>/c.prg",
           "range": { "start": { "line": 5, "character": 11 }, "end": { "line": 5, "character": 15 } },
           "kind": "read (local)", "owner": "MAIN", "certainty": "confirmed",
-          "text": "cMsg + ;" },
+          "text": "           cMsg + ;" },
         { "uri": "file://<CWD>/c.prg",
           "range": { "start": { "line": 8, "character": 5 }, "end": { "line": 8, "character": 9 } },
           "kind": "read (local)", "owner": "MAIN", "certainty": "confirmed",
-          "text": "? cMsg" }
+          "text": "   ? cMsg" }
       ]
     },
     "edits": []

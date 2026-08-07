@@ -18,11 +18,11 @@
         { "uri": "file://<CWD>/s.prg",
           "range": { "start": { "line": 4, "character": 7 }, "end": { "line": 4, "character": 18 } },
           "kind": "send", "owner": "MAIN", "certainty": "possible",
-          "text": "? o:Description, o:Description" },
+          "text": "   ? o:Description, o:Description" },
         { "uri": "file://<CWD>/s.prg",
           "range": { "start": { "line": 4, "character": 22 }, "end": { "line": 4, "character": 33 } },
           "kind": "send", "owner": "MAIN", "certainty": "possible",
-          "text": "? o:Description, o:Description" }
+          "text": "   ? o:Description, o:Description" }
       ]
     },
     "edits": []

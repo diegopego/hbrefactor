@@ -40,7 +40,7 @@
         "kind": "call",
         "owner": "MAIN",
         "certainty": "confirmed",
-        "text": "nTotal += Dobro( 2 )"
+        "text": "   nTotal += Dobro( 2 )"
       },
       {
         "uri": "file://<CWD>/app.prg",
