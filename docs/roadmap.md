@@ -102,10 +102,10 @@ analisar 31%); `usages` 12-15 s (gerar 35%, ler ~10%, **analisar ~50%**).
    fatos do projeto inteiro a cada comando. O objetivo (*custo proporcional ao que você
    TOCOU*) **não se alcança sem tornar incremental o FATO ANALISADO**, não só o dump.
 
-**FATIA 2 (RE-DESENHADA pela fatia 1) — o FATO ANALISADO por módulo, incremental.** O que
-tem de ser reaproveitado quando um módulo não muda é o **resultado da análise daquele
-módulo** (o que ele define, chama, declara) — o dump vem junto, de graça, pelo mesmo
-critério. **REGRA DO FATO:** é PROIBIDO inventar staleness na ferramenta (mtime é
+**FATIA 2 (RE-DESENHADA pela fatia 1) — o FATO ANALISADO por módulo, incremental.
+ABERTA; a parte do DUMP saiu na W.3, a da ANÁLISE é o que resta.** O que tem de ser
+reaproveitado quando um módulo não muda é o **resultado da análise daquele módulo** (o que
+ele define, chama, declara) — o dump vem junto, de graça, pelo mesmo critério. **REGRA DO FATO:** é PROIBIDO inventar staleness na ferramenta (mtime é
 heurística; include transitivo a quebra). Quem decide o que recompilar é o **`hbmk2 -inc`**
 (sondado 2026-07-13: tocando 1 de 3 módulos, **só o dump dele é regravado**); o fecho
 transitivo de include vem do **`harbour -gd`** (P8).
@@ -150,15 +150,30 @@ agente da fase A), e dump ausente é o que acontece a cada limpeza de temporári
 regrava o dump do dependente e só dele (3/3), porque o hbmk2 chama o `harbour -gd` para
 detectar headers na hora de decidir (`hbmk2.prg`, `_hbmk_...` de detecção de dependências).
 
-**EM ABERTO, e é a pergunta que abre a fatia:** *que fato o CORE pode dar sobre a
-correspondência dump↔fonte?* Explorar ANTES de projetar (§1.1) — e a resposta não pode ser
-staleness inventada aqui. Enquanto não houver esse fato, o `-rebuild` de hoje **fica**.
+**A PERGUNTA QUE ABRIA A FATIA — *que fato o CORE pode dar sobre a correspondência
+dump↔fonte?* — FOI RESPONDIDA** *(2026-08-07)*. Virou a fase
+[X](#x--procedência-do-dump-o-artefato-declara-de-onde-veio) (o dump declara de que
+arquivos foi feito, com identidade de conteúdo) e a
+[W.3](#fase-w3--o--inc--entregue-2026-08-07) (o `harbour --ast-fresh` diz quais dumps ainda
+valem, e o hbrefactor pergunta em vez de comparar). **O `-rebuild` incondicional saiu**: o
+dump agora é reaproveitado quando corresponde, e regerado quando não.
 
-> **A pergunta foi sondada e virou a fase [X — PROCEDÊNCIA DO DUMP](#x--procedência-do-dump-o-artefato-declara-de-onde-veio)**
-> *(2026-08-06)*. Resposta curta da tabela: o core **já sabe** a lista exata de arquivos que
-> compõem cada módulo (`-gd`, com transitivo e respeitando `#ifdef`), e o que falta é o dump
-> **declarar** isso com identidade de conteúdo. Esta fatia depende da X — sem ela, tornar o fato
-> analisado incremental é apostar no relógio.
+**O QUE SOBROU DESTA FATIA — e é a metade cara.** O escopo escrito acima diz que o que se
+reaproveita é *"o resultado da ANÁLISE daquele módulo — o dump vem junto, de graça"*. **A
+W.3 entregou o "de graça", não o principal**: o dump deixou de ser regerado à toa, e o
+ganho medido no corpus foi **~1,6x** (`contrib/xhb`, 42 módulos: `usages` 5,14 s →
+3,25-3,59 s). Isso é exatamente o teto que a fatia 1 previu — geração ~35%, análise ~50% —
+e o objetivo da fase (**custo proporcional ao que se TOCOU**) continua fora de alcance
+enquanto a análise for refeita inteira a cada comando.
+
+**Por onde ela começa agora**, com a dependência já satisfeita:
+- o fato de correspondência **existe e é do core** (`--ast-fresh`): o mesmo veredito que
+  hoje decide reusar um dump pode decidir reusar a análise daquele módulo;
+- falta responder o que a fatia 1 já tinha nomeado como o duro: **o veredito de um send
+  depende do PROJETO, não do módulo**. Uma análise por módulo tem um piso irredutível, e
+  descobrir onde ele está é a primeira sonda — não o mecanismo (§1.7.1);
+- **REGRA DO FATO, inalterada:** é proibido inventar staleness aqui. O que mudou é que
+  agora existe a quem perguntar.
 
 **FATIA 3 — CANCELADA** (era paralelizar o `unused-locals`; o comando SAIU — ver fase L no
 arquivo).
