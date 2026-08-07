@@ -1135,6 +1135,69 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
+### P27 — o nome escrito no RESULTADO de uma regra também se renomeia *(aberto 2026-08-07; **A FAZER**; destravada pela P24)*
+
+**O caso.** Uma diretiva do projeto escreve um nome no código que gera:
+
+```harbour
+// log.ch
+#xcommand LOG <cMsg> => nLinhas += 1 ; OutStd( <cMsg> )
+//                      ^^^^^^^ escrito aqui, e ligado ao LOCAL de quem usa
+```
+
+Renomear a **cabeça** do comando já funciona (`rename-dsl`, B4, verificado rodando).
+Renomear o `nLinhas` do RESULTADO recusa: *"is not a match word of any project pp rule"*.
+São dois lados da mesma regra, e só um é editável.
+
+**Por que agora, e não antes.** A P25 registrou isto como "fora de escopo" com o argumento
+de que um `.ch` pode ser usado por projetos que a ferramenta não vê. **O argumento estava
+errado, e contra a própria lei** *(Diego, 2026-08-07: "quando um desenvolvedor decide
+refatorar um `.ch` em um projeto, a responsabilidade é dele... o hbrefactor lida com o que
+está definido no `.hbp`")*: o §1.2 já diz que o **hbmk2 é a fonte de verdade sobre o que é
+o projeto**, e o `rename-dsl` **já edita `.ch`** — medido, o header foi reescrito. Eu
+argumentei o oposto do que a ferramenta faz.
+
+**E a P24 destravou o fato que faltava:** o sítio agora diz de qual APLICAÇÃO veio, então
+o dump responde *quais locais, de quais módulos, aquela regra liga* — que é exatamente o
+conjunto de edições do rename.
+
+**TABELA DE SONDAS** *(§1.7.1 — medida em 2026-08-07, antes do mecanismo)*
+
+| classe de caso | o que o core/ferramenta responde HOJE | comando |
+|---|---|---|
+| nome no resultado de regra do **PROJETO** | `log.ch:1:34`, `log.ch:2:45`, rótulo `in rule result` | `usages app.hbp nLinhas` |
+| o LOCAL que a regra liga | `use (local)` com **`app`** apontando a aplicação | `harbour -x` + `occurrences[].app` |
+| regra de `.ch` do **CORE** | `ppRules[].file` = caminho ABSOLUTO no `harbour-core/include` (127 regras do `hbclass.ch`, 54 do `hboo.ch`) | dump de um `CREATE CLASS` |
+| regra do projeto | `ppRules[].file` = **relativo** (`log.ch`) | dump do fixture |
+| regra **embutida** no pp (`#command ?`) | `(builtin)` — **sem arquivo, sem linha** | `usages q.hbp QOut` |
+
+**A DECISÃO SOBRE ALCANCE É DO DIEGO, e ele a deu duas vezes** *(2026-08-07: "se o
+programador decidiu mudar uma biblioteca, a responsabilidade é dele. mesmo que o `.ch` seja
+do projeto, ou do harbour")*. Então **não há recusa por dono do arquivo**: se o `.hbp`
+alcança a regra, a ferramenta edita — inclusive um `.ch` do próprio Harbour.
+
+O que a tabela entrega, então, não é veto: é o **fato a RELATAR**. O campo `file` separa
+sozinho os três casos, e o usuário tem de ver em qual está antes de a edição acontecer —
+mexer no `hbclass.ch` altera a instalação, que é compartilhada por todo projeto da máquina e
+não está no git do projeto dele. **`(builtin)` continua fora, e não por política: não existe
+arquivo para editar.**
+
+**Escopo**
+- `rename` a partir de um nome no **resultado** de regra: edita o `.ch` **e** os locais que
+  as aplicações ligam, dentro do `.hbp`. Mesma prova do `rename-dsl`: recompila e compara.
+- **A direção INVERSA no mesmo passo** — renomear o LOCAL e a ferramenta editar o `.ch`
+  junto. Sondado: a ferramenta **já acha** o outro lado (é o que a P25 emite como
+  `diagnostics[]`); falta EDITAR. Hoje ela recusa e reverte, dizendo onde está.
+- **Regra `(builtin)` recusa** — não há arquivo. Código de recusa próprio.
+- **Regra em arquivo FORA da árvore do projeto** (o `hbclass.ch` do Harbour) **é editada**,
+  e a ferramenta **DIZ** que o arquivo é externo e compartilhado, com o caminho. É relato,
+  não veto — o §1 manda relatar o fato e deixar o humano decidir.
+
+**Critério de pronto (mecânico)**: caso com `#xcommand` do projeto — rename a partir do
+`.ch` edita os dois lados e sai `verified`; caso a partir do LOCAL, idem; caso com regra de `.ch`
+do Harbour sendo editada **com o aviso do caminho externo**; caso `(builtin)` recusando com
+código próprio e fontes byte a byte intactos; `make test` verde.
+
 ### P26 — `text` e `range` do mesmo sítio NÃO COMPÕEM *(aberto 2026-08-07; **✅ ENTREGUE 2026-08-07**)*
 
 **Achado ao reescrever um caso para falar em CÓDIGO em vez de número mágico** (ordem do
@@ -1248,10 +1311,10 @@ ferramenta existe para eliminar.
 rename recusando com `diagnostics[]` **não vazio** apontando o `.ch` com linha e coluna;
 o `reason` e o `exit` **inalterados**; `make test` verde.
 
-**Fora de escopo:** renomear o nome escrito no RESULTADO da regra (fazer o rename
-funcionar nesse caso). O `rename-dsl` cobre o lado do CASAMENTO — cabeça, palavra-chave
-secundária, restrição — e recusa o resto com motivo próprio (*"is not a match word of any
-project pp rule"*). Ampliar isso é outra fase, e não foi pedida.
+**Fora de escopo AQUI, e virou a [P27](#p27--o-nome-escrito-no-resultado-de-uma-regra-também-se-renomeia):**
+renomear o nome escrito no RESULTADO da regra. A P25 o deixa VISÍVEL; a P27 o torna
+EDITÁVEL. *(O argumento com que eu descartei a P27 — "um `.ch` pode ser de outro projeto" —
+estava errado e contra o §1.2; ver lá.)*
 
 ### P24 — o sítio que veio de DIRETIVA não tem onde ser apontado, e são 40% deles *(aberto 2026-07-28; **✅ ENTREGUE 2026-08-07, `ast-23`**)*
 

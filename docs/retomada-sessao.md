@@ -35,38 +35,26 @@ hbrefactor reprovando qualquer `Warning`.
 
 ## 2. ⚠️ O QUE AINDA NÃO FECHOU — e é por isto que este arquivo existe
 
-### 2.1 Renomear nome escrito no RESULTADO de uma regra *(DECISÃO: abre fase ou não?)*
+### 2.1 A P27 — renomear o nome escrito no RESULTADO de uma regra
 
-O `rename-dsl` cobre o lado do CASAMENTO (cabeça, palavra secundária, restrição) e recusa
-o resto com motivo próprio — *"is not a match word of any project pp rule"*. Renomear o
-`nAcc` de `=> nAcc += <v>` não é suportado. Levantado em 2026-08-07; o Diego confirmou
-que **renomear o COMANDO já existe** (B4, `rename-dsl`, verificado rodando), então o que
-falta é só este caso estreito. Não virou fase por não ter sido pedido.
+Spec escrita, com a tabela de sondas, na [P27 do roadmap](roadmap.md). **Falta implementar.**
+Ela nasce destravada pela P24 (o sítio diz de qual aplicação veio, então o dump responde
+quais locais de quais módulos a regra liga) e pela P25 (a ferramenta já ACHA o outro lado; a
+P27 a faz EDITAR).
 
-### 2.2 Nenhum `push` foi feito, nos DOIS repos
-
-Tudo local. A frente inteira (P21+P24+P25 e as entregas do core) está só nesta máquina.
-
-### 2.3 O email do autor no core é um PLACEHOLDER
-
-`{ID}+{username}@users.noreply.github.com`, em ~50 commits do branch — não só nos meus.
-Para um branch upstreamável (fase B6) isso não passa, e corrigir significa reescrever a
-autoria de todos eles. **Decisão do Diego.**
-
-### 2.4 O acervo em PORTUGUÊS de código e commit *(DIEGO ASSUMIU)*
-
-A regra mudou em 2026-08-07 (CLAUDE.md §5): **código e commit são inglês**; docs de
-raciocínio seguem em português. Vale daqui pra frente — o acervo antigo o Diego disse que
-trata depois. Arquivo misto durante a transição é esperado.
-*(Os IDENTIFICADORES da infra de teste Go são portugueses — `registra`, `Projeto`,
-`Roda`, `Aponta`. Renomeá-los é refatoração à parte.)*
-
-### 2.5 `make core` ainda leva ~2min30
-
-A janela sem compilador fechou; o custo não. Se incomodar, o caminho seria buildar num
-diretório à parte. Não explorado, e não é urgente.
+**Alcance decidido pelo Diego, duas vezes:** não há recusa por dono do arquivo — se o `.hbp`
+alcança a regra, edita, inclusive `.ch` do próprio Harbour. A responsabilidade é de quem
+refatora. O que a ferramenta deve é **relatar** que o arquivo é externo. `(builtin)` recusa,
+e não por política: não há arquivo.
 
 ---
+
+> **O que estava aqui e NÃO era tarefa** *(limpo em 2026-08-07, depois de o Diego perguntar
+> "não entendo qual é a pendência" em dois itens)*: o `push` (é dele, manual), o email
+> placeholder do core (escolha dele, o GitHub cuida), o acervo em português (ele trata
+> depois) e o tempo do `make core` (observação, ninguém pediu). **Eu havia enchido a lista
+> de pendências com não-tarefas, o que derrota o propósito deste arquivo — não dá para ver o
+> que de fato bloqueia.** Régua: entra no §2 o que ALGUÉM precisa FAZER; o resto é nota.
 
 ## 3. ONDE VOCÊ VAI TROPEÇAR
 
