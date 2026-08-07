@@ -1,0 +1,10 @@
+#line 3 "k.prg"
+PROCEDURE Main()
+
+   LOCAL nAcc := 0
+
+   nAcc += 5
+
+   QOut( nAcc )
+
+   RETURN

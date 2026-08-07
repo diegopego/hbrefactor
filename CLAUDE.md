@@ -284,7 +284,15 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
 
 ## 3. Testes, suíte e corpus
 
-- **Contrato executável: `make test`** — deve permanecer verde. Ele cobre `tests/run.sh`,
+- **Contrato executável: `make test`** — deve permanecer verde.
+  > **EXCEÇÃO VIVA HOJE (Diego, 2026-08-06): há UM vermelho commitado de propósito** —
+  > `usages-site-from-include`, o TDD da P24. O padrão é o TDD ficar FORA do git até a
+  > entrega que o torna verde; aqui a frente ficou parada por tempo indeterminado, e
+  > **untracked morre num `git clean -fdx`** — perder o contrato é pior que um vermelho
+  > CONHECIDO. Ele se identifica na própria saída (`TDD DA P24 — vermelho POR DESENHO`).
+  > **Não ajuste o esperado dele para passar**; ele some quando a P24 entregar.
+  > Qualquer OUTRO vermelho é regressão. Detalhes:
+  > [`docs/retomada-posicao-do-sitio.md`](docs/retomada-posicao-do-sitio.md). Ele cobre `tests/run.sh`,
   `govet`, **`lexdiff`**, **`site-check`** e `gotest`, nesta ordem. *(Os dois do meio
   entraram em 2026-07-27: ao remover um comportamento eu enumerei os testes afetados
   rodando `make test`, reportei três, e **faltava um quarto** — o exemplo da landing page

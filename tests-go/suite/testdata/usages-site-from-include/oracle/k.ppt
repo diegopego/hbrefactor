@@ -1,0 +1,4 @@
+k.prg(7) >CMD_SOMA 5<
+#xcommand >nAcc += 5<
+k.prg(9) >? nAcc<
+#command >QOut( nAcc )<

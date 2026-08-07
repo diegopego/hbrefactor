@@ -16,34 +16,50 @@ UMA linha de trabalho e some quando ela fechar.
 
 ## 1. O ESTADO EXATO
 
-**Tudo desta frente está COMMITADO.** Nada em risco no working tree.
+**Tudo desta frente está COMMITADO** — inclusive o TDD vermelho da P24 (§2). Nada em
+risco no working tree.
 
 | repo | commits desta frente |
 |---|---|
 | hbrefactor | `4a70134` a entrega da P21 · `8c07fe6` o CHANGELOG · `b1a825e` os dois toolchains + portão do pipefail · `d18456d` o build limpo sem janela |
 | harbour-core | `c37f8b7c93` `ast-21` · `b7c1aa979a` o `NEWS.md` · `5f827665bd` a página aos mantenedores |
 
-`make test` no HEAD: **verde** (1001/0, `lexdiff` 100/0, Go completo) desde que o
-vermelho de TDD da §2 esteja fora.
+`make test` no HEAD: **um vermelho, o da §2, e mais nenhum** — legado 1001/0,
+`lexdiff` 100/0, o resto da suíte Go verde.
 
 **Nada foi enviado (`push`).** Os dois repos estão só locais.
 
 ---
 
-## 2. O ÚNICO ARTEFATO FORA DO GIT — e ele é o próximo passo
+## 2. ⚠️ O HEAD ESTÁ VERMELHO, E É DE PROPÓSITO
 
 ```
-tests-go/suite/usages_site_from_include_test.go
+tests-go/suite/usages_site_from_include_test.go     ← 1 caso falhando
 tests-go/suite/testdata/usages-site-from-include/
 ```
 
-É o **TDD vermelho da P24**, escrito à mão ANTES do conserto, que é o método deste repo
-(§3: o esperado se escreve, nunca se grava). Ele fica untracked de propósito — a §3 quer
-o HEAD verde, e ele entra com a entrega que o torna verde.
+`make test` **falha**, e a falha é o contrato da P24: o TDD escrito à mão ANTES do
+conserto, que é o método deste repo (§3: o esperado se escreve, nunca se grava de uma
+execução).
 
-> ⚠️ **Untracked morre num `git clean -fdx`.** Se esta frente for ficar parada por muito
-> tempo, vale decidir entre (a) deixá-lo assim e não rodar `git clean`, ou (b) commitá-lo
-> aceitando um HEAD vermelho até a P24 fechar. Hoje está em (a).
+**Decisão do Diego (2026-08-06), e ela inverte o default da §3:** *"acho que é melhor
+commit mesmo em vermelho, pois a outra sessão pode demorar"*. O padrão é o TDD ficar
+fora do git até a entrega que o torna verde — mas **untracked morre num
+`git clean -fdx`**, e com a frente parada por tempo indeterminado o risco de PERDER o
+contrato é pior que um HEAD vermelho **conhecido**. Vermelho se vê; arquivo apagado, não.
+
+Para o vermelho não virar ruído que alguém "conserta" por engano, ele se identifica na
+própria saída:
+
+```
+usages_site_from_include_test.go:41: TDD DA P24 — vermelho POR DESENHO,
+                                     ver docs/retomada-posicao-do-sitio.md
+```
+
+**Não ajuste o esperado para passar** — ele É o contrato. Ele some quando a P24 entregar.
+
+**Enquanto isso, `make test` verde se lê assim:** tudo passa menos
+`TestCasos/usages-site-from-include`. Qualquer outro vermelho é regressão de verdade.
 
 O que ele cobra, e que é o contrato da P24:
 
