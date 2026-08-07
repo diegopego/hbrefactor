@@ -13,6 +13,11 @@
 //
 // A primeira encarnação (sobre .occ.json) está em smoketest/ como referência.
 
+// o header do CORE, não constantes copiadas: FO_* e HB_FLX_* do lock de projeto
+// (W.2) valem o que o Harbour disser que valem. Copiar `0x0000`/`0x0100` para cá
+// seria constante mágica de gramática alheia - §1.2 gatilho 2
+#include "fileio.ch"
+
 #define APP_VERSION "0.5.0"
 
 #define EXIT_OK       0
@@ -111,6 +116,22 @@
 // seção descreve; virou #define ao migrar o caso que o exercita (2026-07-27)
 #define RSN_TEXTUAL_FORCE "textual-refs-require-force"
 
+// W.2: outro processo está refatorando ESTE projeto agora. É a única recusa que
+// não é sobre o pedido nem sobre o projeto - o pedido continua válido, só chegou
+// junto com outro. Por isso ela tem ação PRÓPRIA: nem `stop-and-report` (não há
+// o que contar ao humano) nem `ask-human-then-retry` (não falta consentimento) -
+// é REPETIR, sozinho, daqui a pouco. Sem este par, a corrida chegava ao agente
+// como `unclassified` + `stop-and-report`, e ele parava um trabalho que bastava
+// refazer. (Medido antes do lock: 5 de 12 pares de renames simultâneos no mesmo
+// arquivo perdiam uma das refatorações, sempre com esse envelope enganoso.)
+#define RSN_PROJECT_BUSY "project-busy-another-process"
+#define ACT_RETRY_LATER  "retry-later"
+
+// teto da espera pelo lock. Não é "quanto um comando demora" (isso varia com o
+// projeto): é quanto vale a pena esperar antes de devolver o controle ao
+// chamador com uma recusa que ele SABE repetir
+#define LOCK_WAIT_MS 30000
+
 // sentinela do result das regras-sonda do pp VIVO (ver PpHeadHit)
 #define PP_PROBE_HIT "__HBREF_PP_HIT__"
 
@@ -145,6 +166,7 @@ PROCEDURE Main()
 
    LOCAL aArgs := hb_AParams()
    LOCAL nExit
+   LOCAL pLock := NIL
 
    // A.1: `--json` é flag GLOBAL, retirada antes do despacho - cada comando
    // segue vendo os seus próprios argumentos, sem saber do modo de máquina
@@ -152,7 +174,20 @@ PROCEDURE Main()
    aArgs := TakeJsonFlag( aArgs )
    s_cCmd := iif( Empty( aArgs ), "", Lower( aArgs[ 1 ] ) )   // guarda de acesso, não gramática
 
+   // W.2: o lock fica AQUI, no funil, e não dentro de cada verbo - um verbo novo
+   // que escreva nasce protegido por estar na lista, e não por alguém lembrar de
+   // chamar. Cobre o comando INTEIRO (analisar -> editar -> verificar ->
+   // rollback), porque é a janela toda que tem de ser atômica para o chamador:
+   // proteger só o trecho que edita deixaria o "antes" de um ser o meio do outro.
+   IF VerboEscreve( s_cCmd ) .AND. Len( aArgs ) >= 2 .AND. ;
+      ! ProjLock( aArgs[ 2 ], @pLock )
+      nExit := Refuse( "another process is refactoring '" + aArgs[ 2 ] + ;
+                       "' - waited " + hb_ntos( LOCK_WAIT_MS / 1000 ) + "s", ;
+                       RSN_PROJECT_BUSY, ACT_RETRY_LATER )
+   ENDIF
+
    DO CASE
+   CASE nExit != NIL            // já resolvido antes do despacho (recusa do lock)
    CASE Len( aArgs ) >= 1 .AND. Lower( aArgs[ 1 ] ) == "rename"
       // verbo unificado (fase U): o KIND vem do FATO sob o cursor, não do
       // sufixo do comando - despacha para o rename-* específico por dentro
@@ -196,6 +231,8 @@ PROCEDURE Main()
       Usage()
       nExit := EXIT_USAGE
    ENDCASE
+
+   ProjUnlock( pLock )          // W.2: sempre, inclusive em recusa e em usage
 
    // PORTÃO do contrato de máquina: sob `--json`, sair SEM envelope é o pior
    // modo de falha possível - stdout vazio com exit 0 é indistinguível de
@@ -1163,6 +1200,87 @@ STATIC FUNCTION SnapDir( cSpec )
    hb_DirBuild( cBase )
 
    RETURN hb_DirSepAdd( cBase ) + hb_MD5( hb_DirSepAdd( hb_cwd() ) + cSpec )
+
+// ---------------------------------------------------------------------------
+// W.2 - LOCK POR PROJETO. O mecanismo é do CORE, não nosso: `hb_vfLock` sobre um
+// arquivo (`src/rtl/vfile.c`), que é lock de região do SO - morre com o processo,
+// então não existe lock órfão para limpar. O core ainda documenta o uso vivo em
+// `tests/flock.prg`. Nada de sentinela caseira: arquivo-PID, diretório-como-mutex
+// e afins sobrevivem a `kill -9`, que é o modo de falha que nos importa.
+//
+// A CHAVE É A MESMA DO SnapDir (caminho canônico + spec) e pela mesma razão -
+// ver a cicatriz lá: dois projetos homônimos em diretórios diferentes NÃO podem
+// compartilhar chave. Aqui o dano seria simétrico: bloquear quem não disputa
+// nada, ou deixar passar quem disputa.
+// ---------------------------------------------------------------------------
+
+STATIC FUNCTION LockPath( cSpec )
+
+   LOCAL cBase := WorkRoot() + "lock"
+
+   hb_DirBuild( cBase )
+
+   RETURN hb_DirSepAdd( cBase ) + hb_MD5( hb_DirSepAdd( hb_cwd() ) + cSpec ) + ".lock"
+
+// pega o lock EXCLUSIVO do projeto; .F. só quando estourou o teto de espera.
+// pFile sai por referência para o ProjUnlock.
+//
+// Espera por SONDAGEM (NO_WAIT + hb_idleSleep) em vez de `HB_FLX_WAIT`: o WAIT
+// do core bloqueia sem limite - medido, um processo esperou os 1,6 s inteiros do
+// outro sem chance de desistir -, e espera sem teto é indistinguível de travado
+// para quem chamou. Com teto, a recusa tem código e o chamador decide.
+//
+// Não conseguir ABRIR o arquivo (TMPDIR read-only, disco cheio) NÃO impede o
+// trabalho: segue sem lock, avisando. O pior caso disso é exatamente o
+// comportamento de antes desta fatia - e esse comportamento é seguro por outro
+// motivo (a edição é fail-closed: o texto que não confere derruba o comando e
+// devolve o fonte byte a byte). Recusar aqui seria trocar um risco de corrida
+// por uma parada certa.
+STATIC FUNCTION ProjLock( cSpec, pFile )
+
+   LOCAL nFim
+
+   pFile := hb_vfOpen( LockPath( cSpec ), FO_READWRITE + FO_CREAT )
+   IF pFile == NIL
+      Diag( "lock-unavailable", "could not open the project lock file - " + ;
+            "running without it; concurrent refactorings of this project may " + ;
+            "refuse and roll back", NIL )
+      RETURN .T.
+   ENDIF
+
+   nFim := hb_MilliSeconds() + LOCK_WAIT_MS
+   DO WHILE .T.
+      IF hb_vfLock( pFile, 0, 1, HB_FLX_EXCLUSIVE )
+         RETURN .T.
+      ENDIF
+      IF hb_MilliSeconds() >= nFim
+         EXIT
+      ENDIF
+      hb_idleSleep( 0.05 )
+   ENDDO
+
+   hb_vfClose( pFile )
+   pFile := NIL
+
+   RETURN .F.
+
+STATIC FUNCTION ProjUnlock( pFile )
+
+   IF pFile != NIL
+      hb_vfUnlock( pFile, 0, 1 )
+      hb_vfClose( pFile )
+   ENDIF
+
+   RETURN NIL
+
+// o verbo ESCREVE no projeto do usuário? Só esses disputam - os de leitura
+// convivem sem se atrapalhar (medido: 18 comandos de leitura simultâneos, zero
+// falhas, depois que a W.1 deu workdir próprio a cada invocação). Lista
+// explícita, nunca prefixo: `$` casaria `rename` dentro de qualquer coisa.
+STATIC FUNCTION VerboEscreve( cCmd )
+
+   RETURN hb_AScan( { "rename", "reorder-params", "extract-function", ;
+                      "inline-local", "annotate", "verify" }, cCmd,,, .T. ) > 0
 
 // os fatos do .hrb de um módulo: o hash do objeto inteiro decide
 // preserved/changed; os símbolos e o pcode POR FUNÇÃO dão o delta
