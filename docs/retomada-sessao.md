@@ -25,11 +25,18 @@ conversa")*. Não some quando a frente principal entrega — some quando o §2 e
 | **P24** `ast-23` | o sítio vindo de diretiva aponta a aplicação dela (40% dos sítios) |
 | **P25** | a recusa CONTA a causa: `diagnostics[]` nomeia o `.ch` que escreve o nome |
 | **P26** | o `text` do envelope é VERBATIM — `text[start:end]` volta a recortar a palavra |
+| **P27** *(commit `3ad98db`)* | o nome escrito no RESULTADO de uma regra se renomeia, pelas duas pontas |
+| **P28 fatia 1** *(mesmo commit)* | recusa de `static`/`memvar` diz qual `.ch` escreve o nome |
 
 Mais: os dois toolchains viraram dependência do projeto (`make stock`,
 `make pcode-identity`), o build limpo do core parou de deixar a árvore sem compilador,
 e nasceram três portões — `tests-go/shell` (pipefail), `stock-check`, e o build do
 hbrefactor reprovando qualquer `Warning`.
+
+**E TRÊS portões MORRERAM na P27, cada um medido antes** *(registro completo na P27 do
+roadmap)*: o `--edit-rules`, o veto por dono do arquivo (`ProjectOwnsFile` nos caminhos de
+edição de diretiva) e a regra 2 do hook anti-heurística. Os dois primeiros cobravam pedágio
+sem fato atrás; o terceiro acusava 54 linhas do fonte e nenhuma era heurística.
 
 ---
 
@@ -65,6 +72,18 @@ propor mecanismo é preciso **medir** se aquele alcance continua valendo com as 
 `.ch` dentro do conjunto. *(A suspeita do Diego de que "cada caso tem uma complexidade" se
 confirma AQUI — e não por falta de prova, como eu tinha escrito, mas porque o verbo faz
 muito mais coisa.)*
+
+### 2.2 Duas dívidas que a P27 abriu e não fechou
+
+- **O hook anti-heurística não tem teste.** Ele é um portão que ninguém verifica, e a P27
+  mexeu nele (apagou a regra 2). Eu propus escrever o teste; o Diego autorizou só o apagar.
+  Fica: um diff com a aritmética de abreviação tem de BARRAR, um com `Len( aArgs ) < 6` tem
+  de PASSAR.
+- **O ponteiro de baseline do `CHANGELOG.md` está parado em `e3efe33`**, com 13 commits
+  depois dele — e há entradas de 2026-08-07 que parecem descrever parte deles. Ou o ponteiro
+  ficou para trás, ou as entradas foram escritas sem movê-lo. **Não mexi**: mover sem saber
+  o que ele já cobre quebra a retomada, que é justamente o que ele existe para dar. Conferir
+  antes de escrever a próxima entrada.
 
 ---
 
