@@ -1260,8 +1260,10 @@ o motor da P27/P28 usa) e no caso da diretiva prendendo as duas.
 >   `rename-static-function-beside-module-homonym`).
 > - Citação sem aplicação no módulo da definição = **coincidência de grafia**: o sítio
 >   segue relatado, o header NÃO entra no conjunto (o fato que decide é a aplicação).
-> - Execução idêntica antes/depois: `unit_142` (par hbmk2 + rodar, à moda do 74).
-> - `make test` 1011/0. **Paga de graça**: o item 3 da P31 (rollback culpando o
+> - Execução idêntica antes/depois DENTRO do caso Go (a fixture ganhou `main.prg`;
+>   `executa()` builda com hbmk2 e roda antes e depois do arraste, stdout byte a byte —
+>   o portão do formato barrou, com razão, a primeira versão como unit legado).
+> - `make test` verde. **Paga de graça**: o item 3 da P31 (rollback culpando o
 >   inocente) e a metade "funções" do item 2 (mapa nas recusas).
 
 > **FATIA 0 ENTREGUE** *(2026-08-08, priorizada por sondagem: a prova da P29 —

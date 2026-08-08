@@ -11,9 +11,9 @@
   ],
   "status": "refused",
   "exit": 1,
-  "reason": "verification-failed-rolled-back",
+  "reason": "directive-binds-static-and-dynamic",
   "action": "stop-and-report",
-  "detail": "verification FAILED in f1: symbol 2 unexpected: REMESSA - rollback",
+  "detail": "'Remessa' is called by an applied directive, and the call binds per module: a module STATIC in f2.prg; dynamically in f4.prg - renaming the static would cross that boundary; refusing",
   "diagnostics": [
    {
     "code": "name-also-written-by-directive",

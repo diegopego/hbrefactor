@@ -1,0 +1,2 @@
+f2.prg(5) >XLOG "x2"<
+#xcommand >Remessa( "x2" )<

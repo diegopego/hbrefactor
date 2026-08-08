@@ -129,6 +129,13 @@
 // nenhuma, porque nenhuma resolve
 #define RSN_STATIC_AMBIGUOUS "static-declared-more-than-once"
 
+// P32 - a directive's call binds to a module STATIC function in some applying
+// modules and dynamically in others. One edit set cannot serve both sides:
+// dragging the header re-points the dynamic modules at a name that does not
+// exist, and not dragging it strands the statics. The refusal maps the
+// binding per module; no flag is offered, because none resolves it
+#define RSN_STATIC_DYN_MIX "directive-binds-static-and-dynamic"
+
 // memvar de escopo dinâmico: as duas recusas que o mapa do criador produz.
 // Nenhuma é "a ferramenta não conseguiu" - as duas são fatos sobre o CÓDIGO,
 // e o humano é quem decide o que fazer com eles (`stop-and-report`).
@@ -2751,6 +2758,23 @@ STATIC FUNCTION RuleWritesSymbol( hAst, hFunc, cUp )
 
    RETURN .F.
 
+// P32 - does THIS module apply any rule whose result writes the name? The
+// fact is application-level: a rule that is registered but never applied
+// binds nothing here, and a name a rule writes binds PER APPLYING MODULE -
+// a static function cited in a result is a different function in each
+// module that defines one
+STATIC FUNCTION ModuleAppliesRuleWriting( hAst, cUp )
+
+   LOCAL hApp
+
+   FOR EACH hApp IN hAst[ "ppApplications" ]
+      IF RuleResultWrites( hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ], cUp )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
 // posição -> { "cmd", + campos } (o alvo e o que o rename-* específico
 // precisa) OU { "refuse" => msg } OU NIL (nada de compilação na posição).
 // PRINCÍPIO: resolver pelo BINDING do compilador ANTES de tratar o token
@@ -4595,6 +4619,7 @@ STATIC FUNCTION RenameFunction( aArgs )
    LOCAL aRuleSeen := {}, aRuleSites := {}, aSite
    LOCAL hRule, hTok, cSide, cKey, cChPath, cCwd, cSiteDesc
    LOCAL aWork, hScope, cKind
+   LOCAL aDrag := {}, aDyn := {}, lRuleCoincidence := .F.
 
    IF Len( aArgs ) < 4
       Usage()
@@ -4732,7 +4757,49 @@ STATIC FUNCTION RenameFunction( aArgs )
          // with no sites above. Same lesson the P25 wrote for the local
          RuleSiteDiag( cOld, cSiteDesc, hRule, hTok )
       NEXT
+      // P32: a STATIC function cited by an APPLIED rule binds per module -
+      // each applying module's call reaches ITS OWN homonym static, or binds
+      // dynamically when it defines none. The facts decide the edit set:
+      //   - the definition module applies and every applier has a homonym
+      //     static -> they are all bound to the same result text, so they all
+      //     rename together (the drag), each proven module by module;
+      //   - some applier binds dynamically -> one edit set cannot serve both
+      //     sides; refuse mapping the binding per module;
+      //   - the definition module does NOT apply -> the citation binds OTHER
+      //     modules' functions (or nothing): spelling coincidence for THIS
+      //     static. The site stays reported above; the header is not edited.
+      IF lStatic
+         FOR EACH cPath IN hProj[ "files" ]
+            IF ModuleAppliesRuleWriting( hAsts[ cPath ], cUpOld )
+               IF IsStaticFuncInModule( hAsts[ cPath ], cUpOld )
+                  AAdd( aDrag, cPath )
+               ELSE
+                  AAdd( aDyn, cPath )
+               ENDIF
+            ENDIF
+         NEXT
+         IF hb_AScan( aDrag, cDefFile,,, .T. ) > 0
+            IF ! Empty( aDyn )
+               cSiteDesc := ""                       // reuso: a lista estática
+               FOR EACH cPath IN aDrag
+                  cSiteDesc += iif( Empty( cSiteDesc ), "", ", " ) + hb_FNameNameExt( cPath )
+               NEXT
+               cKey := ""                            // reuso: a lista dinâmica
+               FOR EACH cPath IN aDyn
+                  cKey += iif( Empty( cKey ), "", ", " ) + hb_FNameNameExt( cPath )
+               NEXT
+               RETURN Refuse( "'" + cOld + "' is called by an applied directive, and the " + ;
+                              "call binds per module: a module STATIC in " + cSiteDesc + ;
+                              "; dynamically in " + cKey + " - renaming the static would " + ;
+                              "cross that boundary; refusing", RSN_STATIC_DYN_MIX )
+            ENDIF
+         ELSE
+            lRuleCoincidence := ! Empty( aDrag ) .OR. ! Empty( aDyn )
+            aDrag := {}
+         ENDIF
+      ENDIF
       cCwd := hb_PathNormalize( hb_DirSepAdd( hb_cwd() ) )
+      IF ! lRuleCoincidence
       FOR EACH aSite IN aRuleSites
          hRule := aSite[ 1 ]
          hTok  := aSite[ 2 ]
@@ -4768,17 +4835,20 @@ STATIC FUNCTION RenameFunction( aArgs )
       FOR EACH cKey IN hb_HKeys( hEdits )
          DedupHits( hEdits[ cKey ] )
       NEXT
+      ENDIF
    ENDIF
 
-   // sites: definição + calls; STATIC fica no módulo da definição
+   // sites: definição + calls; STATIC fica no módulo da definição - e, com
+   // diretiva APLICADA prendendo homônimas (P32), nos módulos do arraste
    FOR EACH cPath IN hProj[ "files" ]
-      IF lStatic .AND. ! cPath == cDefFile
+      IF lStatic .AND. ! cPath == cDefFile .AND. hb_AScan( aDrag, cPath,,, .T. ) == 0
          LOOP
       ENDIF
       hAst := hAsts[ cPath ]
       aE := {}
       FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUpOld .AND. cPath == cDefFile
+         IF ! hFunc[ "fileDecl" ] .AND. Upper( hFunc[ "name" ] ) == cUpOld .AND. ;
+            ( cPath == cDefFile .OR. hb_AScan( aDrag, cPath,,, .T. ) > 0 )
             FOR EACH aHit IN LineTokens( hAst, hFunc, hFunc[ "line" ], cUpOld )
                AAdd( aE, aHit )
             NEXT
@@ -4858,8 +4928,17 @@ STATIC FUNCTION RenameFunction( aArgs )
    aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
    hScope := ScopeField( hAsts, hProj, cUpOld )
 
-   Prose( "rename-function: " + cOld + " -> " + cNew + ;
-           iif( lStatic, " (static, only " + hb_FNameNameExt( cDefFile ) + ")", "" ) + hb_eol() )
+   IF Len( aDrag ) > 1
+      cSiteDesc := ""                                // reuso: a lista do arraste
+      FOR EACH cPath IN aDrag
+         cSiteDesc += iif( Empty( cSiteDesc ), "", ", " ) + hb_FNameNameExt( cPath )
+      NEXT
+      Prose( "rename-function: " + cOld + " -> " + cNew + ;
+              " (static: " + cSiteDesc + " - bound by the directive)" + hb_eol() )
+   ELSE
+      Prose( "rename-function: " + cOld + " -> " + cNew + ;
+              iif( lStatic, " (static, only " + hb_FNameNameExt( cDefFile ) + ")", "" ) + hb_eol() )
+   ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
       FOR EACH aE IN hEdits[ cPath ]
          Prose( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( aE[ 1 ] ) + ;
@@ -4894,11 +4973,25 @@ STATIC FUNCTION RenameFunction( aArgs )
       RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
+   // P32: a prova é POR MÓDULO, e a régua depende do que mudou (a da P28):
+   // módulo editado - ou que APLICA uma regra editada, mudando via header -
+   // tem de mostrar a troca de UM símbolo; módulo intocado tem de sair byte
+   // a byte igual. A régua única de antes exigia a troca em TODO módulo, e
+   // reprovava culpando o inocente: a homônima legítima de um módulo alheio
    FOR EACH cPath IN hProj[ "files" ]
-      IF ! FactsEquivalent( cTmp, cPath, cUpOld, cUpNew, @cSpec )   // reuso de cSpec p/ motivo
+      IF hb_HHasKey( hEdits, cPath ) .OR. ;
+         ( ! Empty( aRuleSites ) .AND. ! lRuleCoincidence .AND. ;
+           ModuleAppliesRuleWriting( hAsts[ cPath ], cUpOld ) )
+         IF ! FactsEquivalent( cTmp, cPath, cUpOld, cUpNew, @cSpec )   // reuso de cSpec p/ motivo
+            RollbackAll( hOrig )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
+                           RSN_VERIFY_FAILED )
+         ENDIF
+      ELSEIF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
+                hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
          RollbackAll( hOrig )
-         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
-                        RSN_VERIFY_FAILED )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": not edited, " + ;
+                        "yet its pcode changed - rollback", RSN_VERIFY_FAILED )
       ENDIF
    NEXT
 
@@ -8222,6 +8315,33 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
    IF Empty( aRules )
       RETURN Refuse( "'" + cOld + "' is not written by the result of any pp rule " + ;
                      "applied in project '" + cSpec + "'" )
+   ENDIF
+
+   // P32: the result cites a FUNCTION, not a variable - no application binds
+   // it to a local/static variable anywhere. The set is the function engine's
+   // (definition-module homonyms dragged per applying module, the header, the
+   // per-module proof), and delegating makes the two entry points ONE
+   // operation - the .ch cursor previews exactly what the definition cursor
+   // applies. A static homonym picks the --file of the first applier that
+   // defines one; a plain project function goes project-wide
+   IF nSites == 0 .AND. IsProjectFunction( hAsts, cUpOld )
+      cKey := ""                                  // reuso: o --file do arraste
+      FOR EACH cPath IN hProj[ "files" ]
+         IF ModuleAppliesRuleWriting( hAsts[ cPath ], cUpOld ) .AND. ;
+            IsStaticFuncInModule( hAsts[ cPath ], cUpOld )
+            cKey := cPath
+            EXIT
+         ENDIF
+      NEXT
+      aE := { "rename-function", cSpec, cOld, cNew }        // reuso: a argv
+      IF ! Empty( cKey )
+         AAdd( aE, "--file" )
+         AAdd( aE, cKey )
+      ENDIF
+      IF lDryRun
+         AAdd( aE, "--dry-run" )
+      ENDIF
+      RETURN RenameFunction( aE )
    ENDIF
 
    nDirEdits := RuleResultEdits( hAsts, hProj, cUpOld, cOld, hEdits, @hBad )

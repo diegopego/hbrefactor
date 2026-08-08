@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@1199b49 -->
+<!-- changelog-baseline: hbrefactor@ba37d23 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
@@ -19,6 +19,49 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-08 — the STATIC FUNCTION your directive calls renames too — module by module
+
+A pattern all over real Harbour code: a header's command calls a function, and
+each module that uses the command has its own `STATIC FUNCTION` of that name.
+
+```harbour
+// fn.ch
+#xcommand XLOG <m> => Remessa( <m> )
+```
+
+Three modules define `STATIC FUNCTION Remessa`; two include the header, one
+does not. The same word in the header is a *different function* in each module
+that applies the command — the compiler binds each expansion to that module's
+own static.
+
+Renaming any of them used to fail and roll back — and the message blamed the
+one module that had nothing to do with it. Now the rename follows the binding:
+
+- renaming the static of one applying module drags the other applying modules
+  **and** the header together — they share the written name, so they can only
+  move as one;
+- the module that never includes the header keeps its own homonym, proven
+  **byte for byte** intact;
+- both entry points work and are the same operation: cursor on the definition,
+  or cursor on the name inside the directive's result;
+- the whole thing is proven per module — and run: same program output before
+  and after, to the byte.
+
+Two situations refuse, each with its reason:
+
+- some applying module has **no** homonym static, so its call binds
+  dynamically — one rename cannot serve both sides. The refusal
+  (`directive-binds-static-and-dynamic`) maps the binding module by module;
+- the directive is registered but **never applied** in the definition module —
+  then the citation is a spelling coincidence: the header is reported, never
+  edited.
+
+And a false refusal died on the way, one that needed no directive at all: two
+modules with same-name statics, renaming one used to roll back blaming the
+other. The proof is now per module — the edited module must show exactly the
+one renamed symbol, the untouched module must be byte-identical — so the
+legitimate stranger no longer fails your rename.
 
 ## 2026-08-08 — the proof now comes from the compiler itself
 

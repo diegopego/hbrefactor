@@ -1,0 +1,6 @@
+#line 3 "f4.prg"
+PROCEDURE Um4()
+
+   Remessa( "x4" )
+
+   RETURN

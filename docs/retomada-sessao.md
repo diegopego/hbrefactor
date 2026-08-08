@@ -65,17 +65,20 @@ rename" — **está medida e já implementada**: rename começando no lado direi
 conjunto, e a genealogia atravessa regra que gera regra. A P31 virou 4 itens concretos
 (diagnóstico multi-ligação, mapa nas recusas, o rollback que culpa o inocente, a declaração
 file-wide no `usages`); **qual entra e em que ordem é decisão dele.**
+*(2026-08-08, P32 corpo: o item 3 está PAGO — a prova por-módulo matou o culpa-ao-inocente —
+e a metade "funções" do item 2 também, via `directive-binds-static-and-dynamic`. Restam o
+item 1, a metade memvar do 2, e o 4.)*
 
-### 2.3 A P32 — a função estática que uma diretiva chama *(nasceu 2026-08-08; **fatia 0 ENTREGUE**, corpo aberto)*
+### 2.3 A P32 — ✅ FECHADA (fatia 0 + corpo, 2026-08-08)
 
-> **Fatia 0 (`ast-24`) entregue em 2026-08-08** — priorizada por sondagem de
-> código (frequência no corpus + a prova da P29 depende dela). O dump carrega
-> `symbols[]` e `pcodeSize`/`pcodeHash`/`pcodeNormHash` por função; o
-> `HrbParse` morreu (provas = `ProofFacts` sobre dumps etiquetados; snapshot
-> `snap-2`); controles da normalização medidos; `make test` 1005/0. Registro
-> completo na P32 do roadmap; contrato no ast-schema.md. **Fica aberto: o
-> CORPO da fase** (rename da static citada no result, prova por-módulo, misto
-> recusa com mapa, inversão do caso pinado) — e a P29 agora tem o fato dela.
+> Fatia 0 (`ast-24`: `symbols[]` + hashes por função, `HrbParse` morto) e o
+> corpo (arraste por módulo-aplicador, duas pontas iguais por `DeepEqual`,
+> misto com `directive-binds-static-and-dynamic`, prova POR MÓDULO no
+> `rename-function`, caso pinado invertido, execução idêntica dentro do
+> próprio caso Go) entregues no mesmo dia. Registro completo na P32 do roadmap. A prova
+> por-módulo consertou também a homônima SEM diretiva (reprovava injusto), e
+> pagou o item 3 da P31 + a metade "funções" do item 2. **A P29 tem o fato
+> dela (`pcodeNormHash`) esperando.** Saiu do §2 — resta commit.
 
 Ordem do Diego ("quero"), e a natureza dela mudou DUAS vezes até a forma final — as três
 versões estão datadas na [P32 do roadmap](roadmap.md#p32--renomear-a-função-estática-que-uma-diretiva-chama):

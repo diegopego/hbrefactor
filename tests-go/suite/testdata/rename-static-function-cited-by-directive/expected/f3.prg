@@ -6,7 +6,7 @@ PROCEDURE Um3()
 
    RETURN
 
-STATIC FUNCTION Remessa( c )
+STATIC FUNCTION RemessaB( c )
 
    OutStd( c )
 

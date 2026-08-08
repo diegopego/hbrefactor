@@ -1,0 +1,60 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "g2.prg:7:17",
+   "RemessaB",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 2 edit(s); symbol tables renamed as expected, pcode byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "function",
+   "old": "Remessa",
+   "new": "RemessaB",
+   "editCount": 2,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/g2.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 3
+      },
+      "end": {
+       "line": 2,
+       "character": 10
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/g2.prg",
+     "range": {
+      "start": {
+       "line": 6,
+       "character": 16
+      },
+      "end": {
+       "line": 6,
+       "character": 23
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   }
+  },
+  "edits": []
+ }
+]
