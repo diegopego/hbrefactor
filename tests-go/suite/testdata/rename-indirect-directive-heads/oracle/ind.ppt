@@ -1,0 +1,12 @@
+ind.prg(8) >CREATECMD<
+#xcommand >#xcommand NEWCMD => QOut("1") EOC QOut("2")<
+ind.prg(9) >NEWCMD<
+#xcommand >QOut("1") EOC QOut("2")<
+ind.prg(9) >EOC<
+#define >;<
+ind.prg(10) >NIVEL1<
+#xcommand >#xcommand NIVEL2 => #xcommand NIVEL3 => QOut("fundo")<
+ind.prg(11) >NIVEL2<
+#xcommand >#xcommand NIVEL3 => QOut("fundo")<
+ind.prg(12) >NIVEL3<
+#xcommand >QOut("fundo")<

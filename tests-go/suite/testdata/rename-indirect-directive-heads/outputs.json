@@ -1,0 +1,122 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "ind.prg:9:4",
+   "CMDNOVO",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 1 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "dsl",
+   "old": "NEWCMD",
+   "new": "CMDNOVO",
+   "editCount": 2,
+   "proof": "expansion-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/ind.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 33
+      },
+      "end": {
+       "line": 2,
+       "character": 39
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/ind.prg",
+     "range": {
+      "start": {
+       "line": 8,
+       "character": 3
+      },
+      "end": {
+       "line": 8,
+       "character": 9
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "applicationSites": 1,
+   "directiveOccurrences": 1
+  },
+  "edits": []
+ },
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "ind.prg:12:4",
+   "FUNDO",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 1 application site(s) + 1 directive occurrence(s); .ppo and .hrb byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "dsl",
+   "old": "NIVEL3",
+   "new": "FUNDO",
+   "editCount": 2,
+   "proof": "expansion-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/ind.prg",
+     "range": {
+      "start": {
+       "line": 3,
+       "character": 50
+      },
+      "end": {
+       "line": 3,
+       "character": 56
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/ind.prg",
+     "range": {
+      "start": {
+       "line": 11,
+       "character": 3
+      },
+      "end": {
+       "line": 11,
+       "character": 9
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "applicationSites": 1,
+   "directiveOccurrences": 1
+  },
+  "edits": []
+ }
+]

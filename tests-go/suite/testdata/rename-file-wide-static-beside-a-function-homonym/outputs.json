@@ -1,0 +1,73 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "a.hbp",
+   "a.prg:1:8",
+   "nGeral",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: all 1 module(s) byte-identical (-gh -l)",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "static",
+   "old": "nTotal",
+   "new": "nGeral",
+   "editCount": 3,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 7
+      },
+      "end": {
+       "line": 0,
+       "character": 13
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 3
+      },
+      "end": {
+       "line": 4,
+       "character": 9
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 6,
+       "character": 20
+      },
+      "end": {
+       "line": 6,
+       "character": 26
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   }
+  },
+  "edits": []
+ }
+]

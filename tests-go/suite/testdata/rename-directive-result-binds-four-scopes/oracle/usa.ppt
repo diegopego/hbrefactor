@@ -1,0 +1,6 @@
+usa.prg(7) >CMD_LOG "a"<
+#xcommand >nReg += 1 ; OutStd( "a" )<
+usa.prg(22) >CMD_LOG "b"<
+#xcommand >nReg += 1 ; OutStd( "b" )<
+usa.prg(29) >CMD_LOG "c"<
+#xcommand >nReg += 1 ; OutStd( "c" )<

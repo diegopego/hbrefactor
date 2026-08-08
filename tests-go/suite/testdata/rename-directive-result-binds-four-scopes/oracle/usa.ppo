@@ -1,0 +1,39 @@
+#line 3 "usa.prg"
+PROCEDURE ComLocal()
+
+   LOCAL nReg := 0
+
+   nReg += 1 ; OutStd( "a" )
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN
+
+PROCEDURE ChamaTudo()
+
+   ComStaticFn()
+
+   RETURN
+
+STATIC PROCEDURE ComStaticFn()
+
+   STATIC nReg := 0
+
+   nReg += 1 ; OutStd( "b" )
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN
+
+PROCEDURE ComParam( nReg )
+
+   nReg += 1 ; OutStd( "c" )
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN
+
+PROCEDURE SoHomonimo()
+
+   LOCAL nReg := 5
+
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN

@@ -27,6 +27,7 @@ conversa")*. Não some quando a frente principal entrega — some quando o §2 e
 | **P26** | o `text` do envelope é VERBATIM — `text[start:end]` volta a recortar a palavra |
 | **P27** *(commit `3ad98db`)* | o nome escrito no RESULTADO de uma regra se renomeia, pelas duas pontas |
 | **P28 fatia 1** *(mesmo commit)* | recusa de `static`/`memvar` diz qual `.ch` escreve o nome |
+| **P30** | dois `STATIC` de mesmo nome no mesmo `.prg` renomeiam por POSIÇÃO; a coleta file-wide respeita a sombra |
 | **P28** *(3 fatias)* | `static` e `memvar` escritos por diretiva renomeiam os dois lados; a fatia 1 (relato) virou andaime e saiu |
 | **matriz de homônimos** | 6 casos SEM diretiva: local sombreando, param, static de outro módulo, dois criadores, uso fora do alcance, campo de área de trabalho |
 | **prova do memvar** | recusa falsa consertada: módulo NÃO editado exige byte-identidade (mais duro), módulo editado aceita um símbolo trocado |
@@ -56,13 +57,37 @@ igual quando os alcances são disjuntos (decidível) e quando se cruzam (aí sim
 o pcode de funções intocadas (`HB_P_PUSHMEMVAR` indexa `pSymbols`). Precedente para a prova
 nova: o `symbols-preserved` do `reorder-params`.
 
-### 2.2 A P30 — dois STATIC de mesmo nome no mesmo `.prg` *(nasceu 2026-08-08)*
+### 2.2 A P31 — o lado direito de uma diretiva não é UM símbolo *(nasceu 2026-08-08)*
 
-Recusa falsa **sem diretiva nenhuma**: `STATIC` file-wide e `STATIC` de função com o mesmo
-nome são duas variáveis ordinárias, e o cursor já diz qual é qual. Spec com a medição na
-[P30 do roadmap](roadmap.md#p30--dois-static-de-mesmo-nome-no-mesmo-prg-e-o-cursor-já-diz-qual).
+Sondada em três rodadas (escopos misturados; funções estáticas; diretivas INDIRETAS do
+`doc/pp.txt`, em 2 e 3 níveis). A cadeia do Diego — "se temos usage com escopo, temos
+rename" — **está medida e já implementada**: rename começando no lado direito produz o mesmo
+conjunto, e a genealogia atravessa regra que gera regra. A P31 virou 4 itens concretos
+(diagnóstico multi-ligação, mapa nas recusas, o rollback que culpa o inocente, a declaração
+file-wide no `usages`); **qual entra e em que ordem é decisão dele.**
 
-### 2.3 A página pública (`site/index.html`) — ADIADA pelo Diego
+### 2.3 A P32 — a função estática que uma diretiva chama *(nasceu 2026-08-08; spec pronta)*
+
+Ordem do Diego ("quero"), e a natureza dela mudou DUAS vezes até a forma final — as três
+versões estão datadas na [P32 do roadmap](roadmap.md#p32--renomear-a-função-estática-que-uma-diretiva-chama):
+
+1. eu disse "o core precisa estampar a resolução em `calls[]`" → sonda desmentiu: o vínculo
+   já está nos 2 bytes de escopo do símbolo no `.hrb` (`HB_FS_STATIC`, forward e controle
+   negativo medidos);
+2. "então lê-se do `.hrb`" → o Diego apontou o drift de um leitor próprio de formato alheio,
+   e depois perguntou *"o quanto já pode vir da compilação?"* → inventário: as provas leem
+   só nome, escopo e IGUALDADE de pcode — tudo que o compilador sabe ao compilar;
+3. **forma final (fatia 0): `ast-24`** — o dump ganha `symbols[]` (nome+escopo) e hash de
+   pcode por função; o `HrbParse` MORRE e **nenhum leitor de `.hrb` nasce**; byte-identidade
+   continua crua sobre o artefato; o drift morre pelo schema que berra (caso 122). É
+   extensão de core SIM — do canal que já é o padrão da casa, o dump.
+
+O corpo da fase: rename da static citada no result arrasta as homônimas dos módulos que
+APLICAM a regra + o header; módulo que não aplica fica byte-idêntico; prova por-módulo (mata
+o culpa-ao-inocente); misto static/dinâmico recusa com mapa. Na entrega, o caso pinado
+`refuse-rename-static-function-cited-by-directive` inverte.
+
+### 2.4 A página pública (`site/index.html`) — ADIADA pelo Diego
 
 O manual foi atualizado (baseline `a97c00d`, dois itens novos em *Still rough*). A página é
 derivação mecânica dele e **não** precisa de segunda aprovação — mas o Diego adiou em
@@ -89,10 +114,12 @@ nos resultados `--json`.)*
   rebuildado o core** (aconteceu: o schema pulou de `ast-21` para `ast-22` sem eu saber).
 - **Sessões em paralelo disputam recursos globais:** `make core`/`make stock` mexem em
   binários compartilhados, e `make test` escreve em `tests/tmp/`.
-- **Sonda começa por `D=$(sh tools/probe.sh new <modelo>)`, nunca por `mkdir` seu.** A
+- **Sonda começa por `mktemp -d` + `git init`/`commit`, nunca por `mkdir` seu.** A
   ferramenta EDITA os fontes, então pasta de sonda é de uso único; reusar faz o "antes"
   ser o "depois" da medição anterior, e a medição SAI, com cara de resposta. Aconteceu
-  três vezes em 2026-08-08. *(Regra no [CLAUDE.md §1.7.8](../CLAUDE.md).)*
+  três vezes em 2026-08-08. *(A receita está no [CLAUDE.md §1.7.8](../CLAUDE.md); o
+  `tools/probe.sh` que eu escrevi para isso foi deletado — reimplementava o git e
+  contaminou uma medição por conta própria.)*
 - **Nada de `git add -A`** — nomear arquivo por arquivo é o que evita varrer trabalho de
   outra sessão para dentro do seu commit.
 - **`docs/roadmap.md` é escrito pelas duas sessões.** Reler antes de escrever.

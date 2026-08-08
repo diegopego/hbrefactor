@@ -1,0 +1,2 @@
+mv.prg(9) >CMD_LOG "e"<
+#xcommand >nReg += 1 ; OutStd( "e" )<

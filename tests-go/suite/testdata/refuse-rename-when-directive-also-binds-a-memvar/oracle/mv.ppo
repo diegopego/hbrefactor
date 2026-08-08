@@ -1,0 +1,11 @@
+#line 3 "mv.prg"
+MEMVAR nReg
+
+PROCEDURE ComPrivada()
+
+   PRIVATE nReg := 0
+
+   nReg += 1 ; OutStd( "e" )
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN

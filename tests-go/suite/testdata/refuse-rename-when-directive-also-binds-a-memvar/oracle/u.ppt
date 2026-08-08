@@ -1,0 +1,2 @@
+u.prg(7) >CMD_LOG "a"<
+#xcommand >nReg += 1 ; OutStd( "a" )<

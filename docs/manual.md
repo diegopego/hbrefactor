@@ -935,11 +935,6 @@ stock compiler.
   variable it is and touches nothing. When a directive writes into a name **you**
   declared, the two are tied together: the tool renames both sides or refuses. That
   second shape is fragile by nature, and Harbour's own headers do not use it.
-- **The same name declared `STATIC` twice in one file is refused**, and this has nothing
-  to do with directives — a file-wide `STATIC nTotal` and a `STATIC nTotal` inside one
-  function are two ordinary, distinct variables, and Harbour is happy with both. Your
-  cursor already says which one you mean; the tool does not yet use that, and refuses
-  saying they are different variables. Rename one of them by hand first.
 - Function *parameters* aren't annotated yet — only local variables and code-block
   parameters.
 - Some "maybe" is irreducible: a receiver whose class depends on runtime input (config,

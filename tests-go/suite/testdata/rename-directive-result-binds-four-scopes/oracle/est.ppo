@@ -1,0 +1,9 @@
+#line 3 "est.prg"
+STATIC nReg := 0
+
+PROCEDURE ComStaticPrg()
+
+   nReg += 1 ; OutStd( "d" )
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN

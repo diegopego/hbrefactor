@@ -255,11 +255,24 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
    o modo de falha não é silêncio: é **resposta errada e confiante**. Os três cadáveres do
    dia: rodar `usages` onde um `rename` já havia editado; "restaurar" com `sed` e medir
    (o nome velho já era o novo); e copiar como modelo uma pasta que o script anterior
-   editara. **Mecanismo: [`tools/probe.sh`](tools/probe.sh)** — `new` cria diretório que
-   NUNCA se repete e grava o estado inicial; `check` **recusa** medir numa pasta já
-   modificada; `diff` diz o que mudou. Ele só protege quem o chama — é ferramenta, não
-   portão automático —, e é por isso que a régua vem antes: **toda sonda começa por
-   `D=$(sh tools/probe.sh new ...)`**, nunca por um `mkdir` meu.
+   editara. **A régua: toda sonda começa por um diretório NOVO com o estado inicial
+   registrado**, nunca por um `mkdir` meu com nome escolhido a dedo:
+
+   ```sh
+   D=$(mktemp -d) && cp -r <fixture>/. "$D" && git -C "$D" init -q \
+      && git -C "$D" add -A && git -C "$D" commit -qm base
+   git -C "$D" diff --quiet   # intacto? então pode medir
+   git -C "$D" status --short # depois: o que a ferramenta mexeu
+   git -C "$D" checkout .     # e volta ao inicial, se precisar
+   ```
+
+   **Eu escrevi um `tools/probe.sh` para isto e ele foi DELETADO no mesmo dia** *(Diego,
+   2026-08-08: "se já existe solução pronta ou precisa mesmo criar")*. Ele não fazia nada
+   que `mktemp -d` + `git` não façam, e **causou a contaminação que existia para impedir**:
+   um bug de zero à esquerda na aritmética do contador devolvia diretório VAZIO a partir da
+   nona sonda, e `cd ""` deixa você onde já estava. Medido, reconstruindo a versão com bug.
+   Ferramenta caseira num caminho de MEDIÇÃO é superfície nova de erro, e erro de medição
+   não grita — ele responde.
 
 ### 1.8 EXERCITE O CÓDIGO ANTES DE OPINAR — e experimente para MATAR a sua tese
 

@@ -1,0 +1,12 @@
+#line 3 "f3.prg"
+PROCEDURE Um3()
+
+   Remessa( "x3" )
+
+   RETURN
+
+STATIC FUNCTION Remessa( c )
+
+   OutStd( c )
+
+   RETURN NIL

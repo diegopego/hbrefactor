@@ -1,0 +1,14 @@
+
+
+
+
+
+PROCEDURE Main()
+
+
+   QOut("1") ; QOut("2")
+
+
+   QOut("fundo")
+
+   RETURN

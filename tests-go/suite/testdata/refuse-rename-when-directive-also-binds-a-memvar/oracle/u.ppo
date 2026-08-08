@@ -1,0 +1,9 @@
+#line 3 "u.prg"
+PROCEDURE ComLocal()
+
+   LOCAL nReg := 0
+
+   nReg += 1 ; OutStd( "a" )
+   OutStd( hb_ntos( nReg ) )
+
+   RETURN

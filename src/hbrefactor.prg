@@ -156,6 +156,19 @@
 // variável - antes saía "no editable site found", que é verdade e não ajuda
 #define RSN_DIRECTIVE_OWNED "variable-belongs-to-the-directive"
 
+// P30: the target "the FILE's static", which no function name can express.
+// It is not a function name at all - it is the cursor having touched the
+// file-wide declaration - and the leading `_` keeps it out of the real
+// namespace
+#define FILEWIDE_TARGET "_HBREF_FILEWIDE"
+
+// P31 item 2: a directive's result also binds a memvar somewhere in the
+// project. The joint rename cannot cover it - a memvar has its own verb with
+// its own proof - so the refusal names the binding instead of coming out
+// unclassified. `stop-and-report`: which variable the name should be is the
+// human's call.
+#define RSN_RULE_BINDS_MEMVAR "directive-also-binds-a-memvar"
+
 // W.2: outro processo está refatorando ESTE projeto agora. É a única recusa que
 // não é sobre o pedido nem sobre o projeto - o pedido continua válido, só chegou
 // junto com outro. Por isso ela tem ação PRÓPRIA: nem `stop-and-report` (não há
@@ -2837,7 +2850,10 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
                IF RuleWritesSymbol( hAst, NIL, cUp )
                   RETURN { "cmd" => "rename-rule-written", "old" => cTok }
                ENDIF
-               RETURN { "cmd" => "rename-static", "old" => cTok }
+               // P30: the cursor touched the FILE's declaration. Passing "no
+               // filter" would make the search find a function homonym too
+               RETURN { "cmd" => "rename-static", "old" => cTok, ;
+                        "func" => FILEWIDE_TARGET }
             ENDIF
          NEXT
       ENDIF
@@ -4276,17 +4292,50 @@ STATIC FUNCTION SpanMax( hExpr )
 // antes da primeira função e usado dentro delas. É por isso que ele não cabia
 // no LocalScan: não é o mesmo alcance, e forçar um só teria misturado dois
 // conceitos do compilador num helper "genérico".
+// P30: does the line fall inside a function that declares its own homonym?
+STATIC FUNCTION SombreadoEm( hAst, aSombra, nLine )
+
+   LOCAL hFunc
+
+   FOR EACH hFunc IN aSombra
+      IF InFuncSpan( hAst, hFunc, nLine )
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.
+
 STATIC FUNCTION StaticScan( hAst, cFile, cOld, cNew, cFuncFilter, aEdits, cOwnerDesc )
 
-   LOCAL hFunc, hItem, hTok, aPrev, cPrevType
+   LOCAL hFunc, hItem, hTok, aPrev, cPrevType, aSombra
    LOCAL hOwner := NIL, lFileWide := .F.
    LOCAL cUpOld := Upper( cOld ), cUpNew := Upper( cNew )
 
-   // localiza a declaração STATIC (file-wide mora na pseudo-função fileDecl)
+   // locate the STATIC declaration (file-wide lives in the fileDecl
+   // pseudo-function).
+   //
+   // P30: `cFuncFilter` alone cannot tell the two REACHES apart. A file-wide
+   // STATIC and a function STATIC may share a name in one `.prg` - Harbour
+   // accepts it, and they are distinct variables. The filter by FUNCTION NAME
+   // never skipped the file pseudo-function (on purpose: with `--func X` it was
+   // meant to also find the file-wide that X sees), so with a homonym it found
+   // both and refused as ambiguous. Both refusals were false: the cursor's
+   // POSITION already says which one, and the compiler reports them apart -
+   // the file's lives only in the pseudo-function, the function's only in its
+   // function.
+   //
+   // FILEWIDE_TARGET is the "the file's one" target; any other name means
+   // "that function's, and only it". Empty keeps the old behaviour (broad
+   // search), which the by-NAME call - no position - still needs
    FOR EACH hFunc IN hAst[ "functions" ]
-      IF ! Empty( cFuncFilter ) .AND. ! hFunc[ "fileDecl" ] .AND. ;
-         !( Upper( hFunc[ "name" ] ) == cFuncFilter )
-         LOOP
+      IF cFuncFilter == FILEWIDE_TARGET
+         IF ! hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+      ELSEIF ! Empty( cFuncFilter )
+         IF hFunc[ "fileDecl" ] .OR. !( Upper( hFunc[ "name" ] ) == cFuncFilter )
+            LOOP
+         ENDIF
       ENDIF
       FOR EACH hItem IN hFunc[ "declarations" ]
          IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "static"
@@ -4321,13 +4370,33 @@ STATIC FUNCTION StaticScan( hAst, cFile, cOld, cNew, cFuncFilter, aEdits, cOwner
       ENDIF
    NEXT
 
-   // coleta por span: file-wide = módulo inteiro; de função = span da função
+   // P30: the functions that declare their OWN homonymous static. Inside
+   // their spans the name is THEIR variable, not the file's - that is how the
+   // compiler binds it, and sweeping the whole module would swallow those uses
+   aSombra := {}
+   IF lFileWide
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "static"
+               AAdd( aSombra, hFunc )
+               EXIT
+            ENDIF
+         NEXT
+      NEXT
+   ENDIF
+
+   // collect by span: file-wide = whole module MINUS the shadows; function
+   // static = that function's span
    aPrev := NIL
    FOR EACH hTok IN hAst[ "tokens" ]
       cPrevType := iif( aPrev == NIL, 0, aPrev[ "type" ] )
       IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
          Upper( hTok[ "text" ] ) == cUpOld .AND. ;
          !( cPrevType == 58 .OR. cPrevType == 59 ) .AND. ;
+         ! SombreadoEm( hAst, aSombra, hTok[ "line" ] ) .AND. ;
          ( lFileWide .OR. InFuncSpan( hAst, hOwner, hTok[ "line" ] ) )
          IF hTok[ "col" ] == NIL
             RETURN { "msg" => "reference on line " + hb_ntos( hTok[ "line" ] ) + ;
@@ -8063,7 +8132,8 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
                RETURN Refuse( "'" + cOld + "', written by the directive, binds to a " + ;
                               hItem[ "scope" ] + " in " + hFunc[ "name" ] + " (" + ;
                               hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                              ") - this rename covers LOCAL and STATIC bindings; refusing" )
+                              ") - this rename covers LOCAL and STATIC bindings; refusing", ;
+                              RSN_RULE_BINDS_MEMVAR )
             ENDCASE
          NEXT
          IF ! lBind

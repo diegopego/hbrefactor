@@ -1135,14 +1135,14 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P30 — dois STATIC de mesmo nome no mesmo `.prg`, e o cursor já diz qual *(aberto 2026-08-08; **A FAZER**)*
+### P30 — dois STATIC de mesmo nome no mesmo `.prg`, e o cursor já diz qual *(aberto 2026-08-08; **✅ ENTREGUE 2026-08-08**)*
 
 **O caso, e ele NÃO envolve diretiva** *(Diego, 2026-08-08: "vamos separar as coisas...
 pode haver static de prg e static na função dentro do mesmo prg")*. Harbour aceita um
 `STATIC nTotal` file-wide e outro `STATIC nTotal` dentro de uma função do mesmo arquivo.
 São duas variáveis ordinárias e distintas, e o compilador não reclama.
 
-**Medido** (sonda com `tools/probe.sh`, fixture compilando limpo sob `-w3 -es2`):
+**Medido** (sonda em cópia nova, fixture compilando limpo sob `-w3 -es2`):
 
 | cursor | hoje |
 |---|---|
@@ -1172,6 +1172,185 @@ não conheço, e supor aqui é o erro que este roadmap registra três vezes hoje
 homônima **intacta**; caso renomeando a file-wide com a de função **intacta**; o caso da
 diretiva prendendo as duas continuando a recusar; `make test` verde.
 
+**ENTREGUE.** A sonda confirmou o que o fonte sugeria e mais: o dump **já separa** as duas
+declarações — a file-wide vive só na pseudo-função do módulo, a de função só na função dela,
+cada uma com linha e coluna. O que se perdia era no DESPACHO, que mandava adiante só o NOME
+da função, e nome de função não consegue exprimir "a do arquivo". Entrou o alvo
+`FILEWIDE_TARGET`, e o filtro passou a ser por ALCANCE em vez de por nome.
+
+**E a coleta precisou da regra de sombra**, que o critério de pronto não previa: um `STATIC`
+de arquivo é visível no módulo inteiro, então varrer tudo engolia os usos da homônima de
+`Outra`. Dentro do span de uma função que declara a própria, o nome é o dela — o compilador
+liga assim. A coleta file-wide passa a excluir esses spans (`SombreadoEm`).
+
+A recusa por ambiguidade sobrevive onde continua verdadeira: sem posição (busca ampla, o que
+o motor da P27/P28 usa) e no caso da diretiva prendendo as duas.
+
+### P32 — renomear a função ESTÁTICA que uma diretiva chama *(aberto 2026-08-08; **A FAZER**; spec por ordem do Diego: "quero")*
+
+**O caso.** `#xcommand XLOG <m> => Remessa( <m> )`, e cada módulo que usa o comando tem a
+SUA `STATIC FUNCTION Remessa` — a mesma palavra no result, uma função diferente por módulo
+(f1, que nem inclui o header, tem uma terceira, alheia). Hoje qualquer rename ali termina em
+rollback, e o rollback culpa o módulo inocente.
+
+**TABELA DE SONDAS** *(§1.7.1 — medidas em 2026-08-08, ANTES do mecanismo; sondas em cópia
+nova com baseline git)*
+
+| pergunta | resposta medida |
+|---|---|
+| o dump diz a qual função uma chamada liga? | **NÃO**: `calls[]` tem só `sym`+posição+`app` |
+| o `.hrb` diz? | **SIM**: cada símbolo carrega 2 bytes de escopo; `REMESSA` sai `0x02` = `HB_FS_STATIC` (`include/hbvmpub.h:236`) nos módulos que a definem |
+| e com a chamada ANTES da definição (forward)? | **SIM**, `0x02` do mesmo jeito — a resolução é da tabela, não do sítio |
+| controle negativo | módulo que SÓ chama, sem definir: `REMESSA` sai `0x00` (dinâmico) |
+| a ferramenta já lê isso? | **SIM**: `HrbParse` extrai os 2 bytes (`syms[n][2]`) e o `HrbEquivalent` já os compara |
+
+**A natureza da fase mudou DUAS vezes, e o registro fica** *(§1.7: cada elo é fato)*:
+(1) "o core precisa estampar `calls[].bind`" → a sonda do `.hrb` desmentiu — o vínculo já
+está gravado nos 2 bytes de escopo; (2) "então lê-se do `.hrb` com o parser da ferramenta" →
+o Diego apontou o drift de leitor próprio de formato alheio, e a pergunta seguinte dele
+("o quanto já pode vir da compilação?") produziu o inventário que decidiu: (3) **o canal é o
+DUMP (`ast-24`, fatia 0 abaixo)** — extensão de core sim, do canal padrão da casa, e o
+vínculo estático da ANÁLISE sai do mesmo `symbols[]` que serve às provas.
+
+**Escopo**
+- **Fatia 0 — o HrbParse MORRE, e o canal é a PRÓPRIA COMPILAÇÃO, não um leitor de `.hrb`**
+  *(a pergunta do Diego em duas rodadas, 2026-08-08: "o correto não seria o core retornar?"
+  e depois "o quanto JÁ pode vir direto do processo de compilação?" — a segunda matou a
+  primeira resposta)*.
+
+  **O inventário do que as provas LEEM do `.hrb`** (medido nos cinco leitores): nome de
+  símbolo; os 2 bytes de escopo; **igualdade** de pcode por função (`funcs[nI][2] ==`,
+  nunca decodificado). Única exceção: o extract-de-método BUSCA o nome soletrado dentro dos
+  bytes (`hb_BAt`, um contorno) — e o fato que ele procura o dump JÁ carrega no canal de
+  classes (`_HB_MEMBER`/declared). **As três necessidades são conhecidas do compilador no
+  ato de compilar.**
+
+  **A forma: `ast-24` — o dump ganha, por módulo, `symbols[]` (nome + escopo) e um HASH
+  forte do pcode por função.** Com isso:
+  - a inspeção de `.hrb` cai a ZERO — as provas estruturadas comparam dump-antes ×
+    dump-depois (nomes, escopos, hashes); a exceção do extract-de-método migra para os
+    fatos de classe que o dump já tem;
+  - os 34 sítios de byte-identidade continuam como estão — comparação crua do artefato,
+    SEM parser, e o padrão-ouro ("byte-idêntico") segue sendo sobre o ARTEFATO;
+  - a função de introspecção no `runner.c` (versão anterior desta fatia) fica
+    DESNECESSÁRIA — não se cria canal para um leitor que deixou de existir;
+  - o drift morre pelo mecanismo que a casa já tem: o schema é EXATO e o caso 122 fica
+    vermelho no instante em que core e ferramenta divergirem (§1.5) — um formato binário
+    não berra, o schema berra.
+
+  **Custos honestos**: o hash tem de ser forte (colisão = prova mentindo; emitir tamanho +
+  hash); o snapshot do `verify` guarda `.hrb` e passa a guardar também os fatos (migração
+  de formato de snapshot); e confiar o lado estruturado ao canal `-x` é sustentado pela
+  prova de impacto-zero que já existe (`make pcode-identity`, 889/889) — o canal é medido,
+  não confiado.
+- Rename da static citada no result de regra APLICADA: o conjunto é **todas** as statics
+  homônimas dos módulos que aplicam a regra + o header — o arrasto da P31, agora para
+  função. Módulo que não aplica (f1) fica intacto, byte a byte.
+- **O uso do `.hrb` em ANÁLISE é decisão explícita, não inércia** *(5 porquês, gatilho 6)*:
+  o parser existe para PROVA (5 famílias: verify, função, memvar, método,
+  reorder/extract). Lê-lo na análise porque "já está ali" é o canal mais barato; se o
+  papel de análise crescer, o caminho padrão da casa é o dump estampar (`ast-24`).
+- **A prova é por-módulo, a régua da P28**: módulo editado → substituição de UM símbolo
+  (`HrbEquivalent`); módulo intocado → byte-identidade. É isto que mata o
+  culpa-ao-inocente: a verificação de hoje exige a substituição em TODO módulo, inclusive
+  no que legitimamente mantém o nome velho.
+- **As duas pontas**: cursor na definição de qualquer módulo aplicador, e cursor no nome
+  dentro do result — mesmo conjunto (simetria da P31, afirmada por igualdade).
+- **Misto recusa com mapa**: módulo aplicador SEM static homônima liga dinâmico (a um
+  público de outro módulo) — arrasto atravessaria a fronteira static/dinâmico; recusa
+  nomeando o vínculo por módulo, com código próprio.
+- O caso pinado `refuse-rename-static-function-cited-by-directive` **INVERTE** na entrega
+  (era o combinado ao piná-lo: quem conserta fica vermelho e atualiza consciente).
+
+**Critério de pronto (mecânico)**: caso f1/f2/f3 com rename da static de f2 saindo `ok`,
+editando f2+f3+`fn.ch` e provando f1 **byte-idêntico**; caso simétrico pelo result do
+header com conjuntos IGUAIS; caso misto (um aplicador sem static) recusando com código
+próprio e o vínculo por módulo no detalhe; execução idêntica antes/depois (par `hbmk2` +
+rodar, à moda do caso 74); `make test` verde.
+
+### P31 — o lado direito de uma diretiva não é UM símbolo *(aberto 2026-08-08; **DECISÃO DO DIEGO PENDENTE**)*
+
+**A tese do Diego** *(2026-08-08)*: só faz sentido refatorar o lado ESQUERDO de uma diretiva —
+o lado direito é transformado pelo pp e o programador não o vê no fluxo dele. Ele pediu
+sondas com escopos misturados e com funções estáticas. **As sondas confirmam a metade
+profunda da tese e derrubam a metade simples.**
+
+**TABELA DE SONDAS** *(§1.7.1 — todas em cópia nova com baseline git; fixtures limpas sob
+`-w3 -es2`)*
+
+| sonda | resultado |
+|---|---|
+| projeto com o MESMO nome no result e ligações em 4 escopos (local, param, static de função, static de prg em OUTRO módulo) | `usages` rotula cada sítio pelo escopo DELE; rename de UMA local arrasta **as 4 variáveis distintas** + o `.ch` (8 sítios), prova verde; módulo sem a diretiva e homônima sem o comando ficam intactos |
+| o mesmo projeto + uma PRIVATE ligada | pela local: recusa antecipada nomeando o memvar; pela private: rollback (o módulo intocado mudou de pcode — a régua estrita da P28 pegou) |
+| 3 prgs com `STATIC FUNCTION Grava` homônima; 2 incluem `#xcommand LOG <m> => Grava(<m>)`, 1 não | rename da static de f2: edita `.ch`+f2, e o rollback vem de **f1 — o módulo INOCENTE, que nem inclui a diretiva** ("symbol unexpected: GRAVA"); o estrago real seria f3, que nem é citado |
+| cursor no próprio lado direito (`fn.ch:1:22`, nome de função) | motor não acha ligação de variável, edita só o `.ch`, rollback cego ("f2.hrb changed") |
+| `usages` da função | lista as 3 definições, uma por módulo — mas a declaração do static file-wide de prg **não aparece** no caso das variáveis (lacuna) |
+
+**O que as sondas provam:**
+
+1. **O lado direito NÃO é um símbolo — é um buraco de template preenchido POR SÍTIO DE
+   APLICAÇÃO.** O mesmo `nReg` do result ligou a 4 variáveis distintas num projeto; o mesmo
+   `Grava` a 2 funções distintas (e f1 tem uma terceira, alheia). Cursor ali reivindica "este
+   símbolo", o que em geral é mentira.
+2. **A metade simples ("o programador nunca o vê") não se sustenta**: o lado direito é texto
+   que ele DIGITOU, num `.ch` versionado. O que ele nunca vê é a EXPANSÃO. E "nunca tocar no
+   lado direito" como política de EDIÇÃO quebra o build (medido: `W0001`, exit 1 sob `-es2`).
+3. **O arrasto não vem do ponto de partida — vem do texto compartilhado.** Começando pela
+   local, o conjunto é o MESMO. Proibir o cursor no lado direito não elimina a surpresa das 4
+   variáveis; o relato (dry-run, locations) é o que a elimina.
+
+**A opção (a) MORREU, e quem a matou foi a cadeia lógica do Diego + duas medições**
+*(2026-08-08: "se temos o usage com escopo, temos rename")*:
+- rename COMEÇANDO no lado direito (`log.ch:1:29`) produz o MESMO conjunto de 8+1 edições
+  do começo pela local, prova verde. A capacidade existe, funciona e é simétrica — proibir a
+  entrada removeria coisa provada em troca de nada.
+- e a genealogia alcança **diretiva INDIRETA** (a que o `doc/pp.txt` do core descreve: regra
+  cujo result define OUTRA regra). Medido em 2 e em 3 níveis: a regra gerada registra os
+  tokens dela apontando o TEXTO ORIGINAL dentro do result da geradora (`NIVEL3` nascido na
+  aplicação da linha 6 aponta a linha 1 col 50), o `usages` mostra a cadeia, e o rename do
+  nível mais fundo edita a linha 1 e sai `.ppo`/`.hrb` byte-idêntico. O core JÁ rastreia; o
+  contra-argumento "o programador não vê" não sobrevive a isso.
+
+**O que sobra da P31 são itens concretos, não política de entrada:**
+1. **Rename multi-ligação ganha diagnóstico**: quando o nome do result liga a mais de uma
+   variável (as 4 da sonda), o envelope diz *"este nome liga N variáveis distintas"* com a
+   lista — hoje o arrasto aparece só na lista de edições, sem o rótulo.
+2. **As recusas que EXISTEM ganham o mapa**: memvar misturado e funções hoje recusam às
+   cegas ("f2.hrb changed"); passam a nomear as ligações por módulo/escopo.
+3. **O rollback do rename-function para de culpar o inocente**: tropeça em f1 (que nem
+   inclui a diretiva) e cala sobre f3, o quebrado real.
+4. **`usages` lista a declaração do static file-wide** (hoje falta).
+
+Decisão do Diego: quais dos 4 entram, e em que ordem.
+
+**A classificação das recusas** *(pergunta do Diego, 2026-08-08: "infundadas, ou deixam de
+ser recusas se o core informar?"; sondado antes de responder)*:
+
+| recusa | veredito | o que falta |
+|---|---|---|
+| memvar misturado (`directive-also-binds-a-memvar`) | fundada HOJE | **ferramenta**: prova por-módulo (a arquitetura da P28 fatia 3, aplicada ao motor conjunto) — o core já informa tudo |
+| P29, criadores disjuntos | fundada HOJE | **ferramenta**: prova nova (pcode igual A MENOS da renumeração de símbolos; precedente `symbols-preserved`, e o `HrbParse` já existe) |
+| variável que a diretiva possui | fundada HOJE | **ferramenta**: alpha-rename no result é provável com `-gh -l` (nome de local não existe no pcode) |
+| funções ESTÁTICAS citadas no result (f1/f2/f3) | fundada HOJE | **ferramenta — a sonda seguinte DESMENTIU o "precisa do core"**: o vínculo já está gravado na tabela de símbolos do `.hrb` (`HB_FS_STATIC`), que o core produz e o `HrbParse` já lê. Virou a [P32](#p32--renomear-a-função-estática-que-uma-diretiva-chama) |
+| regra builtin | física (não há arquivo) | o core PODERIA estampar a origem (`std.ch:linha`) para o RELATO; nunca vira rename — editar `std.ch` é reconstruir o Harbour |
+| alcances que se CRUZAM (P29, outra metade) | física | o vínculo depende do caminho de execução em runtime; não existe fato de compilação |
+| buraco de macro (`&x`) | física | runtime-only; irredutível (limites-e-alavancas) |
+
+*(As recusas infundadas desta sessão já caíram: o campo de área de trabalho, os dois STATIC
+por posição — P30 —, e a mensagem que oferecia `--func` inexistente. A do f1/f2/f3 é fundada
+com MENSAGEM falsa — culpa o inocente — e está pinada como defeito.)*
+
+**As descobertas das sondas viraram ESPECIFICAÇÃO EXECUTÁVEL em 2026-08-08** *(cobrança do
+Diego: "você criou especificações executáveis para amarrar estes funcionamentos?")*: 
+`rename-directive-result-binds-four-scopes` (o arrasto total pelas DUAS pontas, com a
+simetria afirmada por `reflect.DeepEqual` dos dois conjuntos), 
+`refuse-rename-when-directive-also-binds-a-memvar` (a recusa saiu de `unclassified` e ganhou
+`directive-also-binds-a-memvar` — item 2 parcialmente pago), 
+`rename-indirect-directive-heads` (o exemplo do `doc/pp.txt` com `EOC` + cadeia de TRÊS
+níveis, renomeando pela genealogia posicional) e 
+`refuse-rename-static-function-cited-by-directive` (o item 3 PINADO como defeito, à moda do
+caso do campo de área de trabalho: quem consertar a culpa-ao-inocente fica vermelho na hora).
+
 ### P29 — dois criadores PRIVATE: a recusa é larga demais *(aberto 2026-08-08; **A FAZER**)*
 
 **O caso.** Dois `PRIVATE` do mesmo nome, criados em funções diferentes. A ferramenta
@@ -1180,7 +1359,7 @@ path"*. Eu descrevi isso como natureza do problema — *"não existe fato de com
 separe os dois"*. **Estava errado, e quem apontou foi o Diego** *(2026-08-08: "o escopo dela
 perdura através das chamadas de função... estou certo ou errado?")*.
 
-**TABELA DE SONDAS** *(§1.7.1 — medida antes do mecanismo, com `tools/probe.sh`)*
+**TABELA DE SONDAS** *(§1.7.1 — medida antes do mecanismo, em cópia nova de cada fixture)*
 
 | o que se perguntou | o que se mediu |
 |---|---|

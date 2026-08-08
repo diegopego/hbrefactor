@@ -1,0 +1,424 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "log.ch:1:29",
+   "nNovo",
+   "--dry-run",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "dry run - nothing was written; 9 edit(s) previewed",
+  "diagnostics": [],
+  "result": {
+   "verdict": "preview",
+   "kind": "rule-written",
+   "old": "nReg",
+   "new": "nNovo",
+   "editCount": 9,
+   "proof": null,
+   "locations": [
+    {
+     "uri": "file://<CWD>/est.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 7
+      },
+      "end": {
+       "line": 2,
+       "character": 11
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/est.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 20
+      },
+      "end": {
+       "line": 7,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/log.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 28
+      },
+      "end": {
+       "line": 0,
+       "character": 32
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 9
+      },
+      "end": {
+       "line": 4,
+       "character": 13
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 20
+      },
+      "end": {
+       "line": 7,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 19,
+       "character": 10
+      },
+      "end": {
+       "line": 19,
+       "character": 14
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 22,
+       "character": 20
+      },
+      "end": {
+       "line": 22,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 26,
+       "character": 20
+      },
+      "end": {
+       "line": 26,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 29,
+       "character": 20
+      },
+      "end": {
+       "line": 29,
+       "character": 24
+      }
+     }
+    }
+   ],
+   "applicationSites": 8,
+   "directiveOccurrences": 1
+  },
+  "edits": [
+   {
+    "uri": "file://<CWD>/est.prg",
+    "range": {
+     "start": {
+      "line": 2,
+      "character": 7
+     },
+     "end": {
+      "line": 2,
+      "character": 11
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/est.prg",
+    "range": {
+     "start": {
+      "line": 7,
+      "character": 20
+     },
+     "end": {
+      "line": 7,
+      "character": 24
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/log.ch",
+    "range": {
+     "start": {
+      "line": 0,
+      "character": 28
+     },
+     "end": {
+      "line": 0,
+      "character": 32
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/usa.prg",
+    "range": {
+     "start": {
+      "line": 4,
+      "character": 9
+     },
+     "end": {
+      "line": 4,
+      "character": 13
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/usa.prg",
+    "range": {
+     "start": {
+      "line": 7,
+      "character": 20
+     },
+     "end": {
+      "line": 7,
+      "character": 24
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/usa.prg",
+    "range": {
+     "start": {
+      "line": 19,
+      "character": 10
+     },
+     "end": {
+      "line": 19,
+      "character": 14
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/usa.prg",
+    "range": {
+     "start": {
+      "line": 22,
+      "character": 20
+     },
+     "end": {
+      "line": 22,
+      "character": 24
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/usa.prg",
+    "range": {
+     "start": {
+      "line": 26,
+      "character": 20
+     },
+     "end": {
+      "line": 26,
+      "character": 24
+     }
+    },
+    "newText": "nNovo"
+   },
+   {
+    "uri": "file://<CWD>/usa.prg",
+    "range": {
+     "start": {
+      "line": 29,
+      "character": 20
+     },
+     "end": {
+      "line": 29,
+      "character": 24
+     }
+    },
+    "newText": "nNovo"
+   }
+  ]
+ },
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "usa.prg:5:10",
+   "nNovo",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 8 binding site(s) + 1 directive occurrence(s); all 3 module(s) byte-identical (-gh -l)",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "rule-written",
+   "old": "nReg",
+   "new": "nNovo",
+   "editCount": 9,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/est.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 7
+      },
+      "end": {
+       "line": 2,
+       "character": 11
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/est.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 20
+      },
+      "end": {
+       "line": 7,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/log.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 28
+      },
+      "end": {
+       "line": 0,
+       "character": 32
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 9
+      },
+      "end": {
+       "line": 4,
+       "character": 13
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 20
+      },
+      "end": {
+       "line": 7,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 19,
+       "character": 10
+      },
+      "end": {
+       "line": 19,
+       "character": 14
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 22,
+       "character": 20
+      },
+      "end": {
+       "line": 22,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 26,
+       "character": 20
+      },
+      "end": {
+       "line": 26,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/usa.prg",
+     "range": {
+      "start": {
+       "line": 29,
+       "character": 20
+      },
+      "end": {
+       "line": 29,
+       "character": 24
+      }
+     }
+    }
+   ],
+   "applicationSites": 8,
+   "directiveOccurrences": 1
+  },
+  "edits": []
+ }
+]

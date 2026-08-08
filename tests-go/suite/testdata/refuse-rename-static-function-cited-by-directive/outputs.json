@@ -1,0 +1,40 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "f2.prg:9:17",
+   "RemessaB",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "verification-failed-rolled-back",
+  "action": "stop-and-report",
+  "detail": "verification FAILED in f1: symbol 2 unexpected: REMESSA - rollback",
+  "diagnostics": [
+   {
+    "code": "name-also-written-by-directive",
+    "severity": "warning",
+    "location": {
+     "uri": "file://<CWD>/fn.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 22
+      },
+      "end": {
+       "line": 0,
+       "character": 29
+      }
+     }
+    },
+    "detail": "'Remessa' is named by a preprocessor rule - fn.ch:1:23: in rule result (#xcommand XLOG)"
+   }
+  ],
+  "result": {},
+  "edits": []
+ }
+]
