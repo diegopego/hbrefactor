@@ -1135,6 +1135,56 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
+### P33 — LSP como superfície de entrega *(aberto 2026-08-08; decisão do Diego: "concordo com: LSP como superfície de entrega"; **A FAZER**)*
+
+**O argumento.** A extensão VSCode fala hoje um protocolo próprio com o CLI. Empacotar o
+hbrefactor atrás do **Language Server Protocol** muda a SUPERFÍCIE, jamais o motor (§1.6
+literal): rename, usages e recusas viram `textDocument/rename`, `textDocument/references` e
+diagnostics — e qualquer editor (Vim, Emacs, IntelliJ) vira consumidor de graça. É a fase A
+(saída estruturada para agentes) com mais um consumidor estruturado: o editor.
+
+**Escopo**
+- Servidor LSP fino sobre o motor existente: `initialize`, `textDocument/rename` (delegando
+  ao `rename` + verificação, com recusa mapeada para `ResponseError` carregando o código de
+  motivo), `textDocument/references` (delegando ao `usages`), e diagnostics para o relato
+  do não-verificável.
+- A extensão VSCode migra para cliente LSP — nenhuma capacidade some no caminho.
+- **Não-objetivo**: nenhuma feature as-you-type nesta fase (isso é a P34); o servidor
+  responde a COMANDOS, com a mesma latência e as mesmas provas do CLI.
+- **Nenhum princípio do §1 cede**: o servidor não responde o que o motor não prova; recusa
+  LSP carrega o mesmo código legível-para-relatar da fase A.
+
+**Critério de pronto (mecânico)**: teste dirigindo o servidor por stdin/stdout
+(`initialize` + `textDocument/rename` sobre fixture) provando que o `WorkspaceEdit` produz
+fonte **byte a byte igual** ao do `rename` do CLI na mesma fixture; caso de recusa provando
+o código de motivo na resposta LSP; a extensão operando via servidor; `make test` verde.
+
+### P34 — IntelliSense na IDE *(aberto 2026-08-08; decisão do Diego: "vou querer IntelliSense no futuro"; **EXPLORATÓRIA — NADA MEDIDO AINDA**)*
+
+**O quê.** Completion, hover e navegação **enquanto se digita** — não sob demanda. É outra
+classe de problema que o rename: exige latência de tecla e tolerância a fonte que **não
+compila** (o estado normal do meio da edição), e o motor de hoje exige projeto que compila.
+
+**A tensão, dita de frente**: a lei do §1 (zero inferência) não cede para IntelliSense. O
+caminho honesto é o fato vir de uma **compilação real** — possivelmente a última boa, com a
+idade do fato declarada — nunca de parser tolerante que adivinha. Se isso não bastar para a
+experiência, a resposta é ir ao core (compilador residente/incremental, §1.4), não
+heurística na ferramenta.
+
+**Perguntas que a exploração responde (medindo, §1.7.2 — nada disto se afirma sem número)**
+- Quanto custa uma compilação de módulo único nos projetos do corpus? (Se for dezenas de ms,
+  "recompila a cada pausa de digitação" pode bastar e o problema morre barato.)
+- O que completion precisa saber, e o dump já carrega? (símbolos visíveis no escopo do
+  cursor, assinaturas, DATAs/métodos do receiver — a P14 é vizinha direta.)
+- Fato da última compilação boa: o que fica errado, por quanto tempo, e como se declara a
+  idade sem virar degradação calada (§1.5)?
+- Daemon: o que o core precisaria para um modo residente (compilador-biblioteca já existe
+  como oráculo — falta medir se aguenta o ciclo de tecla)?
+
+**Critério de pronto (mecânico, da exploração)**: tabela de sondas no formato §1.7.1 com as
+medições acima; decisão registrada aqui (que arquitetura, e o que ela recusa a fazer); as
+fatias executáveis viram fases próprias com critério próprio.
+
 ### P30 — dois STATIC de mesmo nome no mesmo `.prg`, e o cursor já diz qual *(aberto 2026-08-08; **✅ ENTREGUE 2026-08-08**)*
 
 **O caso, e ele NÃO envolve diretiva** *(Diego, 2026-08-08: "vamos separar as coisas...
@@ -1186,7 +1236,33 @@ liga assim. A coleta file-wide passa a excluir esses spans (`SombreadoEm`).
 A recusa por ambiguidade sobrevive onde continua verdadeira: sem posição (busca ampla, o que
 o motor da P27/P28 usa) e no caso da diretiva prendendo as duas.
 
-### P32 — renomear a função ESTÁTICA que uma diretiva chama *(aberto 2026-08-08; **FATIA 0 ✅ ENTREGUE 2026-08-08 (`ast-24`)** — corpo A FAZER; spec por ordem do Diego: "quero")*
+### P32 — renomear a função ESTÁTICA que uma diretiva chama *(aberto 2026-08-08; **✅ ENTREGUE 2026-08-08** — fatia 0 `ast-24` + corpo; spec por ordem do Diego: "quero")*
+
+> **CORPO ENTREGUE** *(2026-08-08, na sequência da fatia 0)* — os quatro pontos do
+> critério de pronto, todos mecânicos e verdes:
+> - **O arraste é fato de APLICAÇÃO, não de texto** (`ModuleAppliesRuleWriting`:
+>   `ppApplications` cujo result escreve o nome): rename da static de f2 edita
+>   f2+f3+`fn.ch` e sai `ok`; f1 — que nem inclui o header — provado **byte-idêntico**.
+>   Caso pinado `refuse-rename-static-function-cited-by-directive` **INVERTIDO**
+>   conscientemente para `rename-static-function-cited-by-directive`.
+> - **As duas pontas são uma operação**: cursor no result (`fn.ch:1:23`) delega ao
+>   motor de função (fallback no `RenameRuleWritten` quando nenhuma variável liga e o
+>   nome é função do projeto) — conjuntos IGUAIS afirmados por `reflect.DeepEqual`.
+> - **Misto recusa com mapa e código próprio** (`RSN_STATIC_DYN_MIX` =
+>   `directive-binds-static-and-dynamic`): aplicador sem homônima liga dinâmico, e a
+>   recusa nomeia o vínculo POR MÓDULO (caso
+>   `refuse-rename-static-function-mixed-binding`, com public real em f5).
+> - **A prova virou POR MÓDULO no `rename-function`** (a régua da P28): editado — ou
+>   aplicador de regra editada, que muda via header — exige a troca de UM símbolo
+>   (`FactsEquivalent`); intocado exige byte-identidade. Isso matou o culpa-ao-inocente
+>   **e um defeito irmão que a sonda achou no caminho**: static com homônima em outro
+>   módulo reprovava injustamente MESMO SEM diretiva (caso novo
+>   `rename-static-function-beside-module-homonym`).
+> - Citação sem aplicação no módulo da definição = **coincidência de grafia**: o sítio
+>   segue relatado, o header NÃO entra no conjunto (o fato que decide é a aplicação).
+> - Execução idêntica antes/depois: `unit_142` (par hbmk2 + rodar, à moda do 74).
+> - `make test` 1011/0. **Paga de graça**: o item 3 da P31 (rollback culpando o
+>   inocente) e a metade "funções" do item 2 (mapa nas recusas).
 
 > **FATIA 0 ENTREGUE** *(2026-08-08, priorizada por sondagem: a prova da P29 —
 > "pcode igual a menos da renumeração" — não tem precedente na ferramenta e
