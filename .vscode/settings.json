@@ -12,10 +12,12 @@
         "statusBar.debuggingBackground": "#410A56",
         "statusBar.debuggingForeground": "#FEFBFF"
     },
-    "harbour.compilerExecutable": "/home/diego/devel/harbour-core/harbour/bin/linux/gcc/harbour",
+    // Branch compiler (HB_BIN). Keep in sync with `sh tools/hbenv.sh --print HB_BIN`:
+    // VSCode cannot call the script, so this literal path is the one place that ages.
+    "harbour.compilerExecutable": "/home/diego/devel/harbour-hbrefactor/harbour-core/bin/linux/gcc/harbour",
     "harbour.extraIncludePaths": [
-        "/home/diego/devel/harbour-core/harbour/include",
-        "/home/diego/devel/harbour-core/harbour/contrib/hbtest"
+        "/home/diego/devel/harbour-hbrefactor/harbour-core/include",
+        "/home/diego/devel/harbour-hbrefactor/harbour-core/contrib/hbtest"
     ],
     "harbour.warningLevel": 3
 }
