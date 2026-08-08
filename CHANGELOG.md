@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@a97c00d -->
+<!-- changelog-baseline: hbrefactor@1199b49 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
@@ -19,6 +19,82 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-08 — the proof now comes from the compiler itself
+
+Every applied refactoring here ends with a proof — you have seen the messages:
+`pcode byte-identical`, `symbols preserved`. Until now, part of that proof came
+from the tool reading the compiled `.hrb` files with a small reader of its own.
+A private reader of someone else's binary format is a quiet liability: the
+format can move, the reader drifts, and a drifted proof is worse than no proof.
+
+Now the compiler itself reports, while compiling, everything those proofs need
+— the module's symbol table and a fingerprint of each function's compiled code
+— and the tool compares facts the compiler stated. It no longer parses
+binaries. Where the claim is "byte-identical", the artifact is still compared
+byte for byte, as before; that path never went through a reader.
+
+What you will notice:
+
+- `verify` snapshots recorded **before** this release are refused: *"no usable
+  snapshot for this project - run `hbrefactor snapshot <project>` first"*.
+  Record a fresh one; nothing else about the oracle changed.
+- Everything else behaves as before, same commands, same messages.
+
+This is also groundwork, and honest about it: the new fingerprint comes in a
+second form that survives what adding one symbol does to a module (it renumbers
+everything the compiled code points at, changing bytes in functions nobody
+touched). That is exactly the fact needed to lift two refusals that are today
+wider than the truth — renaming one of two `PRIVATE`s created in different
+functions, and renaming a static function that a directive calls. Those renames
+are coming; the fact they need now exists.
+
+Details: docs/ast-schema.md, § `symbols[]`.
+
+## 2026-08-08 — two STATICs with the same name in one file: your cursor already says which
+
+Harbour accepts a file-wide `STATIC nTotal` and another `STATIC nTotal` inside
+a function of the same file. Two distinct variables, no warning — real code has
+this. Renaming either of them used to refuse:
+
+```
+STATIC 'nTotal' is declared in more than one place in 'a.prg'
+```
+
+Both refusals were false. The position you point at already answers the
+question: the cursor on line 13 is unambiguously the function's variable, the
+cursor on line 1 is unambiguously the file-wide one.
+
+Now the rename follows your cursor. Renaming the function's `STATIC` leaves the
+file-wide one — and every use of it — byte-for-byte intact, and vice versa.
+Shadowing is respected: inside a function that declares its own `nTotal`, that
+name belongs to the function, so a file-wide rename does not touch those lines
+— the same way the compiler binds them.
+
+The refusal survives only where it is still true: when the target is named
+instead of pointed at, and when a single directive binds both variables — there
+renaming just one would be the wrong job, not a smaller one.
+
+## 2026-08-08 — the STATIC or PRIVATE your directive writes renames too
+
+The previous entry (below) made a name written by a `#xcommand` renameable when
+that name is a `LOCAL`. If it was a file-wide `STATIC`, a function `STATIC` or
+a `PRIVATE`, the same rename failed and rolled back — and the refusal did not
+even say why.
+
+```harbour
+// count.ch
+#xcommand COUNT => nTotal += 1
+```
+
+Now `nTotal` renames whatever it is: every use in your code and the name inside
+the directive's result change together, under the same proof each rename
+already had. A homonym `LOCAL` in another function stays untouched — scope is
+the compiler's, not a text match.
+
+Two honest limits stay exactly as they were: a `PUBLIC` reachable from other
+modules keeps the textual-reference gate (`--force` and its warning), and RDD
+fields stay out — a field is not a symbol of your module.
 
 ## 2026-08-07 — renaming a variable your `#xcommand` writes
 

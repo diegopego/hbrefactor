@@ -26,7 +26,7 @@
 
 // schema do snapshot do verify (fase A.2): EXATO, como o do dump - manifesto
 // de outra versão não se degrada, se recusa
-#define SNAP_SCHEMA   "snap-1"
+#define SNAP_SCHEMA   "snap-2"
 
 // ---------------------------------------------------------------------------
 // A.1 - O CONTRATO DE MÁQUINA. Schema do envelope do `--json` (spec-a §2.2/2.5).
@@ -730,7 +730,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-23"
+   RETURN "ast-24"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -1524,28 +1524,49 @@ STATIC FUNCTION VerboEscreve( cCmd )
    RETURN hb_AScan( { "rename", "reorder-params", "extract-function", ;
                       "inline-local", "annotate", "verify" }, cCmd,,, .T. ) > 0
 
-// os fatos do .hrb de um módulo: o hash do objeto inteiro decide
-// preserved/changed; os símbolos e o pcode POR FUNÇÃO dão o delta
-STATIC FUNCTION HrbFacts( cHrb )
+// the module facts a proof consumes, from the compiler's own dump (ast-24):
+// the symbol table in order (name + 16-bit scope + link kind, richer than
+// the .hrb byte the container truncates) and, per function, the pcode size
+// plus two hashes - "hash" of the raw bytes, "nhash" with symbol-table
+// index operands normalized to the symbol NAMES (immune to renumbering).
+// The tool never parses the .hrb container: byte-identity claims keep
+// comparing the raw artifact, everything structured comes from here.
+// "ast" carries the full dump for checks that need more than the tables.
+STATIC FUNCTION ProofFacts( cTmp, cPath, cTag, cWhy )
 
-   LOCAL hParsed := HrbParse( cHrb )
-   LOCAL aSyms := {}, aFuncs := {}, aItem
+   LOCAL cFile := hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + "." + cTag + ".ast.json"
+   LOCAL hAst := hb_jsonDecode( hb_MemoRead( cFile ) )
+   LOCAL aSyms := {}, aFuncs := {}, hItem, cGot
 
-   IF hParsed == NIL
+   cWhy := ""
+   IF ! HB_ISHASH( hAst )
+      cWhy := "proof dump missing for " + hb_FNameNameExt( cPath )
       RETURN NIL
    ENDIF
-   FOR EACH aItem IN hParsed[ "syms" ]
-      AAdd( aSyms, { "name" => aItem[ 1 ], "scope" => hb_StrToHex( aItem[ 2 ] ) } )
+   cGot := hb_HGetDef( hAst, "schema", "" )
+   IF ! HB_ISSTRING( cGot ) .OR. ! cGot == AstSchema()
+      SchemaMismatch( cGot )
+      cWhy := "the dump speaks another schema - rebuild the toolchain"
+      RETURN NIL
+   ENDIF
+   FOR EACH hItem IN hAst[ "symbols" ]
+      AAdd( aSyms, { "name" => hItem[ "name" ], "scope" => hItem[ "scope" ], ;
+                     "link" => hItem[ "link" ] } )
    NEXT
-   FOR EACH aItem IN hParsed[ "funcs" ]
-      AAdd( aFuncs, { "name" => aItem[ 1 ], "pcode" => hb_MD5( aItem[ 2 ] ) } )
+   FOR EACH hItem IN hAst[ "functions" ]
+      IF ! hItem[ "fileDecl" ]
+         AAdd( aFuncs, { "name" => hItem[ "name" ], ;
+                         "size" => hb_HGetDef( hItem, "pcodeSize", 0 ), ;
+                         "hash" => hb_HGetDef( hItem, "pcodeHash", "" ), ;
+                         "nhash" => hb_HGetDef( hItem, "pcodeNormHash", "" ) } )
+      ENDIF
    NEXT
 
-   RETURN { "hrb" => hb_MD5( cHrb ), "syms" => aSyms, "funcs" => aFuncs }
+   RETURN { "syms" => aSyms, "funcs" => aFuncs, "ast" => hAst }
 
 STATIC FUNCTION Snapshot( aArgs )
 
-   LOCAL hProj, cTmp, cSnap, cPath, cHrb, hFacts
+   LOCAL hProj, cTmp, cSnap, cPath, cHrb, hFacts, cWhy
    LOCAL aMods := {}, nI := 0
 
    IF Len( aArgs ) < 2
@@ -1557,7 +1578,7 @@ STATIC FUNCTION Snapshot( aArgs )
       RETURN Refuse( "could not resolve the project '" + aArgs[ 2 ] + "'" )
    ENDIF
    cTmp := WorkDir()
-   IF ! CompileHrbAll( hProj, cTmp, "snap" )
+   IF ! CompileHrbAll( hProj, cTmp, "snap", .T. )
       RETURN Refuse( "the project does not compile - snapshot a project that builds" )
    ENDIF
 
@@ -1565,10 +1586,14 @@ STATIC FUNCTION Snapshot( aArgs )
    hb_DirCreate( cSnap )            // reutiliza o diretório: um snapshot por projeto
    FOR EACH cPath IN hProj[ "files" ]
       cHrb := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".snap.hrb" )
-      hFacts := HrbFacts( cHrb )
+      hFacts := ProofFacts( cTmp, cPath, "snap", @cWhy )
       IF hFacts == NIL
-         RETURN Refuse( "could not read the .hrb of '" + cPath + "'" )
+         RETURN Refuse( cWhy )
       ENDIF
+      // the artifact identity stays a raw byte fact; the dump never enters
+      // the manifest whole - only the tables the delta consumes
+      hb_HDel( hFacts, "ast" )
+      hFacts[ "hrb" ] := hb_MD5( cHrb )
       nI++
       // a cópia do fonte é o que torna o --rollback possível quando a edição
       // do agente quebra o build
@@ -1630,7 +1655,7 @@ STATIC FUNCTION Verify( aArgs )
    NEXT
 
    cTmp := WorkDir()
-   IF ! CompileHrbAll( hProj, cTmp, "now" )
+   IF ! CompileHrbAll( hProj, cTmp, "now", .T. )
       // o VEREDITO é campo (verdict), não uma palavra a raspar da prosa: é isto
       // que tira o /BROKEN/ da extensão. O rollback vira dado (rolledBack)
       hRes := { "verdict" => "broken", "rolledBack" => .F., "untouched" => {} }
@@ -1662,10 +1687,11 @@ STATIC FUNCTION Verify( aArgs )
          LOOP
       ENDIF
       cHrb := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".now.hrb" )
-      hNow := HrbFacts( cHrb )
+      hNow := ProofFacts( cTmp, cPath, "now", @cWhat )      // reuso de cWhat
       IF hNow == NIL
-         RETURN Refuse( "could not read the .hrb of '" + cPath + "'" )
+         RETURN Refuse( cWhat )
       ENDIF
+      hNow[ "hrb" ] := hb_MD5( cHrb )
       IF hNow[ "hrb" ] == hByPath[ cPath ][ "hrb" ]
          nSame++
       ELSE
@@ -1705,18 +1731,18 @@ STATIC FUNCTION Verify( aArgs )
               { "verdict" => "changed", "gone" => aGone, "new" => aNew, ;
                 "changed" => aDelta, "sameCount" => nSame } )
 
-// o delta de UM módulo, em fatos do .hrb: função cujo pcode mudou, função e
-// símbolo que entraram ou saíram. É o que um diff de texto não sabe dizer
+// o delta de UM módulo, em fatos do dump (ast-24): função cujo pcode mudou,
+// função e símbolo que entraram ou saíram. É o que um diff de texto não diz
 STATIC FUNCTION ModDelta( hWas, hNow )
 
    LOCAL aOut := {}, hItem, cName
    LOCAL hWasFun := { => }, hNowFun := { => }, hWasSym := { => }, hNowSym := { => }
 
    FOR EACH hItem IN hWas[ "funcs" ]
-      hWasFun[ hItem[ "name" ] ] := hItem[ "pcode" ]
+      hWasFun[ hItem[ "name" ] ] := hItem[ "hash" ]
    NEXT
    FOR EACH hItem IN hNow[ "funcs" ]
-      hNowFun[ hItem[ "name" ] ] := hItem[ "pcode" ]
+      hNowFun[ hItem[ "name" ] ] := hItem[ "hash" ]
    NEXT
    FOR EACH hItem IN hWas[ "syms" ]
       hWasSym[ hItem[ "name" ] ] := hItem[ "scope" ]
@@ -3770,6 +3796,11 @@ STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag, lAst )
       // aconteceu: 22 casos da suíte leram o dump PRÉ-edição). Sobrescrever é o
       // certo: depois da edição o fonte é outro, e o dump novo é o que vale;
       // se houver rollback, a procedência denuncia na próxima invocação.
+      //
+      // snapshot/verify reach here without AstDumps ever running, so the
+      // project dump dir may not exist yet - the compiler refuses to create
+      // it (E0032) and the symptom would be the misleading "does not compile"
+      hb_DirBuild( hb_DirSepAdd( AstDir( hProj ) ) )
       cFlags += " -x" + hb_DirSepAdd( AstDir( hProj ) )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
@@ -3779,6 +3810,16 @@ STATIC FUNCTION CompileHrbAll( hProj, cTmp, cTag, lAst )
              @cOut, @cErr ) != 0
          DiagCompile( cPath, cOut + cErr )
          RETURN .F.
+      ENDIF
+      IF hb_defaultValue( lAst, .F. )
+         // proof input (ast-24): the dump of THIS compile, tagged like the
+         // .hrb beside it so a before/after pair can be compared as facts.
+         // The untagged copy in AstDir() stays the single analysis location
+         // (W.3); the tagged one lives in the invocation scratch and no
+         // analysis reader resolves it
+         hb_MemoWrit( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + "." + cTag + ".ast.json", ;
+                      hb_MemoRead( hb_DirSepAdd( AstDir( hProj ) ) + ;
+                                   hb_FNameName( cPath ) + ".ast.json" ) )
       ENDIF
    NEXT
 
@@ -4835,7 +4876,7 @@ STATIC FUNCTION RenameFunction( aArgs )
                  RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
+   IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
       RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
@@ -4848,15 +4889,13 @@ STATIC FUNCTION RenameFunction( aArgs )
                         " does not match - rollback" )
       ENDIF
    NEXT
-   IF ! CompileHrbAll( hProj, cTmp, "after" )
+   IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       RollbackAll( hOrig )
       RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
-      IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                          hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
-                          cUpOld, cUpNew, @cSpec )              // reuso de cSpec p/ motivo
+      IF ! FactsEquivalent( cTmp, cPath, cUpOld, cUpNew, @cSpec )   // reuso de cSpec p/ motivo
          RollbackAll( hOrig )
          RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
                         RSN_VERIFY_FAILED )
@@ -4899,59 +4938,23 @@ STATIC PROCEDURE RollbackAll( hOrig )
    RETURN
 
 // ---------------------------------------------------------------------------
-// leitor do formato .hrb (portado da 1ª encarnação; ver src/vm/runner.c):
-// assinatura \xC0HRB + versão 2 bytes + símbolos[nome\0 escopo tipo] +
-// funções[nome\0 tam4 pcode]. Fail-safe: formato inesperado -> NIL -> recusa.
+// structured proofs over dump facts (ast-24).  The .hrb reader that lived
+// here (ported from the 1st incarnation) is gone: a private parser of a
+// foreign binary format drifts silently, the dump schema refuses loudly.
+// Byte-identity claims still compare the raw .hrb artifact, reader-free.
 // ---------------------------------------------------------------------------
 
-STATIC FUNCTION HrbParse( cBody )
+// post-rename: symbols/functions spelling the old name now spell the new
+// one, EVERYTHING else - scope, link kind, per-function pcode bytes -
+// identical.  For the module that was edited; an untouched module answers
+// to raw byte-identity instead
+STATIC FUNCTION FactsEquivalent( cTmp, cPath, cUpOld, cUpNew, cWhy )
 
-   LOCAL nAt := 1, nSyms, nFuncs, nI, nLen, cName
-   LOCAL aSyms := {}, aFuncs := {}
+   LOCAL hB := ProofFacts( cTmp, cPath, "before", @cWhy )
+   LOCAL hA := iif( hB == NIL, NIL, ProofFacts( cTmp, cPath, "after", @cWhy ) )
+   LOCAL nI, cExp, hSb, hSa
 
-   IF ! hb_BLeft( cBody, 4 ) == Chr( 0xC0 ) + "HRB"
-      RETURN NIL
-   ENDIF
-   nAt := 7                          // assinatura 4 + versão 2, 1-based
-   nSyms := Bin2L( hb_BSubStr( cBody, nAt, 4 ) )
-   nAt += 4
-   FOR nI := 1 TO nSyms
-      nLen := hb_BAt( Chr( 0 ), cBody, nAt ) - nAt
-      IF nLen < 0
-         RETURN NIL
-      ENDIF
-      cName := hb_BSubStr( cBody, nAt, nLen )
-      nAt += nLen + 1
-      AAdd( aSyms, { cName, hb_BSubStr( cBody, nAt, 2 ) } )
-      nAt += 2
-   NEXT
-   nFuncs := Bin2L( hb_BSubStr( cBody, nAt, 4 ) )
-   nAt += 4
-   FOR nI := 1 TO nFuncs
-      nLen := hb_BAt( Chr( 0 ), cBody, nAt ) - nAt
-      IF nLen < 0
-         RETURN NIL
-      ENDIF
-      cName := hb_BSubStr( cBody, nAt, nLen )
-      nAt += nLen + 1
-      nLen := Bin2L( hb_BSubStr( cBody, nAt, 4 ) )
-      nAt += 4
-      AAdd( aFuncs, { cName, hb_BSubStr( cBody, nAt, nLen ) } )
-      nAt += nLen
-   NEXT
-
-   RETURN { "syms" => aSyms, "funcs" => aFuncs }
-
-// pós-rename de função: símbolos/funções com o nome velho viram o novo,
-// TODO o resto (inclusive pcode byte a byte) idêntico
-STATIC FUNCTION HrbEquivalent( cBefore, cAfter, cUpOld, cUpNew, cWhy )
-
-   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
-   LOCAL nI, cExp
-
-   cWhy := ""
    IF hB == NIL .OR. hA == NIL
-      cWhy := "could not read the .hrb"
       RETURN .F.
    ENDIF
    IF Len( hB[ "syms" ] ) != Len( hA[ "syms" ] ) .OR. ;
@@ -4960,21 +4963,25 @@ STATIC FUNCTION HrbEquivalent( cBefore, cAfter, cUpOld, cUpNew, cWhy )
       RETURN .F.
    ENDIF
    FOR nI := 1 TO Len( hB[ "syms" ] )
-      cExp := iif( Upper( hB[ "syms" ][ nI ][ 1 ] ) == cUpOld, cUpNew, hB[ "syms" ][ nI ][ 1 ] )
-      IF !( Upper( hA[ "syms" ][ nI ][ 1 ] ) == Upper( cExp ) ) .OR. ;
-         !( hA[ "syms" ][ nI ][ 2 ] == hB[ "syms" ][ nI ][ 2 ] )
-         cWhy := "symbol " + hb_ntos( nI ) + " unexpected: " + hA[ "syms" ][ nI ][ 1 ]
+      hSb := hB[ "syms" ][ nI ]
+      hSa := hA[ "syms" ][ nI ]
+      cExp := iif( Upper( hSb[ "name" ] ) == cUpOld, cUpNew, hSb[ "name" ] )
+      IF !( Upper( hSa[ "name" ] ) == Upper( cExp ) ) .OR. ;
+         hSa[ "scope" ] != hSb[ "scope" ] .OR. !( hSa[ "link" ] == hSb[ "link" ] )
+         cWhy := "symbol " + hb_ntos( nI ) + " unexpected: " + hSa[ "name" ]
          RETURN .F.
       ENDIF
    NEXT
    FOR nI := 1 TO Len( hB[ "funcs" ] )
-      cExp := iif( Upper( hB[ "funcs" ][ nI ][ 1 ] ) == cUpOld, cUpNew, hB[ "funcs" ][ nI ][ 1 ] )
-      IF !( Upper( hA[ "funcs" ][ nI ][ 1 ] ) == Upper( cExp ) )
-         cWhy := "function " + hb_ntos( nI ) + " unexpected: " + hA[ "funcs" ][ nI ][ 1 ]
+      hSb := hB[ "funcs" ][ nI ]
+      hSa := hA[ "funcs" ][ nI ]
+      cExp := iif( Upper( hSb[ "name" ] ) == cUpOld, cUpNew, hSb[ "name" ] )
+      IF !( Upper( hSa[ "name" ] ) == Upper( cExp ) )
+         cWhy := "function " + hb_ntos( nI ) + " unexpected: " + hSa[ "name" ]
          RETURN .F.
       ENDIF
-      IF !( hA[ "funcs" ][ nI ][ 2 ] == hB[ "funcs" ][ nI ][ 2 ] )
-         cWhy := "pcode of " + hA[ "funcs" ][ nI ][ 1 ] + " changed"
+      IF hSa[ "size" ] != hSb[ "size" ] .OR. !( hSa[ "hash" ] == hSb[ "hash" ] )
+         cWhy := "pcode of " + hSa[ "name" ] + " changed"
          RETURN .F.
       ENDIF
    NEXT
@@ -4991,7 +4998,7 @@ STATIC FUNCTION HrbEquivalent( cBefore, cAfter, cUpOld, cUpNew, cWhy )
 //   data flow : occurrences da função no intervalo vs fora (antes/depois):
 //               dentro+fora = parâmetro; write-first + uso posterior = valor
 //               de retorno; só dentro (decl fora) = a declaração MIGRA
-// Verificação: HrbExtractCheck (símbolos +1 exato no módulo editado, demais
+// Verificação: FactsExtractCheck (símbolos +1 exato no módulo editado, demais
 // byte-idênticos) + rollback. Grafia original recuperada dos tokens.
 // ---------------------------------------------------------------------------
 
@@ -5525,12 +5532,12 @@ STATIC FUNCTION ExtractFunction( aArgs )
                  , aWork )
    ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
+   IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
       RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    hb_MemoWrit( cSrcPath, cTextNew )
 
-   IF ! CompileHrbAll( hProj, cTmp, "after" )
+   IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       hb_MemoWrit( cSrcPath, cText )
       RETURN Refuse( "the project stopped compiling after the extraction - rollback", ;
                      RSN_COMPILE_FAILED )
@@ -5542,16 +5549,13 @@ STATIC FUNCTION ExtractFunction( aArgs )
             // método: além da função gerada nova, o módulo ganha o símbolo
             // da MENSAGEM (send ::Nome) e a registração da classe embute o
             // nome - verificação por fatos previstos, não byte-idêntica
-            IF ! HrbMethodExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                                        hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
-                                        cUpGenNew, cUpNew, Upper( cClassReal ), cNewName, @cWhy )
+            IF ! FactsMethodExtractCheck( cTmp, cPath, ;
+                                          cUpGenNew, cUpNew, Upper( cClassReal ), cNewName, @cWhy )
                hb_MemoWrit( cSrcPath, cText )
                RETURN Refuse( "verification FAILED: " + cWhy + " - rollback", ;
                               RSN_VERIFY_FAILED )
             ENDIF
-         ELSEIF ! HrbExtractCheck( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                                   hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
-                                   cUpNew, @cWhy )
+         ELSEIF ! FactsExtractCheck( cTmp, cPath, cUpNew, @cWhy )
             hb_MemoWrit( cSrcPath, cText )
             RETURN Refuse( "verification FAILED: " + cWhy + " - rollback", ;
                            RSN_VERIFY_FAILED )
@@ -5822,17 +5826,16 @@ STATIC FUNCTION EditLine( cText, nLine, cNew, cEol )
    RETURN hb_BLeft( cText, nStart - 1 ) + iif( Empty( cNew ), "", cNew + cEol ) + ;
           hb_BSubStr( cText, nEnd )
 
-// pós-extração o módulo mantém todos os símbolos/funções que tinha (mesmos
-// escopos) mais exatamente a função nova; casamento por nome porque o ponto
-// de inserção desloca a ordem posicional
-STATIC FUNCTION HrbExtractCheck( cBefore, cAfter, cUpNew, cWhy )
+// post-extraction the module keeps every symbol/function it had (same
+// scopes) plus exactly the new function; matched by name because the
+// insertion point shifts positional order
+STATIC FUNCTION FactsExtractCheck( cTmp, cPath, cUpNew, cWhy )
 
-   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
-   LOCAL nI, nJ, lFound
+   LOCAL hB := ProofFacts( cTmp, cPath, "before", @cWhy )
+   LOCAL hA := iif( hB == NIL, NIL, ProofFacts( cTmp, cPath, "after", @cWhy ) )
+   LOCAL nI, nJ, lFound, hSb, hSa
 
-   cWhy := ""
    IF hB == NIL .OR. hA == NIL
-      cWhy := "could not read the .hrb"
       RETURN .F.
    ENDIF
    IF Len( hA[ "syms" ] ) != Len( hB[ "syms" ] ) + 1 .OR. ;
@@ -5841,22 +5844,24 @@ STATIC FUNCTION HrbExtractCheck( cBefore, cAfter, cUpNew, cWhy )
       RETURN .F.
    ENDIF
    FOR nI := 1 TO Len( hB[ "syms" ] )
+      hSb := hB[ "syms" ][ nI ]
       lFound := .F.
       FOR nJ := 1 TO Len( hA[ "syms" ] )
-         IF hA[ "syms" ][ nJ ][ 1 ] == hB[ "syms" ][ nI ][ 1 ] .AND. ;
-            hA[ "syms" ][ nJ ][ 2 ] == hB[ "syms" ][ nI ][ 2 ]
+         hSa := hA[ "syms" ][ nJ ]
+         IF hSa[ "name" ] == hSb[ "name" ] .AND. ;
+            hSa[ "scope" ] == hSb[ "scope" ] .AND. hSa[ "link" ] == hSb[ "link" ]
             lFound := .T.
             EXIT
          ENDIF
       NEXT
       IF ! lFound
-         cWhy := "symbol lost or altered: " + hB[ "syms" ][ nI ][ 1 ]
+         cWhy := "symbol lost or altered: " + hSb[ "name" ]
          RETURN .F.
       ENDIF
    NEXT
    lFound := .F.
    FOR nJ := 1 TO Len( hA[ "syms" ] )
-      IF hA[ "syms" ][ nJ ][ 1 ] == cUpNew
+      IF hA[ "syms" ][ nJ ][ "name" ] == cUpNew
          lFound := .T.
          EXIT
       ENDIF
@@ -5868,18 +5873,17 @@ STATIC FUNCTION HrbExtractCheck( cBefore, cAfter, cUpNew, cWhy )
 
    RETURN .T.
 
-// pós-extração PARA MÉTODO: além da função gerada nova, o módulo ganha o
-// símbolo da MENSAGEM (o send ::Nome no método de origem) e a registração da
-// classe embute o nome novo (string no pcode da função da classe) - não há
-// byte-idêntico; cada fato PREVISTO é conferido (espírito do PredictText)
-STATIC FUNCTION HrbMethodExtractCheck( cBefore, cAfter, cUpGen, cUpMsg, cUpClass, cNewSpelled, cWhy )
+// post-extraction TO A METHOD: besides the new generated function, the
+// module gains the MESSAGE symbol (the ::Name send in the source method)
+// and the class registration embeds the new name - nothing is
+// byte-identical; each PREDICTED fact is checked (PredictText spirit)
+STATIC FUNCTION FactsMethodExtractCheck( cTmp, cPath, cUpGen, cUpMsg, cUpClass, cNewSpelled, cWhy )
 
-   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
-   LOCAL nI, nJ, lFound, cName
+   LOCAL hB := ProofFacts( cTmp, cPath, "before", @cWhy )
+   LOCAL hA := iif( hB == NIL, NIL, ProofFacts( cTmp, cPath, "after", @cWhy ) )
+   LOCAL nI, nJ, lFound, cName, hSb, hSa
 
-   cWhy := ""
    IF hB == NIL .OR. hA == NIL
-      cWhy := "could not read the .hrb"
       RETURN .F.
    ENDIF
    IF Len( hA[ "funcs" ] ) != Len( hB[ "funcs" ] ) + 1
@@ -5889,37 +5893,39 @@ STATIC FUNCTION HrbMethodExtractCheck( cBefore, cAfter, cUpGen, cUpMsg, cUpClass
    FOR nI := 1 TO Len( hB[ "funcs" ] )
       lFound := .F.
       FOR nJ := 1 TO Len( hA[ "funcs" ] )
-         IF hA[ "funcs" ][ nJ ][ 1 ] == hB[ "funcs" ][ nI ][ 1 ]
+         IF hA[ "funcs" ][ nJ ][ "name" ] == hB[ "funcs" ][ nI ][ "name" ]
             lFound := .T.
             EXIT
          ENDIF
       NEXT
       IF ! lFound
-         cWhy := "function lost: " + hB[ "funcs" ][ nI ][ 1 ]
+         cWhy := "function lost: " + hB[ "funcs" ][ nI ][ "name" ]
          RETURN .F.
       ENDIF
    NEXT
-   // todo símbolo anterior sobrevive (nome+escopo); os NOVOS só podem ser o
-   // símbolo gerado e o da mensagem
+   // every prior symbol survives (name+scope+link); the NEW ones can only
+   // be the generated symbol and the message
    FOR nI := 1 TO Len( hB[ "syms" ] )
+      hSb := hB[ "syms" ][ nI ]
       lFound := .F.
       FOR nJ := 1 TO Len( hA[ "syms" ] )
-         IF hA[ "syms" ][ nJ ][ 1 ] == hB[ "syms" ][ nI ][ 1 ] .AND. ;
-            hA[ "syms" ][ nJ ][ 2 ] == hB[ "syms" ][ nI ][ 2 ]
+         hSa := hA[ "syms" ][ nJ ]
+         IF hSa[ "name" ] == hSb[ "name" ] .AND. ;
+            hSa[ "scope" ] == hSb[ "scope" ] .AND. hSa[ "link" ] == hSb[ "link" ]
             lFound := .T.
             EXIT
          ENDIF
       NEXT
       IF ! lFound
-         cWhy := "symbol lost or altered: " + hB[ "syms" ][ nI ][ 1 ]
+         cWhy := "symbol lost or altered: " + hSb[ "name" ]
          RETURN .F.
       ENDIF
    NEXT
    FOR nI := 1 TO Len( hA[ "syms" ] )
-      cName := hA[ "syms" ][ nI ][ 1 ]
+      cName := hA[ "syms" ][ nI ][ "name" ]
       lFound := .F.
       FOR nJ := 1 TO Len( hB[ "syms" ] )
-         IF hB[ "syms" ][ nJ ][ 1 ] == cName
+         IF hB[ "syms" ][ nJ ][ "name" ] == cName
             lFound := .T.
             EXIT
          ENDIF
@@ -5931,7 +5937,7 @@ STATIC FUNCTION HrbMethodExtractCheck( cBefore, cAfter, cUpGen, cUpMsg, cUpClass
    NEXT
    lFound := .F.
    FOR nJ := 1 TO Len( hA[ "syms" ] )
-      IF hA[ "syms" ][ nJ ][ 1 ] == cUpGen
+      IF hA[ "syms" ][ nJ ][ "name" ] == cUpGen
          lFound := .T.
          EXIT
       ENDIF
@@ -5940,23 +5946,43 @@ STATIC FUNCTION HrbMethodExtractCheck( cBefore, cAfter, cUpGen, cUpMsg, cUpClass
       cWhy := "new symbol " + cUpGen + " not found"
       RETURN .F.
    ENDIF
-   // fato de registro: o nome novo (grafia escrita) tem que aparecer no
-   // pcode da função da CLASSE - sem ele o método não seria registrado e o
-   // send ::Nome só falharia em runtime
-   lFound := .F.
-   FOR nI := 1 TO Len( hA[ "funcs" ] )
-      IF hA[ "funcs" ][ nI ][ 1 ] == cUpClass .AND. ;
-         hb_BAt( cNewSpelled, hA[ "funcs" ][ nI ][ 2 ] ) > 0
-         lFound := .T.
-         EXIT
-      ENDIF
-   NEXT
-   IF ! lFound
+   // the registration fact: the new name, exactly as spelled, must be one
+   // of the strings the CLASS function embeds via stringify - the same
+   // channel ClassMembersOf() reads.  Without it the method would not be
+   // registered and the ::Name send would only fail at runtime.  This
+   // replaces the old byte search inside the .hrb pcode: the dump names
+   // the string AND its stringify provenance, the byte search only proved
+   // the spelling occurred somewhere in the function's bytes
+   IF ! cNewSpelled $ ClassSpelledSet( hA[ "ast" ], cUpClass )
       cWhy := "message registration " + cNewSpelled + " not found in class " + cUpClass
       RETURN .F.
    ENDIF
 
    RETURN .T.
+
+// the strings a class function embeds via STRINGIFY (VAR/DATA/METHOD
+// registration), spelling preserved - ClassMembersOf() uppercases for
+// membership, a registration proof needs the exact text
+STATIC FUNCTION ClassSpelledSet( hAst, cUpClass )
+
+   LOCAL hSet := { => }, aSpans := FuncStmtSpans( hAst )
+   LOCAL hTok, hFrom, hOwn
+
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 41 .AND. hb_HHasKey( hTok, "from" )
+         hOwn := FuncOfTokIdx( aSpans, hTok:__enumIndex() - 1 )
+         IF hOwn != NIL .AND. ! hOwn[ "fileDecl" ] .AND. Upper( hOwn[ "name" ] ) == cUpClass
+            FOR EACH hFrom IN hTok[ "from" ]
+               IF hFrom[ "op" ] == "stringify"
+                  hSet[ hTok[ "text" ] ] := .T.
+                  EXIT
+               ENDIF
+            NEXT
+         ENDIF
+      ENDIF
+   NEXT
+
+   RETURN hSet
 
 // insere uma linha nova APÓS a linha nLine (cNew sem EOL)
 STATIC FUNCTION InsertLineAfter( cText, nLine, cNew, cEol )
@@ -6577,7 +6603,7 @@ STATIC FUNCTION InlineLocal( aArgs )
                                nDeclLine, aWork, NIL ), , aWork )
    ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
+   IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
       RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    cSpec := ApplyRangeEdits( cText, aEdits, @nLine )          // reuso de cSpec
@@ -6593,15 +6619,14 @@ STATIC FUNCTION InlineLocal( aArgs )
    ENDIF
    hb_MemoWrit( cSrcPath, cSpec )
 
-   IF ! CompileHrbAll( hProj, cTmp, "after" )
+   IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       hb_MemoWrit( cSrcPath, cText )
       RETURN Refuse( "the project stopped compiling after the inline - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cSpec IN hProj[ "files" ]                          // reuso
       IF cSpec == cSrcPath
-         IF ! HrbSymbolsEqual( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ), ;
-                               hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ), @cWhy )
+         IF ! FactsSymbolsEqual( cTmp, cSpec, @cWhy )
             hb_MemoWrit( cSrcPath, cText )
             RETURN Refuse( "verification FAILED: " + cWhy + " - rollback", ;
                            RSN_VERIFY_FAILED )
@@ -6955,7 +6980,7 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
 // multi-linha (a era occ recusava). Aridade menor que a assinatura muda
 // semântica (NIL implícito se moveria) -> recusa.
 // Verificação: o pcode MUDA legitimamente (ordem de push) - o comparador
-// exige símbolos e conjunto de funções intactos (HrbSymbolsEqual).
+// exige símbolos e conjunto de funções intactos (FactsSymbolsEqual).
 // ---------------------------------------------------------------------------
 
 STATIC FUNCTION ReorderParams( aArgs )
@@ -7231,7 +7256,7 @@ STATIC FUNCTION ReorderParams( aArgs )
                  , aWork )
    ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
+   IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
       RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
@@ -7244,14 +7269,13 @@ STATIC FUNCTION ReorderParams( aArgs )
                         " does not match what was expected - rollback" )
       ENDIF
    NEXT
-   IF ! CompileHrbAll( hProj, cTmp, "after" )
+   IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       RollbackAll( hOrig )
       RETURN Refuse( "the project stopped compiling after the reorder - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
-      IF ! HrbSymbolsEqual( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                            hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), @cWhy )
+      IF ! FactsSymbolsEqual( cTmp, cPath, @cWhy )
          RollbackAll( hOrig )
          RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback", ;
                         RSN_VERIFY_FAILED )
@@ -7637,16 +7661,15 @@ STATIC FUNCTION ApplyRangeEdits( cText, aEdits, nLineBad )
 
    RETURN cText
 
-// pós-reorder: tabela de símbolos e CONJUNTO de funções intactos (pcode
-// muda legitimamente - ordem de push)
-STATIC FUNCTION HrbSymbolsEqual( cBefore, cAfter, cWhy )
+// post-reorder: symbol table and function SET intact (pcode legitimately
+// changes - push order)
+STATIC FUNCTION FactsSymbolsEqual( cTmp, cPath, cWhy )
 
-   LOCAL hB := HrbParse( cBefore ), hA := HrbParse( cAfter )
-   LOCAL nI
+   LOCAL hB := ProofFacts( cTmp, cPath, "before", @cWhy )
+   LOCAL hA := iif( hB == NIL, NIL, ProofFacts( cTmp, cPath, "after", @cWhy ) )
+   LOCAL nI, hSb, hSa
 
-   cWhy := ""
    IF hB == NIL .OR. hA == NIL
-      cWhy := "could not read the .hrb"
       RETURN .F.
    ENDIF
    IF Len( hB[ "syms" ] ) != Len( hA[ "syms" ] ) .OR. ;
@@ -7655,14 +7678,16 @@ STATIC FUNCTION HrbSymbolsEqual( cBefore, cAfter, cWhy )
       RETURN .F.
    ENDIF
    FOR nI := 1 TO Len( hB[ "syms" ] )
-      IF !( hA[ "syms" ][ nI ][ 1 ] == hB[ "syms" ][ nI ][ 1 ] ) .OR. ;
-         !( hA[ "syms" ][ nI ][ 2 ] == hB[ "syms" ][ nI ][ 2 ] )
+      hSb := hB[ "syms" ][ nI ]
+      hSa := hA[ "syms" ][ nI ]
+      IF !( hSa[ "name" ] == hSb[ "name" ] ) .OR. ;
+         hSa[ "scope" ] != hSb[ "scope" ] .OR. !( hSa[ "link" ] == hSb[ "link" ] )
          cWhy := "symbol " + hb_ntos( nI ) + " changed"
          RETURN .F.
       ENDIF
    NEXT
    FOR nI := 1 TO Len( hB[ "funcs" ] )
-      IF !( hA[ "funcs" ][ nI ][ 1 ] == hB[ "funcs" ][ nI ][ 1 ] )
+      IF !( hA[ "funcs" ][ nI ][ "name" ] == hB[ "funcs" ][ nI ][ "name" ] )
          cWhy := "function " + hb_ntos( nI ) + " was renamed"
          RETURN .F.
       ENDIF
@@ -9422,7 +9447,7 @@ STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
 //   léxica homônima nas funções que usam o velho (mudaria binding em
 //   silêncio - a recusa-chave da spec); strings com o nome velho =
 //   call-by-name possível (TYPE/__mvGet) - aviso + --force.
-// Verificação: HrbEquivalent (símbolo renomeado, pcode byte-idêntico) em
+// Verificação: FactsEquivalent (símbolo renomeado, pcode byte-idêntico) em
 // todos os módulos + rollback; execução idêntica é contrato da suíte.
 // ---------------------------------------------------------------------------
 
@@ -9641,7 +9666,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    NEXT
    // P28 fatia 3: os sítios que uma DIRETIVA aplicada escreve entram no MESMO
    // conjunto, e passam pela MESMA prova - a deste verbo, que aceita um símbolo
-   // renomeado (HrbEquivalent), não a byte-identidade do local/static. É por
+   // renomeado (FactsEquivalent), não a byte-identidade do local/static. É por
    // isto que isto mora AQUI e não no motor da P27: a análise de alcance do
    // memvar (criador, grafo de quem roda com ele vivo, criação por macro) é
    // inseparável das guardas dele, e a prova é outra
@@ -9672,7 +9697,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
                  RenameResult( "preview", "memvar", cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
+   IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
       RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
@@ -9685,14 +9710,14 @@ STATIC FUNCTION RenameMemvar( aArgs )
                         " does not match - rollback" )
       ENDIF
    NEXT
-   IF ! CompileHrbAll( hProj, cTmp, "after" )
+   IF ! CompileHrbAll( hProj, cTmp, "after", .T. )
       RollbackAll( hOrig )
       RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
    // a prova, e ela é DUAS conforme o módulo tenha sido editado ou não.
    //
-   // O `HrbEquivalent` aceita UMA substituição: todo símbolo com o nome velho
+   // O `FactsEquivalent` aceita UMA substituição: todo símbolo com o nome velho
    // vira o novo. Isso é o certo para um módulo QUE FOI EDITADO. Aplicá-lo a um
    // módulo intocado era uma recusa FALSA: um módulo que declare um campo de
    // área de trabalho homônimo tem um símbolo com o nome velho que deve
@@ -9705,9 +9730,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    // é efeito colateral - e aí a recusa é verdadeira.
    FOR EACH cPath IN hProj[ "files" ]
       IF hb_HHasKey( hEdits, hb_PathNormalize( hb_PathJoin( hb_DirSepAdd( hb_cwd() ), cPath ) ) )
-         IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
-                             cUpOld, cUpNew, @cWhy )
+         IF ! FactsEquivalent( cTmp, cPath, cUpOld, cUpNew, @cWhy )
             RollbackAll( hOrig )
             RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback", ;
                            RSN_VERIFY_FAILED )
@@ -14382,7 +14405,7 @@ STATIC FUNCTION RenameMethod( aArgs )
                  " edit(s) previewed", hRes, , aWork )
    ENDIF
 
-   IF ! CompileHrbAll( hProj, cTmp, "before" )
+   IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
       RETURN Refuse( "failed to compile the reference state" )
    ENDIF
    FOR EACH cPath IN hb_HKeys( hEdits )
@@ -14406,16 +14429,14 @@ STATIC FUNCTION RenameMethod( aArgs )
    // registro e nome da função gerada) - símbolos conferidos com o mapa
    // COMPUTADO; demais módulos: byte-idêntico com o símbolo renomeado
    FOR EACH cPath IN hProj[ "files" ]
-      cText := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" )
-      cWhy  := hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" )
       IF ! Empty( hFacts[ cPath ][ "arts" ] )
-         IF ! HrbSymbolsRenamed( cText, cWhy, hMap, hOpt, @cSpec )
+         IF ! FactsSymbolsRenamed( cTmp, cPath, hMap, hOpt, @cSpec )
             RollbackAll( hOrig )
             RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
                            RSN_VERIFY_FAILED )
          ENDIF
       ELSE
-         IF ! HrbEquivalent( cText, cWhy, cUpOld, cUpNew, @cSpec )
+         IF ! FactsEquivalent( cTmp, cPath, cUpOld, cUpNew, @cSpec )
             RollbackAll( hOrig )
             RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
                            RSN_VERIFY_FAILED )
@@ -14462,21 +14483,20 @@ STATIC FUNCTION RenameMethod( aArgs )
    hRes[ "derivedStrings" ] := aPredS
    RETURN Ok( cWhy, hRes )
 
-// símbolos/funções iguais módulo um conjunto de renomes esperados; o
-// PCODE do módulo pode divergir (strings de registro de mensagem mudam
-// de conteúdo e tamanho) - quem fecha o contrato é a execução idêntica.
-// hMap = renomes ESTRITOS (têm que acontecer: mensagem de método,
-// artefatos compostos); hOpt = renomes OPCIONAIS (nome cru de marker
-// puro: um símbolo homônimo REAL fica, um clone derivado vira o novo -
-// os dois desfechos são legais, caso 108)
-STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, hOpt, cWhy )
+// symbols/functions equal modulo a set of expected renames; the module's
+// PCODE may diverge (message registration strings change content and
+// size) - identical execution is what closes the contract.
+// hMap = STRICT renames (must happen: method message, composite
+// artifacts); hOpt = OPTIONAL renames (raw name of a pure marker: a REAL
+// homonym symbol stays, a derived clone becomes the new one - both
+// outcomes are legal, case 108)
+STATIC FUNCTION FactsSymbolsRenamed( cTmp, cPath, hMap, hOpt, cWhy )
 
-   LOCAL hA := HrbParse( cBefore ), hB := HrbParse( cAfter )
+   LOCAL hA := ProofFacts( cTmp, cPath, "before", @cWhy )
+   LOCAL hB := iif( hA == NIL, NIL, ProofFacts( cTmp, cPath, "after", @cWhy ) )
    LOCAL nI, cName, cAfterName
 
-   cWhy := ""
    IF hA == NIL .OR. hB == NIL
-      cWhy := "unexpected .hrb format"
       RETURN .F.
    ENDIF
    IF Len( hA[ "syms" ] ) != Len( hB[ "syms" ] ) .OR. Len( hA[ "funcs" ] ) != Len( hB[ "funcs" ] )
@@ -14484,8 +14504,8 @@ STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, hOpt, cWhy )
       RETURN .F.
    ENDIF
    FOR nI := 1 TO Len( hA[ "syms" ] )
-      cName      := hA[ "syms" ][ nI ][ 1 ]
-      cAfterName := hB[ "syms" ][ nI ][ 1 ]
+      cName      := hA[ "syms" ][ nI ][ "name" ]
+      cAfterName := hB[ "syms" ][ nI ][ "name" ]
       IF !( hb_HGetDef( hMap, cName, cName ) == cAfterName ) .AND. ;
          !( hb_HHasKey( hOpt, cName ) .AND. hOpt[ cName ] == cAfterName )
          cWhy := "symbol " + cName + " -> " + cAfterName + " unexpected"
@@ -14493,8 +14513,8 @@ STATIC FUNCTION HrbSymbolsRenamed( cBefore, cAfter, hMap, hOpt, cWhy )
       ENDIF
    NEXT
    FOR nI := 1 TO Len( hA[ "funcs" ] )
-      cName      := hA[ "funcs" ][ nI ][ 1 ]
-      cAfterName := hB[ "funcs" ][ nI ][ 1 ]
+      cName      := hA[ "funcs" ][ nI ][ "name" ]
+      cAfterName := hB[ "funcs" ][ nI ][ "name" ]
       IF !( hb_HGetDef( hMap, cName, cName ) == cAfterName ) .AND. ;
          !( hb_HHasKey( hOpt, cName ) .AND. hOpt[ cName ] == cAfterName )
          cWhy := "function " + cName + " -> " + cAfterName + " unexpected"

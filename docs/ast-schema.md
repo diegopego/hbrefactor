@@ -166,7 +166,10 @@ ast-2 sem `from` via hbmk2 enquanto o harbour emite ast-3). Conferência:
   "hasCDump": false,             // módulo tem #pragma BEGINDUMP
   "kt": false,                   // ast-7: compilado com -kt? (anotações
                                  // impostas em runtime - camada guaranteed)
-  "tokens": [...], "functions": [...] }
+  "tokens": [...],
+  "symbols": [...],              // ast-24: a tabela de símbolos do módulo
+                                 // (§ abaixo)
+  "functions": [...] }
 ```
 
 ### `provenance` — de que o dump foi feito (ast-22)
@@ -642,6 +645,9 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
 ```jsonc
 { "name": "MAIN", "kind": "procedure"|"function", "static": false,
   "fileDecl": false, "line": 5, "usesMacro": false,   // & macro no pcode
+  "pcodeSize": 34,                    // ast-24: só em função que vira código
+  "pcodeHash": "641ef8115be05f41",    // (fileDecl NÃO tem) - ver § symbols[]
+  "pcodeNormHash": "7d10bed9943a2871",
   "declarations": [   // ast-4: capturadas no PARSE (ver nota abaixo)
     { "sym": "NTOTAL", "scope": "local"|"static"|"field"|"memvar"|
                         "private"|"public",
@@ -783,6 +789,58 @@ Semânticas importantes:
   `block:true`; captura de local externa = `detached`).
 - PRIVATE/PUBLIC com init aparecem em occurrences como `memvar` `write`
   (hook RTVar) + call `__MVPRIVATE`/`__MVPUBLIC`.
+
+## `symbols[]` + hashes de pcode por função (ast-24, P32 fatia 0)
+
+A identidade estrutural do módulo compilado, no dump — o que antes exigia um
+leitor caseiro do container `.hrb` (o `HrbParse` da ferramenta, morto nesta
+fatia). Leitor próprio de formato alheio deriva em silêncio; o schema do dump
+é exato e **berra** quando core e ferramenta divergem (caso 122).
+
+```jsonc
+"symbols": [    // a tabela de símbolos, NA ORDEM da tabela - o índice N aqui
+                // É o índice que os operandos de pcode referenciam
+  { "name": "MAIN",   "scope": 517,  "link": "func" },
+  { "name": "XCFG",   "scope": 128,  "link": "none" },
+  { "name": "OUTSTD", "scope": 8192, "link": "extern" } ]
+```
+
+- **A enumeração espelha o gerador do `.hrb`** (`genhrb.c`): mesma lista
+  (`symbols.pFirst`), mesma ordem. Em `functions[]`, as funções que viram
+  código são as mesmas que o `.hrb` serializa — `fileDecl` fica de fora, e é
+  por isso que os campos `pcode*` não existem nela.
+- **`scope` é o escopo COMPLETO de 16 bits do compilador** (`HB_FS_*` de
+  `include/hbvmpub.h`: `0x02` = STATIC, `0x200` = LOCAL…). O byte de escopo
+  do container `.hrb` trunca o byte alto — um FIXME conhecido do próprio
+  `genhrb.c`; o dump não herda a dívida.
+- **`link`** é a classificação que o `.hrb` grava no byte de tipo: `"func"`
+  (definida neste módulo), `"extern"` (definida noutro), `"deferred"`
+  (ligação tardia), `"none"` (não é função — memvar, campo, mensagem).
+- **`pcodeHash`** = FNV-1a 64 dos bytes crus do pcode da função;
+  **`pcodeSize`** = a contagem exata deles (colisão precisaria ainda de
+  tamanho igual). Igualdade = código byte-idêntico. O algoritmo é o mesmo da
+  procedência (ast-22), pela mesma razão estrutural: o md5 do core mora na
+  `libhbrtl`, e o adversário é *"mudou"*, não um falsificador.
+- **`pcodeNormHash`** = o mesmo stream com **cada operando de índice-de-
+  símbolo substituído pelo NOME do símbolo** (e os pares near/wide de opcode
+  — `PUSHSYMNEAR`/`PUSHSYM` etc. — dobrados no wide: a largura do índice é
+  acidente de codificação). O pcode endereça memvar, field, mensagem e
+  função por POSIÇÃO na tabela; um símbolo a mais renumera a tabela e muda o
+  pcode cru de função que ninguém tocou. Este hash é o fato que sobrevive à
+  renumeração — é a prova que a P29 precisa (*"um símbolo a mais e todo o
+  resto igual a menos da renumeração"*). Medido no controle: símbolo
+  inserido no meio da tabela → função intocada sai `pcodeHash` DIFERENTE e
+  `pcodeNormHash` IGUAL; edição real → os dois mudam.
+- **A lista de opcodes com operando de símbolo espelha o `genc.c`** (cada
+  sítio de `hb_compSymbolName()` no modo verbose), a autoridade da árvore
+  sobre o layout: 16 opcodes de operando USHORT + 3 variantes NEAR de 1
+  byte. `HB_P_WITHOBJECTMESSAGE` com `0xFFFF` (*":&macro"*, sem símbolo)
+  fica cru, como o VM o trata.
+- **Quem consome**: as provas estruturadas da ferramenta (`ProofFacts` →
+  `FactsEquivalent`/`FactsExtractCheck`/`FactsMethodExtractCheck`/
+  `FactsSymbolsEqual`/`FactsSymbolsRenamed`) e o snapshot do `verify`
+  (manifest `snap-2`). Byte-identidade continua CRUA sobre o artefato
+  `.hrb`, sem parser — o padrão-ouro segue sendo sobre o artefato.
 
 ## Canal de tipos da linguagem (ast-4, fase B4f)
 
@@ -1601,6 +1659,13 @@ fechado vive só no `ReadAst`"*). A P10 achou essa lista viva, e ela **matou a f
 inteira** no instante em que o core versionou para `ast-16` — recusa de todo módulo, com
 o diagnóstico enganoso *"dump missing"*, com o dump no lugar. **Regra excetuada não é
 regra.**
+
+A identidade estrutural do módulo (`symbols[]` + `pcodeSize`/`pcodeHash`/
+`pcodeNormHash` por função) entregue no **ast-24** (P32 fatia 0,
+2026-08-08), consumida pelas provas estruturadas (`ProofFacts`) e pelo
+snapshot do `verify` — o leitor caseiro de `.hrb` (`HrbParse`) morreu no
+mesmo commit, e nenhum leitor novo nasceu: os fatos saem da PRÓPRIA
+compilação.
 
 Próximo a avaliar: span original de string no posTrack
 (mataria `StrDelimsOk`). Ao mudar, versionar `"schema"` e atualizar este

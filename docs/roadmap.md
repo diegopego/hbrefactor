@@ -1186,7 +1186,34 @@ liga assim. A coleta file-wide passa a excluir esses spans (`SombreadoEm`).
 A recusa por ambiguidade sobrevive onde continua verdadeira: sem posição (busca ampla, o que
 o motor da P27/P28 usa) e no caso da diretiva prendendo as duas.
 
-### P32 — renomear a função ESTÁTICA que uma diretiva chama *(aberto 2026-08-08; **A FAZER**; spec por ordem do Diego: "quero")*
+### P32 — renomear a função ESTÁTICA que uma diretiva chama *(aberto 2026-08-08; **FATIA 0 ✅ ENTREGUE 2026-08-08 (`ast-24`)** — corpo A FAZER; spec por ordem do Diego: "quero")*
+
+> **FATIA 0 ENTREGUE** *(2026-08-08, priorizada por sondagem: a prova da P29 —
+> "pcode igual a menos da renumeração" — não tem precedente na ferramenta e
+> exigiria crescer o leitor caseiro de `.hrb` até um decodificador de pcode,
+> o drift que a rodada 2 desta spec já vetou; a fatia 0 serve as duas fases)*:
+> - **`ast-24` no core** (`compast.c`): `symbols[]` (nome + escopo de 16 bits +
+>   link, espelhando a enumeração do `genhrb.c`) e, por função que vira código,
+>   `pcodeSize` + `pcodeHash` (bytes crus) + **`pcodeNormHash`** — o stream com
+>   operandos de índice-de-símbolo trocados pelo NOME (lista de 19 opcodes
+>   espelhada do `genc.c`, pares near/wide dobrados, `0xFFFF` do
+>   `WITHOBJECTMESSAGE` cru). O hash é FNV-1a 64 + tamanho, o MESMO da
+>   procedência ast-22 e pela mesma razão estrutural (md5 mora na `libhbrtl`;
+>   o adversário é "mudou", não um falsificador) — o "hash forte" da spec
+>   original foi ajustado a esse precedente documentado no ast-schema.md.
+> - **Controles medidos** (sonda em diretório novo com baseline git): símbolo
+>   inserido no MEIO da tabela → função intocada sai raw DIFERENTE / norm
+>   IGUAL (o fato exato da P29); edição real → os dois mudam.
+> - **O `HrbParse` MORREU e nenhum leitor de `.hrb` nasceu**: `ProofFacts`
+>   lê o dump etiquetado (`.before/.after/.snap/.now.ast.json`, copiado pelo
+>   `CompileHrbAll` na MESMA compilação que gera o `.hrb`), e os cinco
+>   comparadores viraram `FactsEquivalent`/`FactsExtractCheck`/
+>   `FactsMethodExtractCheck`/`FactsSymbolsEqual`/`FactsSymbolsRenamed`. O
+>   `hb_BAt` do extract-de-método (busca de bytes no pcode) virou fato de
+>   stringify do dump (`ClassSpelledSet`). O snapshot do `verify` migrou para
+>   `snap-2` (fatos do dump + md5 do artefato). Os 34 sítios de
+>   byte-identidade continuam CRUS sobre o `.hrb`.
+> - `make test` 1005/0; caso 122 guarda o passo core↔ferramenta em `ast-24`.
 
 **O caso.** `#xcommand XLOG <m> => Remessa( <m> )`, e cada módulo que usa o comando tem a
 SUA `STATIC FUNCTION Remessa` — a mesma palavra no result, uma função diferente por módulo
@@ -1329,7 +1356,7 @@ ser recusas se o core informar?"; sondado antes de responder)*:
 | recusa | veredito | o que falta |
 |---|---|---|
 | memvar misturado (`directive-also-binds-a-memvar`) | fundada HOJE | **ferramenta**: prova por-módulo (a arquitetura da P28 fatia 3, aplicada ao motor conjunto) — o core já informa tudo |
-| P29, criadores disjuntos | fundada HOJE | **ferramenta**: prova nova (pcode igual A MENOS da renumeração de símbolos; precedente `symbols-preserved`, e o `HrbParse` já existe) |
+| P29, criadores disjuntos | fundada HOJE | **ferramenta**: prova nova (pcode igual A MENOS da renumeração de símbolos — o fato é o `pcodeNormHash` do `ast-24`, entregue na fatia 0 da P32; medido: renumeração preserva o norm, edição real muda os dois) |
 | variável que a diretiva possui | fundada HOJE | **ferramenta**: alpha-rename no result é provável com `-gh -l` (nome de local não existe no pcode) |
 | funções ESTÁTICAS citadas no result (f1/f2/f3) | fundada HOJE | **ferramenta — a sonda seguinte DESMENTIU o "precisa do core"**: o vínculo já está gravado na tabela de símbolos do `.hrb` (`HB_FS_STATIC`), que o core produz e o `HrbParse` já lê. Virou a [P32](#p32--renomear-a-função-estática-que-uma-diretiva-chama) |
 | regra builtin | física (não há arquivo) | o core PODERIA estampar a origem (`std.ch:linha`) para o RELATO; nunca vira rename — editar `std.ch` é reconstruir o Harbour |
@@ -1393,6 +1420,8 @@ byte-identidade.
 - **Prova nova**, na linha do `symbols-preserved`: mesma quantidade de funções, pcode de cada
   função igual **a menos dos índices de símbolo**, e a tabela igual mais o símbolo novo.
   Sem isso a fatia não entrega — editar sem prova é o que esta ferramenta não faz.
+  *(2026-08-08: o fato já existe — `pcodeNormHash` por função no `ast-24` (P32 fatia 0),
+  e o controle da renumeração está medido. A prova vira comparação de fatos do dump.)*
 - Buraco no grafo (chamada dinâmica, macro) continua recusando, com o código que já existe.
 
 **Critério de pronto (mecânico)**: caso com dois criadores de alcance DISJUNTO renomeando um

@@ -66,7 +66,16 @@ conjunto, e a genealogia atravessa regra que gera regra. A P31 virou 4 itens con
 (diagnóstico multi-ligação, mapa nas recusas, o rollback que culpa o inocente, a declaração
 file-wide no `usages`); **qual entra e em que ordem é decisão dele.**
 
-### 2.3 A P32 — a função estática que uma diretiva chama *(nasceu 2026-08-08; spec pronta)*
+### 2.3 A P32 — a função estática que uma diretiva chama *(nasceu 2026-08-08; **fatia 0 ENTREGUE**, corpo aberto)*
+
+> **Fatia 0 (`ast-24`) entregue em 2026-08-08** — priorizada por sondagem de
+> código (frequência no corpus + a prova da P29 depende dela). O dump carrega
+> `symbols[]` e `pcodeSize`/`pcodeHash`/`pcodeNormHash` por função; o
+> `HrbParse` morreu (provas = `ProofFacts` sobre dumps etiquetados; snapshot
+> `snap-2`); controles da normalização medidos; `make test` 1005/0. Registro
+> completo na P32 do roadmap; contrato no ast-schema.md. **Fica aberto: o
+> CORPO da fase** (rename da static citada no result, prova por-módulo, misto
+> recusa com mapa, inversão do caso pinado) — e a P29 agora tem o fato dela.
 
 Ordem do Diego ("quero"), e a natureza dela mudou DUAS vezes até a forma final — as três
 versões estão datadas na [P32 do roadmap](roadmap.md#p32--renomear-a-função-estática-que-uma-diretiva-chama):
