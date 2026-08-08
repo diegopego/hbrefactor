@@ -1,0 +1,19 @@
+#line 3 "app.prg"
+PROCEDURE Main()
+
+   STATIC nLinhas := 0
+
+   nLinhas += 1 ; OutStd( "iniciando" )
+   OutStd( hb_ntos( nLinhas ) )
+   Outra()
+
+   RETURN
+
+STATIC PROCEDURE Outra()
+
+   STATIC nLinhas := 0
+
+   nLinhas += 1 ; OutStd( "seguindo" )
+   OutStd( hb_ntos( nLinhas ) )
+
+   RETURN

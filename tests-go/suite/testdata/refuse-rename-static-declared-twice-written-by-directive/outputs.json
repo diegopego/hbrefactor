@@ -1,0 +1,40 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:5:11",
+   "nTotal",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "static-declared-more-than-once",
+  "action": "stop-and-report",
+  "detail": "'nLinhas' is written by a directive and declared STATIC in more than one place in app.prg - those are different variables that the same rule binds, and this rename covers one; refusing",
+  "diagnostics": [
+   {
+    "code": "name-also-written-by-directive",
+    "severity": "warning",
+    "location": {
+     "uri": "file://<CWD>/cmdlog.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 28
+      },
+      "end": {
+       "line": 0,
+       "character": 35
+      }
+     }
+    },
+    "detail": "'nLinhas' is named by a preprocessor rule - cmdlog.ch:1:29: in rule result (#xcommand CMD_LOG)"
+   }
+  ],
+  "result": {},
+  "edits": []
+ }
+]

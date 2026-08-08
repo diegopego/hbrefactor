@@ -1,0 +1,2 @@
+app.prg(5) >CONTADOR<
+#xcommand >LOCAL nInterno := 0 ; nInterno++ ; OutStd( hb_ntos( nInterno ) )<

@@ -1,0 +1,21 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "conta.ch:1:29",
+   "nContador",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "variable-belongs-to-the-directive",
+  "action": "stop-and-report",
+  "detail": "'nInterno' is declared AND used entirely by the directive that generates MAIN (app.prg) - your code never writes it, so there is nothing here to rename",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+ }
+]

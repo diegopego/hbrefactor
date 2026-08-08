@@ -249,6 +249,18 @@ propunha — que é exatamente a heurística que o projeto existe para matar, fe
    houve resposta clara e errada, e o controle que faltava não era sobre o alvo, era sobre o
    instrumento. *([cic §5.1c])*
 
+8. **PASTA DE SONDA É DE USO ÚNICO — a ferramenta EDITA os fontes** *(Diego, 2026-08-08:
+   "precisa resolver este comportamento", depois da TERCEIRA contaminação no mesmo dia)*.
+   Reusar um diretório de sonda faz o **"antes" da medição ser o "depois" da anterior**, e
+   o modo de falha não é silêncio: é **resposta errada e confiante**. Os três cadáveres do
+   dia: rodar `usages` onde um `rename` já havia editado; "restaurar" com `sed` e medir
+   (o nome velho já era o novo); e copiar como modelo uma pasta que o script anterior
+   editara. **Mecanismo: [`tools/probe.sh`](tools/probe.sh)** — `new` cria diretório que
+   NUNCA se repete e grava o estado inicial; `check` **recusa** medir numa pasta já
+   modificada; `diff` diz o que mudou. Ele só protege quem o chama — é ferramenta, não
+   portão automático —, e é por isso que a régua vem antes: **toda sonda começa por
+   `D=$(sh tools/probe.sh new ...)`**, nunca por um `mkdir` meu.
+
 ### 1.8 EXERCITE O CÓDIGO ANTES DE OPINAR — e experimente para MATAR a sua tese
 
 *(Diego, 2026-08-07, e o custo adicional é ACEITO de propósito: "vai custar mais, vai demorar

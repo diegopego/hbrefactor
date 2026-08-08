@@ -27,6 +27,9 @@ conversa")*. Não some quando a frente principal entrega — some quando o §2 e
 | **P26** | o `text` do envelope é VERBATIM — `text[start:end]` volta a recortar a palavra |
 | **P27** *(commit `3ad98db`)* | o nome escrito no RESULTADO de uma regra se renomeia, pelas duas pontas |
 | **P28 fatia 1** *(mesmo commit)* | recusa de `static`/`memvar` diz qual `.ch` escreve o nome |
+| **P28** *(3 fatias)* | `static` e `memvar` escritos por diretiva renomeiam os dois lados; a fatia 1 (relato) virou andaime e saiu |
+| **matriz de homônimos** | 6 casos SEM diretiva: local sombreando, param, static de outro módulo, dois criadores, uso fora do alcance, campo de área de trabalho |
+| **prova do memvar** | recusa falsa consertada: módulo NÃO editado exige byte-identidade (mais duro), módulo editado aceita um símbolo trocado |
 
 Mais: os dois toolchains viraram dependência do projeto (`make stock`,
 `make pcode-identity`), o build limpo do core parou de deixar a árvore sem compilador,
@@ -42,48 +45,32 @@ sem fato atrás; o terceiro acusava 54 linhas do fonte e nenhuma era heurística
 
 ## 2. ⚠️ O QUE AINDA NÃO FECHOU — e é por isto que este arquivo existe
 
-### 2.1 A P28 — a diretiva que escreve um STATIC ou um MEMVAR *(nasceu nesta sessão)*
+### 2.1 A P29 — dois criadores PRIVATE, recusa larga demais *(nasceu 2026-08-08)*
 
-Spec com a tabela de sondas na
-[P28 do roadmap](roadmap.md#p28--a-diretiva-que-escreve-um-static-ou-um-memvar). São TRÊS
-fatias, e a ordem foi decidida medindo os dois verbos por dentro.
+Spec com tabela de sondas na
+[P29 do roadmap](roadmap.md#p29--dois-criadores-private-a-recusa-é-larga-demais). Em uma
+frase: a ferramenta JÁ separa o alcance de cada criador e joga a distinção fora, recusando
+igual quando os alcances são disjuntos (decidível) e quando se cruzam (aí sim ambíguo).
 
-| fatia | o quê | estado |
-|---|---|---|
-| **1 — o relato** | recusa de `static`/`memvar` passa a dizer qual `.ch` escreve o nome | ✅ **ENTREGUE 2026-08-07** |
-| **2 — o static** | o motor da P27 alcança `static` e edita os dois lados | **A FAZER** |
-| **3 — o memvar** | idem para `private`/`public` | **A FAZER, e o tamanho é DESCONHECIDO** |
+**Não falta fato nem edição — falta PROVA.** Acrescentar um símbolo renumera a tabela e muda
+o pcode de funções intocadas (`HB_P_PUSHMEMVAR` indexa `pSymbols`). Precedente para a prova
+nova: o `symbols-preserved` do `reorder-params`.
 
-**Fatia 1, entregue.** `DiagRuleWritesApplied()` emite a regra como `diagnostics[]` nas
-recusas dos dois verbos. O gatilho é **aplicação**, não menção: uma regra só REGISTRADA num
-módulo que nunca usa o comando não causou nada ali, e relatá-la foi o erro que matou o
-`DiagRuleWrites` antes. Casos: `refuse-rename-static-written-by-directive` e
-`refuse-rename-memvar-written-by-directive` (dois, porque são dois sítios de chamada — um
-não pega o outro emudecendo).
+### 2.2 A P30 — dois STATIC de mesmo nome no mesmo `.prg` *(nasceu 2026-08-08)*
 
-**Fatia 2 é repetição de caminho já andado.** O `rename-static` tem a MESMA forma que o
-`rename-local` tinha: guardas, laço que junta posições, dedup. Foi daí que saiu o
-`LocalScan`; sai igual.
+Recusa falsa **sem diretiva nenhuma**: `STATIC` file-wide e `STATIC` de função com o mesmo
+nome são duas variáveis ordinárias, e o cursor já diz qual é qual. Spec com a medição na
+[P30 do roadmap](roadmap.md#p30--dois-static-de-mesmo-nome-no-mesmo-prg-e-o-cursor-já-diz-qual).
 
-**Fatia 3 é diferente, e por isso está por último.** O `rename-memvar` **não** é um coletor
-de posições: ele calcula o alcance de quem criou a variável, monta o grafo de funções que
-rodam com ela viva, recusa se o alcance tem buracos, e trata criação por macro. Antes de
-propor mecanismo é preciso **medir** se aquele alcance continua valendo com as edições do
-`.ch` dentro do conjunto. *(A suspeita do Diego de que "cada caso tem uma complexidade" se
-confirma AQUI — e não por falta de prova, como eu tinha escrito, mas porque o verbo faz
-muito mais coisa.)*
+### 2.3 A página pública (`site/index.html`) — ADIADA pelo Diego
 
-### 2.2 Duas dívidas que a P27 abriu e não fechou
+O manual foi atualizado (baseline `a97c00d`, dois itens novos em *Still rough*). A página é
+derivação mecânica dele e **não** precisa de segunda aprovação — mas o Diego adiou em
+2026-08-08 ("o manual ainda não"). Retomar daqui.
 
-- **O hook anti-heurística não tem teste.** Ele é um portão que ninguém verifica, e a P27
-  mexeu nele (apagou a regra 2). Eu propus escrever o teste; o Diego autorizou só o apagar.
-  Fica: um diff com a aritmética de abreviação tem de BARRAR, um com `Len( aArgs ) < 6` tem
-  de PASSAR.
-- **O ponteiro de baseline do `CHANGELOG.md` está parado em `e3efe33`**, com 13 commits
-  depois dele — e há entradas de 2026-08-07 que parecem descrever parte deles. Ou o ponteiro
-  ficou para trás, ou as entradas foram escritas sem movê-lo. **Não mexi**: mover sem saber
-  o que ele já cobre quebra a retomada, que é justamente o que ele existe para dar. Conferir
-  antes de escrever a próxima entrada.
+*(O ponteiro do `CHANGELOG.md` saiu desta lista: foi movido para `a97c00d` depois de escritas
+as duas entradas que faltavam — as posições dos usos que a diretiva escreve, e a linha crua
+nos resultados `--json`.)*
 
 ---
 
@@ -102,6 +89,10 @@ muito mais coisa.)*
   rebuildado o core** (aconteceu: o schema pulou de `ast-21` para `ast-22` sem eu saber).
 - **Sessões em paralelo disputam recursos globais:** `make core`/`make stock` mexem em
   binários compartilhados, e `make test` escreve em `tests/tmp/`.
+- **Sonda começa por `D=$(sh tools/probe.sh new <modelo>)`, nunca por `mkdir` seu.** A
+  ferramenta EDITA os fontes, então pasta de sonda é de uso único; reusar faz o "antes"
+  ser o "depois" da medição anterior, e a medição SAI, com cara de resposta. Aconteceu
+  três vezes em 2026-08-08. *(Regra no [CLAUDE.md §1.7.8](../CLAUDE.md).)*
 - **Nada de `git add -A`** — nomear arquivo por arquivo é o que evita varrer trabalho de
   outra sessão para dentro do seu commit.
 - **`docs/roadmap.md` é escrito pelas duas sessões.** Reler antes de escrever.

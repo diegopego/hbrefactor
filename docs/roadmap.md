@@ -1135,7 +1135,94 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P28 — a diretiva que escreve um STATIC ou um MEMVAR *(aberto 2026-08-07; **fatia 1 ENTREGUE, fatias 2-3 A FAZER**; resto da P27)*
+### P30 — dois STATIC de mesmo nome no mesmo `.prg`, e o cursor já diz qual *(aberto 2026-08-08; **A FAZER**)*
+
+**O caso, e ele NÃO envolve diretiva** *(Diego, 2026-08-08: "vamos separar as coisas...
+pode haver static de prg e static na função dentro do mesmo prg")*. Harbour aceita um
+`STATIC nTotal` file-wide e outro `STATIC nTotal` dentro de uma função do mesmo arquivo.
+São duas variáveis ordinárias e distintas, e o compilador não reclama.
+
+**Medido** (sonda com `tools/probe.sh`, fixture compilando limpo sob `-w3 -es2`):
+
+| cursor | hoje |
+|---|---|
+| no `STATIC` de FUNÇÃO (`a.prg:13:11`) | ❌ `STATIC 'nTotal' is declared in more than one place in 'a.prg'` |
+| no `STATIC` FILE-WIDE (`a.prg:1:8`) | ❌ a mesma recusa |
+
+**As duas recusas são falsas: a POSIÇÃO desambigua sozinha.** Apontar a linha 13 é
+inequivocamente a de função; apontar a linha 1 é inequivocamente a file-wide.
+
+**Onde a informação se perde** *(lido no fonte, a confirmar com sonda antes de mecanismo)*:
+o `StaticScan` filtra por função com `IF ! Empty( cFuncFilter ) .AND. ! hFunc[ "fileDecl" ]
+.AND. ! ( nome == cFuncFilter )` — a pseudo-função `fileDecl` **nunca** é pulada, então a
+declaração file-wide entra mesmo com `--func`, `hOwner` é atribuído duas vezes e a recusa
+dispara. E para o cursor na file-wide o despacho cai no ramo (5), que não passa filtro
+nenhum. **Não mexer sem sondar antes**: o `! fileDecl` pode existir por um motivo que eu
+não conheço, e supor aqui é o erro que este roadmap registra três vezes hoje.
+
+**Escopo**
+- O despacho passa a levar **QUAL declaração** o cursor tocou, não só o nome da função —
+  file-wide e de-função são alcances diferentes, e a posição já os separa.
+- `StaticScan` honra isso: com alvo file-wide, ignora as de função; com alvo de função,
+  ignora a file-wide.
+- A recusa `RSN_STATIC_AMBIGUOUS` sobrevive só onde é verdadeira: quando o alvo **não** vem
+  de posição (chamada por nome) ou quando uma diretiva prende as duas.
+
+**Critério de pronto (mecânico)**: caso renomeando o `STATIC` de função com a file-wide
+homônima **intacta**; caso renomeando a file-wide com a de função **intacta**; o caso da
+diretiva prendendo as duas continuando a recusar; `make test` verde.
+
+### P29 — dois criadores PRIVATE: a recusa é larga demais *(aberto 2026-08-08; **A FAZER**)*
+
+**O caso.** Dois `PRIVATE` do mesmo nome, criados em funções diferentes. A ferramenta
+recusa **sempre**, com `RSN_MV_MULTI_CREATOR`, dizendo *"bindings depend on the execution
+path"*. Eu descrevi isso como natureza do problema — *"não existe fato de compilação que
+separe os dois"*. **Estava errado, e quem apontou foi o Diego** *(2026-08-08: "o escopo dela
+perdura através das chamadas de função... estou certo ou errado?")*.
+
+**TABELA DE SONDAS** *(§1.7.1 — medida antes do mecanismo, com `tools/probe.sh`)*
+
+| o que se perguntou | o que se mediu |
+|---|---|
+| a ferramenta separa os alcances? | **JÁ SEPARA**: `usages` imprime `creator: PRIVATE in MAIN → reach USAUM` e `creator: PRIVATE in OUTRO → reach USADOIS` |
+| ela usa essa separação? | **NÃO**: imprime a mesma frase e recusa igual, com alcances disjuntos ou cruzados |
+| `MEMVAR`/`FIELD` criam variável? | **NÃO**: `MEMVAR x` sem `PRIVATE`/`PUBLIC` compila limpo; sem ele, o uso dá `W0001` (quebra sob `-es2`). São declaração de COMO LIGAR o nome |
+| a lista `MEMVAR` aceita nome a mais? | **SIM**: `MEMVAR xCfg, xNovo` com um só usado compila limpo sob `-w3 -es2` |
+| a edição do caso disjunto compila? | **SIM**: renomear a cadeia de um criador + acrescentar o nome às listas `MEMVAR` dos módulos deixa tudo limpo |
+| a PROVA aceita? | **NÃO**: `verify` diz CHANGED — *"pcode of OUTRO changed"*, *"pcode of USADOIS changed"*, e essas funções **não foram tocadas** |
+
+**Por que o pcode de função intocada muda** *(fato do core, não dedução)*: o pcode referencia
+memvar por **índice na tabela de símbolos** — `HB_P_PUSHMEMVAR` lê um `USHORT` que indexa
+`pSymbols` (`src/vm/hvm.c`). Um símbolo a mais renumera a tabela, e o pcode de quem não
+mudou anda junto, sem que o comportamento mude.
+
+**O diagnóstico, então, não é o que eu tinha dito.** Não falta FATO (a ferramenta já o
+calcula) e não falta EDIÇÃO (ela compila limpa). **Falta PROVA** que aceite *"um símbolo a
+mais, e todo o resto igual a menos da renumeração"*.
+
+Há precedente na casa: o `reorder-params` prova por `symbols-preserved` justamente porque o
+pcode dele muda de forma legítima. E a P28 já estabeleceu a régua irmã — **a prova depende
+do que MUDOU**: módulo editado aceita uma troca de símbolo; módulo intocado exige
+byte-identidade.
+
+**Escopo**
+- **Estreitar a recusa** para o caso em que ela é verdadeira: alcances que **se cruzam**
+  (uma função alcançada por mais de um criador). Aí o vínculo depende mesmo do caminho de
+  execução, e recusar é o certo.
+- **Alcances DISJUNTOS passam a renomear**: a cadeia do criador escolhido, mais o nome novo
+  na lista `MEMVAR` de cada módulo que passa a vê-lo.
+- **Prova nova**, na linha do `symbols-preserved`: mesma quantidade de funções, pcode de cada
+  função igual **a menos dos índices de símbolo**, e a tabela igual mais o símbolo novo.
+  Sem isso a fatia não entrega — editar sem prova é o que esta ferramenta não faz.
+- Buraco no grafo (chamada dinâmica, macro) continua recusando, com o código que já existe.
+
+**Critério de pronto (mecânico)**: caso com dois criadores de alcance DISJUNTO renomeando um
+deles e saindo `ok`, com o outro criador e a cadeia dele **byte a byte intactos**; caso com
+alcances CRUZADOS recusando com `memvar-has-more-than-one-creator`; caso provando que a lista
+`MEMVAR` recebeu o nome novo; execução idêntica antes/depois (o par `hbmk2` + rodar, como o
+caso 74); `make test` verde.
+
+### P28 — a diretiva que escreve um STATIC ou um MEMVAR *(aberto 2026-08-07; **✅ ENTREGUE 2026-08-08**; resto da P27)*
 
 **O caso.** A P27 renomeia o nome que a diretiva escreve **quando ele liga a um LOCAL**.
 Ligando a outra coisa, ela recusa. Eu escrevi essa recusa dizendo *"só um LOCAL pode ser
@@ -1171,16 +1258,52 @@ nada ali — relatá-la assim mesmo foi o erro que matou o `DiagRuleWrites`. Um 
 os dois sítios, porque mudam pelo mesmo motivo; os verbos seguem tão diferentes quanto são.
 Casos: `refuse-rename-static-written-by-directive` e `refuse-rename-memvar-written-by-directive`.
 
-**Fatia 2 — o static.** O motor da P27 passa a colher sítio de `static`, delegando ao verbo
-que já sabe fazê-lo, como faz com `LocalScan`. A prova é a **daquele** verbo, não uma nova.
-Baixo risco: o `rename-static` tem a mesma forma que o `rename-local` tinha (guardas, laço
-de posições, dedup) — é de onde o `LocalScan` foi extraído.
+**Fatia 2 — o static. ✅ ENTREGUE 2026-08-08.** `StaticScan()` saiu do `rename-static` pelo
+mesmo corte que produziu o `LocalScan`, e o motor escolhe o coletor pelo ESCOPO que o
+compilador reportou no sítio. Não virou um coletor "genérico" para os dois: o alcance de
+cada escopo é do compilador (local = a função; static = o MÓDULO), e fundi-los misturaria
+dois conceitos dele num helper nosso. Por isso o static é colhido **uma vez por módulo**,
+fora do laço de funções — colher por função duplicaria os sítios de um file-wide usado em
+duas delas. O `RuleWritesLocal` virou `RuleWritesSymbol( hAst, hFunc, cUp )`, com `hFunc`
+NIL significando "pergunte ao módulo".
+Dois casos, porque são dois alcances e um não pega o outro quebrando:
+`rename-static-written-by-directive` (file-wide, declarado fora de qualquer função) e
+`rename-static-of-function-written-by-directive` (dentro de `Main`, com uma `LOCAL`
+homônima em outra função que **não** pode ser tocada).
 
-**Fatia 3 — o memvar. Tamanho DESCONHECIDO, e é por isso que está por último.** O
-`rename-memvar` não é um coletor de posições: calcula o alcance de quem criou a variável,
-monta o grafo de funções que rodam com ela viva, recusa em alcance com buracos, e trata
-criação por macro. **Medir primeiro** se aquele alcance continua valendo com as edições do
-`.ch` no conjunto — sem isso, qualquer mecanismo proposto é suposição.
+**E um TERCEIRO caso, achado pelo Diego perguntando "os DOIS alcances foram levados em
+conta?"** — a pergunta que eu deveria ter feito sozinho. O Harbour aceita o mesmo nome como
+STATIC em dois lugares do módulo (duas funções, ou file-wide mais uma função), e são
+variáveis DISTINTAS que a mesma diretiva prende. A ferramenta já recusava com os fontes
+intactos, mas a recusa mandava **"use `--func`"** — e o `rename` unificado não tem esse
+flag. Recusa que aponta passo impossível é pior que recusa seca: o agente tenta, falha e
+volta a editar texto na mão, que é o modo de falha que a ferramenta existe para matar.
+Agora tem código próprio (`RSN_STATIC_AMBIGUOUS`), diz a forma do problema (a regra prende
+duas variáveis, então renomear uma é o trabalho ERRADO, não um trabalho menor) e **não
+oferece flag nenhuma**, porque nenhuma resolve. Caso:
+`refuse-rename-static-declared-twice-written-by-directive`, que reprova qualquer `--` na
+mensagem. Renomear as duas + o header é fatia própria, ainda não escrita.
+
+**Fatia 3 — o memvar. ✅ ENTREGUE 2026-08-08, e a medição mudou o desenho.**
+
+A pergunta era se o alcance que aquele verbo calcula continuaria valendo com o `.ch` dentro
+do conjunto. A resposta veio da PROVA, não do alcance: `HrbEquivalent` aceita **um** símbolo
+renomeado, mesma contagem, mesma ordem, mesmo pcode por função — e o rename conjunto é
+exatamente isso. A recusa que eu media antes (*"the number of symbols/functions changed"*)
+era o `.ch` ficando para trás e criando um símbolo A MAIS.
+
+Então o memvar **não** entra no motor da P27: os sítios da diretiva entram no conjunto do
+PRÓPRIO verbo. Um memvar existe no pcode; byte-identidade é impossível para ele por
+construção, e levá-lo ao motor exigiria ou arrastar a análise de alcance inteira para lá, ou
+inventar uma prova que nenhum dos dois verbos tem. **Um coletor (`RuleResultEdits`), duas
+provas** — porque há genuinamente duas.
+
+**E a fatia 1 virou ANDAIME, o que só ficou visível aqui.** O relato existia para contar o
+que a ferramenta não sabia fazer; feitas as fatias 2 e 3, a diretiva é EDITADA e o que
+sobrava chegando àquelas recusas era coincidência — a mesma armadilha do `DiagRuleWrites`,
+repetida. As duas chamadas e o helper (51 linhas) saíram. O sítio da regra segue emitido em
+**um** lugar, o único onde ela ainda é causa: o STATIC declarado em dois lugares, que a
+regra prende e o rename não cobre.
 
 - `FIELD` continua fora, com a recusa que já existe.
 - **Cuidado medido no `public`:** o nome é visível a outros módulos e alcançável por macro

@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@e3efe33 -->
+<!-- changelog-baseline: hbrefactor@a97c00d -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
@@ -59,9 +59,17 @@ variable, and it is left alone — the tool follows what the directive actually 
 in your compiled code, which the compiler records for it. If your command is used in
 five modules, all five are renamed together, because the header ties them.
 
-**When it cannot do it, it now tells you why.** If the name binds to a `STATIC` or to a
-`PRIVATE`/`PUBLIC`, the rename still fails and undoes itself — but instead of only
-"the pcode changed", it names the header:
+**A `STATIC` works the same way**, whether it is declared at the top of the file or inside
+the function that uses the command. A same-named variable in a function that never uses the
+command is a different variable, and it is left alone.
+
+**A `PRIVATE` or `PUBLIC` works too**, and it is proved differently on purpose: a memvar's
+name really is in the compiled program, so "the bytes came out identical" is not available
+and never will be. What is checked instead is that the symbol table differs in exactly one
+name — the old one became the new one — with every function's code untouched.
+
+**When the header lives outside your project's folder, it is still edited, and you are
+told:**
 
 ```
 warning: 'nLinhas' is named by a preprocessor rule - log.ch:1:29: in rule result (#xcommand LOG)
@@ -71,7 +79,9 @@ It only says that when the command is actually *used* in that module. A header t
 defines a command you never call had nothing to do with the failure, and you will not see
 it blamed.
 
-**Honest limit:** the name has to bind to a `LOCAL` for the rename itself. If the directive writes a name
+**Honest limit:** if the same name is declared `STATIC` in two different places of one
+file, the rename refuses. Those are two different variables that one directive writes into,
+so renaming one of them is not a smaller version of the job — it is the wrong job. If the directive writes a name
 that lands on a PRIVATE/PUBLIC or a FIELD, the tool refuses and says so, because
 those names live in the pcode and the byte-identical proof would not apply.
 
@@ -153,6 +163,54 @@ delete the tool's own work, and the next command still answers about your code a
 is right now.
 
 Details: [docs/roadmap.md](docs/roadmap.md) § W and § X.
+
+## 2026-08-07 — every use your own commands write now has a place to point at
+
+If your project uses `#xcommand`, a large share of the places your variables are touched
+are not written by you at all — they are written by the directive, in the code it
+generates. Those places had no position: the compiler knows they exist, but the line and
+column belonged to a header, or to nothing at all.
+
+`usages` used to report them without a location, which meant your editor could list them
+and not take you anywhere.
+
+Now every one of them points at **the line where you wrote the command**, which is the
+place you would actually edit:
+
+```
+$ hbrefactor usages app.hbp nAcc
+app.prg:5: declaration (local) in MAIN  | LOCAL nAcc := 0
+app.prg:7: use (local) in MAIN          | CMD_SOMA 5          <- written by the command
+app.prg:9: read (local) in MAIN         | ? nAcc
+app.ch:1:27: in rule result (#xcommand CMD_SOMA)  | #xcommand CMD_SOMA <v> => nAcc += <v>
+```
+
+The last line is the other half: the header that spells the name is listed too, with its
+own line and column, so you can see both sides of the same variable at once.
+
+**Why it matters beyond the listing:** a place with no position cannot be renamed. This is
+what made the rename in the entry above possible.
+
+## 2026-08-07 — the line a result carries is now the line as you wrote it
+
+Every result from `--json` carries the source line it refers to, plus the exact range of
+the word inside it. Those two were not consistent: the range counted columns of the **file**,
+while the line came with its leading blanks removed. Anything slicing the line by the range
+got the wrong characters — always shifted by the indentation, and silently, since there was
+no error, just the wrong slice.
+
+Now the line is verbatim, so the obvious thing works:
+
+```
+range says characters 9..13 of line 5, and line 5 is "   LOCAL nAcc := 0"
+                                    that slice is now exactly "nAcc"
+```
+
+This only affects programs reading `--json`. If you read the terminal output, nothing
+changed: the prose still trims the line for you.
+
+**Where it bites:** if you built something on the old behaviour — compensating for the
+missing indentation by hand — that compensation is now wrong. Take it out.
 
 ## 2026-08-06 — every result now points at the exact word, not at the line
 

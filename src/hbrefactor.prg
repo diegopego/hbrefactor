@@ -122,6 +122,40 @@
 // this path: a directive the project compiles is edited, never negotiated.
 #define RSN_RULE_BUILTIN "name-written-by-builtin-rule"
 
+// P28 - o nome é STATIC em mais de um lugar do módulo (duas funções, ou
+// file-wide mais uma função). São variáveis DISTINTAS, e quando uma diretiva
+// escreve o nome ela prende todas: renomear uma não é uma versão menor do
+// trabalho, é o trabalho errado. `stop-and-report` - e sem oferecer flag
+// nenhuma, porque nenhuma resolve
+#define RSN_STATIC_AMBIGUOUS "static-declared-more-than-once"
+
+// memvar de escopo dinâmico: as duas recusas que o mapa do criador produz.
+// Nenhuma é "a ferramenta não conseguiu" - as duas são fatos sobre o CÓDIGO,
+// e o humano é quem decide o que fazer com eles (`stop-and-report`).
+//
+// MULTI_CREATOR: mais de um PRIVATE/PUBLIC cria o mesmo nome. Qual deles um uso
+// enxerga depende do CAMINHO DE EXECUÇÃO, e isso não é fato de compilação -
+// renomear "o" símbolo fundiria variáveis que só o runtime separa.
+// OUT_OF_SCOPE: um uso do nome vive numa função que NUNCA roda com aquele
+// criador vivo. É outra memvar homônima, e editá-la seria editar por
+// coincidência de nome - exatamente o que esta ferramenta existe para não fazer
+#define RSN_MV_MULTI_CREATOR "memvar-has-more-than-one-creator"
+#define RSN_MV_OUT_OF_SCOPE  "memvar-use-outside-creator-scope"
+
+// P28: a variável é da DIRETIVA, não do usuário - ela é declarada E usada
+// inteiramente dentro do código que a regra gera, e o `.prg` nunca a escreve.
+//
+// Medido no corpus do core (40 módulos da RTL + o rt_class): das 333 variáveis
+// que uma diretiva escreve, **as 333** são assim. O `hbclass.ch` cria `oClass`,
+// `nScope`, `s_oClass` e os usa por completo; nenhuma diretiva do core escreve
+// num nome que o usuário declarou. É a diferença entre a diretiva ser DONA do
+// nome e a diretiva invadir um nome alheio.
+//
+// Não há o que renomear no módulo: trocar o nome seria alpha-rename dentro da
+// regra, que é outro trabalho. `stop-and-report`, e a mensagem diz DE QUEM é a
+// variável - antes saía "no editable site found", que é verdade e não ajuda
+#define RSN_DIRECTIVE_OWNED "variable-belongs-to-the-directive"
+
 // W.2: outro processo está refatorando ESTE projeto agora. É a única recusa que
 // não é sobre o pedido nem sobre o projeto - o pedido continua válido, só chegou
 // junto com outro. Por isso ela tem ação PRÓPRIA: nem `stop-and-report` (não há
@@ -2639,18 +2673,41 @@ STATIC FUNCTION IsStaticFuncInModule( hAst, cUp )
 // primeiro elo isto seria "existe uma regra por aí com este nome", que é
 // coincidência de texto; com ele é "esta referência foi escrita por AQUELA
 // aplicação". Uma local homônima em função que não usa o comando não tem `app`
-STATIC FUNCTION RuleWritesLocal( hAst, hFunc, cUp )
+// hFunc NIL = pergunta pelo MÓDULO inteiro. A diferença não é comodidade: o
+// alcance de cada escopo é do compilador. Uma LOCAL homônima em outra função é
+// OUTRA variável (por isso a pergunta é da função dela); um STATIC file-wide é
+// declarado fora de qualquer função e usado dentro delas, então a pergunta só
+// faz sentido no módulo.
+// P28: a declaração deste nome nesta função veio da PRÓPRIA expansão? O fato é
+// a ausência de posição-fonte no nome declarado: o usuário não o escreveu em
+// lugar nenhum do `.prg`. É o que separa "a diretiva é dona da variável"
+// (hbclass e todo o core) de "a diretiva escreve numa variável sua"
+STATIC FUNCTION DirectiveOwns( hFunc, cUp )
 
-   LOCAL hItem, nApp
+   LOCAL hItem
 
-   FOR EACH hItem IN hFunc[ "occurrences" ]
-      nApp := hb_HGetDef( hItem, "app", -1 )
-      IF Upper( hItem[ "sym" ] ) == cUp .AND. nApp >= 0 .AND. ;
-         nApp < Len( hAst[ "ppApplications" ] ) .AND. ;
-         RuleResultWrites( hAst[ "ppRules" ][ ;
-            hAst[ "ppApplications" ][ nApp + 1 ][ "rule" ] + 1 ], cUp )
-         RETURN .T.
+   FOR EACH hItem IN hFunc[ "declarations" ]
+      IF Upper( hItem[ "sym" ] ) == cUp
+         RETURN hb_HGetDef( hItem, "nameCol", NIL ) == NIL
       ENDIF
+   NEXT
+
+   RETURN .F.
+
+STATIC FUNCTION RuleWritesSymbol( hAst, hFunc, cUp )
+
+   LOCAL hItem, nApp, hF
+
+   FOR EACH hF IN iif( hFunc == NIL, hAst[ "functions" ], { hFunc } )
+      FOR EACH hItem IN hF[ "occurrences" ]
+         nApp := hb_HGetDef( hItem, "app", -1 )
+         IF Upper( hItem[ "sym" ] ) == cUp .AND. nApp >= 0 .AND. ;
+            nApp < Len( hAst[ "ppApplications" ] ) .AND. ;
+            RuleResultWrites( hAst[ "ppRules" ][ ;
+               hAst[ "ppApplications" ][ nApp + 1 ][ "rule" ] + 1 ], cUp )
+            RETURN .T.
+         ENDIF
+      NEXT
    NEXT
 
    RETURN .F.
@@ -2737,7 +2794,7 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
             cScope := hItem[ "scope" ]
             lParam := hb_HGetDef( hItem, "param", .F. )
             DO CASE
-            CASE cScope == "local" .AND. RuleWritesLocal( hAst, hFunc, cUp )
+            CASE cScope == "local" .AND. RuleWritesSymbol( hAst, hFunc, cUp )
                // P27: a MESMA variável é escrita por uma diretiva - o header e o
                // módulo têm de mudar juntos, senão o rename não pode dar certo.
                // Fato, não suspeita: o sítio carrega o índice da aplicação que o
@@ -2748,6 +2805,10 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
                RETURN { "cmd" => "rename-param", "func" => hFunc[ "name" ], "old" => cTok }
             CASE cScope == "local"
                RETURN { "cmd" => "rename-local", "func" => hFunc[ "name" ], "old" => cTok }
+            CASE cScope == "static" .AND. RuleWritesSymbol( hAst, NIL, cUp )
+               // P28: um STATIC que a diretiva escreve tem os dois lados presos
+               // um ao outro, igual à local. O alcance da pergunta é o MÓDULO
+               RETURN { "cmd" => "rename-rule-written", "old" => cTok }
             CASE cScope == "static"
                RETURN { "cmd" => "rename-static", "old" => cTok, "func" => hFunc[ "name" ] }
             CASE cScope == "memvar" .OR. cScope == "private" .OR. cScope == "public"
@@ -2772,6 +2833,10 @@ STATIC FUNCTION ResolveRenameAt( hAst, hAsts, nLine, nCol0 )
       IF hOther[ "fileDecl" ]
          FOR EACH hItem IN hOther[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == cUp .AND. hItem[ "scope" ] == "static"
+               // P28: file-wide, e a diretiva o escreve -> os dois lados juntos
+               IF RuleWritesSymbol( hAst, NIL, cUp )
+                  RETURN { "cmd" => "rename-rule-written", "old" => cTok }
+               ENDIF
                RETURN { "cmd" => "rename-static", "old" => cTok }
             ENDIF
          NEXT
@@ -4203,12 +4268,94 @@ STATIC FUNCTION SpanMax( hExpr )
 // Nomes de estáticas não existem no pcode: verificação byte-idêntica.
 // ---------------------------------------------------------------------------
 
+// os sítios editáveis de um STATIC, com as guardas que decidem se ele PODE ser
+// renomeado. Irmã do LocalScan, e extraída pelo mesmo motivo: o motor da
+// diretiva precisa da MESMA definição de "quais tokens são este STATIC".
+//
+// O escopo aqui é o MÓDULO, não a função - um STATIC file-wide é declarado
+// antes da primeira função e usado dentro delas. É por isso que ele não cabia
+// no LocalScan: não é o mesmo alcance, e forçar um só teria misturado dois
+// conceitos do compilador num helper "genérico".
+STATIC FUNCTION StaticScan( hAst, cFile, cOld, cNew, cFuncFilter, aEdits, cOwnerDesc )
+
+   LOCAL hFunc, hItem, hTok, aPrev, cPrevType
+   LOCAL hOwner := NIL, lFileWide := .F.
+   LOCAL cUpOld := Upper( cOld ), cUpNew := Upper( cNew )
+
+   // localiza a declaração STATIC (file-wide mora na pseudo-função fileDecl)
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF ! Empty( cFuncFilter ) .AND. ! hFunc[ "fileDecl" ] .AND. ;
+         !( Upper( hFunc[ "name" ] ) == cFuncFilter )
+         LOOP
+      ENDIF
+      FOR EACH hItem IN hFunc[ "declarations" ]
+         IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "static"
+            IF hOwner != NIL
+               RETURN { "msg" => "STATIC '" + cOld + "' is declared in more than one " + ;
+                        "place in '" + cFile + "' - those are different variables", ;
+                        "reason" => RSN_STATIC_AMBIGUOUS }
+            ENDIF
+            hOwner := hFunc
+            lFileWide := hFunc[ "fileDecl" ]
+         ENDIF
+         IF Upper( hItem[ "sym" ] ) == cUpNew
+            RETURN { "msg" => "new name '" + cNew + "' already declared in " + hFunc[ "name" ], ;
+                     "reason" => RSN_NAME_TAKEN }
+         ENDIF
+      NEXT
+   NEXT
+   IF hOwner == NIL
+      RETURN { "msg" => "STATIC '" + cOld + "' not found in '" + cFile + "'", "reason" => NIL }
+   ENDIF
+
+   // sombras: qualquer declaração homônima não-static no alcance torna a
+   // varredura por nome ambígua - recusa (o compilador resolveu diferente)
+   FOR EACH hFunc IN hAst[ "functions" ]
+      IF lFileWide .OR. hFunc == hOwner
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ! hItem[ "scope" ] == "static"
+               RETURN { "msg" => "'" + cOld + "' is also " + hItem[ "scope" ] + " in " + ;
+                        hFunc[ "name" ] + " - shadow; refusing", "reason" => NIL }
+            ENDIF
+         NEXT
+      ENDIF
+   NEXT
+
+   // coleta por span: file-wide = módulo inteiro; de função = span da função
+   aPrev := NIL
+   FOR EACH hTok IN hAst[ "tokens" ]
+      cPrevType := iif( aPrev == NIL, 0, aPrev[ "type" ] )
+      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
+         Upper( hTok[ "text" ] ) == cUpOld .AND. ;
+         !( cPrevType == 58 .OR. cPrevType == 59 ) .AND. ;
+         ( lFileWide .OR. InFuncSpan( hAst, hOwner, hTok[ "line" ] ) )
+         IF hTok[ "col" ] == NIL
+            RETURN { "msg" => "reference on line " + hb_ntos( hTok[ "line" ] ) + ;
+                     " with no reliable position (pp rewrite) - refusing", "reason" => NIL }
+         ENDIF
+         AAdd( aEdits, { hTok[ "line" ], hTok[ "col" ] + 1 } )
+      ENDIF
+      aPrev := hTok
+   NEXT
+   // dedup por (linha,col): clones de um mesmo token-fonte multiplicado por
+   // expansão de pp não podem gerar edição dupla na mesma span (ver
+   // RenameLocal) - um site = uma posição-fonte
+   DedupHits( aEdits )
+   IF Empty( aEdits )
+      RETURN { "msg" => "no editable site found", "reason" => NIL }
+   ENDIF
+   // quem descobriu o dono é quem o descreve: recomputar isto na prosa era
+   // duas fontes para o mesmo fato, e elas divergem no dia em que uma mudar
+   cOwnerDesc := iif( lFileWide, " (file-wide)", " in " + hOwner[ "name" ] )
+
+   RETURN NIL
+
 STATIC FUNCTION RenameStatic( aArgs )
 
    LOCAL cSpec, cFile, cOld, cNew, cFuncFilter := "", lDryRun := .F.
-   LOCAL hProj, cTmp, cSrcPath, hAst, hFunc, hItem, hTok, aPrev, cPrevType
-   LOCAL hOwner := NIL, lFileWide := .F., aEdits := {}, nI, cText, nLine
-   LOCAL cUpOld, cUpNew, hRule, aWork, hScope, cKind
+   LOCAL hProj, cTmp, cSrcPath, hAst, hBad
+   LOCAL aEdits := {}, nI, cText, nLine
+   LOCAL cUpOld, cUpNew, hRule, aWork, hScope, cKind, cOwnerDesc
 
    IF Len( aArgs ) < 5
       Usage()
@@ -4257,64 +4404,8 @@ STATIC FUNCTION RenameStatic( aArgs )
                      RuleTag( hRule ) + ", " + RuleWhere( hRule ) + ")" )
    ENDIF
 
-   // localiza a declaração STATIC (file-wide mora na pseudo-função fileDecl)
-   FOR EACH hFunc IN hAst[ "functions" ]
-      IF ! Empty( cFuncFilter ) .AND. ! hFunc[ "fileDecl" ] .AND. ;
-         !( Upper( hFunc[ "name" ] ) == cFuncFilter )
-         LOOP
-      ENDIF
-      FOR EACH hItem IN hFunc[ "declarations" ]
-         IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "static"
-            IF hOwner != NIL
-               RETURN Refuse( "STATIC '" + cOld + "' declared in more than one place - use --func" )
-            ENDIF
-            hOwner := hFunc
-            lFileWide := hFunc[ "fileDecl" ]
-         ENDIF
-         IF Upper( hItem[ "sym" ] ) == cUpNew
-            RETURN Refuse( "new name '" + cNew + "' already declared in " + hFunc[ "name" ] )
-         ENDIF
-      NEXT
-   NEXT
-   IF hOwner == NIL
-      RETURN Refuse( "STATIC '" + cOld + "' not found in '" + cFile + "'" )
-   ENDIF
-
-   // sombras: qualquer declaração homônima não-static no alcance torna a
-   // varredura por nome ambígua - recusa (o compilador resolveu diferente)
-   FOR EACH hFunc IN hAst[ "functions" ]
-      IF lFileWide .OR. hFunc == hOwner
-         FOR EACH hItem IN hFunc[ "declarations" ]
-            IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ! hItem[ "scope" ] == "static"
-               RETURN Refuse( "'" + cOld + "' is also " + hItem[ "scope" ] + " in " + ;
-                              hFunc[ "name" ] + " - shadow; refusing" )
-            ENDIF
-         NEXT
-      ENDIF
-   NEXT
-
-   // coleta por span: file-wide = módulo inteiro; de função = span da função
-   aPrev := NIL
-   FOR EACH hTok IN hAst[ "tokens" ]
-      cPrevType := iif( aPrev == NIL, 0, aPrev[ "type" ] )
-      IF hTok[ "type" ] == 21 .AND. hTok[ "prov" ] == "s" .AND. ;
-         Upper( hTok[ "text" ] ) == cUpOld .AND. ;
-         !( cPrevType == 58 .OR. cPrevType == 59 ) .AND. ;
-         ( lFileWide .OR. InFuncSpan( hAst, hOwner, hTok[ "line" ] ) )
-         IF hTok[ "col" ] == NIL
-            RETURN Refuse( "reference on line " + hb_ntos( hTok[ "line" ] ) + ;
-                           " with no reliable position (pp rewrite) - refusing" )
-         ENDIF
-         AAdd( aEdits, { hTok[ "line" ], hTok[ "col" ] + 1 } )
-      ENDIF
-      aPrev := hTok
-   NEXT
-   // dedup por (linha,col): clones de um mesmo token-fonte multiplicado por
-   // expansão de pp não podem gerar edição dupla na mesma span (ver
-   // RenameLocal) - um site = uma posição-fonte
-   DedupHits( aEdits )
-   IF Empty( aEdits )
-      RETURN Refuse( "no editable site found" )
+   IF ( hBad := StaticScan( hAst, cFile, cOld, cNew, cFuncFilter, @aEdits, @cOwnerDesc ) ) != NIL
+      RETURN Refuse( hBad[ "msg" ], hBad[ "reason" ] )
    ENDIF
 
    cKind := "static"
@@ -4322,8 +4413,7 @@ STATIC FUNCTION RenameStatic( aArgs )
    // P17: um STATIC é local ao ARQUIVO - o alcance a declarar é o dele
    hScope := ScopeField( { cSrcPath => hAst }, { "files" => { cSrcPath } }, cUpOld )
 
-   Prose( "rename-static: " + cOld + " -> " + cNew + ;
-           iif( lFileWide, " (file-wide)", " in " + hOwner[ "name" ] ) + ;
+   Prose( "rename-static: " + cOld + " -> " + cNew + cOwnerDesc + ;
            " (" + hb_FNameNameExt( cSrcPath ) + ")" + hb_eol() )
    SayScope( { cSrcPath => hAst }, { "files" => { cSrcPath } }, cUpOld, cOld )
    FOR nI := 1 TO Len( aEdits )
@@ -4348,7 +4438,6 @@ STATIC FUNCTION RenameStatic( aArgs )
    ENDIF
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       hb_MemoWrit( cSrcPath, cText )
-      DiagRuleWritesApplied( { cSrcPath => hAst }, cOld )
       RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
@@ -4356,8 +4445,7 @@ STATIC FUNCTION RenameStatic( aArgs )
       IF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".before.hrb" ) == ;
             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cSpec ) + ".after.hrb" ) )
          hb_MemoWrit( cSrcPath, cText )
-         DiagRuleWritesApplied( { cSrcPath => hAst }, cOld )
-         RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback", ;
+            RETURN Refuse( "verification FAILED: " + hb_FNameName( cSpec ) + ".hrb changed - rollback", ;
                         RSN_VERIFY_FAILED )
       ENDIF
    NEXT
@@ -7707,27 +7795,20 @@ STATIC PROCEDURE RuleSiteDiag( cName, cSiteDesc, hRule, hTok )
 
    RETURN
 
-// P28: uma diretiva APLICADA nestes módulos escreve este nome no resultado
-// dela? Emite cada regra assim como diagnóstico, uma vez por regra.
+// P28: as EDIÇÕES no `.ch` para o nome que uma diretiva aplicada escreve.
+// Acrescenta a `hEdits` e devolve quantas; recusa (por `hBad`) quando não há
+// arquivo (builtin) ou quando o token não tem posição no fonte.
 //
-// O "APLICADA" é a diferença entre causa e coincidência, e ela custou a remoção
-// de um helper: um header que só REGISTRA a regra num módulo que nunca usa o
-// comando não tem nada a ver com o fracasso dali. Aplicada, tem: depois de
-// editar o módulo a expansão continua escrevendo o nome velho, e é por isso que
-// a verificação recusa. Os dois elos vêm do core (a aplicação, e o result da
-// regra dela) - nada aqui casa texto para decidir.
-//
-// Vive fora dos verbos porque não é sobre nenhum deles: é sobre o FATO. Quem
-// aprendeu isso do jeito caro foi a versão anterior, pendurada no rename-local,
-// que disparava onde virou coincidência e calava onde era a causa.
-STATIC PROCEDURE DiagRuleWritesApplied( hAsts, cName )
+// Existe como função porque DOIS chamadores mudam pelo mesmo motivo - o motor
+// da P27 (local/static) e o `rename-memvar` -, e a resposta "quais tokens do
+// `.ch` são este nome" não pode ter duas versões. O que NÃO se compartilha é a
+// PROVA: cada verbo continua com a sua, porque um memvar existe no pcode e um
+// local não. Fundir isso seria inventar uma prova que nenhum dos dois tem.
+STATIC FUNCTION RuleResultEdits( hAsts, hProj, cUp, cOld, hEdits, hBad )
 
-   LOCAL hAst, hApp, hRule, hTok, aSeen := {}, cKey, cSiteDesc
-   LOCAL cUp := Upper( cName )
+   LOCAL hAst, hApp, hRule, hTok, aSeen := {}, cKey, cChPath, aE, nTotal := 0
 
-   IF hAsts == NIL .OR. cName == NIL
-      RETURN
-   ENDIF
+   hBad := NIL
    FOR EACH hAst IN hAsts
       FOR EACH hApp IN hAst[ "ppApplications" ]
          hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
@@ -7739,24 +7820,41 @@ STATIC PROCEDURE DiagRuleWritesApplied( hAsts, cName )
             LOOP
          ENDIF
          AAdd( aSeen, cKey )
+         IF hRule[ "file" ] == NIL
+            hBad := { "msg" => "'" + cOld + "' is written by a BUILTIN rule (" + ;
+                      RuleTag( hRule ) + ") - there is no directive file to edit", ;
+                      "reason" => RSN_RULE_BUILTIN }
+            RETURN nTotal
+         ENDIF
+         cChPath := ResolveInclude( hProj, hRule[ "file" ] )
+         IF Empty( cChPath )
+            hBad := { "msg" => "could not find the directive file '" + hRule[ "file" ] + "'", ;
+                      "reason" => NIL }
+            RETURN nTotal
+         ENDIF
+         DiagExternalRule( hProj, cChPath, hRule )
+         aE := {}
          FOR EACH hTok IN hRule[ "result" ]
             IF ! ( hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 .AND. ;
                    Upper( hb_HGetDef( hTok, "text", "" ) ) == cUp )
                LOOP
             ENDIF
-            cSiteDesc := iif( hRule[ "file" ] == NIL, "(builtin)", ;
-                              hRule[ "file" ] + ;
-                              iif( hTok[ "line" ] == NIL, "", ;
-                                   ":" + hb_ntos( hTok[ "line" ] ) ) + ;
-                              iif( hTok[ "col" ] == NIL, "", ;
-                                   ":" + hb_ntos( hTok[ "col" ] + 1 ) ) ) + ;
-                         ": in rule result (" + RuleTag( hRule ) + ")"
-            RuleSiteDiag( cName, cSiteDesc, hRule, hTok )
+            IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
+               hBad := { "msg" => "'" + cOld + "' in the result of " + RuleTag( hRule ) + ;
+                         " (" + RuleWhere( hRule ) + ") with no source position " + ;
+                         "(directive born of an expansion) - refusing to edit", ;
+                         "reason" => NIL }
+               RETURN nTotal
+            ENDIF
+            AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
          NEXT
+         DedupHits( aE )
+         nTotal += Len( aE )
+         AbsEditsAdd( hEdits, cChPath, aE )
       NEXT
    NEXT
 
-   RETURN
+   RETURN nTotal
 
 // the directive file is EDITED, and what the tool owes is a REPORT.
 //
@@ -7883,9 +7981,9 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hApp, hTok, hFunc, hItem
    LOCAL cUpOld := Upper( cOld ), cUpNew := Upper( cNew )
    LOCAL aRules := {}, aSeen := {}, cKey, nI, nApp
-   LOCAL hEdits := { => }, aE, cChPath, hOrig := { => }, cText, nLine
-   LOCAL aApps, lBind, hBad, aFuncEdits
-   LOCAL nSites := 0, nDirEdits := 0, aWork, hRes
+   LOCAL hEdits := { => }, aE, hOrig := { => }, cText, nLine
+   LOCAL aApps, lBind, lStatic, hBad, aFuncEdits
+   LOCAL nSites := 0, nDirEdits, aWork, hRes
 
    IF ! OneWord( cNew )
       RETURN Refuse( "new name '" + cNew + "' is not a single word" )
@@ -7933,7 +8031,12 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
       IF Empty( aApps )
          LOOP
       ENDIF
-      // as funções que a regra liga NESTE módulo
+      // as funções que a regra liga NESTE módulo. O ESCOPO da ligação decide
+      // quem colhe os sítios: cada escopo tem o seu alcance no compilador
+      // (local = a função; static = o módulo), e é o verbo daquele escopo que
+      // já sabe percorrê-lo. Um coletor "genérico" para os dois misturaria dois
+      // conceitos do compilador num só, que é o erro que esta ferramenta mata
+      lStatic := .F.
       FOR EACH hFunc IN hAst[ "functions" ]
          IF hFunc[ "fileDecl" ]
             LOOP
@@ -7945,30 +8048,80 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
                hb_AScan( aApps, nApp ) == 0
                LOOP
             ENDIF
-            // o que a diretiva escreve pode ligar a qualquer coisa. O motor
-            // COLHE sítio de LOCAL; static e memvar têm verbo próprio, com
-            // prova própria que JÁ funciona (medido: os dois renomeiam sem
-            // diretiva), e ligá-los aqui é trabalho, não impossibilidade -
-            // dizer o contrário seria supor no lugar de medir
-            IF ! hItem[ "scope" ] == "local"
+            DO CASE
+            CASE hItem[ "scope" ] == "local"
+               lBind := .T.
+            CASE hItem[ "scope" ] == "static"
+               // um STATIC não é da função: é do MÓDULO. Colhe-se UMA vez por
+               // módulo, depois deste laço - colher por função duplicaria os
+               // sítios de um file-wide usado em duas funções
+               lStatic := .T.
+            OTHERWISE
+               // memvar/private/public/field: o verbo deles tem prova própria
+               // (medido: renomeiam sem diretiva), e ligá-los aqui é trabalho,
+               // não impossibilidade. Recusa nomeando o escopo, nunca supondo
                RETURN Refuse( "'" + cOld + "', written by the directive, binds to a " + ;
                               hItem[ "scope" ] + " in " + hFunc[ "name" ] + " (" + ;
                               hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                              ") - this rename covers a LOCAL binding; refusing" )
-            ENDIF
-            lBind := .T.
+                              ") - this rename covers LOCAL and STATIC bindings; refusing" )
+            ENDCASE
          NEXT
          IF ! lBind
             LOOP
          ENDIF
          aFuncEdits := {}
          IF ( hBad := LocalScan( hAst, hFunc, cOld, cNew, .F., @aFuncEdits ) ) != NIL
+            IF DirectiveOwns( hFunc, cUpOld )
+               RETURN Refuse( "'" + cOld + "' is declared AND used entirely by the " + ;
+                              "directive that generates " + hFunc[ "name" ] + " (" + ;
+                              hb_FNameNameExt( cPath ) + ") - your code never writes " + ;
+                              "it, so there is nothing here to rename", RSN_DIRECTIVE_OWNED )
+            ENDIF
             RETURN Refuse( hBad[ "msg" ] + " (" + hFunc[ "name" ] + ", " + ;
                            hb_FNameNameExt( cPath ) + ")", hBad[ "reason" ] )
          ENDIF
          nSites += Len( aFuncEdits )
          AbsEditsAdd( hEdits, cPath, aFuncEdits )
       NEXT
+      IF lStatic
+         aFuncEdits := {}
+         IF ( hBad := StaticScan( hAst, hb_FNameNameExt( cPath ), cOld, cNew, "", ;
+                                  @aFuncEdits ) ) != NIL
+            // o motor sabe o que o scan não sabe: quem prende as duas é a REGRA
+            IF hBad[ "reason" ] == RSN_STATIC_AMBIGUOUS
+               // aqui a diretiva É a causa (ela prende as duas), então o sítio
+               // dela vai junto, com posição. É o ÚNICO lugar que ainda emite
+               // isto: nas outras recusas destes verbos a diretiva já foi
+               // editada, e o que sobrava era coincidência
+               FOR EACH hApp IN hAst[ "ppApplications" ]
+                  hRule := hAst[ "ppRules" ][ hApp[ "rule" ] + 1 ]
+                  IF RuleResultWrites( hRule, cUpOld ) .AND. hRule[ "file" ] != NIL
+                     FOR EACH hTok IN hRule[ "result" ]
+                        IF hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 .AND. ;
+                           Upper( hb_HGetDef( hTok, "text", "" ) ) == cUpOld .AND. ;
+                           hTok[ "line" ] != NIL
+                           RuleSiteDiag( cOld, hRule[ "file" ] + ":" + ;
+                              hb_ntos( hTok[ "line" ] ) + ":" + ;
+                              hb_ntos( hb_HGetDef( hTok, "col", 0 ) + 1 ) + ;
+                              ": in rule result (" + RuleTag( hRule ) + ")", hRule, hTok )
+                           EXIT
+                        ENDIF
+                     NEXT
+                     EXIT
+                  ENDIF
+               NEXT
+               RETURN Refuse( "'" + cOld + "' is written by a directive and declared " + ;
+                              "STATIC in more than one place in " + ;
+                              hb_FNameNameExt( cPath ) + " - those are different " + ;
+                              "variables that the same rule binds, and this rename " + ;
+                              "covers one; refusing", RSN_STATIC_AMBIGUOUS )
+            ENDIF
+            RETURN Refuse( hBad[ "msg" ] + " (" + hb_FNameNameExt( cPath ) + ")", ;
+                           hBad[ "reason" ] )
+         ENDIF
+         nSites += Len( aFuncEdits )
+         AbsEditsAdd( hEdits, cPath, aFuncEdits )
+      ENDIF
    NEXT
 
    IF Empty( aRules )
@@ -7976,32 +8129,11 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
                      "applied in project '" + cSpec + "'" )
    ENDIF
 
-   FOR EACH hRule IN aRules
-      IF hRule[ "file" ] == NIL
-         RETURN Refuse( "'" + cOld + "' is written by a BUILTIN rule (" + RuleTag( hRule ) + ;
-                        ") - there is no directive file to edit", RSN_RULE_BUILTIN )
-      ENDIF
-      cChPath := ResolveInclude( hProj, hRule[ "file" ] )
-      IF Empty( cChPath )
-         RETURN Refuse( "could not find the directive file '" + hRule[ "file" ] + "'" )
-      ENDIF
-      DiagExternalRule( hProj, cChPath, hRule )
-      aE := {}
-      FOR EACH hTok IN hRule[ "result" ]
-         IF hTok[ "role" ] == "literal" .AND. hTok[ "type" ] == 21 .AND. ;
-            Upper( hb_HGetDef( hTok, "text", "" ) ) == cUpOld
-            IF hTok[ "line" ] == NIL .OR. hTok[ "col" ] == NIL
-               RETURN Refuse( "'" + cOld + "' in the result of " + RuleTag( hRule ) + " (" + ;
-                              RuleWhere( hRule ) + ") with no source position (directive " + ;
-                              "born of an expansion) - refusing to edit" )
-            ENDIF
-            AAdd( aE, { hTok[ "line" ], hTok[ "col" ] + 1 } )
-         ENDIF
-      NEXT
-      DedupHits( aE )
-      nDirEdits += Len( aE )
-      AbsEditsAdd( hEdits, cChPath, aE )
-   NEXT
+   nDirEdits := RuleResultEdits( hAsts, hProj, cUpOld, cOld, hEdits, @hBad )
+   IF hBad != NIL
+      RETURN Refuse( hBad[ "msg" ], hBad[ "reason" ] )
+   ENDIF
+
    FOR EACH cKey IN hb_HKeys( hEdits )
       DedupHits( hEdits[ cKey ] )
    NEXT
@@ -9191,7 +9323,7 @@ STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
       Prose( "  declared MEMVAR: " + aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + " " + aC[ 2 ] + hb_eol() )
    NEXT
    FOR EACH aC IN hF[ "lexshadow" ]
-      Prose( "  lexical shadow: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 4 ] ) + ") declara " + ;
+      Prose( "  lexical shadow: " + aC[ 2 ] + " (" + aC[ 1 ] + ":" + hb_ntos( aC[ 4 ] ) + ") declares a " + ;
               aC[ 3 ] + " of the same name - uses there are NOT this memvar" + hb_eol() )
    NEXT
    FOR EACH aC IN hF[ "fields" ]
@@ -9231,6 +9363,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    LOCAL cUpOld, cUpNew, hF, hFNew, hIdx, hReach, hInReach, aC, aU, aWarn := {}
    LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
    LOCAL cWhy := "", aLive, aWork, hScope
+   LOCAL hRuleBad                       // P28: recusa vinda da coleta do `.ch`
 
    IF Len( aArgs ) < 4
       Usage()
@@ -9300,7 +9433,8 @@ STATIC FUNCTION RenameMemvar( aArgs )
          cWhy += iif( Empty( cWhy ), "", "; " ) + aC[ 4 ] + " in " + aC[ 2 ] + " (" + ;
                  aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ")"
       NEXT
-      RETURN Refuse( "'" + cOld + "' has more than one creator - bindings depend on the execution path: " + cWhy )
+      RETURN Refuse( "'" + cOld + "' has more than one creator - bindings depend on the execution path: " + cWhy, ;
+                     RSN_MV_MULTI_CREATOR )
    ENDIF
    aC := hF[ "creators" ][ 1 ]
 
@@ -9346,7 +9480,8 @@ STATIC FUNCTION RenameMemvar( aArgs )
       IF ! hb_HHasKey( hInReach, aU[ 7 ] + "!" + Upper( aU[ 2 ] ) )
          RETURN Refuse( "use of '" + cOld + "' outside the creator's scope: " + aU[ 2 ] + ;
                         " (" + aU[ 1 ] + ":" + hb_ntos( aU[ 3 ] ) + ") never runs with that " + ;
-                        aC[ 4 ] + " alive - a different memvar of the same name; refusing" )
+                        aC[ 4 ] + " alive - a different memvar of the same name; refusing", ;
+                        RSN_MV_OUT_OF_SCOPE )
       ENDIF
    NEXT
    // criação via macro dentro do alcance = pode ser este nome
@@ -9427,10 +9562,23 @@ STATIC FUNCTION RenameMemvar( aArgs )
       NEXT
       IF ! Empty( aE )
          DedupHits( aE )
-         hEdits[ cPath ] := aE
+         // AbsEditsAdd, não `hEdits[ cPath ]`: a chave tem de ser CANÔNICA, e a
+         // coleta do `.ch` (P28) já entrava por ele. Duas formas de chave no
+         // mesmo hash fazem "este módulo foi editado?" responder errado
+         AbsEditsAdd( hEdits, cPath, aE )
          nTotal += Len( aE )
       ENDIF
    NEXT
+   // P28 fatia 3: os sítios que uma DIRETIVA aplicada escreve entram no MESMO
+   // conjunto, e passam pela MESMA prova - a deste verbo, que aceita um símbolo
+   // renomeado (HrbEquivalent), não a byte-identidade do local/static. É por
+   // isto que isto mora AQUI e não no motor da P27: a análise de alcance do
+   // memvar (criador, grafo de quem roda com ele vivo, criação por macro) é
+   // inseparável das guardas dele, e a prova é outra
+   nTotal += RuleResultEdits( hAsts, hProj, cUpOld, cOld, hEdits, @hRuleBad )
+   IF hRuleBad != NIL
+      RETURN Refuse( hRuleBad[ "msg" ], hRuleBad[ "reason" ] )
+   ENDIF
    IF nTotal == 0
       RETURN Refuse( "no editable site found for '" + cOld + "'" )
    ENDIF
@@ -9469,18 +9617,36 @@ STATIC FUNCTION RenameMemvar( aArgs )
    NEXT
    IF ! CompileHrbAll( hProj, cTmp, "after" )
       RollbackAll( hOrig )
-      DiagRuleWritesApplied( hAsts, cOld )
       RETURN Refuse( "the project stopped compiling after the rename - rollback", ;
                      RSN_COMPILE_FAILED )
    ENDIF
+   // a prova, e ela é DUAS conforme o módulo tenha sido editado ou não.
+   //
+   // O `HrbEquivalent` aceita UMA substituição: todo símbolo com o nome velho
+   // vira o novo. Isso é o certo para um módulo QUE FOI EDITADO. Aplicá-lo a um
+   // módulo intocado era uma recusa FALSA: um módulo que declare um campo de
+   // área de trabalho homônimo tem um símbolo com o nome velho que deve
+   // CONTINUAR com ele - é um campo, não a memvar -, e a regra "todos ou
+   // nenhum" reprovava um programa correto. Medido com controle: removida só a
+   // declaração do campo, o mesmo rename passava.
+   //
+   // Para um módulo não editado a régua é mais dura, não mais frouxa: o pcode
+   // tem de sair BYTE A BYTE igual. Ele não foi tocado, então qualquer diferença
+   // é efeito colateral - e aí a recusa é verdadeira.
    FOR EACH cPath IN hProj[ "files" ]
-      IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
-                          hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
-                          cUpOld, cUpNew, @cWhy )
+      IF hb_HHasKey( hEdits, hb_PathNormalize( hb_PathJoin( hb_DirSepAdd( hb_cwd() ), cPath ) ) )
+         IF ! HrbEquivalent( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ), ;
+                             hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ), ;
+                             cUpOld, cUpNew, @cWhy )
+            RollbackAll( hOrig )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback", ;
+                           RSN_VERIFY_FAILED )
+         ENDIF
+      ELSEIF !( hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".before.hrb" ) == ;
+                hb_MemoRead( hb_DirSepAdd( cTmp ) + hb_FNameName( cPath ) + ".after.hrb" ) )
          RollbackAll( hOrig )
-         DiagRuleWritesApplied( hAsts, cOld )
-         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cWhy + " - rollback", ;
-                        RSN_VERIFY_FAILED )
+         RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": not edited, " + ;
+                        "yet its pcode changed - rollback", RSN_VERIFY_FAILED )
       ENDIF
    NEXT
 

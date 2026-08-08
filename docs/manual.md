@@ -1,7 +1,7 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@e3efe33 · harbour-core@9d42e27866 (feature/compiler-ast-dump)
+  baseline: hbrefactor@a97c00d · harbour-core@9d42e27866 (feature/compiler-ast-dump)
     — this round closed the gap between "never edits what it cannot prove" and "never
       keeps quiet about it either":
       * IT NOW REPORTS THE UNVERIFIABLE THING YOUR EDIT REACHES (new section "What it
@@ -929,6 +929,17 @@ stock compiler.
 
 - Renaming a class **data member** covers plain `VAR`/`DATA`; members with explicit
   `ACCESS`/`ASSIGN` accessors, or inherited from a superclass, aren't covered yet.
+- **A directive should own the variables it creates.** When it declares the variable and
+  uses it inside the code it generates — the way Harbour's own class system does — your
+  code never writes that name, so there is nothing there to rename; the tool says whose
+  variable it is and touches nothing. When a directive writes into a name **you**
+  declared, the two are tied together: the tool renames both sides or refuses. That
+  second shape is fragile by nature, and Harbour's own headers do not use it.
+- **The same name declared `STATIC` twice in one file is refused**, and this has nothing
+  to do with directives — a file-wide `STATIC nTotal` and a `STATIC nTotal` inside one
+  function are two ordinary, distinct variables, and Harbour is happy with both. Your
+  cursor already says which one you mean; the tool does not yet use that, and refuses
+  saying they are different variables. Rename one of them by hand first.
 - Function *parameters* aren't annotated yet — only local variables and code-block
   parameters.
 - Some "maybe" is irreducible: a receiver whose class depends on runtime input (config,

@@ -1,0 +1,4 @@
+app.prg(7) >CMD_LOG "iniciando"<
+#xcommand >nLinhas += 1 ; OutStd( "iniciando" )<
+app.prg(17) >CMD_LOG "seguindo"<
+#xcommand >nLinhas += 1 ; OutStd( "seguindo" )<

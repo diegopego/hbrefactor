@@ -1,0 +1,21 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "a.prg:5:12",
+   "xNovo",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "memvar-use-outside-creator-scope",
+  "action": "stop-and-report",
+  "detail": "use of 'xCfg' outside the creator's scope: SOLTA (b.prg:5) never runs with that PRIVATE alive - a different memvar of the same name; refusing",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+ }
+]
