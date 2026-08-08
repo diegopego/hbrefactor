@@ -1,21 +1,19 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@a97c00d · harbour-core@9d42e27866 (feature/compiler-ast-dump)
-    — this round closed the gap between "never edits what it cannot prove" and "never
-      keeps quiet about it either":
-      * IT NOW REPORTS THE UNVERIFIABLE THING YOUR EDIT REACHES (new section "What it
-        sees but must not touch"). A string that macro-expands at run time is named, in
-        the whole project, with the reason. A module whose `__LINE__` shifts under an
-        edit gets a warning — and it is a warning, not a refusal, because the new value
-        is the correct one. Neither is ever edited.
-      * AND IT NOW KNOWS WHEN TO SAY NOTHING. A `TEXT ... ENDTEXT` line matching a name
-        is a coincidence, not an occurrence — the preprocessor stamps such a line as
-        data (ast-18), so the silence is a fact it was told, not a guess from shape.
-      * The core grew the facts all of that stands on: ast-17 (a position-built value
-        keeps a link to the rule that made it, independent of the line) and ast-18 (the
-        three seals above).
-  updated: 2026-07-23
+  baseline: hbrefactor@277d317 · harbour-core@d14fbbb53b (feature/compiler-ast-dump)
+    — this round the proofs changed hands: the compiler now states the module's
+      identity in the dump (symbol table + two code fingerprints per function, one
+      byte-exact and one immune to symbol renumbering, ast-24), and the tool's
+      equivalence proofs compare those stated facts — its private reader of the .hrb
+      binary format is gone. Byte-identity claims still compare artifacts byte for
+      byte. User-visible edge: `verify` snapshots recorded before this round are
+      refused and ask for a fresh `snapshot`. The schema ladder also caught up in this
+      file (ast-19..ast-24 rows were missing since ast-18).
+      Previous round (kept for context): the "report the unverifiable, know when to
+      say nothing" work — sections "What it sees but must not touch" and the ast-17/
+      ast-18 seals.
+  updated: 2026-08-08
 
   This file is the single, current-state, user-facing description of hbrefactor.
   The landing page (site/) is GENERATED FROM this content — iterate the words here,
@@ -814,7 +812,9 @@ function*, *Annotate apply*, *Call graph*, and more.
 
 <!-- prov: architecture (docs/arquitetura.md, ast-schema.md); byte proof cases 10/21/
      89–90; hbmk2 resolution cases 29/83/103; -kt by-name check case 87; exec-registry
-     case 101. -->
+     case 101; compiler-stated proof facts (ast-24): hbrefactor@277d317 +
+     harbour-core@71c0363c1f, live rename/snapshot/verify probes 2026-08-08, suite
+     1005/0. -->
 
 hbrefactor never re-implements Harbour's grammar (a re-parse is a degraded copy that
 drifts). It asks the official tools and reads the answer:
@@ -826,7 +826,9 @@ drifts). It asks the official tools and reads the answer:
   as data, so it never guesses a flag — and never has to build your project just to
   learn what it is made of;
 - every edit is **proven** — recompile, compare the binary byte-for-byte, roll back on
-  any difference;
+  any difference — and the equivalence proofs compare facts the compiler itself states
+  (the symbol table, per-function code fingerprints): the tool parses no binary format.
+  Where the claim is byte-identity, the artifacts are still compared byte for byte;
 - under `-kt`, the runtime **checks types by name** on the live object — reaching
   classes built at runtime that no static analysis could see;
 - **exec-registry** compiles a minimal driver (never your `Main`), runs only the
@@ -839,6 +841,10 @@ drifts). It asks the official tools and reads the answer:
      b758cf376a; segfault fix in 29eb2aa940 (ast-8); parentage c2c26e5aa3 + b07fef4060;
      ast-14 c7100f8cdb, ast-15 4d6deca13d, ast-16 611e0c45cc, ast-17 77a105602d,
      ast-18 f76137f85d (its guarantees narrowed to what the code does by 4c02f40f44).
+     ast-19..ast-24 rows added 2026-08-08 (they were missing since ast-18), cross-
+     checked against docs/ast-schema.md and harbour-core/NEWS.md; ast-24 is
+     harbour-core@71c0363c1f, renumbering controls measured live (raw hash differs,
+     normalized hash identical on an untouched function).
      ZERO-IMPACT: this section used to cite "1085/1085 and 112/112 byte-identical",
      taken on faith from the core commits. Neither figure is reproducible - they were
      measured by hand, once, with no script, and they aged in silence. RE-MEASURED
@@ -872,6 +878,12 @@ one fact at a time:
 | `ast-16` | a directive has a **lifetime**. `#undef` and `#xuncommand` switch one off partway through a file — the preprocessor did that and told nobody, so a tool renaming the directive left the switch-off behind, pointing at a name that no longer existed, and the directive silently **leaked** past the point where you turned it off |
 | `ast-17` | a value the preprocessor builds out of **position** (`__LINE__`, `__FILE__`) keeps a link back to the rule that made it. It used to arrive looking like a number you typed, and the only tie back to its origin was to match things up *by line* — the one thing that moves the instant an edit happens. The link does not depend on the line |
 | `ast-18` | three seals for what a tool must **report but never edit**: a `TEXT ... ENDTEXT` line is stamped as data (so a name matching its text is provably a coincidence, and silence about it is a fact rather than a guess); a position-built value says **which** axis it follows (the line, or the file); and a string carries the memvar names it re-expands at run time, so a rename matches the name — not the text |
+| `ast-19` | what conditional compilation **skipped** — the part of your file that was NOT built, so a tool can say how far its verification reached (report-only, never edited) |
+| `ast-20` | occurrences, calls and sends gain a **column**, not just a line |
+| `ast-21` | that column comes from the **parser's own node** — the counting heuristic it replaced is dead |
+| `ast-22` | **provenance**: the dump names every file (and `-D`) it was made from, and the compiler answers whether it still holds — no more trusting timestamps |
+| `ast-23` | a token written by a directive points at the **application** that wrote it — the 40% of sites whose only written position is in another file |
+| `ast-24` | the module's **identity**: the symbol table and two fingerprints per function — the exact bytes, and a form immune to symbol renumbering — so proofs read compiler facts instead of parsing `.hrb` |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false
