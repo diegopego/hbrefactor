@@ -3051,6 +3051,10 @@ STATIC FUNCTION Rename( aArgs )
       ENDIF
    CASE hR[ "cmd" ] == "rename-memvar"
       aDel := { "rename-memvar", cSpec, hR[ "old" ], cNew }
+      // P29: the cursor names WHICH creator chain the user means - with two
+      // PRIVATE creators of disjoint reach, that choice is the whole answer
+      AAdd( aDel, "--at" )
+      AAdd( aDel, cAtFile + ":" + hb_ntos( nLine ) )
       IF lForce
          AAdd( aDel, "--force" )
       ENDIF
@@ -9579,6 +9583,9 @@ STATIC FUNCTION RenameMemvar( aArgs )
    LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
    LOCAL cWhy := "", aLive, aWork, hScope
    LOCAL hRuleBad                       // P28: recusa vinda da coleta do `.ch`
+   LOCAL cAtMod := "", nAtLine := 0     // P29: the cursor, naming the chain
+   LOCAL lP29 := .F., aReaches := {}, aSets := {}, nPick := 0
+   LOCAL hChainMods := { => }, hSet, nJ
 
    IF Len( aArgs ) < 4
       Usage()
@@ -9593,6 +9600,13 @@ STATIC FUNCTION RenameMemvar( aArgs )
          lForce := .T.
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
+      CASE Lower( aArgs[ nI ] ) == "--at" .AND. nI < Len( aArgs )
+         cWhy := aArgs[ ++nI ]                       // reuso: file:line
+         IF ( nJ := RAt( ":", cWhy ) ) > 1
+            cAtMod  := hb_FNameNameExt( Left( cWhy, nJ - 1 ) )
+            nAtLine := Val( SubStr( cWhy, nJ + 1 ) )
+         ENDIF
+         cWhy := ""
       ENDCASE
    NEXT
    cUpOld := Upper( cOld )
@@ -9642,20 +9656,142 @@ STATIC FUNCTION RenameMemvar( aArgs )
       ENDIF
       RETURN Refuse( "'" + cOld + "' exists only as a MEMVAR declaration (no creator, no use) - nothing to rename safely" )
    ENDIF
+   hIdx := FuncIndex( hProj, hAsts )
    IF Len( hF[ "creators" ] ) > 1
+      // P29: the tool ALREADY computes each creator's dynamic reach - and used
+      // to throw that separation away, refusing "bindings depend on the
+      // execution path" even when the reaches are DISJOINT and no function
+      // ever runs under two creators. The refusal survives where it is true:
+      //   - a non-PRIVATE creator (a PUBLIC is one global, re-created);
+      //   - an applied directive writing the name (chains and rule text mix);
+      //   - a hole in ANY reach (disjointness would be a guess, not a fact);
+      //   - reaches that CROSS (there the binding IS path-dependent).
       cWhy := ""
       FOR EACH aC IN hF[ "creators" ]
          cWhy += iif( Empty( cWhy ), "", "; " ) + aC[ 4 ] + " in " + aC[ 2 ] + " (" + ;
                  aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ")"
       NEXT
-      RETURN Refuse( "'" + cOld + "' has more than one creator - bindings depend on the execution path: " + cWhy, ;
-                     RSN_MV_MULTI_CREATOR )
-   ENDIF
-   aC := hF[ "creators" ][ 1 ]
+      lP29 := .T.
+      FOR EACH aC IN hF[ "creators" ]
+         IF ! aC[ 4 ] == "PRIVATE"
+            lP29 := .F.
+         ENDIF
+      NEXT
+      IF lP29
+         FOR EACH cPath IN hProj[ "files" ]
+            IF ModuleAppliesRuleWriting( hAsts[ cPath ], cUpOld )
+               lP29 := .F.
+            ENDIF
+         NEXT
+      ENDIF
+      IF lP29
+         FOR EACH aC IN hF[ "creators" ]
+            hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
+            IF ! Empty( hReach[ "holes" ] )
+               lP29 := .F.
+               EXIT
+            ENDIF
+            AAdd( aReaches, hReach )
+            hSet := { => }
+            FOR EACH aU IN hReach[ "funcs" ]
+               hSet[ aU[ 1 ] + "!" + Upper( aU[ 2 ][ "name" ] ) ] := .T.
+            NEXT
+            AAdd( aSets, hSet )
+         NEXT
+      ENDIF
+      IF lP29
+         FOR nI := 1 TO Len( aSets ) - 1
+            FOR nJ := nI + 1 TO Len( aSets )
+               FOR EACH cWhy IN hb_HKeys( aSets[ nI ] )      // reuso
+                  IF hb_HHasKey( aSets[ nJ ], cWhy )
+                     lP29 := .F.
+                     EXIT
+                  ENDIF
+               NEXT
+            NEXT
+         NEXT
+         cWhy := ""
+         FOR EACH aC IN hF[ "creators" ]
+            cWhy += iif( Empty( cWhy ), "", "; " ) + aC[ 4 ] + " in " + aC[ 2 ] + " (" + ;
+                    aC[ 1 ] + ":" + hb_ntos( aC[ 3 ] ) + ")"
+         NEXT
+      ENDIF
+      IF ! lP29
+         RETURN Refuse( "'" + cOld + "' has more than one creator - bindings depend on the execution path: " + cWhy, ;
+                        RSN_MV_MULTI_CREATOR )
+      ENDIF
+      // the cursor names the chain: the creator's own declaration line, or a
+      // use inside exactly one reach (disjointness guarantees at most one)
+      FOR nI := 1 TO Len( hF[ "creators" ] )
+         aC := hF[ "creators" ][ nI ]
+         IF Lower( aC[ 1 ] ) == Lower( cAtMod ) .AND. aC[ 3 ] == nAtLine
+            nPick := nI
+            EXIT
+         ENDIF
+      NEXT
+      IF nPick == 0 .AND. ! Empty( cAtMod )
+         FOR EACH cPath IN hProj[ "files" ]
+            IF Lower( hb_FNameNameExt( cPath ) ) == Lower( cAtMod )
+               hFunc := FuncAtLine( hAsts[ cPath ], nAtLine )
+               IF hFunc != NIL
+                  FOR nI := 1 TO Len( aSets )
+                     IF hb_HHasKey( aSets[ nI ], cPath + "!" + Upper( hFunc[ "name" ] ) )
+                        nPick := nI
+                        EXIT
+                     ENDIF
+                  NEXT
+               ENDIF
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
+      IF nPick == 0
+         RETURN Refuse( "'" + cOld + "' has more than one creator with disjoint reaches - " + ;
+                        "point the cursor at the creator (or a use) of the chain you mean: " + cWhy, ;
+                        RSN_MV_MULTI_CREATOR )
+      ENDIF
+      // one MODULE hosting sites of two chains shares its MEMVAR declaration
+      // between them: renaming one chain would need the new name ADDED beside
+      // the old one - a symbol more, renumbering the table and leaving the
+      // edited functions without the one-symbol-substitution proof this verb
+      // gives. Editing without proof is what this tool does not do
+      aC := hF[ "creators" ][ nPick ]
+      hChainMods[ aC[ 5 ] ] := .T.
+      FOR EACH aU IN hF[ "uses" ]
+         IF hb_HHasKey( aSets[ nPick ], aU[ 7 ] + "!" + Upper( aU[ 2 ] ) )
+            hChainMods[ aU[ 7 ] ] := .T.
+         ENDIF
+      NEXT
+      FOR nI := 1 TO Len( hF[ "creators" ] )
+         IF nI == nPick
+            LOOP
+         ENDIF
+         cWhy := ""                                   // reuso: o módulo em comum
+         IF hb_HHasKey( hChainMods, hF[ "creators" ][ nI ][ 5 ] )
+            cWhy := hF[ "creators" ][ nI ][ 1 ]
+         ELSE
+            FOR EACH aU IN hF[ "uses" ]
+               IF hb_HHasKey( aSets[ nI ], aU[ 7 ] + "!" + Upper( aU[ 2 ] ) ) .AND. ;
+                  hb_HHasKey( hChainMods, aU[ 7 ] )
+                  cWhy := aU[ 1 ]
+                  EXIT
+               ENDIF
+            NEXT
+         ENDIF
+         IF ! Empty( cWhy )
+            RETURN Refuse( "'" + cOld + "' has more than one creator with disjoint reaches, but " + ;
+                           cWhy + " hosts sites of more than one chain - its MEMVAR declaration " + ;
+                           "serves both; refusing", RSN_MV_MULTI_CREATOR )
+         ENDIF
+      NEXT
+      hReach := aReaches[ nPick ]
+      cWhy := ""
+   ELSE
+      aC := hF[ "creators" ][ 1 ]
 
-   // alcance dinâmico do criador: fecho dos callees, sem furos
-   hIdx := FuncIndex( hProj, hAsts )
-   hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
+      // alcance dinâmico do criador: fecho dos callees, sem furos
+      hReach := ReachFrom( hProj, hAsts, hIdx, aC[ 5 ], aC[ 2 ] )
+   ENDIF
    // P16(c) - a STRING que é MACRO VIVO: uma string que contém '&' + nome é
    // macro-expandida em RUNTIME e vale o memvar que ela nomeia (fato do
    // compilador: a presença dela sozinha liga usesMacro na função - provado
@@ -9690,9 +9826,22 @@ STATIC FUNCTION RenameMemvar( aArgs )
       hInReach[ aU[ 1 ] + "!" + Upper( aU[ 2 ][ "name" ] ) ] := .T.
    NEXT
 
-   // todos os usos do projeto dentro do alcance
+   // todos os usos do projeto dentro do alcance - de ALGUM criador: com as
+   // cadeias disjuntas (P29) um uso da outra cadeia pertence a ela, e fica
    FOR EACH aU IN hF[ "uses" ]
       IF ! hb_HHasKey( hInReach, aU[ 7 ] + "!" + Upper( aU[ 2 ] ) )
+         IF lP29
+            nJ := 0
+            FOR nI := 1 TO Len( aSets )
+               IF hb_HHasKey( aSets[ nI ], aU[ 7 ] + "!" + Upper( aU[ 2 ] ) )
+                  nJ := nI
+                  EXIT
+               ENDIF
+            NEXT
+            IF nJ > 0
+               LOOP
+            ENDIF
+         ENDIF
          RETURN Refuse( "use of '" + cOld + "' outside the creator's scope: " + aU[ 2 ] + ;
                         " (" + aU[ 1 ] + ":" + hb_ntos( aU[ 3 ] ) + ") never runs with that " + ;
                         aC[ 4 ] + " alive - a different memvar of the same name; refusing", ;
@@ -9718,6 +9867,11 @@ STATIC FUNCTION RenameMemvar( aArgs )
       hAst := hAsts[ cPath ]
       FOR EACH hFunc IN hAst[ "functions" ]
          IF ! MvFuncUsesOld( hFunc, cUpOld )
+            LOOP
+         ENDIF
+         // P29: só as funções CUJOS usos serão renomeados - as da outra cadeia
+         // continuam com o nome velho, e uma sombra do nome NOVO lá é inócua
+         IF lP29 .AND. ! hb_HHasKey( hInReach, cPath + "!" + Upper( hFunc[ "name" ] ) )
             LOOP
          ENDIF
          FOR EACH hItem IN hFunc[ "declarations" ]
@@ -9751,7 +9905,10 @@ STATIC FUNCTION RenameMemvar( aArgs )
                      RSN_TEXTUAL_FORCE, ACT_RETRY )
    ENDIF
 
-   // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos
+   // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos.
+   // P29 (cadeia escolhida): o PRIVATE é o do criador escolhido; a MEMVAR é
+   // SUBSTITUÍDA só nos módulos da cadeia (os da outra continuam precisando
+   // do nome velho); os usos são os do alcance dele
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
       hLines := { => }
@@ -9759,12 +9916,23 @@ STATIC FUNCTION RenameMemvar( aArgs )
          FOR EACH hItem IN hFunc[ "declarations" ]
             IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ;
                ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "private" )
+               IF lP29 .AND. hItem[ "scope" ] == "private" .AND. ;
+                  ! ( cPath == aC[ 5 ] .AND. hItem[ "declLine" ] == aC[ 3 ] )
+                  LOOP
+               ENDIF
+               IF lP29 .AND. hItem[ "scope" ] == "memvar" .AND. ;
+                  ! hb_HHasKey( hChainMods, cPath )
+                  LOOP
+               ENDIF
                hLines[ hItem[ "declLine" ] ] := .T.
             ENDIF
          NEXT
          FOR EACH hItem IN hFunc[ "occurrences" ]
             IF Upper( hItem[ "sym" ] ) == cUpOld .AND. ;
                ( hItem[ "scope" ] == "memvar" .OR. hItem[ "scope" ] == "memvar_implicit" )
+               IF lP29 .AND. ! hb_HHasKey( hInReach, cPath + "!" + Upper( hFunc[ "name" ] ) )
+                  LOOP
+               ENDIF
                hLines[ hItem[ "line" ] ] := .T.
             ENDIF
          NEXT

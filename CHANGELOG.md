@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@ba37d23 -->
+<!-- changelog-baseline: hbrefactor@bfc0cd8 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
@@ -19,6 +19,37 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-08 — two PRIVATEs with the same name: rename the one your cursor points at
+
+Legacy code has this shape everywhere: two subsystems, each creating its own
+`PRIVATE xCfg`, never running one under the other. Renaming either used to
+refuse — *"more than one creator - bindings depend on the execution path"* —
+even when nothing about the program depends on any path.
+
+Now the tool checks what is actually true. When each creator's dynamic life is
+**closed and separate** (no function ever runs under both), your cursor names
+the one you mean: point at a creator (or any use of its chain) and the rename
+takes that chain — the `PRIVATE`, every use it reaches across modules, and the
+`MEMVAR` declarations of those modules. The other chain, and everything else,
+comes out **byte for byte identical**, and the program's output is proven
+unchanged.
+
+This is also how you *clean up* the pattern: renaming one chain to its own
+honest name is the first step out of shared-name PRIVATEs.
+
+The refusal stays — and stays with its reason — exactly where it is true:
+
+- the two lives **overlap** (one creator's function calls into the other's):
+  there a use really does bind by execution path;
+- a creator sits inside an `IF`, the same use is shared by callers with
+  different creators, or a creator's function can reach itself: runtime-only,
+  permanently refused — **by policy, bad practice gets an honest refusal and
+  nothing more**;
+- one module hosts sites of both chains: its `MEMVAR` line would have to
+  serve two names at once, and that edit has no proof today;
+- any hole in a chain's reach (macros, dynamic calls): separation would be a
+  guess, and the tool does not guess.
 
 ## 2026-08-08 — the STATIC FUNCTION your directive calls renames too — module by module
 

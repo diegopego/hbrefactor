@@ -1,0 +1,21 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "a.prg:5:12",
+   "xNovo",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "memvar-has-more-than-one-creator",
+  "action": "stop-and-report",
+  "detail": "'xCfg' has more than one creator with disjoint reaches, but both.prg hosts sites of more than one chain - its MEMVAR declaration serves both; refusing",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+ }
+]

@@ -1,0 +1,86 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "a.prg:5:12",
+   "xNovo",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 4 edit(s); symbol renamed, pcode byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "memvar",
+   "old": "xCfg",
+   "new": "xNovo",
+   "editCount": 4,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 7
+      },
+      "end": {
+       "line": 0,
+       "character": 11
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 11
+      },
+      "end": {
+       "line": 4,
+       "character": 15
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/c.prg",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 7
+      },
+      "end": {
+       "line": 0,
+       "character": 11
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/c.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 20
+      },
+      "end": {
+       "line": 4,
+       "character": 24
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   }
+  },
+  "edits": []
+ }
+]
