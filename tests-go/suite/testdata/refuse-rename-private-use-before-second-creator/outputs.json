@@ -1,0 +1,21 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "p.hbp",
+   "a.prg:5:12",
+   "xNovo",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "memvar-has-more-than-one-creator",
+  "action": "stop-and-report",
+  "detail": "'xCfg' has more than one creator - bindings depend on the execution path: PRIVATE in MAIN (a.prg:5); PRIVATE in USA (b.prg:7)",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+ }
+]

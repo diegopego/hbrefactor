@@ -46,16 +46,14 @@ sem fato atrás; o terceiro acusava 54 linhas do fonte e nenhuma era heurística
 
 ## 2. ⚠️ O QUE AINDA NÃO FECHOU — e é por isto que este arquivo existe
 
-### 2.1 A P29 — dois criadores PRIVATE, recusa larga demais *(nasceu 2026-08-08)*
+### 2.1 A P29 — ✅ FECHADA *(2026-08-08)*
 
-Spec com tabela de sondas na
-[P29 do roadmap](roadmap.md#p29--dois-criadores-private-a-recusa-é-larga-demais). Em uma
-frase: a ferramenta JÁ separa o alcance de cada criador e joga a distinção fora, recusando
-igual quando os alcances são disjuntos (decidível) e quando se cruzam (aí sim ambíguo).
-
-**Não falta fato nem edição — falta PROVA.** Acrescentar um símbolo renumera a tabela e muda
-o pcode de funções intocadas (`HB_P_PUSHMEMVAR` indexa `pSymbols`). Precedente para a prova
-nova: o `symbols-preserved` do `reorder-params`.
+> Disjunto renomeia (cursor nomeia a cadeia; `MEMVAR` **substituída** nos módulos
+> da cadeia — sem símbolo a mais, sem renumeração, prova `FactsEquivalent` que já
+> existia, MAIS forte que a planejada); cruzado segue recusando (caso pré-existente
+> intocado, zero drift); módulo compartilhado entre cadeias recusa nomeando-o (é o
+> caso que um dia usará o `pcodeNormHash` — limite honesto registrado). Execução
+> idêntica no próprio caso. Registro completo na P29 do roadmap. Resta commit.
 
 ### 2.2 A P31 — o lado direito de uma diretiva não é UM símbolo *(nasceu 2026-08-08)*
 
@@ -99,7 +97,16 @@ APLICAM a regra + o header; módulo que não aplica fica byte-idêntico; prova p
 o culpa-ao-inocente); misto static/dinâmico recusa com mapa. Na entrega, o caso pinado
 `refuse-rename-static-function-cited-by-directive` inverte.
 
-### 2.4 A página pública (`site/index.html`) — ADIADA pelo Diego
+### 2.4 A P33 — ✅ FECHADA POR POLÍTICA no dia em que abriu *(2026-08-08)*
+
+Nasceu do exemplo anotado do Diego (decidível — a linha do `PRIVATE` corta a função,
+execução confirmou `7/7/9/7`) e **morreu pela política que ele confirmou no mesmo dia**:
+*má prática recebe recusa honesta e nenhum investimento além dela* (regra nova no
+CLAUDE.md §1; medição: 0 `PRIVATE` condicional em 62 no corpus). Os **4 pinos** na suíte
+são o contrato executável — o decidível recusa por política, os três indecidíveis por
+fato. Registro completo na P33 do roadmap. Resta commit.
+
+### 2.5 A página pública (`site/index.html`) — ADIADA pelo Diego
 
 O manual foi atualizado (baseline `a97c00d`, dois itens novos em *Still rough*). A página é
 derivação mecânica dele e **não** precisa de segunda aprovação — mas o Diego adiou em

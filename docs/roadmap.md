@@ -1373,6 +1373,73 @@ header com conjuntos IGUAIS; caso misto (um aplicador sem static) recusando com 
 próprio e o vínculo por módulo no detalhe; execução idêntica antes/depois (par `hbmk2` +
 rodar, à moda do caso 74); `make test` verde.
 
+### P33 — vínculo de memvar por POSIÇÃO DE STATEMENT *(aberto e **FECHADO POR POLÍTICA no MESMO DIA**, 2026-08-08 — Diego: "não tratar as exceções de más práticas")*
+
+> **PORTÃO FECHADO POR POLÍTICA** *(Diego, 2026-08-08, confirmado depois de medição)*:
+> **má prática recebe recusa honesta e NENHUM investimento além dela.** O padrão que
+> esta fase serviria — usar um nome ANTES de recriá-lo como `PRIVATE` — é código frágil
+> por natureza, e a esperteza para atendê-lo (cortar a função na linha do `PRIVATE`)
+> seria o próximo motor grande de análise. Medido antes de decidir: **62 `PRIVATE`s no
+> corpus core+xhb, ZERO em bloco condicional** — a exceção não existe nem no corpus.
+> A recusa É o tratamento: barata, segura, nunca mente. Capacidade continua indo para
+> o que o código legado real faz (a P29, entregue, é o exemplo: rename é a ferramenta
+> com que se LIMPA má prática).
+>
+> **A política é EXECUTÁVEL — 4 pinos na suíte**, e este é o contrato:
+> `refuse-rename-private-use-before-second-creator` (o caso DECIDÍVEL do exemplo do
+> Diego — recusa **por política**, não por limitação; a execução `7/7/9/7` está
+> registrada abaixo) e os três genuinamente indecidíveis
+> (`conditionally-created`, `shared-use-two-callers`, `recursive-creator`).
+> Se qualquer um parar de recusar, o teste quebra.
+>
+> A spec técnica abaixo fica como registro do que se decidiu NÃO construir — e do
+> porquê ela seria possível (os fatos existem nos canais atuais), que é o que dá à
+> decisão o caráter de política, não de impossibilidade.
+
+**O caso, e ele veio de uma pergunta do Diego** *("é certo dizer que neste caso não há
+forma de determinar os escopos?" — errado, e a execução provou)*: `Main` cria
+`PRIVATE xCfg := 7` e chama `Usa`; `Usa` USA o nome, **depois** cria o seu próprio
+`PRIVATE xCfg := 9`, e usa de novo. Todo uso deste programa tem vínculo determinado —
+**a linha do `PRIVATE` corta a função em duas**: uso antes dela vê a variável de quem
+chamou; uso depois vê a própria. Medido: `main: 7  antes: 7  depois: 9  volta: 7`.
+
+**TABELA DE SONDAS** *(§1.7.1 — medidas em 2026-08-08, ANTES do mecanismo; cada sonda em
+diretório novo com baseline git)*
+
+| pergunta | resposta medida |
+|---|---|
+| o programa do caso decide os vínculos? | **SIM**: `main: 7 / antes: 7 / depois: 9 / volta: 7` — anotação humana confirmada pela execução |
+| a ferramenta hoje? | recusa (`memvar-has-more-than-one-creator`) — granularidade de FUNÇÃO: vê "Usa ∈ alcance de Main E cria o próprio" e para |
+| os fatos para decidir existem? | **SIM, nos canais atuais**: linha do uso × `declLine` da criação (dump); criação dentro de bloco condicional = eventos `blocks[]` (open/close com linha); vínculo de entrada = grafo fechado (`ReachFrom`, que já existe) |
+| criação CONDICIONAL (`IF lFlag / PRIVATE / ENDIF / uso`) | recusa hoje, e **deve recusar para sempre** — o vínculo do uso depende de valor de runtime |
+| DOIS CHAMADORES com criadores distintos e uso compartilhado | idem — um sítio, duas variáveis, escolhidas pela chamada |
+| criador RECURSIVO | idem — o "antes" da segunda ativação vê o PRIVATE da PRIMEIRA ativação, não o do chamador externo: "o que está vivo na entrada" não tem resposta única |
+
+**A metade executável da spec JÁ ESTÁ NA SUÍTE** *(exigência do Diego: "o que quer que
+seja, deve estar descrito em especificação executável")*:
+- `refuse-rename-private-use-before-second-creator` — o caso DECIDÍVEL, recusado
+  **por política** (nasceu como pino de defeito invertível; a política do mesmo dia o
+  tornou permanente);
+- `refuse-rename-private-conditionally-created`,
+  `refuse-rename-private-shared-use-two-callers`,
+  `refuse-rename-private-recursive-creator` — **pinos PERMANENTES**: se algum deles
+  parar de recusar, não é progresso — é a ferramenta afirmando fato que não existe.
+
+**O escopo que NÃO será construído (registro do desenho, para a decisão ter conteúdo)**
+- O modelo: dentro da função que cria, os usos se dividem na linha da criação
+  **incondicional no nível do corpo** (fora de qualquer span de `blocks[]`); "antes" =
+  vínculo de entrada, resolvido pelo grafo fechado quando TODO sítio de chamada roda sob
+  exatamente UM criador e a função criadora **não está no próprio alcance** (recusa a
+  recursão); "depois" = o criador local.
+- `usages` rotula cada uso com o SEU criador (a anotação que o Diego escreveu à mão,
+  emitida pela ferramenta); o rename de cada criador alcança exatamente a sua metade.
+- As quatro guardas acima recuam para a recusa atual, cada uma por fato.
+- Prova: a da P29 (substituição de um símbolo por módulo onde os módulos não se
+  compartilham; o caso módulo-compartilhado continua com a régua de lá).
+
+*(O critério de pronto que existia aqui morreu com o portão: os 4 pinos são o contrato
+vigente, e reabrir esta fase é decisão do Diego revogando a política — nunca faxina.)*
+
 ### P31 — o lado direito de uma diretiva não é UM símbolo *(aberto 2026-08-08; **DECISÃO DO DIEGO PENDENTE**)*
 
 **A tese do Diego** *(2026-08-08)*: só faz sentido refatorar o lado ESQUERDO de uma diretiva —
@@ -1456,7 +1523,32 @@ níveis, renomeando pela genealogia posicional) e
 `refuse-rename-static-function-cited-by-directive` (o item 3 PINADO como defeito, à moda do
 caso do campo de área de trabalho: quem consertar a culpa-ao-inocente fica vermelho na hora).
 
-### P29 — dois criadores PRIVATE: a recusa é larga demais *(aberto 2026-08-08; **A FAZER**)*
+### P29 — dois criadores PRIVATE: a recusa é larga demais *(aberto 2026-08-08; **✅ ENTREGUE 2026-08-08**)*
+
+> **ENTREGUE, e a medição mudou o desenho da spec em UM ponto que a torna mais forte**:
+> a spec pedia *acrescentar* o nome novo às listas `MEMVAR` e uma prova nova
+> "pcode igual a menos da renumeração". A análise achou o caminho sem renumeração:
+> com cadeias disjuntas TAMBÉM em módulos, a `MEMVAR` da cadeia escolhida é
+> **SUBSTITUÍDA** (mesma posição na tabela de símbolos) — cada módulo editado vira a
+> troca de UM símbolo que o `FactsEquivalent` **já** prova com pcode cru byte-idêntico,
+> guarantee mais forte que a prova-modulo-renumeração planejada. O `pcodeNormHash`
+> fica reservado ao caso que segue recusando (abaixo).
+> - **Disjunto renomeia** (`rename-private-with-disjoint-creators`): o cursor nomeia a
+>   cadeia (`--at` que o despacho unificado agora passa ao verbo: linha do criador, ou
+>   função de exatamente um alcance); edita PRIVATE + usos do alcance + `MEMVAR`s dos
+>   módulos da cadeia; a outra cadeia e o `main` **byte-idênticos**; execução idêntica
+>   (build+run no próprio caso).
+> - **Cruzado segue recusando** com `memvar-has-more-than-one-creator` — o caso
+>   pré-existente (`refuse-rename-private-with-two-creators`, Main chama Usa) pinava
+>   exatamente o cruzamento e passou INTOCADO, zero drift.
+> - **A recusa também sobrevive, por fato, quando**: criador não-PRIVATE (PUBLIC é um
+>   global só); diretiva aplicada escreve o nome; furo em QUALQUER alcance (disjunção
+>   seria palpite); e **módulo compartilhado entre cadeias**
+>   (`refuse-rename-private-disjoint-creators-sharing-a-module`): a `MEMVAR` file-wide
+>   serve as duas — renomear exigiria o nome A MAIS, renumerando a tabela e deixando as
+>   funções editadas sem a prova de um-símbolo. Levantar ISSO é que exigirá a prova por
+>   `pcodeNormHash` (fica como limite honesto registrado).
+> - `make test` verde; matriz de homônimos inteira intocada.
 
 **O caso.** Dois `PRIVATE` do mesmo nome, criados em funções diferentes. A ferramenta
 recusa **sempre**, com `RSN_MV_MULTI_CREATOR`, dizendo *"bindings depend on the execution
