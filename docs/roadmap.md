@@ -2885,11 +2885,17 @@ contagem é que era fantasia. **Rodar o script antes de citar — nunca a contag
 
 # Backlog (por valor)
 
-0. **Manutenção de doc de USUÁRIO em atraso (2026-07-12)**: o `docs/manual.md` está com
-   baseline em `hbrefactor@437a6a6` — várias entregas atrás; a `site/index.html` deriva dele.
-   Os DOIS CHANGELOGs estão em dia (têm ponteiro próprio); o manual não. Rodar a
-   `/update-manual` em modo catch-up — **o delta do manual exige o OK do Diego antes de
-   aplicar** (invariante 1 da skill). Não é bloqueante para nenhuma fase.
+0. **A `site/index.html` do hbrefactor está atrás do manual — ADIADA pelo Diego
+   (2026-08-08, reafirmado em 2026-08-09)**. *(Atualizado em 2026-08-09: o item dizia que o
+   MANUAL estava atrasado, em `437a6a6`; ele foi ao dia — baseline `hbrefactor@277d317 ·
+   harbour-core@d14fbbb53b`, com a escada de schemas até `ast-24` e a fonte das provas. Os
+   dois CHANGELOGs também estão em dia, com ponteiro próprio.)*
+   A página é **derivação mecânica do manual** e, pela skill `/update-manual`, não precisa
+   de segunda aprovação — mas o Diego a adiou explicitamente duas vezes; retomar SÓ quando
+   ele mandar. Não bloqueia fase nenhuma.
+   **Também adiados por ele, e igualmente não-bloqueantes:** o deploy do Pages do core (a
+   página dos mantenedores já tem o quinto canal, commit `9e5e00c46b`) e o push dos dois
+   repositórios (sempre manual, dele).
 
 0b. **Higiene: o compilador deixa lixo no repo (2026-07-12)**: cada `make test` deixa um
    `sh1.c` na RAIZ (o `harbour` grava o `.c` no **CWD**, não ao lado do fonte — a mesma
