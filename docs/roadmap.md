@@ -1188,13 +1188,35 @@ heurística viva ao lado dele. Então:
    fronteira que ele não cobre. Isto responde, com fato, a assimetria que o backlog de
    27/07 registrou como decisão pendente (memvar recusa × função passa).
 
+**DUAS REGRAS DO DIEGO QUE GOVERNAM ESTA FASE** *(2026-07-27; resgatadas em 2026-08-09 do
+razão de sessão que as guardava, ao auditá-lo antes de apagá-lo — não existiam em nenhum
+outro lugar, e as duas são operativas AQUI)*
+
+1. **O código de recusa NÃO se batiza pela saída.** Eu havia proposto
+   `macro-reach-requires-force`, e o Diego apontou o que já existia, o
+   `textual-refs-require-force`: *"pelo nome parece que isso é heurística ainda"*. A régua
+   que ficou: **`reason` diz o que É; `action` diz o que FAZER** — porque **código batizado
+   pelo contorno sobrevive à morte da causa**. Esta fase é a prova viva: ela mata a
+   heurística de string, e o `RSN_TEXTUAL_FORCE` que sobreviveria a ela é exatamente um
+   código com nome de contorno. O fato novo do `ast-25` entra com nome de FATO
+   (o nome que a chamada resolve em runtime), nunca de flag.
+2. **Ao matar uma heurística, cada caso que cai junto tem de ser INTERROGADO** — *o que ele
+   provava tem fato por trás?* Quando a heurística de string morreu no `usages`, três casos
+   caíram: dois eram mesmo dela, e o **73 era capacidade legítima entregue pelo canal
+   errado** (o `from: [{op: "stringify"}]` do token com a aplicação que o produziu — e o
+   fato aponta melhor que a heurística apontava: o token ESCRITO, em 9:10, que é o lugar
+   que uma edição precisa tocar). Nenhum caso desta fase cai sem essa pergunta respondida
+   por escrito.
+
 **Critério de pronto (mecânico)**: caso pinado com `__mvGet( "xC" + "fg" )` **recusando**
 pelo fato novo (hoje ele edita e o programa morre — o caso nasce vermelho); caso com
 `LOCAL cF := "Dob" + "ro"` + `&cF.()` recusando por `usesMacro` **sem** nenhuma regra de
 string no caminho; caso com string que é dado puro e coincide com o nome **não** exigindo
 `--force`; `grep` de casamento de texto de string no fonte sem resultado nos dois sítios;
 rename de função em projeto com macro saindo `ok` **com o alcance declarado** no envelope;
-execução idêntica onde a edição é legítima; `make test` verde.
+execução idêntica onde a edição é legítima; **cada caso derrubado com a resposta escrita da
+regra 2, e nenhum código de recusa novo batizado pelo contorno (regra 1)**; `make test`
+verde.
 
 ### P33 — LSP como superfície de entrega *(aberto 2026-08-08; decisão do Diego: "concordo com: LSP como superfície de entrega"; **A FAZER**)*
 
