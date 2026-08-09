@@ -17,7 +17,7 @@ import (
 //	             on the first activation and the PREVIOUS ACTIVATION'S on
 //	             the next - "what is alive at entry" has no single answer.
 //
-// These pins are the executable half of P33's spec: if a future change makes
+// These pins are the executable half of P35's spec: if a future change makes
 // any of them stop refusing, that is not progress - it is the tool claiming
 // a fact that does not exist.
 func init() {

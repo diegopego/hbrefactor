@@ -1373,7 +1373,13 @@ header com conjuntos IGUAIS; caso misto (um aplicador sem static) recusando com 
 próprio e o vínculo por módulo no detalhe; execução idêntica antes/depois (par `hbmk2` +
 rodar, à moda do caso 74); `make test` verde.
 
-### P33 — vínculo de memvar por POSIÇÃO DE STATEMENT *(aberto e **FECHADO POR POLÍTICA no MESMO DIA**, 2026-08-08 — Diego: "não tratar as exceções de más práticas")*
+### P35 — vínculo de memvar por POSIÇÃO DE STATEMENT *(aberto e **FECHADO POR POLÍTICA no MESMO DIA**, 2026-08-08 — Diego: "não tratar as exceções de más práticas")*
+
+> **Esta fase nasceu numerada P33 e foi RENUMERADA para P35 em 2026-08-09.** O número
+> já estava tomado: a sessão paralela abriu a P33 (LSP) às 19:14 de 08-08 e eu escrevi
+> a minha às 00:55 de 08-09, sem reler o roadmap — exatamente o que a nota de retomada
+> avisava sobre número disputado, no dia em que a apaguei. O commit `17fb3a0` e a
+> mensagem dele dizem "P33"; é este parágrafo que liga um ao outro.
 
 > **PORTÃO FECHADO POR POLÍTICA** *(Diego, 2026-08-08, confirmado depois de medição)*:
 > **má prática recebe recusa honesta e NENHUM investimento além dela.** O padrão que

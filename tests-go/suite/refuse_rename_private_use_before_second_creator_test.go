@@ -16,7 +16,7 @@ import (
 // the function already read is fragile code, and bad practice gets an honest
 // refusal and no engineering beyond it - the statement-level analysis that
 // could serve this pattern was designed, measured and consciously NOT built
-// (roadmap P33, closed the day it opened; zero conditional PRIVATEs in the
+// (roadmap P35, closed the day it opened; zero conditional PRIVATEs in the
 // whole measurement corpus). If this case ever stops refusing, someone
 // reopened that gate without revoking the policy - the tests' job is to make
 // that impossible to do silently.

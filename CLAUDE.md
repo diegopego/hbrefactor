@@ -43,7 +43,7 @@ construir inferência. *(Diego, 2026-07-08.)*
   A recusa É o tratamento: barata, segura, nunca mente; capacidade vai para o que o
   código legado real faz (renomear é como se LIMPA má prática — a P29 é o exemplo).
   Antes de fechar uma capacidade por esta política, MEDIR no corpus (a primeira:
-  0 `PRIVATE` condicional em 62 no core+xhb). Registro: roadmap P33, fechada por
+  0 `PRIVATE` condicional em 62 no core+xhb). Registro: roadmap P35, fechada por
   política no dia em que abriu, com 4 pinos executáveis como contrato.
 - **Genérico > específico**: comando dedicado só com razão forte (o `usages-dsl` foi
   absorvido pelo `usages`); ao consumir fatos de pp, operar sobre o genérico

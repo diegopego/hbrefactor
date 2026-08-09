@@ -12,13 +12,23 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-> **⇢ COMECE AQUI se vai retomar a frente da POSIÇÃO DO SÍTIO:**
-> [`retomada-sessao.md`](retomada-sessao.md), e depois a **P27** do
-> [`roadmap.md`](roadmap.md), que é a única coisa aberta.
+> **⇢ COMECE AQUI (atualizado em 2026-08-09): vá direto ao
+> [`roadmap.md`](roadmap.md).** Não existe mais arquivo de retomada — a frente da
+> POSIÇÃO DO SÍTIO fechou inteira, e o ledger daquela sessão morreu com ela (era
+> `retomada-sessao.md`; este bloco apontava para ele e ficou com link morto por
+> algumas horas — ninguém percebeu, porque **nada verifica referência entre docs**).
 >
-> A sessão de 2026-08-06/07 entregou **P21** (`ast-21`), **P24** (`ast-23`), **P25** e
-> **P26**; o mecanismo está em [`posicao-do-sitio.md`](posicao-do-sitio.md). A retomada
-> **só some quando a P27 fechar**.
+> **O que aquela linhagem entregou** (registro por fase no roadmap): **P21** (`ast-21`),
+> **P24** (`ast-23`), **P25**, **P26**, **P27**, **P28**, **P30**; depois **P32**
+> (`ast-24` — as provas passaram a ler fato do compilador e o leitor de `.hrb` morreu),
+> **P29**, **P31** e a **P35**, fechada por política no dia em que abriu. O mecanismo da
+> posição está em [`posicao-do-sitio.md`](posicao-do-sitio.md).
+>
+> **O que está ABERTO agora** — e é isto que uma sessão fria precisa saber:
+> **P33** (LSP como superfície de entrega, aprovada pelo Diego, A FAZER) e **P34**
+> (IntelliSense, exploratória); **P17** é a mais grave da fila antiga; **P22** e **P25**
+> seguem EM CURSO; e a `site/index.html` do hbrefactor, o deploy do Pages do core e o
+> push dos dois repositórios estão **adiados por ordem do Diego**.
 
 ## 0-28. A SESSÃO DE 2026-07-28 — a P21 entregou o MECANISMO, e a fila mudou de dono
 
