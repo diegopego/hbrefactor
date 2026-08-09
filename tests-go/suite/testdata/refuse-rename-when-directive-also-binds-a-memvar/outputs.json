@@ -13,7 +13,7 @@
   "exit": 1,
   "reason": "directive-also-binds-a-memvar",
   "action": "stop-and-report",
-  "detail": "'nReg', written by the directive, binds to a memvar in COMPRIVADA (mv.prg:9) - this rename covers LOCAL and STATIC bindings; refusing",
+  "detail": "'nReg', written by the directive, binds per module: local in COMLOCAL (u.prg:5); memvar in COMPRIVADA (mv.prg:9) - a memvar renames under its own verb and proof, and one edit set cannot carry two proofs; refusing",
   "diagnostics": [],
   "result": {},
   "edits": []

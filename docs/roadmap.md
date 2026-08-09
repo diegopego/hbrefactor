@@ -1440,7 +1440,26 @@ seja, deve estar descrito em especificação executável")*:
 *(O critério de pronto que existia aqui morreu com o portão: os 4 pinos são o contrato
 vigente, e reabrir esta fase é decisão do Diego revogando a política — nunca faxina.)*
 
-### P31 — o lado direito de uma diretiva não é UM símbolo *(aberto 2026-08-08; **DECISÃO DO DIEGO PENDENTE**)*
+### P31 — o lado direito de uma diretiva não é UM símbolo *(aberto 2026-08-08; **✅ ENTREGUE 2026-08-09 — os 4 itens**)*
+
+> **FECHADA.** O item 3 e a metade "funções" do item 2 foram pagos pela P32
+> (prova por-módulo + `directive-binds-static-and-dynamic`). Os três restantes
+> entregues em 2026-08-09, cada um com caso executável:
+> - **Item 1** — rename multi-ligação ganhou o rótulo: diagnóstico
+>   `name-binds-multiple-variables` ancorado no token do result, nomeando cada
+>   vínculo ("local in COMLOCAL (usa.prg:5); parameter in ...") nas DUAS pontas
+>   (preview e applied). O caso `rename-directive-result-binds-four-scopes`
+>   re-pinado afirmando-o.
+> - **Item 2, metade memvar** — a recusa `directive-also-binds-a-memvar` parou
+>   de disparar no PRIMEIRO memvar: a varredura completa o MAPA e a recusa
+>   nomeia todos os lados, módulo a módulo ("local in COMLOCAL (u.prg:5);
+>   memvar in COMPRIVADA (mv.prg:9)"). Caso re-pinado afirmando os dois lados.
+> - **Item 4** — o `usages` lista a declaração do static file-wide (e o write
+>   do inicializador), que viviam na pseudo-função do módulo e eram pulados
+>   inteiros: o leitor via a vida toda da variável menos o nascimento. Sítios
+>   rotulados "file-wide", sem dono (a pseudo-função não é função: não casa
+>   definição nem `--func`). Caso novo `usages-filewide-static-declaration`
+>   com envelope pinado à mão.
 
 **A tese do Diego** *(2026-08-08)*: só faz sentido refatorar o lado ESQUERDO de uma diretiva —
 o lado direito é transformado pelo pp e o programador não o vê no fluxo dele. Ele pediu

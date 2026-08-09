@@ -2,6 +2,7 @@ package suite
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -47,6 +48,24 @@ func init() {
 		if !reflect.DeepEqual(preview.Result.Locations, applied.Result.Locations) {
 			t.Errorf("the two entry points disagree on the edit set:\npreview: %v\napplied: %v",
 				preview.Result.Locations, applied.Result.Locations)
+		}
+
+		// P31 item 1: the multi-binding is STATED, not just implied by a long
+		// edit list - one diagnostic naming all four variables, in both runs
+		for _, env := range []Envelope{preview, applied} {
+			var d *Diagnostico
+			for i := range env.Diagnostics {
+				if env.Diagnostics[i].Code == "name-binds-multiple-variables" {
+					d = &env.Diagnostics[i]
+				}
+			}
+			if d == nil {
+				t.Error("no name-binds-multiple-variables diagnostic in the envelope")
+				continue
+			}
+			if !strings.Contains(d.Detail, "4 distinct variables") {
+				t.Errorf("the diagnostic does not state the count: %q", d.Detail)
+			}
 		}
 	})
 }

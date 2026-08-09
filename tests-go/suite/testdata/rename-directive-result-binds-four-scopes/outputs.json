@@ -15,7 +15,26 @@
   "reason": null,
   "action": null,
   "detail": "dry run - nothing was written; 9 edit(s) previewed",
-  "diagnostics": [],
+  "diagnostics": [
+   {
+    "code": "name-binds-multiple-variables",
+    "severity": "warning",
+    "location": {
+     "uri": "file://<CWD>/log.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 28
+      },
+      "end": {
+       "line": 0,
+       "character": 32
+      }
+     }
+    },
+    "detail": "'nReg' in the directive's result binds 4 distinct variables - they rename together, the header text is one: local in COMLOCAL (usa.prg:5); parameter in COMPARAM (usa.prg:27); static in COMSTATICFN (usa.prg:20); static file-wide (est.prg:3)"
+   }
+  ],
   "result": {
    "verdict": "preview",
    "kind": "rule-written",
@@ -289,7 +308,26 @@
   "reason": null,
   "action": null,
   "detail": "verified: 8 binding site(s) + 1 directive occurrence(s); all 3 module(s) byte-identical (-gh -l)",
-  "diagnostics": [],
+  "diagnostics": [
+   {
+    "code": "name-binds-multiple-variables",
+    "severity": "warning",
+    "location": {
+     "uri": "file://<CWD>/log.ch",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 28
+      },
+      "end": {
+       "line": 0,
+       "character": 32
+      }
+     }
+    },
+    "detail": "'nReg' in the directive's result binds 4 distinct variables - they rename together, the header text is one: local in COMLOCAL (usa.prg:5); parameter in COMPARAM (usa.prg:27); static in COMSTATICFN (usa.prg:20); static file-wide (est.prg:3)"
+   }
+  ],
   "result": {
    "verdict": "applied",
    "kind": "rule-written",

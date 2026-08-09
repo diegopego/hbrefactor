@@ -55,7 +55,14 @@ sem fato atrás; o terceiro acusava 54 linhas do fonte e nenhuma era heurística
 > caso que um dia usará o `pcodeNormHash` — limite honesto registrado). Execução
 > idêntica no próprio caso. Registro completo na P29 do roadmap. Resta commit.
 
-### 2.2 A P31 — o lado direito de uma diretiva não é UM símbolo *(nasceu 2026-08-08)*
+### 2.2 A P31 — ✅ FECHADA *(os 4 itens; 3 e 2-funções via P32 em 2026-08-08, o resto em 2026-08-09)*
+
+> Item 1 (diagnóstico `name-binds-multiple-variables` nas duas pontas), item 2
+> completo (mapa por módulo nas recusas de função E de memvar), item 4 (o
+> `usages` lista o nascimento do static file-wide). Registro na P31 do roadmap;
+> cada item com caso executável. Resta commit.
+>
+> *(O registro histórico da fase segue abaixo, como estava.)*
 
 Sondada em três rodadas (escopos misturados; funções estáticas; diretivas INDIRETAS do
 `doc/pp.txt`, em 2 e 3 níveis). A cadeia do Diego — "se temos usage com escopo, temos

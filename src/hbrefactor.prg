@@ -1055,6 +1055,39 @@ STATIC FUNCTION Usages( aArgs )
 
       FOR EACH hFunc IN hAst[ "functions" ]
          IF hFunc[ "fileDecl" ]
+            // P31 item 4: the file-wide declarations (STATIC/MEMVAR) and the
+            // static initializer's own write live in the module's pseudo
+            // function - skipping it whole hid the one site that CREATES the
+            // variable while every use in real functions appeared. The pseudo
+            // function is still NOT a function: no definition match, no
+            // --func match, no owner name - the sites say "file-wide"
+            IF ! Empty( cFuncFilter ) .OR. lAtPp
+               LOOP
+            ENDIF
+            FOR EACH hItem IN hFunc[ "declarations" ]
+               IF Upper( hItem[ "sym" ] ) == cUp
+                  nHits++
+                  cKind := "declaration (" + hItem[ "scope" ] + ", file-wide)"
+                  LocAdd( aLoc, cPath, hItem[ "declLine" ], ;
+                          TokenCols( hAst, hItem[ "declLine" ], cName ), ;
+                          Len( cName ), cKind, NIL, "confirmed", aSrc )
+                  Prose( cModFile + ":" + hb_ntos( hItem[ "declLine" ] ) + ": " + cKind + ;
+                     SrcLine( aSrc, hItem[ "declLine" ] ) + hb_eol() )
+               ENDIF
+            NEXT
+            FOR EACH hItem IN hFunc[ "occurrences" ]
+               IF Upper( hItem[ "sym" ] ) == cUp
+                  nHits++
+                  cKind := hItem[ "access" ] + " (" + hItem[ "scope" ] + ", file-wide" + ;
+                           iif( hItem[ "block" ], ", codeblock", "" ) + ")"
+                  aPos := SitePos( hAst, hItem, Len( cName ) )
+                  nSiteLn := aPos[ 1 ]
+                  LocAdd( aLoc, cPath, nSiteLn, aPos[ 2 ], aPos[ 3 ], ;
+                          cKind, NIL, "confirmed", aSrc )
+                  Prose( cModFile + ":" + hb_ntos( nSiteLn ) + ": " + cKind + ;
+                     SrcLine( aSrc, nSiteLn ) + hb_eol() )
+               ENDIF
+            NEXT
             LOOP
          ENDIF
          IF ! Empty( cFuncFilter ) .AND. !( Upper( hFunc[ "name" ] ) == cFuncFilter )
@@ -8175,6 +8208,8 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
    LOCAL hEdits := { => }, aE, hOrig := { => }, cText, nLine
    LOCAL aApps, lBind, lStatic, hBad, aFuncEdits
    LOCAL nSites := 0, nDirEdits, aWork, hRes
+   LOCAL aBinds := {}, cLbl              // P31 item 1: o rótulo de cada vínculo
+   LOCAL lMixed := .F.                   // P31 item 2: um vínculo de MEMVAR entrou
 
    IF ! OneWord( cNew )
       RETURN Refuse( "new name '" + cNew + "' is not a single word" )
@@ -8250,17 +8285,26 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
             OTHERWISE
                // memvar/private/public/field: o verbo deles tem prova própria
                // (medido: renomeiam sem diretiva), e ligá-los aqui é trabalho,
-               // não impossibilidade. Recusa nomeando o escopo, nunca supondo
-               RETURN Refuse( "'" + cOld + "', written by the directive, binds to a " + ;
-                              hItem[ "scope" ] + " in " + hFunc[ "name" ] + " (" + ;
-                              hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                              ") - this rename covers LOCAL and STATIC bindings; refusing", ;
-                              RSN_RULE_BINDS_MEMVAR )
+               // não impossibilidade. P31 item 2: a recusa deixou de disparar
+               // no PRIMEIRO memvar - o vínculo entra no mapa e a varredura
+               // segue, para a recusa nomear TODOS os lados, módulo a módulo
+               AAdd( aBinds, hItem[ "scope" ] + " in " + hFunc[ "name" ] + " (" + ;
+                     hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ")" )
+               lMixed := .T.
+               EXIT
             ENDCASE
          NEXT
          IF ! lBind
             LOOP
          ENDIF
+         FOR EACH hItem IN hFunc[ "declarations" ]
+            IF Upper( hItem[ "sym" ] ) == cUpOld
+               AAdd( aBinds, iif( hb_HGetDef( hItem, "param", .F. ), "parameter", "local" ) + ;
+                     " in " + hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ":" + ;
+                     hb_ntos( hItem[ "declLine" ] ) + ")" )
+               EXIT
+            ENDIF
+         NEXT
          aFuncEdits := {}
          IF ( hBad := LocalScan( hAst, hFunc, cOld, cNew, .F., @aFuncEdits ) ) != NIL
             IF DirectiveOwns( hFunc, cUpOld )
@@ -8313,12 +8357,44 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
          ENDIF
          nSites += Len( aFuncEdits )
          AbsEditsAdd( hEdits, cPath, aFuncEdits )
+         cLbl := ""
+         FOR EACH hFunc IN hAst[ "functions" ]
+            FOR EACH hItem IN hFunc[ "declarations" ]
+               IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hItem[ "scope" ] == "static"
+                  cLbl := iif( hFunc[ "fileDecl" ], "static file-wide (", ;
+                               "static in " + hFunc[ "name" ] + " (" ) + ;
+                          hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "declLine" ] ) + ")"
+                  EXIT
+               ENDIF
+            NEXT
+            IF ! Empty( cLbl )
+               EXIT
+            ENDIF
+         NEXT
+         IF ! Empty( cLbl )
+            AAdd( aBinds, cLbl )
+         ENDIF
       ENDIF
    NEXT
 
    IF Empty( aRules )
       RETURN Refuse( "'" + cOld + "' is not written by the result of any pp rule " + ;
                      "applied in project '" + cSpec + "'" )
+   ENDIF
+
+   // P31 item 2: the mixed refusal carries the whole MAP - every binding the
+   // scan found, module by module, memvar sides included - instead of naming
+   // only the first memvar it tripped on. The reason stays the same code; the
+   // reader stops hunting through modules to learn the shape of the problem
+   IF lMixed
+      cKey := ""                                   // reuso: o mapa
+      FOR nI := 1 TO Len( aBinds )
+         cKey += iif( nI == 1, "", "; " ) + aBinds[ nI ]
+      NEXT
+      RETURN Refuse( "'" + cOld + "', written by the directive, binds per module: " + ;
+                     cKey + " - a memvar renames under its own verb and proof, and " + ;
+                     "one edit set cannot carry two proofs; refusing", ;
+                     RSN_RULE_BINDS_MEMVAR )
    ENDIF
 
    // P32: the result cites a FUNCTION, not a variable - no application binds
@@ -8346,6 +8422,34 @@ STATIC FUNCTION RenameRuleWritten( cSpec, cOld, cNew, lDryRun )
          AAdd( aE, "--dry-run" )
       ENDIF
       RETURN RenameFunction( aE )
+   ENDIF
+
+   // P31 item 1: the result's name binding MORE than one variable used to be
+   // visible only as a longer edit list - the drag happened unlabeled. The
+   // envelope now states the fact, one entry per binding, anchored at the
+   // result token: the reader learns the SHAPE of the rename before reading
+   // every edit, and the surprise ("I renamed one local and four variables
+   // moved") stops being a surprise
+   IF Len( aBinds ) > 1
+      hRule := aRules[ 1 ]
+      hTok := NIL
+      FOR EACH hItem IN hRule[ "result" ]
+         IF hItem[ "role" ] == "literal" .AND. hItem[ "type" ] == 21 .AND. ;
+            Upper( hb_HGetDef( hItem, "text", "" ) ) == cUpOld .AND. ;
+            hItem[ "line" ] != NIL .AND. hItem[ "col" ] != NIL
+            hTok := hItem
+            EXIT
+         ENDIF
+      NEXT
+      cKey := ""                                   // reuso: a lista dos vínculos
+      FOR nI := 1 TO Len( aBinds )
+         cKey += iif( nI == 1, "", "; " ) + aBinds[ nI ]
+      NEXT
+      Diag( "name-binds-multiple-variables", ;
+            "'" + cOld + "' in the directive's result binds " + hb_ntos( Len( aBinds ) ) + ;
+            " distinct variables - they rename together, the header text is one: " + cKey, ;
+            iif( hTok == NIL .OR. hRule[ "file" ] == NIL, NIL, ;
+                 LspLoc( hRule[ "file" ], hTok[ "line" ], hTok[ "col" ] + 1, hb_BLen( cOld ) ) ) )
    ENDIF
 
    nDirEdits := RuleResultEdits( hAsts, hProj, cUpOld, cOld, hEdits, @hBad )

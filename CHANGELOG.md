@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@bfc0cd8 -->
+<!-- changelog-baseline: hbrefactor@17fb3a0 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
@@ -19,6 +19,38 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-09 — the shape of the rename, stated before you go hunting
+
+Three gaps closed, all of the same kind: facts the tool already knew and made
+you discover by reading edit lists or scanning modules yourself.
+
+**A rename through a directive tells you how many variables move.** When the
+name in a header's result binds several distinct variables — a local here, a
+parameter there, a static elsewhere — the rename always dragged them together
+(they share the written text), but you only saw it as a long edit list. Now a
+warning states it up front, naming each binding:
+
+```
+warning: 'nReg' in the directive's result binds 4 distinct variables - they
+rename together, the header text is one: local in COMLOCAL (usa.prg:5);
+parameter in COMPARAM (usa.prg:27); static in COMSTATICFN (usa.prg:20);
+static file-wide (est.prg:3)
+```
+
+It comes in the dry run too — so you can see the whole shape before anything
+is written.
+
+**The mixed refusal carries the whole map.** When the directive also binds a
+memvar somewhere, the tool refuses (a memvar renames under its own verb and
+proof) — but it used to name only the first memvar it tripped on. Now the
+refusal lists every binding, module by module, both sides. You learn the shape
+of the problem from the message alone.
+
+**`usages` now shows where a file-wide STATIC is born.** The declaration
+(`STATIC nTot := 0` at the top of a module) and the initializer's own write
+were the one part of the variable's life that never appeared — every use in
+real functions did. They are listed now, labeled `file-wide`.
 
 ## 2026-08-08 — two PRIVATEs with the same name: rename the one your cursor points at
 

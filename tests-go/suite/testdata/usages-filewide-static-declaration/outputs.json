@@ -1,0 +1,95 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "usages",
+  "argv": [
+   "usages",
+   "p.hbp",
+   "nTot",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "4 result(s) for 'nTot'",
+  "diagnostics": [],
+  "result": {
+   "query": "nTot",
+   "total": 4,
+   "returned": 4,
+   "truncated": false,
+   "locations": [
+    {
+     "uri": "file://<CWD>/e.prg",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 7
+      },
+      "end": {
+       "line": 0,
+       "character": 11
+      }
+     },
+     "kind": "declaration (static, file-wide)",
+     "owner": null,
+     "certainty": "confirmed",
+     "text": "STATIC nTot := 0"
+    },
+    {
+     "uri": "file://<CWD>/e.prg",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 7
+      },
+      "end": {
+       "line": 0,
+       "character": 11
+      }
+     },
+     "kind": "write (static, file-wide, codeblock)",
+     "owner": null,
+     "certainty": "confirmed",
+     "text": "STATIC nTot := 0"
+    },
+    {
+     "uri": "file://<CWD>/e.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 3
+      },
+      "end": {
+       "line": 4,
+       "character": 7
+      }
+     },
+     "kind": "write (static)",
+     "owner": "SOMA",
+     "certainty": "confirmed",
+     "text": "   nTot := 1"
+    },
+    {
+     "uri": "file://<CWD>/e.prg",
+     "range": {
+      "start": {
+       "line": 10,
+       "character": 20
+      },
+      "end": {
+       "line": 10,
+       "character": 24
+      }
+     },
+     "kind": "read (static)",
+     "owner": "MOSTRA",
+     "certainty": "confirmed",
+     "text": "   OutStd( hb_ntos( nTot ) )"
+    }
+   ]
+  },
+  "edits": []
+ }
+]
