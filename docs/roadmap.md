@@ -1028,8 +1028,12 @@ verifica; o que mente é a palavra **verified** chegando ao usuário.
 - nós `MACRO` em `statements[]`, **posicionados** — as avaliações reais nas linhas 14 e 15.
 
 **AS 16 FORMAS DE MACRO, TESTADAS UMA A UMA** *(Diego, 2026-07-27: "existem muitas formas de
-se escrever macros. teste todas."; tabela completa no
-[backlog da sessão](backlog-2026-07-27.md) § 4)*. O resultado muda o escopo desta fase:
+se escrever macros. teste todas.")*. **RE-MEDIDAS em 2026-08-09, e mais forte**: as 16
+formas foram reescritas com o nome MONTADO (`"mT" + "ot"`) e as 16 seguiram acendendo
+`usesMacro` — a tabela e o resultado estão na
+[P36](#p36--o-acesso-por-nome-em-runtime-mata-o-frágil-e-o-core-dá-o-fato-forte), que
+substituiu o razão de sessão onde a versão original vivia. O resultado muda o escopo desta
+fase:
 
 1. **Toda forma com `&` produz UM nó `MACRO` e liga `usesMacro`** — 14 de 14, das mais óbvias
    (`&cN`) às de canto (`&cN.`, `&cN := 9`, `M->&cN`, `FIELD->&cN`, `&cN[1]`, `o:&cF := 1`,
@@ -1134,6 +1138,63 @@ montado provando **recusa** com a posição da avaliação de macro; caso com `L
 macro provando que nada é relatado; `grep` do casamento de texto em string sem resultado no
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
+
+### P36 — o acesso por NOME em runtime: mata o frágil, e o core dá o fato forte *(aberto 2026-08-09; ordem do Diego: "quero que evite tudo o que seja frágil. somente fique com solução que seja forte mesmo. mas precisa provar"; **A FAZER**)*
+
+**Como nasceu.** O Diego perguntou como a detecção de macro é feita e se ela pegaria
+`LOCAL cF := "Dob" + "ro"`. A resposta separou o repositório em duas metades — uma provada
+forte, outra provada frágil — e revelou que **o `rename-memvar` tem o MESMO defeito que a
+gente atribuía só ao `rename-function`**: a "proteção" dele era uma regra de string.
+
+**TABELA DE SONDAS** *(§1.7.1 — medidas em 2026-08-09, ANTES do mecanismo; cada sonda em
+diretório novo com baseline git; posições computadas do arquivo, nunca contadas)*
+
+| pergunta | resposta medida |
+|---|---|
+| `usesMacro` pega TODAS as formas de `&`? | **SIM: 16/16**, e todas escritas com nome MONTADO (`"mT" + "ot"`). O core varre o pcode atrás de 15 opcodes de macro (`hb_compAstHasMacro`); não olha string nenhuma |
+| a regra "string nomeia função do projeto" sobrevive a concatenação? | **NÃO**: com `LOCAL cF := "Dob" + "ro"`, as strings do módulo são `['Dob','ro',...]` e a regra não acha nada |
+| e a regra "string igual ao nome do memvar" (`--force`)? | **NÃO**: `__mvGet( "xC" + "fg" )` passa com `verified: 2 edit(s); symbol renamed, pcode byte-identical` e o programa morre com `Error BASE/1003 Variable does not exist: xCfg` |
+| o mesmo com nome LITERAL (`__mvGet("xCfg")`) | recusa hoje — mas só pela regra frágil, e ela força `--force` também sobre string que é dado puro |
+| `Eval( hb_macroBlock( ... ) )` acende `usesMacro`? | **NÃO** — mas registra `sends[] = EVAL` (o `Eval` de bloco é send), e o detector de send, que é fato, pega |
+| `__mvGet` sem send e sem `&` | **nada forte pega**: `usesMacro=False`, `sends=[]`, só `calls[].sym = __MVGET` |
+| o core tem onde marcar isso? | `s_stdFunc` (`hbfunchk.c`, 67 entradas) já conhece `TYPE`; `__mvGet`/`hb_macroBlock` são RTL e precisariam ser nomeados lá |
+
+**O veredito das duas metades**
+
+- **FORTE, fica** *(fato do compilador, imune a como o nome foi escrito)*: `usesMacro`;
+  `sends[]` (alvo de mensagem é resolvido em runtime, o grafo genuinamente não fecha);
+  `calls[].sym`.
+- **FRÁGIL, morre** *(§1.2 gatilho 1 — texto decidindo papel; as duas contornadas com uma
+  concatenação)*: a regra "string nomeia função do projeto" no detector de furos do
+  `ReachFrom`, e a regra "string igual ao nome do memvar" do `rename-memvar`, com o
+  `RSN_TEXTUAL_FORCE` que ela alimenta. São as gêmeas sobreviventes da que a P22 matou no
+  `usages`/`rename-function`.
+
+**Escopo — as três coisas saem JUNTAS, e a razão é medida**
+
+Matar o frágil sozinho ABRE o caso literal (`__mvGet("xCfg")` hoje recusa; passaria a
+quebrar calado, como o montado já quebra). Entregar o fato do core sozinho deixa a
+heurística viva ao lado dele. Então:
+
+1. **`ast-25`: o dump marca a chamada que RESOLVE NOME EM RUNTIME.** O fato é do core
+   porque o dono do conhecimento é a RTL (§1.7.5: a mesma lista dentro do hbrefactor é a
+   heurística que o Diego já recusou — *"me recuso a ter heurística nele"*). A indireção
+   fica coberta de graça pelo fecho do grafo: `FUNCTION MeuGet(c) → __mvGet(c)` chega ao
+   marcador por transitividade.
+2. **As duas regras de string morrem**, e com elas o `RSN_TEXTUAL_FORCE` se ficar sem
+   consumidor.
+3. **O `verified` declara o próprio alcance por `usesMacro`** (fato por função), no padrão
+   do `scope`/`unseen` da P17: não recusa nada — faz o selo parar de ser mudo sobre a
+   fronteira que ele não cobre. Isto responde, com fato, a assimetria que o backlog de
+   27/07 registrou como decisão pendente (memvar recusa × função passa).
+
+**Critério de pronto (mecânico)**: caso pinado com `__mvGet( "xC" + "fg" )` **recusando**
+pelo fato novo (hoje ele edita e o programa morre — o caso nasce vermelho); caso com
+`LOCAL cF := "Dob" + "ro"` + `&cF.()` recusando por `usesMacro` **sem** nenhuma regra de
+string no caminho; caso com string que é dado puro e coincide com o nome **não** exigindo
+`--force`; `grep` de casamento de texto de string no fonte sem resultado nos dois sítios;
+rename de função em projeto com macro saindo `ok` **com o alcance declarado** no envelope;
+execução idêntica onde a edição é legítima; `make test` verde.
 
 ### P33 — LSP como superfície de entrega *(aberto 2026-08-08; decisão do Diego: "concordo com: LSP como superfície de entrega"; **A FAZER**)*
 
@@ -2890,6 +2951,37 @@ contagem é que era fantasia. **Rodar o script antes de citar — nunca a contag
 ---
 
 # Backlog (por valor)
+
+0-rev. **Os achados da revisão de 2026-07-27 que sobreviveram** *(migrados em 2026-08-09 do
+   `backlog-2026-07-27.md` — o razão daquela sessão, **apagado no mesmo commit**, como o
+   `retomada-sessao.md` foi: ledger de sessão morre quando o conteúdo vivo tem casa —
+   depois de auditar item a item contra a árvore de hoje. Fecharam pela evolução, e NÃO entram aqui: os achados 1 e 9 — o
+   `SitePos()` existe e é usado em 6 sítios —, o 11 — a baseline do CHANGELOG está em dia
+   —, a guarda de docs que já cobre o `caso-new.sh`, e o `p.Cria()`, hoje exercitado por
+   dois casos. O achado da assimetria memvar × função deixou de ser decisão: virou a
+   [P36](#p36--o-acesso-por-nome-em-runtime-mata-o-frágil-e-o-core-dá-o-fato-forte).)*
+
+   a. **Declaração resolvida por `declLine` + primeiro token** (achado 3), com
+      `nameLine`/`nameCol` existindo desde o `ast-9`. Dois sítios no `usages`
+      (`TokenCols( hAst, hItem[ "declLine" ], cName )`) escolhem o token pelo NOME na
+      linha, quando o dump já diz qual é. **Precisa de spec** — é a mesma classe de erro
+      que a P21 matou nos sítios de uso.
+   b. **`RenameMemvar` não consome `tokLine`** (achado 4): memvar em statement CONTINUADO
+      (o registro aponta a última linha física) pode gerar arquivo escrito pela metade e
+      recusa que não nomeia a causa. `MvLineHits` ainda casa por `hTok["line"] == nLine`.
+      **Precisa de spec.**
+   c. **Dois sentinelas de ausência** (achado 10): `-1` × `NIL` entre `tokLine`/`col` e
+      `nameLine`/`nameCol`. **Precisa de spec** — anda junto com (a).
+   d. **`fixture/compila` só compila `*.prg` do topo de `source/`**: fixture com módulo em
+      subpasta não é conferida pela rede que existe para isso.
+   e. **`go.mod` marca `go-cmp` como `// indirect`**, sem `vendor/`: clone novo sem rede
+      não roda a suíte Go.
+
+   **Continua sendo DECISÃO DO DIEGO, e por isso fica nomeado aqui:** o `total` do `usages`
+   conta sítios `excluded` que nunca entram em `locations` (medido em 2026-08-09 com duas
+   classes homônimas: `total = 5`, `locations = 3` — a prosa explica os dois excluídos, o
+   JSON não). A outra metade do achado 6 CADUCOU: nada trunca o `usages`, então
+   `truncated: false` é honesto, e o único corte — a busca ampla do `projects-of` — avisa.
 
 0. **A `site/index.html` do hbrefactor está atrás do manual — ADIADA pelo Diego
    (2026-08-08, reafirmado em 2026-08-09)**. *(Atualizado em 2026-08-09: o item dizia que o
