@@ -20,6 +20,133 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
+## 2026-08-10 — `--force` is gone
+
+The flag existed so you could say *"I know, do it anyway"*. Measuring what
+actually fed it showed that the tool was asking for consent about things it
+already knew — and, in one case, about something that was not true.
+
+| what used to ask for `--force` | what it is now |
+|---|---|
+| the new name is a Harbour runtime function | a **note**. The dangerous case — your project actually *calls* that function — has its own refusal, with no flag and no way past it |
+| a local/static shares the new name, "calls there would be shadowed" | **removed**: measured false. Harbour decides a call by the parentheses; the program printed the same value and the compiled code came out byte-identical |
+| the export file (`.hbx`) still lists the old name | a **note**. That file is generated; the fix is `-hbx=`, and it belongs to the build |
+| a string macro-expands the memvar you are renaming | a **refusal**. The compiler states that this string re-expands *this* variable, so the rename provably breaks it — and the string is data, which this tool never edits |
+| a call resolves a name at run time, while reordering parameters | a **declaration**. It could not tell whether that call names *your* function, so it says where the call is and gets on with it |
+
+So the rule is now one line: **the tool refuses when it can prove the edit
+breaks something, and otherwise applies and declares what it could not see.**
+There is no third state for you to unlock.
+
+Typing `--force` now gets you an error explaining this, rather than being
+quietly accepted — a flag that no longer exists should not silently give you
+something different from what you asked for.
+
+## 2026-08-09 — no more warnings about strings that merely spell a name
+
+The change above killed that guess where it was most dangerous. This one
+finishes the job everywhere else, under one rule: **a warning only exists when
+the compiler can prove the thing it warns about.**
+
+What you will notice, verb by verb:
+
+- **`inline-local` stops refusing over a string that is just data.** A literal
+  spelling the variable used to block the whole operation — even though a local
+  variable cannot be reached by name while your program runs, so there was
+  nothing to protect. It still refuses when a **directive** built that string
+  out of your identifier (`#xcommand ... => OutStd( #<v> ... )`), because there
+  the compiler says the string came from that very name, and inlining would
+  leave it pointing at a variable that no longer exists.
+- **Renaming a method stops asking for `--force` over a label.** It now states
+  the real thing instead: `__objSendMsg( oObj, cMsg )` reaches a message by
+  name, so the result declares that site — file and line — and the rename goes
+  through. Before, a label like `OutStd( "Mostra" + ": " )` demanded the flag,
+  while the send two lines below, whose name was assembled at run time, was
+  never mentioned.
+- **`reorder-params` asks for `--force` only when a call really resolves a name
+  at run time** — and then it names it. Reordering changes what every call site
+  means, so that flag is now consent to a proven risk instead of a shrug at a
+  coincidence.
+- **`extract-function` no longer reports that a string spells the new name.**
+- **`find-dynamic-calls` answers the question its name promises.** It used to
+  list strings whose text matched a project function; on a file with five
+  dynamic accesses it reported one printed label and stayed silent about the
+  three real ones. Now it lists what the compiler proves: the calls that resolve
+  a name at run time and the macro evaluations. Same file, four findings, no
+  false ones.
+
+**The honest limit is the same as before, and worth repeating:** none of this
+sees a `&` building code out of thin air, or a C function of your own that
+resolves names. What changed is that the tool stopped pretending that a string
+which happens to spell a name is evidence of anything.
+
+## 2026-08-09 — a rename that was protected by a guess is now protected by a fact
+
+**The short version: if your code reads a variable by its NAME at run time, the
+tool now knows — however that name was spelled.** Before, the protection was a
+comparison of string literals against the variable's name, and it broke in both
+directions.
+
+**The bad direction, and it was the dangerous one.** With
+
+```harbour
+   PRIVATE xCfg := 7
+   ...
+   OutStd( hb_ntos( __mvGet( "xC" + "fg" ) ) )
+```
+
+there is no literal `"xCfg"` anywhere, so the old check found nothing and the
+rename went through announcing `verified: 2 edit(s); symbol renamed, pcode
+byte-identical`. Every word of that was true — and the program then died with
+`Error BASE/1003 Variable does not exist: xCfg`, because the break lives inside
+a string, which pcode identity cannot see. Now:
+
+```
+$ hbrefactor rename app.hbp app.prg:5:12 xConf
+warning: SHOW (app.prg:13) calls __MVGET, which resolves a memvar name at run time
+hbrefactor: scope with holes - code outside the static graph may see 'xCfg'; refusing
+```
+
+The refusal names the call and the line, so you can go read it. It does not
+depend on how the name was written: assembled, read from a file, or never a
+literal at all — the compiler is the one saying that `__mvGet` resolves a name,
+and the same holds for `__mvPut`, `MemVarBlock`, `Type`, `hb_macroBlock`, `Do`
+and the rest of that family.
+
+**The annoying direction.** A string that is just *data* and happens to spell
+the variable used to demand `--force`:
+
+```harbour
+   PRIVATE xCfg := 7
+   OutStd( "xCfg" + "=" + hb_ntos( xCfg ) )
+```
+
+That rename now goes through with no warning at all, and the string is left
+exactly as it was. `--force` is for a risk that was proven, and spending it on
+a non-risk is how a flag stops being read.
+
+**Renaming a FUNCTION does not refuse on macro — it states the reach.** Macro
+evaluation is run time, and a refactoring tool does not control it; pretending
+otherwise would be worse than saying so. So the machine output of a rename now
+carries a `reach` field saying, explicitly, whether anything in the project
+resolves names at run time and where:
+
+```json
+"reach": { "complete": false,
+           "runtime": [ { "file": "app.prg", "line": 6, "kind": "code", "sym": null } ] }
+```
+
+`complete: true` is stated too, never implied by silence — the point is that
+you should not have to notice an *absent* field to learn that something was
+left out.
+
+**Where it still bites you.** Renaming a **method** or reordering parameters
+still uses the old literal comparison, so the assembled-name case gets past
+them; that is next, not done. And the tool's knowledge covers the Harbour
+core's own functions — a C function of your own that resolves names is, and
+stays, outside the static graph (the tool already treats any function it cannot
+see as a hole). Details: `docs/roadmap.md` § P36, `docs/ast-schema.md` § `dyn`.
+
 ## 2026-08-09 — the shape of the rename, stated before you go hunting
 
 Three gaps closed, all of the same kind: facts the tool already knew and made

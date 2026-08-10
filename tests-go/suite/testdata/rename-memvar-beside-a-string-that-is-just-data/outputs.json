@@ -1,0 +1,77 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:5:12",
+   "xConf",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 3 edit(s); symbol renamed, pcode byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "memvar",
+   "old": "xCfg",
+   "new": "xConf",
+   "editCount": 3,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 0,
+       "character": 7
+      },
+      "end": {
+       "line": 0,
+       "character": 11
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 11
+      },
+      "end": {
+       "line": 4,
+       "character": 15
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 6,
+       "character": 35
+      },
+      "end": {
+       "line": 6,
+       "character": 39
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "reach": {
+    "complete": true,
+    "runtime": []
+   }
+  },
+  "edits": []
+ }
+]

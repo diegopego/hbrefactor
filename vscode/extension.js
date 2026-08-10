@@ -309,11 +309,15 @@ async function saveAll() { await vscode.workspace.saveAll(false); }
 // papel estrutural do site + escopo declarado da função dona) e despacha
 // para o rename-* específico por dentro, com saída byte-idêntica. Substitui
 // os comandos por-kind (Local/Static/Function/Dsl/PpMarker, DESCONTINUADOS):
-// a taxonomia é do compilador, não uma escolha remontada na UX. O fluxo de
-// confirmação (--force quando há strings/HB_FUNC) chega pela MESMA mensagem do
-// CLI - o rename delega ao rename-* que já a emite, então há um único ponto de
-// confirmação. Posição sem identificador de compilação: o CLI recusa nomeando a
-// exceção (degrade honesto, nunca palpite).
+// a taxonomia é do compilador, não uma escolha remontada na UX. Posição sem
+// identificador de compilação: o CLI recusa nomeando a exceção (degrade
+// honesto, nunca palpite).
+//
+// P36c: havia aqui um modal de confirmação "Proceed (--force)?", disparado por
+// um REGEX na saída do CLI. Ele morreu com a flag: o CLI passou a ou recusar,
+// quando prova que a edição quebra algo, ou aplicar e DECLARAR o que não pôde
+// ver. Não existe mais estado intermediário para o usuário destravar - e some
+// junto o último ponto onde a extensão decidia fluxo casando prosa em inglês.
 //
 // P27: havia aqui um segundo confirm, para --edit-rules, quando o nome era
 // citado dentro de uma diretiva. A flag deixou de existir - uma diretiva que o
@@ -331,18 +335,7 @@ async function cmdRename() {
   await saveAll();
   const pos = c.editor.selection.active;
   const at = atSpec(c.file, pos.line, pos.character);
-  const flags = [];
-  let res = await runWrite(['rename', c.spec, at, novo], c.cwd, `rename @ ${at} -> ${novo}`);
-  // strings/HB_FUNC iguais ao nome NÃO são editadas: o CLI pede --force
-  if (res.code !== 0 && /--force/.test(res.stderr + res.stdout)) {
-    report(`rename @ ${at} -> ${novo} (textual references)`, res);
-    const go = await vscode.window.showWarningMessage(
-      'There are textual references (strings/HB_FUNC) that will NOT be changed. Proceed anyway?',
-      'Proceed (--force)', 'Cancelar');
-    if (go !== 'Proceed (--force)') return;
-    flags.push('--force');
-    res = await runWrite(['rename', c.spec, at, novo, ...flags], c.cwd, `rename @ ${at} -> ${novo}`);
-  }
+  const res = await runWrite(['rename', c.spec, at, novo], c.cwd, `rename @ ${at} -> ${novo}`);
   report(`rename @ ${at} -> ${novo}`, res);
 }
 

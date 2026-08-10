@@ -1,0 +1,40 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:5:12",
+   "xConf",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "memvar-scope-not-closed",
+  "action": "stop-and-report",
+  "detail": "scope with holes - code outside the static graph may see 'xCfg'; refusing",
+  "diagnostics": [
+   {
+    "code": "scope-hole",
+    "severity": "warning",
+    "location": {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 14,
+       "character": 20
+      },
+      "end": {
+       "line": 14,
+       "character": 21
+      }
+     }
+    },
+    "detail": "SHOW (app.prg) uses macro '&'"
+   }
+  ],
+  "result": {},
+  "edits": []
+ }
+]

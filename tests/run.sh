@@ -453,14 +453,22 @@ check "a.prg untouched"            $?
 }
 
 unit_22() {
-echo "case 22: find-dynamic-calls audits strings and macro zones"
+echo "case 22: find-dynamic-calls audits what the compiler PROVES is dynamic"
+# P36b (Diego, 2026-08-09): "so' quero alertas quando puder provar, atraves de
+# fatos usando o core do harbour". O verbo era feito da heuristica - uma string
+# cujo TEXTO era o nome de uma funcao do projeto virava "possivel chamada
+# dinamica". Medido: num fixture com cinco acessos dinamicos ele relatava UM
+# rotulo impresso e ficava mudo sobre os tres acessos reais.
+# O assert que este caso perdeu (kind=string-names-function) afirmava a
+# heuristica; o que entra afirma o fato do `dyn` (ast-25) - a funcao alcancada
+# por nome, o memvar alcancado por nome - e o de macro, que ja' era fato.
 D=$(fresh case22)
-printf '\nFUNCTION NomeEmTexto()\n\n   RETURN "Dupla"\n\nFUNCTION Dinamica( cVar )\n\n   RETURN &cVar\n' >> "$D/a.prg"
+printf '\nFUNCTION Indireta( cVar )\n\n   RETURN Do( cVar, 1 )\n\nFUNCTION Dinamica( cVar )\n\n   RETURN &cVar\n' >> "$D/a.prg"
 ( cd "$D" && "$BIN" find-dynamic-calls fix01.hbp --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-"$TCHECK" envrow "$D/out.log" findings "kind=string-names-function;string=Dupla;names=b.prg"
-check "string naming function reported" $?
+"$TCHECK" envrow "$D/out.log" findings "kind=call-resolves-name;sym=DO;reaches=function;function=INDIRETA"
+check "call that resolves a function name reported" $?
 "$TCHECK" envrow "$D/out.log" findings "kind=function-uses-macro;function=DINAMICA"
 check "macro zone reported"        $?
 
@@ -531,9 +539,12 @@ printf 'DYNAMIC Dupla\n' > "$D/exports.hbx"
 printf 'exports.hbx\n' >> "$D/fix01.hbp"
 ( cd "$D" && "$BIN" rename fix01.hbp b.prg:5:10 Dobrar --json > out.log 2>&1 )
 RC=$?
-check "refused without --force"    $([ $RC -ne 0 ] && echo 0 || echo 1)
+# P36c (Diego, 2026-08-09: "concordo em matar a flag"): a linha do `.hbx` e'
+# INFORMACAO, nao decisao - o arquivo e' GERADO pelo hbmk2 e o conserto e'
+# `-hbx=`, do build. Antes isso barrava o rename e pedia --force.
+check "renames, the export file is not a veto" $([ $RC -eq 0 ] && echo 0 || echo 1)
 "$TCHECK" envhas "$D/out.log" diagnostics "DYNAMIC DUPLA in the export (.hbx)"
-check "hbx warning listed"         $?
+check "hbx note listed as a diagnostic" $?
 
 }
 
@@ -594,7 +605,7 @@ check "rename-local by method name"  $([ $RC -eq 0 ] && echo 0 || echo 1)
 check "3 modules verified"           $?
 ( cd "$D" && "$BIN" rename case29.hbp b.prg:5:10 Dobrar --json > hbx.log 2>&1 )
 RC=$?
-check "hbx via \${hb_name} refused without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
+check "hbx via \${hb_name}: renames and notes it" $([ $RC -eq 0 ] && echo 0 || echo 1)
 "$TCHECK" envhas "$D/hbx.log" diagnostics "DYNAMIC DUPLA in the export (.hbx)"
 check "hbx warning proves macro expansion" $?
 
@@ -964,16 +975,16 @@ echo "case 45: B4b - rename-memvar on a closed clean reach (behaviour identical)
 D=$(freshmv case45)
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_before -gtcgi -q0 > /dev/null 2>&1 && ./app_before > saida_antes.txt 2>/dev/null )
 check "fixture runs before"           $?
-# a criação via '&' FORA do alcance é aviso (não roda com o PRIVATE vivo):
-# sem --force recusa e não escreve; com --force executa
-( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xCaixa > ren0.log 2>&1 )
-RC=$?
-check "out-of-reach '&' creation gates without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-cmp -s "$D/a.prg" "$HERE/fixmv/a.prg"
-check "nothing written without --force" $?
-( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xCaixa --force > ren.log 2>&1 )
+# P36c (Diego, 2026-08-09: "concordo em matar a flag"): a criacao via '&' FORA
+# do alcance e' INFORMACAO - a propria ferramenta acabou de provar que aquele
+# sitio nao roda enquanto este criador vive (dentro do alcance ha recusa dura).
+# Antes isso barrava o rename e pedia --force, que e' pedir consentimento sobre
+# algo que a ferramenta ja' sabia ser inofensivo.
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xCaixa --json > ren.log 2>&1 )
 RC=$?
 check "rename-memvar exit 0 (clean closure)" $([ $RC -eq 0 ] && echo 0 || echo 1)
+"$TCHECK" envhas "$D/ren.log" diagnostics "outside the scope"
+check "the out-of-scope creation is a note, not a veto" $?
 grep -q "verified: 5 edit(s); symbol renamed, pcode byte-identical" "$D/ren.log"
 check "verification: symbol renamed, pcode byte-identical" $?
 grep -q "MEMVAR xSaldo, xCaixa" "$D/a.prg" && grep -q "PRIVATE xCaixa := 10" "$D/a.prg" \
@@ -982,7 +993,7 @@ check "declaration, creator and cross-module use renamed" $?
 ( cd "$D" && $HB_BIN/hbmk2 a.prg b.prg -oapp_after -gtcgi -q0 > /dev/null 2>&1 && ./app_after > saida_depois.txt 2>/dev/null )
 cmp -s "$D/saida_antes.txt" "$D/saida_depois.txt"
 check "execution identical after rename" $?
-( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xConta --force > /dev/null 2>&1 )
+( cd "$D" && "$BIN" rename fixmv.hbp a.prg:33:12 xConta > /dev/null 2>&1 )
 cmp -s "$D/a.prg" "$HERE/fixmv/a.prg" && cmp -s "$D/b.prg" "$HERE/fixmv/b.prg"
 check "A->B->A round-trip byte-exact"  $?
 
@@ -1045,15 +1056,25 @@ check "execution identical after rename" $?
 ( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:17:8 Info > /dev/null 2>&1 )
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "A->B->A round-trip byte-exact"  $?
-# INLINE: o nome também vive numa string do usuário -> --force obrigatório
-( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:7:11 Duplo > inl0.log 2>&1 )
+# INLINE: o nome tambem vive numa string do usuario (c2.prg:26,
+# `LOCAL cTag := "Dobro"`). Ate' 2026-08-09 isso exigia --force, e o motivo era
+# o TEXTO da string ser igual ao nome do metodo.
+#
+# P36b (decisao do Diego, com o fixture na mesa): "so' quero alertas quando
+# puder provar, atraves de fatos usando o core do harbour". Uma string de dado
+# nao e' o metodo - so' a grafia liga uma coisa a outra -, entao o rename passa
+# sem flag nenhuma e a string fica onde estava. O risco de verdade (alcancar a
+# mensagem por NOME em run time) e' fato do compilador desde o ast-26
+# (`dyn: "message"`) e sai declarado no campo `reach`, nunca como recusa.
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:7:11 Duplo > inl.log 2>&1 )
 RC=$?
-check "user string with the name gates without --force" $([ $RC -ne 0 ] && echo 0 || echo 1)
-cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg"
-check "nothing written without --force" $?
-( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:7:11 Duplo --force > inl.log 2>&1 && \
-             "$BIN" rename fixmth.hbp c1.prg:7:11 Dobro --force > /dev/null 2>&1 )
-check "INLINE method renames with --force and returns" $?
+check "INLINE method renames with no flag needed" $([ $RC -eq 0 ] && echo 0 || echo 1)
+! grep -q -- "--force" "$D/inl.log"
+check "no --force is demanded over a data string" $?
+grep -q '"Dobro"' "$D/c2.prg"
+check "the user string is left exactly as written" $?
+( cd "$D" && "$BIN" rename fixmth.hbp c1.prg:7:11 Dobro > /dev/null 2>&1 )
+check "and renames back"                $?
 cmp -s "$D/c1.prg" "$HERE/fixmth/c1.prg" && cmp -s "$D/c2.prg" "$HERE/fixmth/c2.prg"
 check "INLINE round-trip byte-exact"   $?
 

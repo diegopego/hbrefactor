@@ -1,0 +1,299 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "fix01.hbp",
+   "b.prg:19:10",
+   "Len",
+   "--dry-run",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "dry run - nothing was written; 2 edit(s) previewed",
+  "diagnostics": [
+   {
+    "code": "shadows-runtime-function",
+    "severity": "warning",
+    "location": null,
+    "detail": "'Len' is a Harbour runtime function - defining it in the project shadows the native one in every call"
+   }
+  ],
+  "result": {
+   "verdict": "preview",
+   "kind": "function",
+   "old": "Sub2",
+   "new": "Len",
+   "editCount": 2,
+   "proof": null,
+   "locations": [
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 13,
+       "character": 19
+      },
+      "end": {
+       "line": 13,
+       "character": 23
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/b.prg",
+     "range": {
+      "start": {
+       "line": 18,
+       "character": 9
+      },
+      "end": {
+       "line": 18,
+       "character": 13
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "reach": {
+    "complete": true,
+    "runtime": []
+   }
+  },
+  "edits": [
+   {
+    "uri": "file://<CWD>/a.prg",
+    "range": {
+     "start": {
+      "line": 13,
+      "character": 19
+     },
+     "end": {
+      "line": 13,
+      "character": 23
+     }
+    },
+    "newText": "Len"
+   },
+   {
+    "uri": "file://<CWD>/b.prg",
+    "range": {
+     "start": {
+      "line": 18,
+      "character": 9
+     },
+     "end": {
+      "line": 18,
+      "character": 13
+     }
+    },
+    "newText": "Len"
+   }
+  ]
+ },
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "fix01.hbp",
+   "b.prg:19:10",
+   "hb_ntos",
+   "--dry-run",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "dry run - nothing was written; 2 edit(s) previewed",
+  "diagnostics": [
+   {
+    "code": "shadows-runtime-function",
+    "severity": "warning",
+    "location": null,
+    "detail": "'hb_ntos' is a Harbour runtime function - defining it in the project shadows the native one in every call"
+   }
+  ],
+  "result": {
+   "verdict": "preview",
+   "kind": "function",
+   "old": "Sub2",
+   "new": "hb_ntos",
+   "editCount": 2,
+   "proof": null,
+   "locations": [
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 13,
+       "character": 19
+      },
+      "end": {
+       "line": 13,
+       "character": 23
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/b.prg",
+     "range": {
+      "start": {
+       "line": 18,
+       "character": 9
+      },
+      "end": {
+       "line": 18,
+       "character": 13
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "reach": {
+    "complete": true,
+    "runtime": []
+   }
+  },
+  "edits": [
+   {
+    "uri": "file://<CWD>/a.prg",
+    "range": {
+     "start": {
+      "line": 13,
+      "character": 19
+     },
+     "end": {
+      "line": 13,
+      "character": 23
+     }
+    },
+    "newText": "hb_ntos"
+   },
+   {
+    "uri": "file://<CWD>/b.prg",
+    "range": {
+     "start": {
+      "line": 18,
+      "character": 9
+     },
+     "end": {
+      "line": 18,
+      "character": 13
+     }
+    },
+    "newText": "hb_ntos"
+   }
+  ]
+ },
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "fix01.hbp",
+   "b.prg:19:10",
+   "hb_MilliSeconds",
+   "--dry-run",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "dry run - nothing was written; 2 edit(s) previewed",
+  "diagnostics": [
+   {
+    "code": "shadows-runtime-function",
+    "severity": "warning",
+    "location": null,
+    "detail": "'hb_MilliSeconds' is a Harbour runtime function - defining it in the project shadows the native one in every call"
+   }
+  ],
+  "result": {
+   "verdict": "preview",
+   "kind": "function",
+   "old": "Sub2",
+   "new": "hb_MilliSeconds",
+   "editCount": 2,
+   "proof": null,
+   "locations": [
+    {
+     "uri": "file://<CWD>/a.prg",
+     "range": {
+      "start": {
+       "line": 13,
+       "character": 19
+      },
+      "end": {
+       "line": 13,
+       "character": 23
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/b.prg",
+     "range": {
+      "start": {
+       "line": 18,
+       "character": 9
+      },
+      "end": {
+       "line": 18,
+       "character": 13
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "reach": {
+    "complete": true,
+    "runtime": []
+   }
+  },
+  "edits": [
+   {
+    "uri": "file://<CWD>/a.prg",
+    "range": {
+     "start": {
+      "line": 13,
+      "character": 19
+     },
+     "end": {
+      "line": 13,
+      "character": 23
+     }
+    },
+    "newText": "hb_MilliSeconds"
+   },
+   {
+    "uri": "file://<CWD>/b.prg",
+    "range": {
+     "start": {
+      "line": 18,
+      "character": 9
+     },
+     "end": {
+      "line": 18,
+      "character": 13
+     }
+    },
+    "newText": "hb_MilliSeconds"
+   }
+  ]
+ }
+]

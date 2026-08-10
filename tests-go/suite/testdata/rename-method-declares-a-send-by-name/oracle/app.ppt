@@ -1,0 +1,86 @@
+app.prg(3) >CREATE CLASS Caixa<
+#xcommand >CLASS Caixa<
+app.prg(3) >CLASS Caixa<
+#xcommand >_HB_CLASS Caixa ; function __HB_CLS_OPT( Caixa ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Caixa", __HB_CLS_PAR( ), @__HB_CLS_OPT( Caixa)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Caixa ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(3) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(3) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(3) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(3) >__HB_CLS_OPT( Caixa )<
+#xtranslate >Caixa<
+app.prg(3) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(3) >__HB_CLS_OPT( Caixa)<
+#xtranslate >Caixa<
+app.prg(4) >VAR nTot INIT 7<
+#xcommand >_HB_MEMBER { nTot } ; oClass:AddMultiData(, 7, __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"nTot"}, __HB_CLS_NOINI )<
+app.prg(4) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(4) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(4) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(4) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(4) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(5) >METHOD Mostra()<
+#xcommand >METHOD Mostra() _CLASS_MODE_<
+app.prg(5) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(5) >METHOD Mostra() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Mostra()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Mostra()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Mostra()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Mostra() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(5) >_CLASS_NAME_<
+#define >Caixa<
+app.prg(5) >_CLASS_NAME_<
+#define >Caixa<
+app.prg(5) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(5) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(5) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(5) >__HB_CLS_ASFUNC(Mostra())<
+#xtranslate >Mostra()<
+app.prg(5) >__HB_CLS_PARAMS(Mostra())<
+#xtranslate >__HB_CLS_ASID(Mostra())<
+app.prg(5) >__HB_CLS_ASID(Mostra())<
+#xtranslate >Mostra<
+app.prg(5) >__HB_CLS_ASSTRING(Mostra())<
+#xtranslate >"Mostra"<
+app.prg(5) >__HB_CLS_MTHNAME Caixa Mostra()<
+#xtranslate >Caixa_Mostra()<
+app.prg(5) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(5) >Caixa _<
+(concatenate) >Caixa_<
+app.prg(5) >Caixa_ Mostra<
+(concatenate) >Caixa_Mostra<
+app.prg(5) >__HB_CLS_ASID( Caixa_Mostra() )<
+#xtranslate >Caixa_Mostra<
+app.prg(5) >__HB_CLS_DECLARE_METHOD Mostra Caixa<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Mostra CLASS Caixa _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Mostra CLASS Caixa ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Mostra([ <xparams,... >] ) CLASS Caixa _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Mostra([ <xparams>] ) CLASS Caixa<
+app.prg(6) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(6) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(6) >_CLASS_NAME_<
+#define >Caixa<
+app.prg(6) >END SEQUENCE<
+#command >end<
+app.prg(8) >METHOD Mostra() CLASS Caixa<
+#xcommand >METHOD FUNCTION Mostra() CLASS Caixa _CLASS_MODE_<
+app.prg(8) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(8) >METHOD FUNCTION Mostra() CLASS Caixa _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Mostra( ) CLASS Caixa<
+app.prg(8) >DECLARED METHOD FUNCTION Mostra( ) CLASS Caixa<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Caixa Mostra( ) ; local Self AS CLASS Caixa := QSelf() AS CLASS Caixa<
+app.prg(8) >__HB_CLS_MTHNAME Caixa Mostra( )<
+#xtranslate >Caixa_Mostra( )<
+app.prg(8) >Caixa _<
+(concatenate) >Caixa_<
+app.prg(8) >Caixa_ Mostra<
+(concatenate) >Caixa_Mostra<

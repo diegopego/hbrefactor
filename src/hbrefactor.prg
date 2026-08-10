@@ -108,13 +108,21 @@
 // cenário as exercitar - código sem cenário é código que ninguém confere
 #define RSN_VERIFY_FAILED "verification-failed-rolled-back"
 
-// referência TEXTUAL achada (o não-verificável: string, comentário, função do
-// runtime que o nome novo sombrearia). Único código da taxonomia com
-// `ask-human-then-retry`: a refatoração é possível, o que falta é consentimento
-// - o `--force` é o portão, e quem o abre é o humano, nunca o agente sozinho.
-// Vinha repetido como literal em 4 sítios, que é o erro que o cabeçalho desta
-// seção descreve; virou #define ao migrar o caso que o exercita (2026-07-27)
-#define RSN_TEXTUAL_FORCE "textual-refs-require-force"
+// P36c - MORTOS com a flag `--force` (Diego, 2026-08-09: "concordo em matar a
+// flag"). O `textual-refs-require-force` era o único código da taxonomia com
+// `ask-human-then-retry`, e o nome dizia o CONTORNO, não o fato - exatamente o
+// que a regra do Diego de 2026-07-27 proíbe. Cada um dos seus alimentadores
+// virou o que a medição mostrou que ele era: informação (diagnostic), recusa
+// por quebra provada, ou nada (o aviso de sombra de local, que era falso).
+// Ficam nomeados aqui porque um código que some sem explicação vira mistério
+// no próximo `git log`:
+//    #define RSN_TEXTUAL_FORCE      "textual-refs-require-force"
+//    #define RSN_RUNTIME_NAME_FORCE "call-resolves-name-at-runtime"
+//
+// E a flag não é ignorada em silêncio: quem a digitar recebe ISTO, porque
+// aceitar calado um pedido que não existe mais é entregar um comportamento
+// diferente do que a pessoa pediu
+#define RSN_FLAG_RETIRED "flag-no-longer-exists"
 
 // P27 - the name is spelled in a pp rule that is compiled INTO the pp (std.ch
 // is built in): no file, no line, so module and directive can never be made to
@@ -148,6 +156,32 @@
 // coincidência de nome - exatamente o que esta ferramenta existe para não fazer
 #define RSN_MV_MULTI_CREATOR "memvar-has-more-than-one-creator"
 #define RSN_MV_OUT_OF_SCOPE  "memvar-use-outside-creator-scope"
+
+// P36 - o alcance dinâmico do criador NÃO FECHA: dentro dele há um macro, um
+// send, uma chamada que resolve nome em run time (`dyn`, ast-25) ou uma função
+// que não é do projeto nem do core. Renomear seria afirmar sobre código que a
+// compilação não enxerga, e a ferramenta não afirma o que não prova.
+//
+// O nome diz o FATO, não o contorno (regra do Diego, 2026-07-27: código
+// batizado pelo contorno sobrevive à morte da causa - foi o que aconteceu com
+// o `textual-refs-require-force`). `stop-and-report`, e nenhuma flag é
+// oferecida: não falta consentimento, falta fato. Os furos vão em
+// `diagnostics[]`, com posição, porque é com eles que o humano decide
+#define RSN_MV_SCOPE_HOLES   "memvar-scope-not-closed"
+
+// P36b - o inline-local pararia de fazer sentido: uma DIRETIVA fabricou uma
+// string a partir deste identificador (fato do rastro `from`/stringify), e
+// inlinar deixaria a string nomeando uma variável que não existe mais. O nome
+// diz o FATO; a ação é `stop-and-report` porque não há flag que resolva - o que
+// resolve é mexer na diretiva, e isso é decisão de quem escreveu o programa
+#define RSN_INLINE_STRINGIFIED "name-stringified-by-directive"
+
+// P36c - a string que MACRO-EXPANDE este memvar em run time (`macrovars`, o
+// fato do ast-18: o compilador computa com a mesma regra do HB_P_MACROTEXT).
+// Renomear faz aquela string deixar de resolver - quebra PROVADA, e a string é
+// dado, que a ferramenta não edita nunca. Logo: recusa, `stop-and-report`,
+// sem flag - não falta consentimento, o que falta é a quebra não existir
+#define RSN_MV_MACRO_STRING "memvar-named-inside-a-macro-string"
 
 // P28: a variável é da DIRETIVA, não do usuário - ela é declarada E usada
 // inteiramente dentro do código que a regra gera, e o `.prg` nunca a escreve.
@@ -335,11 +369,11 @@ STATIC PROCEDURE Usage()
 
    OutStd( "hbrefactor " + APP_VERSION + " - Harbour refactoring (compiler AST)" + hb_eol() )
    OutStd( "Usage:" + hb_eol() )
-   OutStd( "  hbrefactor rename <project> <file:line:col> <new> [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor rename <project> <file:line:col> <new> [--dry-run]" + hb_eol() )
    OutStd( "                                     (renames the symbol UNDER THE CURSOR; the KIND -" + hb_eol() )
    OutStd( "                                      local/param/static/memvar/function/method/dsl/marker -" + hb_eol() )
    OutStd( "                                      comes from the FACT in the tree, not from the command)" + hb_eol() )
-   OutStd( "  hbrefactor reorder-params <project> <function> <n1,n2,...> [--file <f.prg>] [--force] [--dry-run]" + hb_eol() )
+   OutStd( "  hbrefactor reorder-params <project> <function> <n1,n2,...> [--file <f.prg>] [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor extract-function <project> <file.prg> <first>-<last> <name> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor inline-local <project> <file.prg> <function> <name> [--dry-run]" + hb_eol() )
    OutStd( "  hbrefactor usages <project> <name|Class:Method|--at file:line:col> [--func <function>] [--json <out>] [--show-expansion]" + hb_eol() )
@@ -737,7 +771,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-24"
+   RETURN "ast-26"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -2974,7 +3008,7 @@ STATIC FUNCTION Rename( aArgs )
 
    LOCAL cSpec, cAtSpec, cNew, aAtParts, cAtFile, nLine, nCol0, nI
    LOCAL hProj, cTmp, cAtPath, hAsts := { => }, cPath, hR, aDel
-   LOCAL lForce := .F., lDryRun := .F.
+   LOCAL lDryRun := .F.
 
    IF Len( aArgs ) < 4
       Usage()
@@ -2986,7 +3020,10 @@ STATIC FUNCTION Rename( aArgs )
    FOR nI := 5 TO Len( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--force"
-         lForce := .T.
+         RETURN Refuse( "--force no longer exists - this tool does not ask for consent to " + ;
+                        "act on what it cannot prove: it either refuses, naming what it " + ;
+                        "found, or applies and declares the reach it could not see", ;
+                        RSN_FLAG_RETIRED )
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
       ENDCASE
@@ -3079,28 +3116,16 @@ STATIC FUNCTION Rename( aArgs )
          AAdd( aDel, "--file" )
          AAdd( aDel, cAtFile )
       ENDIF
-      IF lForce
-         AAdd( aDel, "--force" )
-      ENDIF
    CASE hR[ "cmd" ] == "rename-memvar"
       aDel := { "rename-memvar", cSpec, hR[ "old" ], cNew }
       // P29: the cursor names WHICH creator chain the user means - with two
       // PRIVATE creators of disjoint reach, that choice is the whole answer
       AAdd( aDel, "--at" )
       AAdd( aDel, cAtFile + ":" + hb_ntos( nLine ) )
-      IF lForce
-         AAdd( aDel, "--force" )
-      ENDIF
    CASE hR[ "cmd" ] == "rename-method"
       aDel := { "rename-method", cSpec, hR[ "target" ], cNew }
-      IF lForce
-         AAdd( aDel, "--force" )
-      ENDIF
    CASE hR[ "cmd" ] == "rename-pp-marker"
       aDel := { "rename-pp-marker", cSpec, hR[ "old" ], cNew }
-      IF lForce
-         AAdd( aDel, "--force" )
-      ENDIF
    CASE hR[ "cmd" ] == "rename-dsl"
       aDel := { "rename-dsl", cSpec, hR[ "old" ], cNew }
    OTHERWISE
@@ -3329,12 +3354,61 @@ STATIC FUNCTION ScopeField( hAsts, hProj, cUpName )
 
    RETURN { "complete" => Empty( aUnseen ), "unseen" => aUnseen }
 
+// P36 como CAMPO: reach = { complete, runtime[] } - a OUTRA coisa que o
+// veredito não cobre, e ela é um desconhecido diferente do `scope`. Ali é
+// região que a compilação pulou; aqui é nome que só existe com o programa
+// RODANDO: um macro sendo avaliado, ou uma chamada que o core declara como
+// resolvedora de nome (`dyn`, ast-25).
+//
+// NÃO recusa: macro é run time e está fora do controle da ferramenta por
+// decisão (Diego, 2026-07-27) - o produto honesto é dizer ONDE. Sem este
+// campo o envelope dizia `verified` e `scope.complete: true`, e quem lia
+// tinha todo o direito de entender "nada ficou de fora".
+//
+// A régua é a de sempre: nada aqui lê o texto de uma string para adivinhar
+// qual nome o sítio alcança. O sítio é fato do compilador; QUAL nome ele
+// resolve é justamente o que ninguém pode provar, e é por isso que o campo
+// existe em vez de um veredito.
+STATIC FUNCTION ReachField( hAsts, hProj )
+
+   LOCAL aOut := {}, cPath, hAst, hFunc, hItem, hSite
+
+   FOR EACH cPath IN hProj[ "files" ]
+      IF ! hb_HHasKey( hAsts, cPath )
+         LOOP
+      ENDIF
+      hAst := hAsts[ cPath ]
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
+         ENDIF
+         IF hFunc[ "usesMacro" ]
+            FOR EACH hSite IN MacroSites( hAst, hFunc )
+               AAdd( aOut, { "file" => hb_FNameNameExt( cPath ), "line" => hSite[ "line" ], ;
+                             "kind" => "code", "sym" => NIL } )
+            NEXT
+         ENDIF
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF hb_HGetDef( hItem, "dyn", NIL ) != NIL
+               AAdd( aOut, { "file" => hb_FNameNameExt( cPath ), "line" => hItem[ "line" ], ;
+                             "kind" => hItem[ "dyn" ], "sym" => hItem[ "sym" ] } )
+            ENDIF
+         NEXT
+      NEXT
+   NEXT
+   ASort( aOut,,, {| x, y | iif( x[ "file" ] == y[ "file" ], ;
+                                x[ "line" ] < y[ "line" ], x[ "file" ] < y[ "file" ] ) } )
+
+   RETURN { "complete" => Empty( aOut ), "runtime" => aOut }
+
 // o result comum dos verbos de RENAME. cVerdict = "applied" | "preview";
 // cProof = a força da verificação quando aplicado (NIL/null sob --dry-run,
 // onde nada foi compilado); hScope = ScopeField(...) só nos verbos com
 // alcance condicional (o rename de local não tem: um homônimo em ramo pulado
-// é outra variável, não o mesmo símbolo)
-STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope )
+// é outra variável, não o mesmo símbolo); hReach = ReachField(...) só onde o
+// símbolo é alcançável POR NOME em run time - função e memvar. LOCAL e STATIC
+// não são: nem macro nem `__mvGet` chegam neles (medido na P22)
+STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope, hReach )
 
    LOCAL hRes := { ;
       "verdict"   => cVerdict, ;
@@ -3347,6 +3421,9 @@ STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope
 
    IF hScope != NIL
       hRes[ "scope" ] := hScope
+   ENDIF
+   IF hReach != NIL
+      hRes[ "reach" ] := hReach
    ENDIF
 
    RETURN hRes
@@ -4540,6 +4617,11 @@ STATIC FUNCTION RenameStatic( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--func" .AND. nI < Len( aArgs )
          cFuncFilter := Upper( aArgs[ ++nI ] )
+      CASE Lower( aArgs[ nI ] ) == "--force"
+         RETURN Refuse( "--force no longer exists - this tool does not ask for consent to " + ;
+                        "act on what it cannot prove: it either refuses, naming what it " + ;
+                        "found, or applies and declares the reach it could not see", ;
+                        RSN_FLAG_RETIRED )
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
       ENDCASE
@@ -4649,13 +4731,13 @@ STATIC FUNCTION InFuncSpan( hAst, hFunc, nLine )
 
 STATIC FUNCTION RenameFunction( aArgs )
 
-   LOCAL cSpec, cOld, cNew, cOnlyFile := "", lForce := .F., lDryRun := .F.
+   LOCAL cSpec, cOld, cNew, cOnlyFile := "", lDryRun := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI
    LOCAL lStatic := .F., cDefFile := "", aWarn := {}, hEdits := { => }, aE
    LOCAL cUpOld, cUpNew, cText, hOrig := { => }, nLine, nTotal := 0, aHit
    LOCAL aRuleSeen := {}, aRuleSites := {}, aSite
    LOCAL hRule, hTok, cSide, cKey, cChPath, cCwd, cSiteDesc
-   LOCAL aWork, hScope, cKind
+   LOCAL aWork, hScope, hReachFld, cKind
    LOCAL aDrag := {}, aDyn := {}, lRuleCoincidence := .F.
 
    IF Len( aArgs ) < 4
@@ -4668,7 +4750,10 @@ STATIC FUNCTION RenameFunction( aArgs )
    FOR nI := 5 TO Len( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--force"
-         lForce := .T.
+         RETURN Refuse( "--force no longer exists - this tool does not ask for consent to " + ;
+                        "act on what it cannot prove: it either refuses, naming what it " + ;
+                        "found, or applies and declares the reach it could not see", ;
+                        RSN_FLAG_RETIRED )
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
       CASE Lower( aArgs[ nI ] ) == "--file" .AND. nI < Len( aArgs )
@@ -4898,16 +4983,13 @@ STATIC FUNCTION RenameFunction( aArgs )
             ENDIF
          NEXT
       NEXT
-      // colisão do novo nome com locais/estáticas do módulo (sombra léxica)
-      FOR EACH hFunc IN hAst[ "functions" ]
-         FOR EACH hItem IN hFunc[ "declarations" ]
-            IF Upper( hItem[ "sym" ] ) == cUpNew .AND. ! Empty( aE )
-               AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "declLine" ] ) + ;
-                     ": '" + cNew + "' is " + hItem[ "scope" ] + " in " + hFunc[ "name" ] + ;
-                     " - calls there would be shadowed" )
-            ENDIF
-         NEXT
-      NEXT
+      // P36c: aqui se avisava que uma LOCAL/STATIC homônima "sombrearia as
+      // chamadas" naquele módulo, e o aviso era FALSO - medido em 2026-08-09:
+      // com `LOCAL nItens` e a função renomeada para `nItens`, o programa
+      // imprime o mesmo valor antes e depois e o pcode sai byte-idêntico. O
+      // Harbour decide chamada por PARÊNTESE, não por nome disputado. E, se
+      // algum dia sombreasse, quem pegaria seria o verificador - que compara
+      // o pcode e desfaz - e não um aviso escrito à mão
       IF ! Empty( aE )
          DedupHits( aE )
          IF hb_HHasKey( hEdits, cPath )          // já há edição de diretiva aqui
@@ -4953,17 +5035,24 @@ STATIC FUNCTION RenameFunction( aArgs )
       RETURN Refuse( "no editable site found for '" + cOld + "'" )
    ENDIF
 
+   // P36c (ordem do Diego, 2026-08-09: "concordo em matar a flag"): estes dois
+   // fatos são INFORMAÇÃO, não decisão. Sombrear uma função do runtime só é
+   // perigoso quando o projeto a CHAMA - e esse caso já tem recusa dura
+   // própria, medida ("the rename would hijack those calls"); quando ninguém
+   // chama, o rename é correto e o que resta é você saber que passou a ter uma
+   // homônima. A linha do `.hbx` é um arquivo GERADO que ficou velho: o
+   // conserto é `-hbx=`, e é do build, não da refatoração.
+   //
+   // O `--force` cobria os dois como se fossem risco a consentir. Ele era a
+   // ferramenta dizendo "não sei, decide você" sobre coisas que ela sabe
    FOR nI := 1 TO Len( aWarn )
-      Diag( "textual-reference", aWarn[ nI ], NIL )
+      Diag( "shadows-runtime-function", aWarn[ nI ], NIL )
    NEXT
-   IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "textual references found (see warnings) - repeat with --force to proceed without touching them", ;
-                     RSN_TEXTUAL_FORCE, ACT_RETRY )
-   ENDIF
 
    cKind := "function"
    aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
    hScope := ScopeField( hAsts, hProj, cUpOld )
+   hReachFld := ReachField( hAsts, hProj )
 
    IF Len( aDrag ) > 1
       cSiteDesc := ""                                // reuso: a lista do arraste
@@ -4989,7 +5078,7 @@ STATIC FUNCTION RenameFunction( aArgs )
       Prose( "dry run - nothing was written" + hb_eol() )
       RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
                  " edit(s) previewed", ;
-                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope ), , aWork )
+                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope, hReachFld ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
@@ -5037,7 +5126,7 @@ STATIC FUNCTION RenameFunction( aArgs )
 
    RETURN Ok( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed " + ;
               "as expected, pcode byte-identical", ;
-              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", hScope ) )
+              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", hScope, hReachFld ) )
 
 STATIC PROCEDURE DedupHits( aE )
 
@@ -5374,20 +5463,13 @@ STATIC FUNCTION ExtractFunction( aArgs )
             ENDIF
          NEXT
       ENDDO
-      // strings soltas que soletram o nome novo: relato (nunca edição)
-      FOR EACH hTok IN hAst[ "tokens" ]
-         IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. Upper( hTok[ "text" ] ) == cUpNew
-            IF s_lJson
-               Diag( "string-spells-new-name", "string on line " + ;
-                     hb_ntos( hTok[ "line" ] ) + " spells out '" + cNewName + "'", ;
-                     LspLoc( cSrcPath, hTok[ "line" ], iif( hTok[ "col" ] == NIL, 1, ;
-                             hTok[ "col" ] + 1 ), Len( cNewName ) ) )
-            ELSE
-               Prose( "warning: string on line " + hb_ntos( hTok[ "line" ] ) + ;
-                       " spells out '" + cNewName + "'" + hb_eol() )
-            ENDIF
-         ENDIF
-      NEXT
+      // P36b: aqui havia o relato `string-spells-new-name` - "uma string deste
+      // módulo soletra o nome novo". Saiu pela regra do Diego (2026-08-09):
+      // alerta só quando se pode PROVAR pelo core, e não há fato nenhum ligando
+      // uma string de dado ao nome que se vai criar; o que havia era a grafia.
+      // Era também o mais estreito dos cinco sítios da família: só existia
+      // NESTE ramo, o de extrair para MÉTODO - extrair para função nunca
+      // emitiu nada, e ninguém tinha reparado
    ENDIF
 
    // macro na seleção: semântica movida não-provável (memvar via &) - recusa
@@ -6592,15 +6674,27 @@ STATIC FUNCTION InlineLocal( aArgs )
                      "(the compiler reports unused variables under -w3)" )
    ENDIF
 
-   // nome citado em string no módulo (stringify de pp/call-by-name): a
-   // verificação de símbolos não pegaria a troca - recusa. SEM filtro de
-   // linha: o token do stringify nasce sintetizado com line 0/prov 'n'
+   // P36b: a string que uma DIRETIVA fabricou a partir deste identificador.
+   // Inlinar deixaria essa string nomeando uma variável que não existe mais, e
+   // a verificação de símbolos não pega a troca - recusa.
+   //
+   // O `from` é o que separa esta recusa da que morreu aqui. Até 2026-08-09
+   // bastava o TEXTO da string ser igual ao nome, e isso fundia duas coisas
+   // diferentes: uma string impressa como rótulo NÃO é a variável cujo nome
+   // ela soletra (Diego), e nenhum fato liga uma à outra - só a grafia. A
+   // regra de texto era frágil dos dois lados: bastava montar o nome por
+   // concatenação para passar por ela, e a única coisa que ela alegava
+   // proteger - alcançar o LOCAL por nome em run time - é impossível (a P22
+   // mediu: macro sobre nome de LOCAL resolve MEMVAR, não o local).
+   // Aqui não entra fato novo no lugar porque não existe fato a buscar
    FOR EACH hTok IN hAst[ "tokens" ]
-      IF hTok[ "type" ] == 41 .AND. Upper( hTok[ "text" ] ) == cUp
-         RETURN Refuse( "string equal to '" + cName + "'" + ;
+      IF hTok[ "type" ] == 41 .AND. Upper( hTok[ "text" ] ) == cUp .AND. ;
+         hb_HHasKey( hTok, "from" )
+         RETURN Refuse( "a directive turns '" + cName + "' into a string (stringify)" + ;
                         iif( hTok[ "line" ] > 0, " on line " + hb_ntos( hTok[ "line" ] ), ;
-                             " generated by a pp rule" ) + ;
-                        " (stringify/call by name) - refusing" )
+                             "" ) + ;
+                        " - inlining would leave that string naming a variable that is gone; refusing", ;
+                        RSN_INLINE_STRINGIFIED )
       ENDIF
    NEXT
 
@@ -7015,25 +7109,9 @@ STATIC FUNCTION GenTargets( aOwners )
 // a função tem macro '&' ESCRITO PELO USUÁRIO? Um macro real é token type 22
 // posicionado (prov 's', ex.: '&cVar.'); o '&' interno da expansão do
 // hbclass.ch (usesMacro na função da classe) não gera token posicionado, então
-// é falso positivo. Varre o span de linhas da função por um type 22 prov 's'.
+// é falso positivo. É o MacroSites que responde - aqui só o sim/não
 STATIC FUNCTION HasUserMacro( hAst, hFunc )
-
-   LOCAL nEnd := 0, hItem, hTok
-
-   FOR EACH hItem IN hAst[ "functions" ]
-      IF ! hItem[ "fileDecl" ] .AND. hItem[ "line" ] > hFunc[ "line" ] .AND. ;
-         ( nEnd == 0 .OR. hItem[ "line" ] < nEnd )
-         nEnd := hItem[ "line" ]
-      ENDIF
-   NEXT
-   FOR EACH hTok IN hAst[ "tokens" ]
-      IF hTok[ "type" ] == 22 .AND. hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
-         hTok[ "line" ] >= hFunc[ "line" ] .AND. ( nEnd == 0 .OR. hTok[ "line" ] < nEnd )
-         RETURN .T.
-      ENDIF
-   NEXT
-
-   RETURN .F.
+   RETURN ! Empty( MacroSites( hAst, hFunc ) )
 
 STATIC FUNCTION FindDynamicCalls( aArgs )
 
@@ -7067,23 +7145,32 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       aSrc := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
-      // strings do stream do compilador que são identificadores de funções
-      // do projeto (possível Do()/dispatch por nome)
-      FOR EACH hItem IN hAst[ "tokens" ]
-         // nome ∈ funções do projeto (fato do compilador) já implica
-         // identificador - sem cheque próprio de gramática
-         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) $ hDefined
-            nFound++
-            AAdd( aFind, { "kind" => "string-names-function", ;
-                           "file" => hb_FNameNameExt( cPath ), "line" => hItem[ "line" ], ;
-                           "string" => hItem[ "text" ], ;
-                           "names" => hDefined[ Upper( hItem[ "text" ] ) ], ;
-                           "text" => SrcText( aSrc, hItem[ "line" ] ) } )
-            Prose( hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-               ": string '" + hItem[ "text" ] + "' names a project function [" + ;
-               hDefined[ Upper( hItem[ "text" ] ) ] + "]" + SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+      // P36b: o verbo era feito da heurística - "string cujo TEXTO é o nome de
+      // uma função do projeto, logo talvez uma chamada dinâmica". Medido num
+      // fixture com cinco acessos dinâmicos: ele relatava UM rótulo impresso
+      // (uma string de dado que soletrava o nome de uma função) e ficava mudo
+      // sobre os três acessos reais - por nome de função, por nome de memvar e
+      // por compilação em run time. Agora a pergunta que
+      // o nome do comando promete é respondida pelo fato: as chamadas que o
+      // core declara como resolvedoras de nome (`dyn`, ast-25) e as avaliações
+      // de macro. No mesmo fixture: quatro achados, nenhum falso
+      FOR EACH hFunc IN hAst[ "functions" ]
+         IF hFunc[ "fileDecl" ]
+            LOOP
          ENDIF
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF hb_HGetDef( hItem, "dyn", NIL ) != NIL
+               nFound++
+               AAdd( aFind, { "kind" => "call-resolves-name", ;
+                              "file" => hb_FNameNameExt( cPath ), "line" => hItem[ "line" ], ;
+                              "sym" => hItem[ "sym" ], "reaches" => hItem[ "dyn" ], ;
+                              "function" => hFunc[ "name" ], ;
+                              "text" => SrcText( aSrc, hItem[ "line" ] ) } )
+               Prose( hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                  ": " + hItem[ "sym" ] + " " + DynPhrase( hItem[ "dyn" ] ) + ;
+                  SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+            ENDIF
+         NEXT
       NEXT
       FOR EACH hFunc IN hAst[ "functions" ]
          // só macro REAL do usuário: usesMacro provindo da expansão do
@@ -7115,13 +7202,13 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
 
 STATIC FUNCTION ReorderParams( aArgs )
 
-   LOCAL cSpec, cFunc, cOrder, cOnlyFile := "", lForce := .F., lDryRun := .F.
+   LOCAL cSpec, cFunc, cOrder, cOnlyFile := "", lDryRun := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, nJ
    LOCAL cDefFile := "", hDef := NIL, aParams := {}, aNew, aPerm := {}
    LOCAL hEdits := { => }, aE, aWarn := {}, cText, hOrig := { => }
    LOCAL cUpFunc, aArgsSpans, aSigHits, nTotal := 0, cWhy
    LOCAL aIdent, lIsMethod, cUpMsg := "", nAt, aOwnerClasses := {}
-   LOCAL hOwn, cOwn, aSpell, hF, cCallName
+   LOCAL hOwn, cOwn, aSpell, hF
    LOCAL aWork, hRes
 
    IF Len( aArgs ) < 4
@@ -7134,7 +7221,10 @@ STATIC FUNCTION ReorderParams( aArgs )
    FOR nI := 5 TO Len( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--force"
-         lForce := .T.
+         RETURN Refuse( "--force no longer exists - this tool does not ask for consent to " + ;
+                        "act on what it cannot prove: it either refuses, naming what it " + ;
+                        "found, or applies and declares the reach it could not see", ;
+                        RSN_FLAG_RETIRED )
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
       CASE Lower( aArgs[ nI ] ) == "--file" .AND. nI < Len( aArgs )
@@ -7207,7 +7297,6 @@ STATIC FUNCTION ReorderParams( aArgs )
          ENDIF
       ENDIF
    ENDIF
-   cCallName := iif( lIsMethod, cUpMsg, cUpFunc )
 
    // nova ordem: permutação exata
    aNew := hb_ATokens( Upper( cOrder ), "," )
@@ -7340,15 +7429,20 @@ STATIC FUNCTION ReorderParams( aArgs )
             NEXT
          NEXT
       ENDIF
-      // strings citando a função/mensagem (possível acesso por nome:
-      // __objSendMsg, &; string DERIVADA por regra tem "from" e não é isso)
-      FOR EACH hItem IN hAst[ "tokens" ]
-         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cCallName .AND. ;
-            !( lIsMethod .AND. hb_HHasKey( hItem, "from" ) )
-            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string equal to '" + cFunc + "' - possible call by name" )
-         ENDIF
+      // P36b: aqui se comparava o TEXTO de cada string com o nome da função e
+      // se pedia `--force` por causa disso. Medido no fixture que abriu a
+      // fatia: o aviso saía sobre um rótulo impresso que soletrava o nome da
+      // função, e ficava MUDO sobre a chamada da linha seguinte, que resolvia
+      // essa mesma função por nome em run time. O fato certo já está no dump
+      // (`dyn`), e é ele que alimenta o `reach` deste verbo agora
+      FOR EACH hFunc IN hAst[ "functions" ]
+         FOR EACH hItem IN hFunc[ "calls" ]
+            IF hb_HGetDef( hItem, "dyn", NIL ) != NIL
+               AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
+                     ": " + hItem[ "sym" ] + " " + DynPhrase( hItem[ "dyn" ] ) + ;
+                     " - the argument order it passes is not this tool's to see" )
+            ENDIF
+         NEXT
       NEXT
       IF ! Empty( aE )
          hEdits[ cPath ] := aE
@@ -7359,13 +7453,18 @@ STATIC FUNCTION ReorderParams( aArgs )
       RETURN Refuse( "no site found" )
    ENDIF
 
+   // P36c: este portão era a ferramenta parando por uma chamada dinâmica
+   // QUALQUER do projeto - inclusive uma que nomeia outra função (medido:
+   // `Do( cOutra )` com `cOutra := "Relatorio"` barrava o reorder de outra
+   // função). Como todo projeto real tem uma, o portão barrava sempre, que é
+   // a definição de portão inútil.
+   //
+   // Não há fato que ligue uma chamada por nome A ESTA função: o nome é valor
+   // de run time. Então o verbo faz o que os renames fazem - DECLARA os
+   // sítios no `reach` e segue -, e quem sabe o que aquele nome vale é você
    FOR nI := 1 TO Len( aWarn )
-      Diag( "textual-reference", aWarn[ nI ], NIL )
+      Diag( "runtime-name-call", aWarn[ nI ], NIL )
    NEXT
-   IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "textual references found - repeat with --force", ;
-                     RSN_TEXTUAL_FORCE, ACT_RETRY )
-   ENDIF
 
    aWork := WorkFromRange( hEdits )
 
@@ -9518,15 +9617,28 @@ STATIC FUNCTION FuncIndex( hProj, hAsts )
 
    RETURN hIdx
 
-// fecho transitivo dos callees a partir de (módulo, função) com furos:
-// tudo que roda ENQUANTO um PRIVATE do ponto de partida vive. Furos =
-// arestas que o grafo estático não segue: macro '&', send, string com nome
-// de função do projeto (chamada dinâmica possível), função nem do projeto
-// nem do core Harbour.
+// Transitive closure of the callees of (module, function), with the HOLES:
+// everything that runs while a PRIVATE created at the starting point is
+// alive, plus the edges the static graph cannot follow - a macro evaluation,
+// a message send (dynamic target), a call that resolves a name at RUN TIME
+// (`dyn`, ast-25), and a function that is neither the project's nor the
+// Harbour core's.
+//
+// P36: here lived the twin of the heuristic the P22 killed - "a string whose
+// text equals the name of a project function, therefore a possible dynamic
+// call". It was §1.2 trigger 1, text deciding a role, and one concatenation
+// walked around it: with `LOCAL cF := "Dob" + "ro"` the module's strings are
+// 'Dob' and 'ro' and the rule found nothing, so a memvar rename shipped
+// `verified` over a program that died at run time. What replaced it is the
+// compiler saying which of ITS functions reach a symbol by name - a fact that
+// does not care how the name was spelled, or whether it was ever a literal.
+//
+// Each hole is { text, loc } - the loc feeds `diagnostics[]`, because a
+// refusal the agent cannot locate is a refusal it cannot report.
 STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
 
    LOCAL hSeen := { => }, aQueue := {}, aHoles := {}, aFuncs := {}
-   LOCAL aCur, cPath, hFunc, hAst, hItem, cKey, cTgt, aDef, hTok
+   LOCAL aCur, cPath, hFunc, hAst, hItem, cKey, cTgt, aDef, aSite, cDyn
 
    AAdd( aQueue, { cStartPath, Upper( cStartFunc ) } )
    DO WHILE ! Empty( aQueue )
@@ -9540,7 +9652,7 @@ STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
          aDef := hIdx[ "public" ][ cTgt ]
       ELSE
          IF ! CoreFunction( hProj, cTgt )
-            AAdd( aHoles, "function '" + cTgt + "' outside the project and the Harbour core" )
+            AAdd( aHoles, Hole( "function '" + cTgt + "' outside the project and the Harbour core" ) )
          ENDIF
          LOOP
       ENDIF
@@ -9552,31 +9664,92 @@ STATIC FUNCTION ReachFrom( hProj, hAsts, hIdx, cStartPath, cStartFunc )
       ENDIF
       hSeen[ cKey ] := .T.
       AAdd( aFuncs, { cPath, hFunc } )
+      hAst := hAsts[ cPath ]
 
       IF hFunc[ "usesMacro" ]
-         AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") uses macro '&'" )
+         aSite := MacroSites( hAst, hFunc )
+         IF Empty( aSite )
+            // usesMacro without a '&' the user wrote: the expansion of a
+            // directive put it there (hbclass.ch does). Still a hole - the
+            // evaluation is real - but there is no source position to give
+            AAdd( aHoles, Hole( hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") uses macro '&'" ) )
+         ELSE
+            // um furo por AVALIAÇÃO, e o texto é o de sempre: mudá-lo é drift
+            // em teste pré-existente (run.sh:950), e quem decide isso é o
+            // Diego. A posição - que é o que faltava - vai pelo `location`,
+            // que é o canal de máquina e não estava sendo usado aqui
+            FOR EACH hItem IN aSite
+               AAdd( aHoles, Hole( hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") uses macro '&'", ;
+                     LspLoc( cPath, hItem[ "line" ], hItem[ "col" ], 1 ) ) )
+            NEXT
+         ENDIF
       ENDIF
       IF ! Empty( hFunc[ "sends" ] )
-         AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") sends messages (method - dynamic target)" )
+         AAdd( aHoles, Hole( hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ") sends messages (method - dynamic target)" ) )
       ENDIF
-      // string com nome de função do projeto = chamada dinâmica possível
-      hAst := hAsts[ cPath ]
-      FOR EACH hTok IN hAst[ "tokens" ]
-         IF hTok[ "type" ] == 41 .AND. hTok[ "line" ] > 0 .AND. ;
-            hb_HHasKey( hIdx[ "names" ], Upper( hTok[ "text" ] ) ) .AND. ;
-            InFuncSpan( hAst, hFunc, hTok[ "line" ] )
-            AAdd( aHoles, hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ":" + ;
-                  hb_ntos( hTok[ "line" ] ) + ") cita '" + hTok[ "text" ] + "' in a string (possible dynamic call)" )
-         ENDIF
-      NEXT
       FOR EACH hItem IN hFunc[ "calls" ]
-         IF ! Left( hItem[ "sym" ], 4 ) == "__MV"
-            AAdd( aQueue, { cPath, hItem[ "sym" ] } )
+         cDyn := hb_HGetDef( hItem, "dyn", NIL )
+         IF cDyn != NIL
+            AAdd( aHoles, Hole( hFunc[ "name" ] + " (" + hb_FNameNameExt( cPath ) + ":" + ;
+                  hb_ntos( hItem[ "line" ] ) + ") calls " + hItem[ "sym" ] + ", which " + ;
+                  DynPhrase( cDyn ), CallLoc( cPath, hItem ) ) )
          ENDIF
+         AAdd( aQueue, { cPath, hItem[ "sym" ] } )
       NEXT
    ENDDO
 
    RETURN { "funcs" => aFuncs, "holes" => aHoles }
+
+// um furo do alcance: o texto que o usuário lê e, quando o fato tem posição,
+// o Location que o agente usa para abrir o arquivo no lugar certo
+STATIC FUNCTION Hole( cText, hLoc )
+   RETURN { "text" => cText, "loc" => hLoc }
+
+// o que a chamada faz com o nome, por classe do fato (ast-25). Não é
+// vocabulário nosso: quem classifica é a tabela do core, e a ferramenta só
+// traduz o código em frase
+STATIC FUNCTION DynPhrase( cDyn )
+
+   DO CASE
+   CASE cDyn == "memvar"   ; RETURN "resolves a memvar name at run time"
+   CASE cDyn == "function" ; RETURN "resolves a function name at run time"
+   CASE cDyn == "code"     ; RETURN "compiles code at run time"
+   ENDCASE
+
+   RETURN "resolves a name at run time"
+
+// o Location de um sítio de chamada, quando o dump deu a coluna (ast-20/21).
+// Sem coluna não se inventa uma: o range de largura zero mentiria menos, mas
+// mentiria - e o texto do furo já carrega a linha
+STATIC FUNCTION CallLoc( cPath, hCall )
+
+   IF hb_HGetDef( hCall, "col", NIL ) == NIL
+      RETURN NIL
+   ENDIF
+
+   RETURN LspLoc( cPath, hCall[ "line" ], hCall[ "col" ] + 1, hb_BLen( hCall[ "sym" ] ) )
+
+// os '&' que o USUÁRIO escreveu dentro do span da função: token type 22 com
+// prov 's' e coluna. É o mesmo fato que o HasUserMacro consulta - aqui com as
+// posições, para o furo poder ser apontado
+STATIC FUNCTION MacroSites( hAst, hFunc )
+
+   LOCAL aOut := {}, nEnd := 0, hItem, hTok
+
+   FOR EACH hItem IN hAst[ "functions" ]
+      IF ! hItem[ "fileDecl" ] .AND. hItem[ "line" ] > hFunc[ "line" ] .AND. ;
+         ( nEnd == 0 .OR. hItem[ "line" ] < nEnd )
+         nEnd := hItem[ "line" ]
+      ENDIF
+   NEXT
+   FOR EACH hTok IN hAst[ "tokens" ]
+      IF hTok[ "type" ] == 22 .AND. hTok[ "prov" ] == "s" .AND. hTok[ "col" ] != NIL .AND. ;
+         hTok[ "line" ] >= hFunc[ "line" ] .AND. ( nEnd == 0 .OR. hTok[ "line" ] < nEnd )
+         AAdd( aOut, { "line" => hTok[ "line" ], "col" => hTok[ "col" ] + 1 } )
+      ENDIF
+   NEXT
+
+   RETURN aOut
 
 // P16(c) - as strings que são MACRO VIVO do memvar cUpName: cada string
 // literal que macro-referencia o nome ('&' + nome) re-expande em RUNTIME e
@@ -9606,7 +9779,7 @@ STATIC FUNCTION MacroLiveHits( hAst, cUpName )
 STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
 
    LOCAL hF := MvFacts( hProj, hAsts, cUp )
-   LOCAL hIdx, aC, aI, hReach, cLine, nPub := 0, nPriv := 0
+   LOCAL hIdx, aC, aI, hReach, cLine, hHole, nPub := 0, nPriv := 0
 
    IF Empty( hF[ "creators" ] ) .AND. Empty( hF[ "uses" ] )
       RETURN
@@ -9631,8 +9804,8 @@ STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
          ENDIF
       NEXT
       Prose( "    dynamic reach: " + iif( Empty( cLine ), "(no callee in the project)", cLine ) + hb_eol() )
-      FOR EACH cLine IN hReach[ "holes" ]
-         Prose( "    hole in reach: " + cLine + hb_eol() )
+      FOR EACH hHole IN hReach[ "holes" ]
+         Prose( "    hole in reach: " + hHole[ "text" ] + hb_eol() )
       NEXT
    NEXT
    IF nPriv > 0 .AND. nPub > 0
@@ -9681,11 +9854,11 @@ STATIC PROCEDURE MvMapReport( hProj, hAsts, cUp )
 
 STATIC FUNCTION RenameMemvar( aArgs )
 
-   LOCAL cSpec, cOld, cNew, lForce := .F., lDryRun := .F., nI
+   LOCAL cSpec, cOld, cNew, lDryRun := .F., nI
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
    LOCAL cUpOld, cUpNew, hF, hFNew, hIdx, hReach, hInReach, aC, aU, aWarn := {}
    LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
-   LOCAL cWhy := "", aLive, aWork, hScope
+   LOCAL cWhy := "", aLive, aWork, hScope, hReachFld, hHole
    LOCAL hRuleBad                       // P28: recusa vinda da coleta do `.ch`
    LOCAL cAtMod := "", nAtLine := 0     // P29: the cursor, naming the chain
    LOCAL lP29 := .F., aReaches := {}, aSets := {}, nPick := 0
@@ -9701,7 +9874,10 @@ STATIC FUNCTION RenameMemvar( aArgs )
    FOR nI := 5 TO Len( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--force"
-         lForce := .T.
+         RETURN Refuse( "--force no longer exists - this tool does not ask for consent to " + ;
+                        "act on what it cannot prove: it either refuses, naming what it " + ;
+                        "found, or applies and declares the reach it could not see", ;
+                        RSN_FLAG_RETIRED )
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
       CASE Lower( aArgs[ nI ] ) == "--at" .AND. nI < Len( aArgs )
@@ -9913,18 +10089,21 @@ STATIC FUNCTION RenameMemvar( aArgs )
       NEXT
    NEXT
    IF ! Empty( hReach[ "holes" ] )
+      // P36: os furos eram PROSA no stderr, e sob `--json` o veredito saía em
+      // stdout sem eles - quem lê o stdout, que é o normal num pipe, recebia
+      // "scope with holes" sem nenhum hole. Cada furo é agora um diagnostic
+      // com posição, e a recusa tem código próprio: é ele que diz ao agente
+      // que não há flag nenhuma a repetir, o que existe é código para o
+      // humano ler
       FOR nI := 1 TO Len( aLive )
-         OutErr( "warning: " + aLive[ nI ] + hb_eol() )
+         Diag( "macro-live-string", aLive[ nI ], NIL )
       NEXT
-      OutErr( "hbrefactor: the dynamic scope of " + aC[ 2 ] + " has holes:" + hb_eol() )
-      FOR EACH cWhy IN hReach[ "holes" ]
-         OutErr( "  - " + cWhy + hb_eol() )
+      FOR EACH hHole IN hReach[ "holes" ]
+         Diag( "scope-hole", hHole[ "text" ], hHole[ "loc" ] )
       NEXT
-      RETURN Refuse( "scope with holes - code outside the static graph may see '" + cOld + "'; refusing" )
+      RETURN Refuse( "scope with holes - code outside the static graph may see '" + cOld + "'; refusing", ;
+                     RSN_MV_SCOPE_HOLES )
    ENDIF
-   FOR nI := 1 TO Len( aLive )
-      AAdd( aWarn, aLive[ nI ] )
-   NEXT
    hInReach := { => }
    FOR EACH aU IN hReach[ "funcs" ]
       hInReach[ aU[ 1 ] + "!" + Upper( aU[ 2 ][ "name" ] ) ] := .T.
@@ -9959,7 +10138,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
                         hb_ntos( aU[ 3 ] ) + ") - the created name is invisible to the compiler; refusing" )
       ENDIF
       AAdd( aWarn, "creation via '&' outside the scope in " + aU[ 2 ] + " (" + aU[ 1 ] + ":" + ;
-            hb_ntos( aU[ 3 ] ) + ") - does not run with the " + aC[ 4 ] + " vivo, mas confira" )
+            hb_ntos( aU[ 3 ] ) + ") - it does not run while this " + aC[ 4 ] + " is alive" )
    NEXT
 
    // nome novo: sem vida própria de memvar e sem sombra léxica onde o velho vive
@@ -9992,21 +10171,47 @@ STATIC FUNCTION RenameMemvar( aArgs )
             ENDIF
          NEXT
       NEXT
-      // strings com o nome velho: call-by-name possível (TYPE, __mvGet...)
-      FOR EACH hItem IN hAst[ "tokens" ]
-         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. Upper( hItem[ "text" ] ) == cUpOld
-            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string equal to '" + cOld + "' - possible access by name (will NOT be changed)" )
-         ENDIF
-      NEXT
+      // P36: aqui estava a segunda gêmea da heurística de string - "um literal
+      // igual ao nome do memvar, logo acesso por nome possível" -, e ela era a
+      // GRAVE das duas. Errava nas duas direções, medido: `__mvGet( "xC" +
+      // "fg" )` passava com `verified: 2 edit(s); pcode byte-identical` sobre um
+      // programa que morria em `Variable does not exist`, enquanto uma string
+      // que era só DADO e por acaso soletrava o nome exigia `--force` - gastando
+      // num risco inexistente a flag que existe para um risco provado.
+      //
+      // O que ocupa o lugar não é outra leitura de string: é o alcance do
+      // criador ter de FECHAR (a recusa RSN_MV_SCOPE_HOLES acima). O acesso por
+      // nome que importava - `__mvGet`, `Type`, `hb_macroBlock` - é agora fato
+      // do compilador, e vale para o nome montado, lido de arquivo ou nunca
+      // literal. Ler o texto da string é justamente a pergunta que esta fase
+      // deixa de fazer
    NEXT
 
+   // o que sobra em aWarn é o MACRO VIVO do P16(c), e ele não é leitura de
+   // texto nenhuma: quem diz que a string re-expande aquele memvar é o
+   // compilador, pela mesma regra do pcode HB_P_MACROTEXT.
+   //
+   // P36c: aqui o `--force` era o pior dos três, porque a quebra é PROVADA -
+   // renomeado o memvar, aquela string deixa de resolver, e o compilador já
+   // disse que é este memvar que ela nomeia. A ferramenta não aplica edição
+   // que ela própria prova que quebra alguma coisa; então recusa, e o humano
+   // decide o que fazer com a string (que é dado, e ninguém vai editar por ele)
+   // a nota de criação via macro FORA do alcance é informação: a própria
+   // ferramenta acabou de provar que aquele sítio não roda enquanto este
+   // criador vive (dentro do alcance existe recusa dura, acima)
    FOR nI := 1 TO Len( aWarn )
-      Diag( "textual-reference", aWarn[ nI ], NIL )
+      Diag( "macro-creation-out-of-scope", aWarn[ nI ], NIL )
    NEXT
-   IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "warnings above - repeat with --force to proceed without touching them", ;
-                     RSN_TEXTUAL_FORCE, ACT_RETRY )
+   // a string que MACRO-EXPANDE este memvar é outra coisa: renomear faz ela
+   // deixar de resolver, e quem afirma que é este memvar que ela nomeia é o
+   // compilador. Quebra provada + dado que não se edita = recusa, sem flag
+   FOR nI := 1 TO Len( aLive )
+      Diag( "macro-live-string", aLive[ nI ], NIL )
+   NEXT
+   IF ! Empty( aLive )
+      RETURN Refuse( "a string macro-expands '" + cOld + "' at run time (see diagnostics) - " + ;
+                     "the rename would break it and the string is data; refusing", ;
+                     RSN_MV_MACRO_STRING )
    ENDIF
 
    // sites: declarações MEMVAR + declaração PRIVATE/linha do PUBLIC + usos.
@@ -10072,6 +10277,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
    hScope := ScopeField( hAsts, hProj, cUpOld )
+   hReachFld := ReachField( hAsts, hProj )
 
    Prose( "rename-memvar: " + cOld + " -> " + cNew + " (creator " + aC[ 4 ] + " in " + ;
            aC[ 2 ] + ", scope closed and clean)" + hb_eol() )
@@ -10086,7 +10292,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
       Prose( "dry run - nothing was written" + hb_eol() )
       RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
                  " edit(s) previewed", ;
-                 RenameResult( "preview", "memvar", cOld, cNew, aWork, NIL, hScope ), , aWork )
+                 RenameResult( "preview", "memvar", cOld, cNew, aWork, NIL, hScope, hReachFld ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
@@ -10139,7 +10345,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    RETURN Ok( "verified: " + hb_ntos( nTotal ) + ;
               " edit(s); symbol renamed, pcode byte-identical", ;
-              RenameResult( "applied", "memvar", cOld, cNew, aWork, "pcode-identical", hScope ) )
+              RenameResult( "applied", "memvar", cOld, cNew, aWork, "pcode-identical", hScope, hReachFld ) )
 
 STATIC FUNCTION MvFuncUsesOld( hFunc, cUpOld )
 
@@ -14434,11 +14640,11 @@ STATIC FUNCTION SendLineHits( hAst, nLine, cUp )
 
 STATIC FUNCTION RenameMethod( aArgs )
 
-   LOCAL cSpec, cTarget, cNew, lForce := .F., lDryRun := .F., nI, nAt
+   LOCAL cSpec, cTarget, cNew, lDryRun := .F., nI, nAt
    LOCAL cClass := "", cMethod, cUpOld, cUpNew, cUpClass
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
    LOCAL hFacts := { => }, hF, aOwners := {}, cClassPath := "", lMethod
-   LOCAL aWarn := {}, hEdits := { => }, aE, nLine, aSpans, hOwn, aArts
+   LOCAL hEdits := { => }, aE, nLine, aSpans, hOwn, aArts
    LOCAL hMap := { => }, hPredStr := { => }, aPS, cPred, cOwn, aArt, hTok
    LOCAL cText, hOrig := { => }, nTotal := 0, cWhy := "", aHit, lOurs
    LOCAL hOpt := { => }, lData := .F.
@@ -14456,7 +14662,10 @@ STATIC FUNCTION RenameMethod( aArgs )
    FOR nI := 5 TO Len( aArgs )
       DO CASE
       CASE Lower( aArgs[ nI ] ) == "--force"
-         lForce := .T.
+         RETURN Refuse( "--force no longer exists - this tool does not ask for consent to " + ;
+                        "act on what it cannot prove: it either refuses, naming what it " + ;
+                        "found, or applies and declares the reach it could not see", ;
+                        RSN_FLAG_RETIRED )
       CASE Lower( aArgs[ nI ] ) == "--dry-run"
          lDryRun := .T.
       ENDCASE
@@ -14730,26 +14939,16 @@ STATIC FUNCTION RenameMethod( aArgs )
       IF ! Empty( aE )
          hEdits[ cPath ] := aE
       ENDIF
-      // string do USUÁRIO com o nome = possível acesso por nome
-      // (__objSendMsg, :&) - aviso, nunca edição. O rastro dá o corte
-      // exato: string derivada (com "from") se regenera da edição do
-      // identificador; string sem "from" é do usuário
-      FOR EACH hItem IN hAst[ "tokens" ]
-         IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. ;
-            Upper( hItem[ "text" ] ) == cUpOld .AND. ! hb_HHasKey( hItem, "from" )
-            AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": string equal to '" + cMethod + "' - possible access by name (will NOT be changed)" )
-         ENDIF
-      NEXT
+      // P36b: aqui se comparava o TEXTO de cada string do usuário com o nome
+      // do método e se exigia `--force` por isso. Medido no fixture que abriu
+      // a fatia: o aviso saía sobre um rótulo impresso e ficava MUDO sobre a
+      // chamada da linha seguinte, que enviava a mensagem por nome montado -
+      // o único risco real dos dois. Quem sabe que uma função da RTL alcança
+      // mensagem por nome é o core, e agora ele diz (`dyn: "message"`).
+      // O veredito DECLARA (campo `reach`) em vez de recusar, que é a mesma
+      // escolha do rename de função: o sítio é fato, mas QUAL mensagem ele
+      // resolve não é - e ninguém deve fingir que é
    NEXT
-
-   FOR nI := 1 TO Len( aWarn )
-      Diag( "textual-reference", aWarn[ nI ], NIL )
-   NEXT
-   IF ! Empty( aWarn ) .AND. ! lForce
-      RETURN Refuse( "textual references found (see warnings) - repeat with --force", ;
-                     RSN_TEXTUAL_FORCE, ACT_RETRY )
-   ENDIF
 
    // AddHit já normalizou tudo para pares { linha, coluna 1-based }
    FOR EACH cPath IN hb_HKeys( hEdits )
@@ -14790,7 +14989,8 @@ STATIC FUNCTION RenameMethod( aArgs )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      hRes := RenameResult( "preview", cKind, cMethod, cNew, aWork, NIL, NIL )
+      hRes := RenameResult( "preview", cKind, cMethod, cNew, aWork, NIL, NIL, ;
+                            ReachField( hAsts, hProj ) )
       hRes[ "derived" ] := aPred
       hRes[ "derivedStrings" ] := aPredS
       RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
@@ -14870,7 +15070,8 @@ STATIC FUNCTION RenameMethod( aArgs )
       "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" ) )
    Prose( cWhy + hb_eol() )
 
-   hRes := RenameResult( "applied", cKind, cMethod, cNew, aWork, cProof, NIL )
+   hRes := RenameResult( "applied", cKind, cMethod, cNew, aWork, cProof, NIL, ;
+                         ReachField( hAsts, hProj ) )
    hRes[ "derived" ] := aPred
    hRes[ "derivedStrings" ] := aPredS
    RETURN Ok( cWhy, hRes )

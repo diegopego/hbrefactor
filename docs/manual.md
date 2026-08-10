@@ -662,6 +662,15 @@ in Harbour — and it is **your** thread to keep, not something the tool will ho
 
 ### Where the line actually sits
 
+<!-- prov: REWRITTEN 2026-08-09 (P36, ast-25). This section used to say that a codeblock
+     built from text, a call made by name and an assembled name "are not seen, and none of
+     them can be" — the compiler now states which of ITS functions resolve a name at run
+     time, so the first two ARE seen and named. Cases:
+     refuse-rename-memvar-read-by-name-at-runtime (the __mvGet hole, with position),
+     refuse-rename-memvar-reached-by-macro (the macro hole),
+     rename-function-declares-its-runtime-reach (reach as a positive field).
+     Outputs captured live 2026-08-09 against those fixtures. -->
+
 Harbour lets a program build code while it runs and use it in the next instant. No
 refactoring tool controls that, and this one does not pretend to. What it does instead is
 split cleanly:
@@ -672,21 +681,49 @@ stops rather than promise a completeness it cannot have:
 
 ```
 $ hbrefactor rename d.hbp d.prg:6:12 mNova
-hbrefactor: the dynamic scope of MAIN has holes:
-  - MAIN (d.prg) uses macro '&'
+warning: MAIN (d.prg) uses macro '&'
 hbrefactor: scope with holes - code outside the static graph may see 'mOutra'; refusing
 ```
+
+**A call that reaches a name is now one of those holes.** Harbour's own runtime has
+functions that take a *name* and go find the symbol: `__mvGet` and `__mvPut` for
+variables, `Do` and `hb_ExecFromArray` for functions, `Type` and `hb_macroBlock`, which
+compile source while your program runs and can therefore reach anything. The compiler
+states which of its functions do this, so the hole is named and located:
+
+```
+$ hbrefactor rename app.hbp app.prg:5:12 xConf
+warning: SHOW (app.prg:13) calls __MVGET, which resolves a memvar name at run time
+hbrefactor: scope with holes - code outside the static graph may see 'xCfg'; refusing
+```
+
+This does not depend on how the name was written. `__mvGet( "xC" + "fg" )` has no literal
+`xCfg` anywhere in it, and the refusal is the same — because what is being read is the
+*call*, never the text of the string. What the tool deliberately does **not** claim is
+*which* name that call resolves: that is unknowable, and a guess dressed as an answer is
+exactly what this tool exists to remove.
 
 **It reports where it can see.** The `&cLayout` string above is the case where the compiler
 *can* say which memvar a string re-expands — so you are told where, and the string is never
 edited.
 
-That second case is **one form among many**. A codeblock built from text
-(`hb_macroBlock( cExpr )`), a call made by name through the runtime, a name assembled from
-pieces — none of those are seen, and none of them can be. **No output of this tool should
-be read as "your dynamic code is covered."** The promise is narrower and firmer than that:
-*verified* means verified against what compilation can see. Where compilation sees nothing,
-you get a refusal, not a guess.
+**And where it neither refuses nor can prove, it states the reach.** Renaming a *function*
+does not stop for a macro — macro evaluation is run time, and no refactoring tool controls
+it — so the machine output says so out loud instead of implying completeness by silence:
+
+```json
+"reach": { "complete": false,
+           "runtime": [ { "file": "app.prg", "line": 6, "kind": "code", "sym": null } ] }
+```
+
+`complete: true` is stated in the same way when there is nothing to declare, because an
+*absent* field is not something you would notice.
+
+**No output of this tool should be read as "your dynamic code is covered."** A `&` still
+builds code out of anything at all, and a function of your own written in C is outside
+what any compilation can see. The promise is narrower and firmer: *verified* means
+verified against what compilation can see — and where it cannot see, you get a refusal or
+a stated reach, never a guess.
 
 ### The certainty ladder
 
@@ -764,7 +801,7 @@ Every classic refactoring, re-seated on the compiler's facts; each one verified
 | `inline-local` | Fold a variable back into its uses — purity judged by the compiler's own tree. |
 | `reorder-params` | Change a function's or method's parameter order and fix every call site to match. |
 | `call-graph` | See who calls what — across modules, out to external functions; method sends shown as dynamic edges, honestly distinct from static calls. |
-| `find-dynamic-calls` | Surface strings and macros that might be dynamic function calls — an honest audit that filters out the class system's own internals. |
+| `find-dynamic-calls` | List every place the compiler proves a name is resolved at run time — a call into the runtime that takes a name, or a macro — and nothing that merely looks like one. |
 | `annotate` | Materialize implied types (`DECLARE` / `AS CLASS`), verified, with automatic rollback. |
 | `exec-registry` | Snapshot classes that only exist at runtime, by running just the registration code in a sandbox. |
 
@@ -884,6 +921,8 @@ one fact at a time:
 | `ast-22` | **provenance**: the dump names every file (and `-D`) it was made from, and the compiler answers whether it still holds — no more trusting timestamps |
 | `ast-23` | a token written by a directive points at the **application** that wrote it — the 40% of sites whose only written position is in another file |
 | `ast-24` | the module's **identity**: the symbol table and two fingerprints per function — the exact bytes, and a form immune to symbol renumbering — so proofs read compiler facts instead of parsing `.hrb` |
+| `ast-25` | a call marked when it reaches a symbol by a name that only exists at run time (`__mvGet`, `Do`, `hb_macroBlock`…), and which class of symbol it reaches |
+| `ast-26` | the same for a **message** reached by name (`__objSendMsg`) — so renaming a method states that reach instead of guessing at strings |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false

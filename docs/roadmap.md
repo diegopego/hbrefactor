@@ -1139,7 +1139,7 @@ macro provando que nada é relatado; `grep` do casamento de texto em string sem 
 fonte; cada um dos dois gatilhos sobreviventes com **código de recusa próprio** e um caso que o
 exercita, e `RSN_TEXTUAL_FORCE` sem consumidor no fonte; `make test` verde.
 
-### P36 — o acesso por NOME em runtime: mata o frágil, e o core dá o fato forte *(aberto 2026-08-09; ordem do Diego: "quero que evite tudo o que seja frágil. somente fique com solução que seja forte mesmo. mas precisa provar"; **A FAZER**)*
+### P36 — o acesso por NOME em runtime: mata o frágil, e o core dá o fato forte *(aberto 2026-08-09; ordem do Diego: "quero que evite tudo o que seja frágil. somente fique com solução que seja forte mesmo. mas precisa provar"; **✅ ENTREGUE 2026-08-09, `ast-25` — os 3 itens; 2 DECISÕES DO DIEGO ABERTAS, ver § no fim**)*
 
 **Como nasceu.** O Diego perguntou como a detecção de macro é feita e se ela pegaria
 `LOCAL cF := "Dob" + "ro"`. A resposta separou o repositório em duas metades — uma provada
@@ -1217,6 +1217,196 @@ rename de função em projeto com macro saindo `ok` **com o alcance declarado** 
 execução idêntica onde a edição é legítima; **cada caso derrubado com a resposta escrita da
 regra 2, e nenhum código de recusa novo batizado pelo contorno (regra 1)**; `make test`
 verde.
+
+#### O QUE ENTROU (2026-08-09) — e as duas coisas que a entrega DESCOBRIU
+
+**Os 4 casos nasceram VERMELHOS, cada um pelo seu motivo** (`tests-go/suite/`):
+`refuse-rename-memvar-read-by-name-at-runtime` (renomeava e o programa morria),
+`refuse-rename-memvar-reached-by-macro` (recusava, mas o furo vazava no stderr),
+`rename-memvar-beside-a-string-that-is-just-data` (exigia `--force` sobre dado puro),
+`rename-function-declares-its-runtime-reach` (não existia campo de alcance).
+
+**No core (`ast-24` → `ast-25`)**: `calls[]` ganha `dyn` — `"memvar"`, `"function"` ou
+`"code"` — quando o callee é função do core que alcança símbolo por nome de run time.
+Tabela `s_dynName` em `src/compiler/hbfunchk.c`, ao lado da de aridade da RTL, com o
+critério de derivação escrito no cabeçalho (todo `HB_FUNC` de `src/rtl`/`src/vm`
+exportado no `harbour.hbx` cujo corpo transforma caractere vindo de PARÂMETRO em símbolo
+dinâmico, memvar, mensagem ou código). **Só em chamada que o fonte escreve**: o
+`__mvPrivate()` que o `PRIVATE x` gera sai sem `dyn` (o nome ali é símbolo de
+compilação) — sem esse corte, todo projeto com um `PRIVATE` teria um furo. Contrato em
+[ast-schema.md](ast-schema.md); `make pcode-identity` **889/889, 0 divergentes**.
+
+**Na ferramenta**: as duas regras de string morreram; o `ReachFrom` fura por `dyn` (e o
+`Left( sym, 4 ) == "__MV"` que pulava os callees também morreu — era prefixo de texto
+decidindo papel); a recusa do alcance ganhou código próprio (`RSN_MV_SCOPE_HOLES`,
+`memvar-scope-not-closed`) e os furos viraram `diagnostics[]` **com posição**; e o
+`result` ganhou **`reach: { complete, runtime[] }`** (rename de função e de memvar), no
+padrão do `scope` da P17 — declara, nunca recusa.
+
+**DESCOBERTA 1 — o furo vazava para o stderr, e ninguém tinha percebido.** A recusa por
+alcance imprimia *quais* eram os furos com `OutErr`, inclusive sob `--json`: quem lia o
+stdout — o normal num pipe — recebia `scope with holes` sem um único hole, e `reason:
+"unclassified"`. É o mesmo defeito que a fase A existe para matar, dentro do caminho que
+a P36 veio consertar. Achado porque o harness Go **reprova stderr não-vazio**, não porque
+alguém olhou.
+
+**DESCOBERTA 2 — a família frágil é MAIOR que as duas gêmeas** *(§1.7: achado é achado de
+CLASSE)*. Varrido o fonte inteiro por token de string (type 41) cujo TEXTO é comparado a
+um nome de símbolo, sobram **cinco**, e nenhum estava na spec:
+
+| sítio | o que faz hoje | polaridade do erro |
+|---|---|---|
+| `InlineLocal` | **recusa dura**, sem `--force` | **medido**: `"nBase" + "="` recusa; `"nBa" + "se" + "="` passa. E o que ela alega proteger — macro nomeando um LOCAL — a P22 mediu como **impossível** |
+| `RenameMethod` | aviso + `--force` | gêmea exata da que morreu no memvar |
+| `ReorderParams` | aviso + `--force` | idem |
+| `ExtractFunction` | só relata (`string-spells-new-name`), e **só no ramo de extrair para MÉTODO** — medido: extrair para função não emite nada | relato, não decide fluxo |
+| `FindDynamicCalls` | **é o verbo inteiro** | o produto do comando É a regra frágil |
+
+As três primeiras têm substituto pronto: o mesmo `dyn`, nas classes `message` e `code`
+que a tabela do core já sabe derivar e que ficaram de fora por não terem consumidor
+(`adr-003`). O `FindDynamicCalls` é decisão de produto — é o teste da fase L virado
+contra ele: um comando cujo produto é heurística. **Nada disso entrou nesta fatia** (a
+spec dizia dois sítios), e nada disso se decide sem o Diego.
+
+#### DECIDIDO PELO DIEGO (2026-08-09), com o código de cada caso na mesa
+
+**A palavra do furo de macro FICA como está** — frase antiga (`run.sh:950` segue
+verde) e a posição pelo `location` do diagnostic, que é o canal de máquina.
+
+**Os cinco sítios morrem, e a régua é uma só** *(Diego, vendo os cinco fixtures
+rodando)*: **"eu discordo desses alertas sobre possible de qualquer natureza em
+string. só quero alertas quando puder provar, através de fatos usando o core do
+harbour. trazer fragilidades para esta ferramenta está fora do escopo. explorar e
+ver se é possível que o core passe a trazer informações está dentro do escopo"** — e,
+para cada um dos outros quatro: *"se for possível rastrear via harbour core com
+certeza, ok, senão nem tenta. heurística é fora do escopo."*
+
+E a correção dele sobre o caso 1, que é o enquadramento certo: **`"nBase"` é outra
+coisa que `hb_ntos( nBase * 2 )`** — a string de dado não se compara com o stringify
+da diretiva, que é o único dos dois que o compilador liga ao identificador. Isso vira
+a fatia abaixo.
+
+### P36b — a família frágil inteira, e nada entra no lugar sem fato do core *(aberta e **✅ ENTREGUE 2026-08-09**, `ast-26`; decisão do Diego com os cinco fixtures na mesa)*
+
+**Escopo, sítio a sítio** (todos medidos na P36, com fixture `.prg` que compila limpo):
+
+1. **`InlineLocal`** — a recusa passa a exigir o rastro: `hb_HHasKey( hTok, "from" )`.
+   Fica de pé a recusa do **stringify de diretiva** (o token nasce do identificador, e
+   inlinar deixaria a string nomeando uma variável morta); cai a comparação de texto
+   com string do usuário. **Nada entra no lugar** — um LOCAL não é alcançável por nome
+   em run time (medido na P22), então não há fato a buscar. **Zero drift** (o caso 36
+   exercita a metade que sobrevive).
+2. **`ReorderParams`** — sai o aviso por texto; entra o `dyn` (classes `function` e
+   `code`, que já existem no `ast-25`). Nenhum teste o pina. Medido: o verbo avisava
+   da linha do rótulo `"Soma"` e ignorava o `Do( cF, 2, 3 )` da linha seguinte, que o
+   dump já marca.
+3. **`RenameMethod`** — sai o aviso por texto. Entra a classe **`message`** no
+   `s_dynName` do core (`__objSendMsg`, `__objHasMsg`, `__objHasMsgAssigned`,
+   `__clsMsgType`) → **`ast-26`**. **NÃO entram** `__clsAddMsg`/`__clsModMsg`/
+   `__clsDelMsg`: o `hbclass.ch` os gera por membro, e marcá-los poria sítio de run
+   time em todo projeto com classe. O veredito **declara** (`reach`), não recusa — a
+   mesma escolha do rename de função. **Drift a resolver: caso 47**, 4 asserts do
+   portão de `--force`.
+4. **`ExtractFunction`** — o relato `string-spells-new-name` sai. Medido: ele só
+   existe no ramo de extrair para MÉTODO, e não há fato do core atrás dele.
+5. **`FindDynamicCalls`** — deixa de ler string e passa a responder pelo fato: os
+   `calls[]` com `dyn` mais os sítios de macro (`usesMacro` + token type 22, que é
+   fato e já filtra o `&` da expansão do `hbclass.ch`). Medido no fixture de 5 acessos:
+   hoje **1 falso positivo (um rótulo impresso) + 1 acerto, e três acessos reais
+   invisíveis**; pelo fato, **4 acertos, 0 falsos**. Casos 22 e 58 reescritos; linha do
+   manual e da página ajustadas (a descrição promete "strings and macros" e passa a
+   prometer o que o compilador prova).
+
+#### O QUE ENTROU
+
+Os cinco sítios, na ordem em que foram feitos, com o que cada um passou a fazer:
+
+| sítio | antes | agora |
+|---|---|---|
+| `InlineLocal` | recusava por texto igual (e `"nBa" + "se"` passava) | recusa **só** com o rastro `from`/stringify; código próprio `RSN_INLINE_STRINGIFIED` |
+| `ReorderParams` | avisava do rótulo, calava sobre a chamada real | avisa da chamada com `dyn`; `--force` vira consentimento a risco PROVADO (`RSN_RUNTIME_NAME_FORCE`) |
+| `ExtractFunction` | relatava string que soletra o nome novo | nada — não havia fato atrás |
+| `RenameMethod` | `--force` por causa de rótulo | **declara** o `reach` (classe `message`, `ast-26`); `--force` continua aceito e sem efeito neste caminho |
+| `FindDynamicCalls` | 1 falso + 3 acessos reais invisíveis | 4 achados de fato, 0 falsos |
+
+**A `__objHasMsg` entrou na tabela do core e saiu na MESMA sessão**, e isso é o
+registro que impede a próxima pessoa de repetir: o `hbclass.ch` a emite na criação
+da classe (`__objHasMsg( oInstance, "InitClass" )`), então todo `ENDCLASS` passou a
+relatar uma porta de run time na linha da própria declaração. Quem mostrou foi a
+fixture do caso novo, não a leitura do `.ch` (§1.7.3).
+
+**Drift resolvido, os dois na decisão do Diego**: caso 22 (o `envrow` afirmava
+`kind=string-names-function`, que era a heurística) e caso 47 (4 asserts do portão
+de `--force` no método). Os dois reescritos afirmando o contrato novo, com o porquê
+no próprio arquivo. `make test` **1006/0**; `make pcode-identity` **889/889**.
+
+**Critério de pronto (mecânico)**: `grep` de `"type" ] == 41` comparado a nome de
+símbolo **sem resultado** no fonte (a régua da família inteira, não de dois sítios);
+caso pinando o inline-local que passa a inlinar ao lado de string de dado E o que
+segue recusando pelo `from`; caso do `reorder-params` que ignora o rótulo e enxerga o
+`Do()`; caso do `rename-method` com `__objSendMsg` de nome MONTADO aparecendo no
+`reach` (nasce vermelho: hoje é invisível); `find-dynamic-calls` com os quatro
+achados de fato e nenhum rótulo; caso 47 re-baselinado **com o drift apresentado**;
+`make test` verde; `make pcode-identity` 889/889.
+
+### P36c — a flag `--force` morre, e cada alimentador vira o que ele é *(ordem do Diego, 2026-08-09: "concordo em matar a flag"; **✅ ENTREGUE 2026-08-10**)*
+
+**A tese do Diego, e ela se confirmou medindo**: *"este flag não deveria existir. a
+existência dele parece apontar para fragilidade da ferramenta."* Levantados os cinco
+alimentadores, nenhum era "risco a consentir":
+
+| alimentador | virou | por quê (medido) |
+|---|---|---|
+| nome novo é função do runtime | **diagnostic** | o caso perigoso (o projeto CHAMA a função) já tem recusa dura própria — medido: `'Len' is already called ... would hijack those calls` |
+| nome novo é LOCAL/STATIC homônima | **removido** | o aviso era **FALSO**: com `LOCAL nItens` e a função renomeada para `nItens`, o programa imprime 43 antes e depois e o pcode sai byte-idêntico. O Harbour decide chamada por PARÊNTESE |
+| linha `DYNAMIC` no `.hbx` | **diagnostic** | arquivo GERADO pelo hbmk2; o conserto é `-hbx=`, que é do build |
+| string que macro-expande o memvar | **recusa** (`memvar-named-inside-a-macro-string`) | quebra PROVADA (`macrovars`, ast-18) sobre dado que a ferramenta não edita |
+| chamada `dyn` no reorder-params | **declaração** | ver P36d |
+
+**Dois achados que só a medição dá:** o aviso de sombra léxica era falso havia
+tempo (e ninguém tinha rodado o programa para conferir), e o balde `aWarn` do
+memvar misturava **duas coisas de naturezas opostas** — a quebra provada e uma
+nota sobre criação via macro que a própria ferramenta acabara de provar estar
+FORA do alcance. Separados.
+
+**A régua que fica, e é uma linha:** a ferramenta **recusa quando prova que a
+edição quebra algo**, e no resto **aplica e declara o que não pôde ver**. Não há
+terceiro estado para o usuário destravar. Digitar `--force` recebe recusa
+explicando isso (`flag-no-longer-exists`) — aceitar calado um pedido que não
+existe mais é entregar comportamento diferente do pedido.
+
+**Drift resolvido**: casos 27, 29 e 45 do `run.sh` re-baselinados; o caso Go
+`refuse-new-function-name-shadows-runtime` virou
+`new-function-name-shadowing-runtime-is-a-note` (o que ele provava — que o fato
+vem do `harbour.hbx` do PROJETO, e não do que a ferramenta carrega dentro de si,
+via `hb_MilliSeconds` — está preservado, agora sobre `--dry-run`). A **extensão
+VSCode** perdeu o modal "Proceed (--force)?", que era o último ponto onde ela
+decidia fluxo casando prosa em inglês. `make test` 1005/0.
+
+### P36d — o `reach` do reorder-params tem escopo errado *(aberta 2026-08-10; **A FAZER**)*
+
+**O defeito, achado por pergunta do Diego** (*"o reorder que é recusado é quando
+alguém tenta reorder em cima da chamada do()? ou da função invocada pelo do()?"*).
+Nenhum dos dois: o verbo varria **o projeto inteiro** atrás de qualquer chamada com
+`dyn` e parava. Medido: `Do( cOutra )` com `cOutra := "Relatorio"` barrava o reorder
+de `Soma`, com a qual não tem relação nenhuma.
+
+**Entregue junto com a P36c**: o portão virou declaração, então o verbo não para
+mais. **O que fica ABERTO** é o escopo do que ele declara: hoje ele lista toda
+chamada dinâmica do projeto, o que é ruído em projeto grande.
+
+**A pergunta que abre a fatia, e é de core (§1.1)**: quando o argumento do nome é
+**constante de compilação** (`Do( "Soma", 2, 3 )`), o compilador SABE o nome — ele
+está na árvore, e o `ast-25` já publica a chamada. Se o dump publicar também o nome
+resolvido quando ele é constante, o verbo passa a distinguir três situações em vez
+de uma: *nomeia esta função* (relata/recusa), *nomeia outra* (silêncio), *não dá para
+saber* (declara). **Sondar antes de projetar**: medir quantos `Do(...)`/`__mvGet(...)`
+do corpus têm argumento constante — se for a maioria, a fatia vale; se for resíduo,
+o escopo certo é outro.
+
+**Critério de pronto (mecânico)**: tabela de sondas com a medição do corpus; e, se a
+fatia seguir, caso pinando que um `Do()` que nomeia outra função **não** aparece no
+`reach` do reorder daquela, e que um que nomeia a própria aparece.
 
 ### P33 — LSP como superfície de entrega *(aberto 2026-08-08; decisão do Diego: "concordo com: LSP como superfície de entrega"; **A FAZER**)*
 

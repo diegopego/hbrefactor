@@ -1,0 +1,71 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:10:10",
+   "Duplica",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 2 edit(s); symbol tables renamed as expected, pcode byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "function",
+   "old": "Dobro",
+   "new": "Duplica",
+   "editCount": 2,
+   "proof": "pcode-identical",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 20
+      },
+      "end": {
+       "line": 4,
+       "character": 25
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 9,
+       "character": 9
+      },
+      "end": {
+       "line": 9,
+       "character": 14
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": true,
+    "unseen": []
+   },
+   "reach": {
+    "complete": false,
+    "runtime": [
+     {
+      "file": "app.prg",
+      "line": 6,
+      "kind": "code",
+      "sym": null
+     }
+    ]
+   }
+  },
+  "edits": []
+ }
+]

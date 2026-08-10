@@ -1,4 +1,4 @@
-# Schema `ast-18` — o dump AST do compilador (spec)
+# Schema `ast-26` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
@@ -686,7 +686,11 @@ função de implementação gerada pelo hbclass.ch (`<CLASSE>_<MÉTODO>`).
       "access": "read"|"write"|"ref"|"use",
       "block": false, // true = dentro de corpo de codeblock
       "filewide": true /* só quando static file-wide */ } ],
-  "calls":  [ { "sym": "DUPLA", "line": 10, "col": 19, "block": false } ],
+  "calls":  [ { "sym": "DUPLA", "line": 10, "col": 19, "block": false },
+              // ast-25: OPCIONAL - este callee do core alcança um símbolo por
+              // um NOME que só existe em run time (ver § abaixo)
+              { "sym": "__MVGET", "line": 13, "col": 20,
+                "dyn": "memvar"|"function"|"code", "block": false } ],
   "sends":  [ { "sym": "EVAL",  "line": 10, "col": 6,  "block": false } ],
   "blocks": [   // eventos de estrutura de controle, do próprio parser
     { "kind": "if"|"while"|"for"|"case"|"switch"|"sequence",
@@ -789,6 +793,57 @@ Semânticas importantes:
   `block:true`; captura de local externa = `detached`).
 - PRIVATE/PUBLIC com init aparecem em occurrences como `memvar` `write`
   (hook RTVar) + call `__MVPRIVATE`/`__MVPUBLIC`.
+
+### `dyn` em `calls[]` — a chamada que resolve NOME em run time (ast-25; classe `message` no ast-26, P36/P36b)
+
+**Chave OPCIONAL** (`hb_HGetDef`), presente só quando o callee é uma função do
+core que alcança um símbolo por um nome que **não existe em tempo de
+compilação**. O valor diz QUE CLASSE de símbolo:
+
+| `dyn` | o que a chamada alcança | exemplos |
+|---|---|---|
+| `memvar` | um memvar pelo nome | `__mvGet`, `__mvPut`, `__mvPublic`, `MemVarBlock` |
+| `function` | uma função pelo nome | `Do`, `hb_ExecFromArray`, `hb_threadStart` |
+| `code` | **qualquer coisa** — compila fonte em run time | `Type`, `hb_macroBlock` |
+| `message` | uma mensagem pelo nome *(ast-26)* | `__objSendMsg`, `__clsMsgType` |
+
+**A tabela é do CORE**, em `src/compiler/hbfunchk.c` (`s_dynName`), ao lado da
+que o compilador já mantinha sobre a aridade da RTL. Quem sabe o que uma função
+da RTL faz é a RTL — a mesma lista dentro do hbrefactor seria conhecimento
+NOSSO sobre o core, que é a heurística que o §1.7.5 do CLAUDE.md proíbe. O
+cabeçalho lá registra **como a lista foi derivada**, para poder ser re-derivada:
+todo `HB_FUNC` de `src/rtl`/`src/vm` exportado no `harbour.hbx` cujo corpo
+transforma um caractere vindo de PARÂMETRO em símbolo dinâmico, memvar,
+mensagem ou código compilado.
+
+**Só em chamada que o FONTE escreve.** `PRIVATE x` compila para um
+`__mvPrivate()` próprio, e ali o nome é símbolo de compilação — já está em
+`declarations[]`. Essa chamada gerada sai **sem `dyn`** (e sem `col`, pelo mesmo
+motivo: não há token escrito). Marcá-la anunciaria uma porta que não existe, e
+todo projeto com um `PRIVATE` teria um furo.
+
+**O que o consumidor deve fazer com o fato:** a chamada existe e a ferramenta
+**não sabe qual nome ela resolve** — ler o texto do argumento é justamente a
+adivinhação que este canal substitui (com `"xC" + "fg"` não há literal nenhum
+para ler). Logo o fato serve para **declarar alcance** ou **recusar**, nunca
+para decidir que aquele sítio nomeia este símbolo.
+
+**O que fica FORA, e por quê** (registrado para não se re-derivar): campo de área
+de trabalho (`FieldBlock`, `FieldWBlock`) — sem consumidor hoje, e `adr-003` diz
+que fato sem consumidor é fato local.
+
+E três da própria família de mensagem, por uma razão mais forte que essa: o
+`hbclass.ch` os GERA. `__clsAddMsg`/`__clsModMsg`/`__clsDelMsg` saem por membro de
+classe, com o nome que o pp stringificou do próprio fonte; o `__clsInstSuper` sai
+com símbolo de compilação (`@<ClassFuncName>()`). Marcar qualquer um poria porta de
+run time em todo programa que declara classe, todas falsas.
+
+> **O `__objHasMsg` esteve na tabela por UMA medição e voltou na hora** — e fica
+> nomeado aqui porque sem isso a ausência dele parece esquecimento. O
+> `hbclass.ch` emite `__objHasMsg( oInstance, "InitClass" )` na criação da
+> classe, então todo `ENDCLASS` do mundo passou a relatar uma porta na linha da
+> própria declaração. Foi a fixture do caso de rename de método que mostrou —
+> não a leitura do `.ch`. *(§1.7.3: o dump manda, não a dedução.)*
 
 ## `symbols[]` + hashes de pcode por função (ast-24, P32 fatia 0)
 

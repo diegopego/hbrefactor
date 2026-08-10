@@ -1496,8 +1496,7 @@ app.prg:5:13: in rule match (#xuncommand CONFERE)  | #xuncommand CONFERE &lt;x&g
   <div class="code term ex-run"><button class="copy" type="button">Copy</button>
 <pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:5:12 cModelo
 <span class="warn">warning: app.prg:7: string contains &#x27;&amp;cLayout&#x27; - macro-expanded at RUN TIME to the value of the memvar it names, so its behaviour follows this rename; the string is data and will NOT be edited</span>
-<span class="bad">hbrefactor: the dynamic scope of MAIN has holes:</span>
-  - MAIN (app.prg) uses macro &#x27;&amp;&#x27;
+<span class="warn">warning: MAIN (app.prg) uses macro &#x27;&amp;&#x27;</span>
 <span class="bad">hbrefactor: scope with holes - code outside the static graph may see &#x27;cLayout&#x27;; refusing</span></code></pre></div>
   <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
 </div>
@@ -1584,7 +1583,9 @@ app.prg:11: read (local) in MAIN  | ? cSaldo
     <p>Line 5 of that file reads <span class="mono">? &quot;cSaldo&quot;</span> — a string whose contents happen to equal the name — and it is <strong>not</strong> in the list. Nothing about it is a reference: <span class="mono">cSaldo</span> is a local, and a local cannot be reached by name while your program runs. Comparing a string's text against the name you asked about, to decide what that string <em>is</em>, is the one thing this tool must never do.</p>
     <h3>Where the line actually sits</h3>
     <p>Harbour lets a program build code while it runs and use it in the next instant. No refactoring tool controls that, and this one does not pretend to. It splits cleanly instead: it <b class="emph">refuses where it cannot see</b> — a macro whose target is only known at run time is a hole in the reachable scope, and the command stops rather than promise a completeness it cannot have — and it <b class="emph">reports where it can see</b>, as with the <span class="mono">&amp;cLayout</span> string above, which the compiler itself resolves.</p>
-    <p>That second case is <strong>one form among many</strong>. A codeblock built from text, a call made by name through the runtime, a name assembled from pieces — none of those are seen, and none of them can be. <strong>No output of this tool should be read as “your dynamic code is covered.”</strong> The promise is narrower and firmer: <em>verified</em> means verified against what compilation can see. Where compilation sees nothing, you get a refusal, not a guess.</p>
+    <p><b class="emph">A call that reaches a name is one of those holes.</b> Harbour's own runtime has functions that take a <em>name</em> and go find the symbol — <span class="mono">__mvGet</span> and <span class="mono">__mvPut</span> for variables, <span class="mono">Do</span> for functions, <span class="mono">Type</span> and <span class="mono">hb_macroBlock</span>, which compile source while your program runs and can therefore reach anything. The compiler states which of its functions do this, so the refusal names and locates the call: <span class="mono">SHOW (app.prg:13) calls __MVGET, which resolves a memvar name at run time</span>. It does not depend on how the name was written — <span class="mono">__mvGet( "xC" + "fg" )</span> has no literal <span class="mono">xCfg</span> in it and refuses just the same, because what is read is the <em>call</em>, never the text of the string.</p>
+    <p><b class="emph">And where it neither refuses nor can prove, it states the reach.</b> Renaming a function does not stop for a macro — macro evaluation is run time, and no refactoring tool controls it — so the machine output carries a <span class="mono">reach</span> field naming every site that resolves names at run time, and says <span class="mono">complete: true</span> just as explicitly when there are none. An <em>absent</em> field is not something you would notice.</p>
+    <p><strong>No output of this tool should be read as “your dynamic code is covered.”</strong> A <span class="mono">&amp;</span> still builds code out of anything at all, and a function of your own written in C is outside what any compilation can see. The promise is narrower and firmer: <em>verified</em> means verified against what compilation can see — and where it cannot see, you get a refusal or a stated reach, never a guess.</p>
   </div>
 </section>
 
@@ -1658,7 +1659,7 @@ Eval( bPaga )
       <div class="cmd"><span class="nm">inline-local</span><p>Fold a variable back into its uses — purity judged by the compiler's own tree, not a guess.</p></div>
       <div class="cmd"><span class="nm">reorder-params</span><p>Change a function's or method's parameter order and fix every call site to match, behavior-preserving.</p></div>
       <div class="cmd"><span class="nm">call-graph</span><p>See who calls what — across modules and out to external functions; method sends shown as dynamic edges, honestly distinct from static calls.</p></div>
-      <div class="cmd"><span class="nm">find-dynamic-calls</span><p>Surface strings and macros that might be dynamic function calls — an honest audit that filters out the class system's own internals.</p></div>
+      <div class="cmd"><span class="nm">find-dynamic-calls</span><p>List every place the compiler proves a name is resolved at run time — a call into the runtime that takes a name, or a macro — and nothing that merely looks like one.</p></div>
       <div class="cmd"><span class="nm">annotate</span><p>Materialize implied types (<span class="mono">DECLARE</span> / <span class="mono">AS CLASS</span>), verified, with automatic rollback.</p></div>
       <div class="cmd"><span class="nm">exec-registry</span><p>Snapshot classes that only exist at runtime, by running just the registration code in a sandbox.</p></div>
     </div>

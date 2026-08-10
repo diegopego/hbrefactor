@@ -1,0 +1,58 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "inline-local",
+  "argv": [
+   "inline-local",
+   "app.hbp",
+   "app.prg",
+   "Main",
+   "nBase",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 1 use(s) replaced; symbols intact; run your test suite to confirm behaviour",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "name": "nBase",
+   "expr": "7",
+   "function": "MAIN",
+   "useCount": 1,
+   "declRemoved": 3,
+   "proof": "symbols-preserved",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 0
+      },
+      "end": {
+       "line": 4,
+       "character": 0
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 36
+      },
+      "end": {
+       "line": 4,
+       "character": 41
+      }
+     }
+    }
+   ]
+  },
+  "edits": []
+ }
+]

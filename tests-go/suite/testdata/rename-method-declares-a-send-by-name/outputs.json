@@ -1,0 +1,80 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:5:11",
+   "Exibe",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 2 edit(s); message and generated function renamed, other modules byte-identical",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "method",
+   "old": "Mostra",
+   "new": "Exibe",
+   "editCount": 2,
+   "proof": "symbols-renamed",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 4,
+       "character": 10
+      },
+      "end": {
+       "line": 4,
+       "character": 16
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 7
+      },
+      "end": {
+       "line": 7,
+       "character": 13
+      }
+     }
+    }
+   ],
+   "reach": {
+    "complete": false,
+    "runtime": [
+     {
+      "file": "app.prg",
+      "line": 21,
+      "kind": "message",
+      "sym": "__OBJSENDMSG"
+     }
+    ]
+   },
+   "derived": [
+    {
+     "from": "CAIXA_MOSTRA",
+     "to": "CAIXA_EXIBE"
+    }
+   ],
+   "derivedStrings": [
+    {
+     "from": "Mostra",
+     "to": "Exibe",
+     "file": "app.prg"
+    }
+   ]
+  },
+  "edits": []
+ }
+]
