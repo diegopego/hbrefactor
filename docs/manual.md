@@ -362,16 +362,32 @@ concerned (`nSaldo` and `_nSaldo`) — the tool renames **both**, and proves it 
 symbol table before keeping a single edit.
 
 And the guard. If **two classes** in your project happen to have a member of the same
-name, the rename is genuinely ambiguous — `:nSaldo` is dynamic dispatch, and no fact says
-which class you meant. So it refuses, and names the other class:
+name, what decides is whether anything says which class each `:nSaldo` reaches. Where a
+fact does — a receiver declared `AS CLASS`, or a class whose constructor the compiler
+knows the return type of — the rename acts on that fact, site by site, and leaves the
+other class alone. Where nothing does, the send really is ambiguous, and it refuses naming
+both the other class and the send it could not place:
 
 ```
 $ hbrefactor rename app.hbp c1.prg:15:8 nX
-hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing
+hbrefactor: 'nSaldo' is also a member of: POUPANCA (c2.prg), and the send at c1.prg:9 does not resolve to a receiver (possible send (dynamic dispatch, receiver unknown)) - the rename is ambiguous; refusing
 ```
 
-That's the same rule that has always governed homonymous *methods* — data members simply
-inherit it.
+That's the same rule that governs homonymous *methods* — data members simply inherit it.
+
+When it refuses for that reason, what is missing is a *declaration*, and `annotate --apply`
+is the verb that writes one — see
+[Spotlight: `annotate`](#spotlight-annotate--materialize-the-facts-your-code-already-implies).
+After it succeeds, the same rename goes through; mind that `annotate` inserts lines, so
+point at the method again rather than reusing a `file:line:col` you noted before.
+
+One known gap, so you are not surprised by it: if the class is defined in the **same file
+and below** the function that uses the object, `annotate --apply` currently refuses and
+rolls back (`Class ... not known in declaration of ...`). Move the class above, or keep it
+in another file of the project — both work today. **Nothing else about your layout
+matters**: the order of files in your `.hbp` does not, and neither does the class living in
+another module. And this affects `annotate` only — `usages` and `rename` read your code the
+same way whatever the order.
 
 ### Same name, different owner — it only edits yours
 

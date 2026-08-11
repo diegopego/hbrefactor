@@ -1,6 +1,6 @@
-<!-- changelog-baseline: hbrefactor@29b3665 -->
+<!-- changelog-baseline: hbrefactor@c14acfa -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
-     To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
+     To resume:  git log c14acfa..HEAD   (see § Maintaining this file, at the end). -->
 
 # Changelog
 
@@ -19,6 +19,70 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-11 — two classes with the same method name no longer stop the rename
+
+If two of your classes answered a method of the same name, renaming either one was
+refused outright: *"'Print' is also a member of: MYCLASS2 — a send is dynamic
+dispatch, the rename is ambiguous"*. Now it looks at each send and renames the ones
+that reach the class you pointed at.
+
+```harbour
+LOCAL c1 AS CLASS MyClass1
+LOCAL c2 AS CLASS MyClass2
+...
+c1:Print()      // both classes have METHOD Print()
+c2:Print()
+```
+
+```
+$ hbrefactor rename app.hbp app.prg:12:8 Show
+rename-method: MYCLASS1:Print -> Show
+  app.prg:6:11
+  app.prg:12:8
+  app.prg:36:7
+verified: 3 edit(s); message and generated function renamed for MYCLASS1;
+          1 send proven to dispatch elsewhere left untouched
+```
+
+`c1:Print()` became `c1:Show()`. `c2:Print()` was not touched, and neither was
+anything belonging to `MyClass2` — the tool proved that send goes somewhere else
+before leaving it alone. The same applies to `VAR`/`DATA` members, where reading and
+writing are two different messages and both move together.
+
+**Why this was refused before, and what changed.** Nothing new is being guessed. In
+the same project and the same run, `usages MyClass1:Print` already told you which send
+reached which class — `confirmed send (receiver declared AS CLASS MYCLASS1)` on one
+line and `excluded send ... (dispatches to MYCLASS2:PRINT)` on the next. The query
+asked; the rename never did. Now it asks, using the same answers.
+
+**When it still refuses — and it should.** If nothing in your code says what a
+receiver holds, then two classes answering one name really is ambiguous, and it stops:
+
+```
+$ hbrefactor rename app.hbp app.prg:14:8 Show
+hbrefactor: 'Print' is also a member of: MYCLASS2 (app.prg), and the send at
+app.prg:31 does not resolve to a receiver (possible send (dynamic dispatch, receiver
+unknown)) - the rename is ambiguous; refusing
+```
+
+It now names the send that blocked it, instead of only naming the other class. Your
+sources come back byte-for-byte, as with every refusal.
+
+**How often will this help you?** Measured on Harbour's own source, so you can
+calibrate: of 1816 method names, **408 (22%) live in more than one class** — so the
+old refusal was common. But what makes the receiver knowable is rarer: only **31 of
+285 classes (11%)** declare a `CONSTRUCTOR`, which is one of the two ways the compiler
+learns what an object is. The other is you saying so — `LOCAL o AS CLASS Conta` — and
+`annotate --apply` can write those for you, proving your program is unchanged before
+it keeps a line. Expect this to work where types are declared, and to keep refusing
+where they are not.
+
+**Two limits worth knowing.** If two sends of the *same* message with *different*
+receivers are written on one line — `f( oC:nSaldo, oP:nSaldo )` — the tool cannot yet
+tell them apart and refuses; splitting the line resolves it. And `annotate --apply`
+still refuses when the class is defined in the same file *below* the function using
+it; the class in another file, or above, both work.
 
 ## 2026-08-11 — the audit: which of your modules can be refactored on proof
 

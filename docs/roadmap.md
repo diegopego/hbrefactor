@@ -599,6 +599,56 @@ Plano, usos candidatos e limites: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-
 > `'Print' is also a member of: MYCLASS2 - a send is dynamic dispatch, the rename is
 > ambiguous; refusing`.
 >
+> ### ⚠️ CORREÇÃO ao (a), medida em 2026-08-11 ao executar o passo 1
+>
+> **A fixture acima não tem `METHOD New() CONSTRUCTOR`, e é SÓ por isso que o (a) dá
+> `receiver unknown`.** Acrescente o construtor às duas classes e o MESMO
+> `LOCAL c1 := MyClass1():New()` — sem nenhum `AS CLASS` — passa a sair
+> `confirmed send (receiver class MYCLASS1 via declared types)` /
+> `excluded send within the declared class graph`. O canal é declarado (o `CONSTRUCTOR`
+> do hbclass diz o que a função de classe devolve), não inferência: o `New()` da fixture
+> do (a) é o HERDADO, e esse ninguém declarou.
+>
+> **O que isto muda no plano:** o **E1** (`FUNCTION F() AS CLASS X`) NÃO é o que faz a
+> notação do Diego funcionar — ela já funciona em toda classe que declara construtor.
+> *(Cadáver do §1.7.3: a linha (a) foi escrita a partir de UMA fixture e lida como
+> propriedade da notação.)*
+>
+> ### ⚠️⚠️ CORREÇÃO DA CORREÇÃO, MEDIDA no corpus no mesmo dia (§1.7.2)
+>
+> **Eu escrevi acima "que é como código real escreve classe" — e isso era PALPITE.**
+> O Diego perguntou se ia funcionar, e a pergunta cobrou a medição que eu devia ter feito
+> antes de escrever a frase. Corpus = os 1037 `.prg` do core *(contagem de texto no fonte,
+> aproximada — serve para dimensionar, não para decidir)*:
+>
+> | | |
+> |---|---|
+> | classes declaradas | **285** |
+> | …com `CONSTRUCTOR` | **31 (≈11%)** |
+> | nomes de método declarados | **1816** |
+> | …em MAIS de uma classe (o gatilho da recusa) | **408 (≈22%)** |
+>
+> **Logo: o gatilho é COMUM e o canal do construtor é RARO.** Em código como o do core, a
+> maioria dos renames de método homônimo continua recusando — não por falta de capacidade,
+> por falta de receptor declarado. **O E1 volta a valer o que valia**: classe sem
+> construtor e fábrica são a MAIORIA do corpus, não o resto.
+>
+> **A saída CANDIDATA já existe no produto:** o **`annotate --apply`** escreve as
+> declarações que faltam e prova o que escreveu. Medido na fixture do
+> `refuse-rename-method-homonym-receiver-unknown` (classes escritas ANTES do `Main`):
+> `4 declaration(s) + 2 AS CLASS annotation(s)`, `.hrb` byte-idêntico, e ele escreve
+> `LOCAL c1 AS CLASS MYCLASS1 := MyClass1():New()` — depois disso o MESMO rename que
+> recusava aplica 3 edições com `c2:Print()` intacto.
+>
+> **Mas ela tem um buraco ESTREITO**: quando a classe está no MESMO módulo e **abaixo** da
+> função que a usa (a ordem do nosso `fixdata`), o `annotate --apply` falha com `W0025` e
+> faz rollback. Fora disso — outro módulo, qualquer ordem no `.hbp`, ou classe acima — ele
+> passa. Matriz medida e a causa localizada na **P41**, abaixo.
+> *(Duas frases minhas caíram aqui, em sequência: "o fluxo é annotate → rename" caiu ao
+> medir no fixture que o MANUAL descreve; e "é ordem de declaração" caiu quando o Diego
+> perguntou se isso obrigava classes primeiro no projeto — não obriga, e só o `annotate` é
+> afetado. §1.8, e o padrão é sempre o mesmo: eu generalizo de UMA fixture.)*
+>
 > ### O ACHADO NOVO, e ele é o mais barato de consertar
 >
 > **O `usages` pergunta o receptor e o `rename` não.** Mesma execução, mesmo projeto,
@@ -606,17 +656,221 @@ Plano, usos candidatos e limites: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-
 > bloco por homonímia. Não falta FATO — falta o rename consultar o que já existe.
 >
 > **A ordem que isto sugere** (e cada passo é entregável sozinho):
-> 1. **o rename consulta os mesmos fatos do `usages`** — recusa só quando os envios
->    ficam mesmo ambíguos, e renomeia quando o alcance declarado fecha;
-> 2. **o cursor deixa de mandar consulta nua** (a Fase 2 desta fase);
-> 3. **E1** (`FUNCTION F() AS CLASS X` no core) — é o que faz a notação do Diego,
->    `LOCAL c1 := MyClass1():New()`, funcionar SEM `AS CLASS`: a função de classe
->    passa a declarar o que devolve, e o tipo vira fato por declaração. O roadmap já
->    chamava o E1 de "a maior alavanca do sistema"; este exemplo é o caso dele.
+> 1. ✅ **ENTREGUE (2026-08-11)** — **o rename consulta os mesmos fatos do `usages`**:
+>    recusa só quando os envios ficam mesmo ambíguos, e renomeia quando o alcance
+>    declarado fecha. Detalhe abaixo, em **P39**;
+> 2. **o cursor deixa de mandar consulta nua** (a Fase 2 desta fase) — e o passo 1
+>    deixou o pedido dele MAIS preciso: hoje, cursor no send `c2:Print()` resolve para
+>    `MYCLASS1:Print` (o "primeiro dono"), e o rename só não age sobre isso porque
+>    passou a exigir que a classe seja FATO. Fechado o cursor, a mesma capacidade do
+>    passo 1 passa a valer a partir do send;
+> 3. **E1** (`FUNCTION F() AS CLASS X` no core) — NÃO é o que faz
+>    `LOCAL c1 := MyClass1():New()` funcionar (o `CONSTRUCTOR` já faz), mas o construtor
+>    é **≈11% das classes do corpus**: o E1 é o que fecha os outros **89%** e a
+>    **fábrica** (`oX := AlgumaFabrica()`). Continua sendo a maior alavanca — a medição
+>    acima CONFIRMA isso, não reduz.
+> 4. **P41** — pinar o encadeamento `annotate --apply` → `rename` num caso, porque é o
+>    que entrega a P39 ao código legado HOJE, sem core novo.
 >
 > **Critério de aceitação, nas palavras do Diego**: a partir de `c1:Print()` ir à
 > definição de `METHOD Print() CLASS MyClass1`; `find all usages` achar `c1:Print()`
 > e **não** `c2:Print()`; e o rename tocar um e não o outro.
+> **O terceiro está ENTREGUE** (P39); o primeiro é o passo 2 (cursor); o segundo já
+> funcionava.
+
+### P39 — o rename de método pergunta o receptor ✅ *(P14 passo 1; ENTREGUE 2026-08-11)*
+
+**Escopo** — homonímia entre classes deixa de ser, por si, ambiguidade. Quando a classe
+do alvo é FATO (o cursor sentou numa declaração ou implementação), o `rename` classifica
+**site a site** com as mesmas funções do `usages` e move só o que um fato coloca na
+classe pedida:
+
+- **sítios escritos** — dono por `PpMarkerLift` (implementação, pelo rastro da colagem) e
+  por `MethodDeclSites` (declaração, pelo canal `_HB_CLASS`/`_HB_MEMBER` do stream, agora
+  extraído do `Usages` e compartilhado);
+- **sends** — `SendVerdict( SendReceiverType(...) )`, `hInter` NIL como no `usages`
+  (portão RE.3): `confirmed`/`guaranteed` edita, `excluded` fica, **qualquer outro
+  RECUSA** nomeando o send. A posição é a do send (`SitePos`, ast-21), nunca "toda grafia
+  da linha" — dois receptores numa linha não são um sítio só;
+- **artefatos** — `ArtOwners` (extraído do `PpMarkerOwners`) filtra a predição: o
+  `MYCLASS2_PRINT` do outro dono não é previsto, porque ele não muda.
+
+**A verificação é OUTRA, e o campo `proof` diz isso** (`symbols-renamed-in-class`): a
+tabela de símbolos **GANHA** uma entrada — o dono que ficou continua respondendo a
+mensagem velha —, então o passo índice-a-índice perde sentido. `FactsPartialRenamed`
+compara os símbolos como MULTICONJUNTO (nome+scope+link) e **RECOMPUTA** as mensagens a
+partir do que a edição fez, por mensagem (getter `:NOME` e setter `:_NOME` são duas, cada
+uma viva por conta dos SEUS sends). **Fato medido que sustenta a regra:** o símbolo nu da
+mensagem existe por causa dos SENDS — módulo sem send não o tem, porque o que registra um
+método é uma STRING. Funções seguem índice-a-índice (um rename parcial não cria nem
+remove função).
+
+**Recusas novas, com código** (§1.6 — a recusa diz o que FAZER): `send-receiver-not-a-fact`
+e `site-owner-class-not-a-fact`, ambas `stop-and-report` — não falta consentimento, falta
+fato, e o que o cria é declarar o receptor, que é decisão de quem escreveu o programa.
+A recusa em bloco antiga **fica** para o cursor que não nomeia classe (o send), byte a
+byte.
+
+**Critério de pronto (mecânico)** — atingido:
+- `tests-go/suite/rename-method-homonym-with-declared-receiver` (aplica: 3 edições,
+  `c2:Print()` intacto) e `refuse-rename-method-homonym-receiver-unknown` (recusa com
+  código), os dois com `expected/` escrito à mão ANTES;
+- `make test` **1007/0** + Go + lexdiff + site-check;
+- controle negativo do portão: mentir no `hMsgRen` faz a verificação reprovar
+  (`symbol SHOW unexpected after the rename`) e **rollback** byte a byte;
+- página: `09-rename-homonym` (a capacidade) ao lado de `08-refuse-homonym` e
+  `12-refuse-data-homonym`, reescritos para a fixture que NÃO fecha com fato — a linha
+  entre os dois virou o que a página ensina *(decisão do Diego, 2026-08-11)*.
+
+**O que ficou de fora** — dois sends da MESMA mensagem na MESMA linha com receptores
+diferentes. **Não é limite de fato: é a P40, abaixo.** *(Eu relatei isto ao Diego como
+"teto honesto"; ele perguntou POR QUÊ, e a pergunta derrubou a minha frase — o fato existe
+no dump, quem é grosso é a chave de join. §1.8: era eu que não tinha exercitado.)*
+
+### P40 — o receptor por SÍTIO, não por LINHA *(vizinha da P14; ABERTA, achada ao entregar a P39 em 2026-08-11)*
+
+**O sintoma, medido** — mesmo programa, mesmos fatos, só muda onde cai a quebra de linha:
+
+```
+   OutStd( hb_ntos( oC:nSaldo ) + hb_ntos( oP:nSaldo ) )     // UMA linha
+app.prg:24: possible send (dynamic dispatch, receiver unknown)
+app.prg:24: possible send (dynamic dispatch, receiver unknown)
+
+   OutStd( hb_ntos( oC:nSaldo ) )                            // DUAS linhas
+   OutStd( hb_ntos( oP:nSaldo ) )
+app.prg:24: confirmed send (receiver class CONTA via declared types)
+app.prg:25: excluded send within the declared class graph (dispatches to POUPANCA:NSALDO)
+```
+
+**A causa** — `SendNodesWalk` (src, chamado por `SendReceiverType`) casa nó de expressão
+com fato de send por **(linha, mensagem)**. Dois nós na mesma linha com a mesma mensagem
+casam os dois; `SendReceiverType` vê receptores discordantes e devolve NIL (fail-closed,
+correto para a chave que ele tem). O `usages` degrada para `possible`; o `rename` (P39)
+**recusa**.
+
+**O fato que separa os dois já está no dump, dos DOIS lados** *(medido no mesmo fixture)*:
+
+| lado | chave | valor nos dois sends da linha 24 |
+|---|---|---|
+| fato (`sends[]`) | `col` (ast-21) | 23 e 46 |
+| nó (`statements[]`) | `tok` | 544 e 551 |
+
+**A PERGUNTA ABERTA, e ela se responde no CORE — não dumpando** *(§1.7.3)*: o `tok` de um
+nó `SEND` é contratualmente o token da MENSAGEM? O `ast-schema.md` avisa que `tok` é
+**birthTok** e nasce ATRASADO pelo lookahead, servindo para *delimitar statement*, **não
+para recortar sub-expressão** — e essa armadilha já custou um mecanismo errado escrito
+neste roadmap. Contra o aviso: 11 de 11 nós `SEND` medidos (sonda variando o token
+seguinte: `)`, `+`, `:=`, `(` com argumentos, `>`, fim de statement) caíram exatamente no
+token da mensagem, com o `col` batendo com o do fato. **Isso é evidência, não contrato.**
+Quem responde é a ação da gramática que constrói o nó SEND no `harbour.y` e o `@N` que ela
+lê — leitura de core, antes de projetar.
+
+**Escopo** — as duas saídas, e a ordem entre elas depende SÓ da resposta acima:
+- **se o `tok` do SEND é contrato**: o conserto é na ferramenta — `SendNodesWalk` passa a
+  casar por `tokens[ nó.tok ].col == fato.col` em vez de por linha;
+- **se não é**: o core publica a posição da mensagem no nó SEND (ast-NN novo, do tamanho
+  do ast-21), e a ferramenta consome. É o caminho padrão do §1.4, e não é o caro dos dois.
+
+**Fail-closed obrigatório em qualquer das duas**: `col` é chave OPCIONAL (ast-23 — nome
+escrito por diretiva não tem coluna neste módulo). Sem os dois lados da chave, o
+comportamento tem de ficar **exatamente o de hoje** (NIL → `possible`/recusa), nunca um
+casamento por aproximação.
+
+**Critério de pronto (mecânico)**:
+- caso novo no formato Go com as DUAS formas do fixture acima (uma linha × duas linhas)
+  produzindo o **mesmo** veredito por sítio — hoje elas divergem, e é o caso que prova;
+- o `rename` de método sobre o fixture de uma linha **aplica** em vez de recusar, com
+  `c2`/`oP` intacto;
+- caso de fail-closed: sítio sem `col` continua `possible`/recusa;
+- `usages-two-sends-on-one-line` e `usages-send-write-and-read-on-one-line`
+  **byte-idênticos** (os dois têm o MESMO receptor nas duas pontas: divergir ali é BUG,
+  não contrato — nenhum dos dois fossiliza o defeito, conferido);
+- se a rota for de core: contagem de conflitos do bison INALTERADA e pcode byte-idêntico
+  sem as flags (critério herdado da P14 Fase 1).
+
+### P41 — `annotate` → `rename`: a ponte que entrega a P39 ao código legado *(ABERTA; medida 2026-08-11)*
+
+**Por que existe** — a P39 renomeia método homônimo quando o receptor é fato. Medido no
+corpus (tabela na CORREÇÃO DA CORREÇÃO, acima): o gatilho é comum (**≈22%** dos nomes de
+método vivem em mais de uma classe) e o canal do construtor é raro (**≈11%** das classes).
+Sem ponte, a capacidade nova quase não alcança código real — e a ponte **já existe e já
+prova o que faz**, só não está pinada nem contada ao usuário.
+
+**O fluxo, medido de ponta a ponta** na fixture do `refuse-rename-method-homonym-receiver-unknown`:
+
+```
+$ hbrefactor rename app.hbp app.prg:14:8 Show
+hbrefactor: ... the send at app.prg:31 does not resolve to a receiver ...; refusing
+
+$ hbrefactor annotate app.hbp --apply
+annotate --apply: 4 declaration(s) + 2 AS CLASS annotation(s)
+verified: .hrb byte-identical without -kt; compiles clean under -w3 -es2; runs under -kt
+
+$ hbrefactor rename app.hbp app.prg:16:8 Show      # o annotate DESLOCA as linhas
+rename-method: MYCLASS1:Print -> Show
+verified: 3 edit(s); ... renamed for MYCLASS1; 1 send proven to dispatch elsewhere left untouched
+```
+
+**⚠️ A PONTE NÃO É GERAL — medido logo depois, e é o CORAÇÃO desta fase.** No `fixdata`,
+que é o fixture que o manual descreve, `annotate --apply` **FALHA**:
+
+```
+$ hbrefactor annotate fixdata.hbp --apply
+c1.prg(8) Warning W0025  Class 'CONTA' not known in declaration of 'OC'
+hbrefactor: gold standard FAILED after annotating locals: the project stopped compiling clean (-w3 -es2)
+```
+
+**O CASO É ESTREITO, e a matriz abaixo é o que a medição devolveu** *(cada linha rodada de
+fonte pristino em diretório novo — a primeira rodada desta matriz saiu ERRADA porque copiei
+os fontes de um diretório onde o `--apply` já havia editado, §1.7.8 pela segunda vez)*:
+
+| onde a classe está, em relação ao uso | `annotate --apply` | o que ele emite |
+|---|---|---|
+| outro módulo (qualquer ordem no `.hbp`) | **passa** | `1 declaration(s) + 1 AS CLASS` |
+| mesmo módulo, **acima** do uso | **passa** | `0 declaration(s) + 1 AS CLASS` |
+| mesmo módulo, **abaixo** do uso | **W0025 + rollback** | — |
+
+**A ordem do `.hbp` NÃO importa** (medido nos dois sentidos) e **fronteira de módulo NÃO
+importa**. E o `usages`/`rename` **não ligam para nada disso**: com o `Main` antes ou depois
+das classes, os dois dão os mesmos `confirmed send`, e o rename de membro homônimo aplica
+com o `Main` no topo (medido de ponta a ponta, programa idêntico antes/depois).
+
+**A causa, que a própria matriz entrega:** o `annotate` trata *"a classe é deste módulo"*
+como *"não precisa de `DECLARE`"* — e emite a declaração só no caso cross-module. Mas o
+canal declarado do compilador é **SEQUENCIAL** (harbour.y): um uso escrito ACIMA da
+`CREATE CLASS` está tão desprovido de declaração quanto um uso de outro módulo. Ele já
+**sabe** emitir o `DECLARE` (faz isso cross-module) — só não reconhece que este caso
+precisa. **É defeito de ferramenta, num ponto localizado; não é limite do core, e não é
+nada que o usuário deva mudar no código dele.**
+
+**Logo a P41 não é "pinar um encadeamento que já funciona"** (era assim que eu ia escrever
+a fase; a medição derrubou) nem "consertar a ordem do projeto do usuário" (era assim que eu
+descrevi a causa ao Diego; a matriz derrubou). É: **fazer o `annotate` decidir a emissão do
+`DECLARE` pela VISIBILIDADE no ponto de uso, não pela pertinência ao módulo.**
+
+**Escopo**:
+- **caso** que encadeia os três comandos (recusa → `annotate --apply` → rename aplica),
+  com `expected/` escrito à mão, **na ordem `Main` primeiro** — que é a que hoje falha.
+  É o único caso da suíte que provaria que os dois verbos compõem;
+- **a recusa APONTA a ponte**: hoje o `send-receiver-not-a-fact` diz o que falta e não diz
+  que a própria ferramenta sabe criar o fato. Um `action` que mande rodar o `annotate`
+  (vocabulário novo, ou `ACT_RETRY` com o comando no `detail`) é o que faz um agente
+  RESOLVER em vez de parar — §1.6: *"a recusa tem de ser legível para o agente RELATAR"*, e
+  aqui ela pode ser melhor que isso;
+- **manual + página**: o encadeamento é o que o programador Harbour de verdade vai digitar.
+
+**A armadilha, que o caso tem de pinar** *(custou uma medição errada minha na sessão)*: o
+`annotate --apply` **INSERE linhas** (`_HB_MEMBER ... AS CLASS ...` no topo), então toda
+coordenada `file:line:col` obtida ANTES dele fica velha. Um agente que guarde a posição e
+repita o rename acerta outra linha — no meu caso, um `_HB_MEMBER`, com recusa ilegível
+(`cannot classify '_HB_MEMBER' by fact at this position`). **O caso tem de exercitar a
+coordenada RECALCULADA**, e vale avaliar se o `annotate` deve relatar o deslocamento.
+
+**Critério de pronto (mecânico)**:
+- o caso encadeado verde, com o projeto final byte a byte igual ao `expected/`;
+- a recusa por receptor desconhecido carrega, no envelope, o caminho acionável (campo
+  `action` ou `detail`), pinado no caso da recusa;
+- `make test` verde e a página/manual citando o encadeamento por execução (§4).
 
 Plano completo: **[plano-tipos-com-alcance.md](plano-tipos-com-alcance.md)** — **o arquivo é
 plano, não registro.**

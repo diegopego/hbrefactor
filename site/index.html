@@ -1020,11 +1020,12 @@ app.prg:26: excluded method declaration (declares REGISTRO:ENVIAR)  | METHOD Env
 
 
     <div class="cap">
-      <h3>And knowing when to stop — an ambiguous rename</h3>
-      <p class="muted">Two classes, both with a method called <span class="mono">Enviar</span>. A send is dynamic dispatch — no fact says which one you meant. So it refuses, and names the other class.</p>
-<!-- SITE-EX:08-refuse-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+      <h3>And then it renames one of them</h3>
+      <p class="muted">Two classes, both with a method called <span class="mono">Enviar</span>. Same project, same run: the query above already knows which send reaches which class — so the rename acts on that, and the send it proved goes elsewhere is left exactly where it was.</p>
+<!-- SITE-EX:09-rename-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
 <div class="ex">
-    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+  <div class="exdiff">
+    <div class="code-card ex-code"><div class="code-top">before — app.prg</div>
 <pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
 <span class="l"> </span>
 <span class="l">PROCEDURE Main()</span>
@@ -1058,9 +1059,88 @@ app.prg:26: excluded method declaration (declares REGISTRO:ENVIAR)  | METHOD Env
 <span class="l"> </span>
 <span class="l">METHOD Enviar() CLASS Registro</span>
 <span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+    <div class="code-card ex-code"><div class="code-top">after — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oPag := Pagamento():New()</span>
+<span class="l">   LOCAL oReg := Registro():New()</span>
+<span class="l"> </span>
+<span class="l">   oPag:Transmitir()</span>
+<span class="l">   oReg:Enviar()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Pagamento</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Transmitir()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Pagamento</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Transmitir() CLASS Pagamento</span>
+<span class="l">   RETURN &quot;pago&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Registro</span>
+<span class="l">   METHOD New() CONSTRUCTOR</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD New() CLASS Registro</span>
+<span class="l">   RETURN Self</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Registro</span>
+<span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+  </div>
   <div class="code term ex-run"><button class="copy" type="button">Copy</button>
 <pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:21:8 Transmitir
-<span class="bad">hbrefactor: &#x27;Enviar&#x27; is also a member of: REGISTRO (app.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing</span></code></pre></div>
+rename-method: PAGAMENTO:Enviar -&gt; Transmitir
+  app.prg:15:11
+  app.prg:21:8
+  app.prg:8:9
+  predicted: PAGAMENTO_ENVIAR -&gt; PAGAMENTO_TRANSMITIR
+  predicted string: &quot;Enviar&quot; -&gt; &quot;Transmitir&quot; (app.prg)
+<span class="ok">verified: 3 edit(s); message and generated function renamed for PAGAMENTO; 1 send proven to dispatch elsewhere left untouched</span></code></pre></div>
+</div>
+<!-- SITE-EX:09-rename-homonym:END -->
+    </div>
+
+    <div class="cap">
+      <h3>And knowing when to stop — when the receiver is not a fact</h3>
+      <p class="muted">The same two classes, with one thing removed: nothing declares what <span class="mono">Pagamento()</span> hands back. Now no fact says which class a send reaches, and two classes answering one name IS ambiguity. So it refuses — naming the other class, and the send it could not place.</p>
+<!-- SITE-EX:08-refuse-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
+<div class="ex">
+    <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
+<pre class="num"><code><span class="l">#include &quot;hbclass.ch&quot;</span>
+<span class="l"> </span>
+<span class="l">PROCEDURE Main()</span>
+<span class="l"> </span>
+<span class="l">   LOCAL oPag := Pagamento():New()</span>
+<span class="l">   LOCAL oReg := Registro():New()</span>
+<span class="l"> </span>
+<span class="l">   oPag:Enviar()</span>
+<span class="l">   oReg:Enviar()</span>
+<span class="l"> </span>
+<span class="l">   RETURN</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Pagamento</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Pagamento</span>
+<span class="l">   RETURN &quot;pago&quot;</span>
+<span class="l"> </span>
+<span class="l">CREATE CLASS Registro</span>
+<span class="l">   METHOD Enviar()</span>
+<span class="l">ENDCLASS</span>
+<span class="l"> </span>
+<span class="l">METHOD Enviar() CLASS Registro</span>
+<span class="l">   RETURN &quot;gravado&quot;</span></code></pre></div>
+  <div class="code term ex-run"><button class="copy" type="button">Copy</button>
+<pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:17:8 Transmitir
+<span class="bad">hbrefactor: &#x27;Enviar&#x27; is also a member of: REGISTRO (app.prg), and the send at app.prg:8 does not resolve to a receiver (possible send (dynamic dispatch, receiver unknown)) - the rename is ambiguous; refusing</span></code></pre></div>
   <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
 </div>
 <!-- SITE-EX:08-refuse-homonym:END -->
@@ -1168,7 +1248,7 @@ rename-data: CONTA:nLimite -&gt; nTeto
 </div>
 <!-- SITE-EX:11-rename-data:END -->
     <p>Reading a member and writing to it are two <em>different</em> messages as far as the compiler is concerned (<span class="mono">nLimite</span> and <span class="mono">_nLimite</span>) — the tool renames <b>both</b>, and proves it against the symbol table before keeping a single edit.</p>
-    <p>And the guard. If <b>two classes</b> in your project happen to have a member of the same name, the rename is genuinely ambiguous — <span class="mono">:nSaldo</span> is dynamic dispatch, and no fact says which class you meant. So it refuses, and names the other class:</p>
+    <p>And the guard. If <b>two classes</b> in your project happen to have a member of the same name, what decides is whether anything says which class each <span class="mono">:nSaldo</span> reaches. Here nothing does — the receiver is not a fact — so the rename is genuinely ambiguous, and it refuses naming both the other class and the send it could not place:</p>
 <!-- SITE-EX:12-refuse-data-homonym:BEGIN (GERADO por make site-examples - NAO editar a mao) -->
 <div class="ex">
     <div class="code-card ex-code"><div class="code-top">the code — unchanged — app.prg</div>
@@ -1186,22 +1266,14 @@ rename-data: CONTA:nLimite -&gt; nTeto
 <span class="l"> </span>
 <span class="l">CREATE CLASS Conta</span>
 <span class="l">   VAR nSaldo INIT 0</span>
-<span class="l">   METHOD New() CONSTRUCTOR</span>
 <span class="l">ENDCLASS</span>
-<span class="l"> </span>
-<span class="l">METHOD New() CLASS Conta</span>
-<span class="l">   RETURN Self</span>
 <span class="l"> </span>
 <span class="l">CREATE CLASS Poupanca</span>
 <span class="l">   VAR nSaldo INIT 0</span>
-<span class="l">   METHOD New() CONSTRUCTOR</span>
-<span class="l">ENDCLASS</span>
-<span class="l"> </span>
-<span class="l">METHOD New() CLASS Poupanca</span>
-<span class="l">   RETURN Self</span></code></pre></div>
+<span class="l">ENDCLASS</span></code></pre></div>
   <div class="code term ex-run"><button class="copy" type="button">Copy</button>
 <pre><code><span class="cmd">$ hbrefactor</span> rename app.hbp app.prg:14:8 nDisponivel
-<span class="bad">hbrefactor: &#x27;nSaldo&#x27; is also a member of: POUPANCA (app.prg) - a send is dynamic dispatch, the rename is ambiguous; refusing</span></code></pre></div>
+<span class="bad">hbrefactor: &#x27;nSaldo&#x27; is also a member of: POUPANCA (app.prg), and the send at app.prg:7 does not resolve to a receiver (possible send (dynamic dispatch, receiver unknown)) - the rename is ambiguous; refusing</span></code></pre></div>
   <p class="ex-note muted">It refused — and the source is <strong>byte-for-byte unchanged</strong>. This suite fails the build if a refusal ever edits a single character.</p>
 </div>
 <!-- SITE-EX:12-refuse-data-homonym:END -->

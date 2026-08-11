@@ -1,0 +1,21 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:14:8",
+   "Show",
+   "--json"
+  ],
+  "status": "refused",
+  "exit": 1,
+  "reason": "send-receiver-not-a-fact",
+  "action": "stop-and-report",
+  "detail": "'Print' is also a member of: MYCLASS2 (app.prg), and the send at app.prg:31 does not resolve to a receiver (possible send (dynamic dispatch, receiver unknown)) - the rename is ambiguous; refusing",
+  "diagnostics": [],
+  "result": {},
+  "edits": []
+ }
+]

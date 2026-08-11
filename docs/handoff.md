@@ -16,11 +16,14 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 > sessão fica longa, o handoff vira o mapa dela, e ele apaga o arquivo quando tudo estiver
 > pronto)*. O estado durável está no [`roadmap.md`](roadmap.md); aqui só o que está VIVO.
 
-**TUDO ENTREGUE E COMMITADO.** `hbrefactor@abf0643` · `harbour-core@6c9b74ca63`,
+**TUDO ENTREGUE E COMMITADO até `hbrefactor@c14acfa`** · `harbour-core@6c9b74ca63`,
 `make test` **1007/0**, `pcode-identity` **889/889**.
+**NÃO COMMITADO:** a **P39** (abaixo) — só `src/hbrefactor.prg`, dois casos Go novos,
+três exemplos da página, manual/roadmap/handoff. Zero linha de core.
 
 | fase | o que mudou |
 |---|---|
+| **P39** (sem core) | o `rename` de método pergunta o receptor: homonímia entre classes deixa de ser ambiguidade quando um fato coloca cada sítio numa classe |
 | **P36** (`ast-25`) | o dump marca a chamada que resolve nome em run time; a heurística de string do memvar morre — ela deixava passar `__mvGet( "xC" + "fg" )` com selo de `verified` |
 | **P36b** (`ast-26`) | a família frágil inteira: `inline-local`, `reorder-params`, `rename-method`, `extract-function`, `find-dynamic-calls` |
 | **P36c** | a flag `--force` **morre**; cada alimentador vira o que é (dois diagnostics, um alerta falso removido, uma recusa por quebra provada, uma declaração) |
@@ -43,37 +46,77 @@ custou um erro:
 
 ---
 
-## ⇢ A PRÓXIMA SESSÃO COMEÇA AQUI: a P14, e ela já está medida
+## ⇢ A PRÓXIMA SESSÃO COMEÇA AQUI: a P14 passo 2 — o CURSOR
 
-O Diego pediu três coisas, nas palavras dele, e a sessão as mediu de ponta a ponta antes de
-acabar. **Leia a [P14 no roadmap](roadmap.md) — o bloco "O ESTADO REAL, MEDIDO" tem o
-fixture inteiro e as quatro saídas reais.** Aqui só o que faz agir:
-
-```harbour
-LOCAL c1 := MyClass1():New()
-LOCAL c2 := MyClass2():New()
-c1:Print()      // MyClass1 e MyClass2 ambas têm METHOD Print()
-c2:Print()
-```
+**O passo 1 está ENTREGUE** (P39 no [roadmap](roadmap.md)): o `rename` de método pergunta
+o receptor com as mesmas funções do `usages`, e renomear `METHOD Print() CLASS MyClass1`
+toca `c1:Print()` e não toca `c2:Print()`. Dos três pedidos do Diego, o terceiro fechou; o
+segundo já funcionava; **sobra o primeiro, que é o cursor**.
 
 | o que ele espera | hoje |
 |---|---|
 | de `c1:Print()` ir à definição em `MyClass1` | **meio** — o envio é classificado certo, mas a consulta sai NUA e lista as duas definições |
-| `usages` achar `c1:Print()` e não `c2:Print()` | **funciona** com `LOCAL c1 AS CLASS MyClass1` (`confirmed`/`excluded`); sem a anotação, os dois saem `receiver unknown` |
-| `rename` tocar um e não o outro | **recusa**, mesmo com o tipo declarado |
+| `usages` achar `c1:Print()` e não `c2:Print()` | **funciona** |
+| `rename` tocar um e não o outro | **funciona** (P39) |
 
-**O achado que ordena o trabalho: o `usages` pergunta o receptor e o `rename` NÃO.** Mesma
-execução, mesmos fatos — um diz `confirmed`/`excluded` com o motivo, o outro recusa em bloco
-por homonímia. **Não falta fato; falta o rename consultar o que já existe.** É o passo mais
-barato e o primeiro.
+**O que o passo 1 deixou apontado, e é o que dá urgência ao cursor:** hoje, cursor no send
+`c2:Print()` resolve para `MYCLASS1:Print` — o **primeiro dono**, não o receptor. O rename
+não age errado só porque passou a exigir que a classe seja FATO (e vindo de send ela não é),
+então ele recusa. **Fechado o cursor, a capacidade do passo 1 passa a valer a partir do
+send** — que é como o programador usa a IDE.
 
-Depois vêm o cursor (parar de mandar consulta nua) e o **E1** de core (`FUNCTION F() AS CLASS
-X`), que é o que faz a notação SEM `AS CLASS` funcionar — hoje ela não funciona por decisão,
-não por esquecimento: tipar pelo `New()` foi removido na RE.3 como inferência.
+**TRÊS CORREÇÕES a fatos que estavam escritos aqui e no roadmap** (leia os dois blocos
+"⚠️ CORREÇÃO" na P14 — a segunda corrige a primeira):
 
-**O caminho de sonda**: reconstruir o fixture leva 30 segundos e ele está inteiro na P14.
+1. **"sem `AS CLASS` os dois saem `receiver unknown`" é FALSO.** Era verdade só para a
+   fixture medida, que não tem `METHOD New() CONSTRUCTOR`. Com construtor,
+   `LOCAL c1 := MyClass1():New()` já sai
+   `confirmed send (receiver class MYCLASS1 via declared types)`.
+2. **Mas "construtor é como código real escreve classe" também era PALPITE, e caiu na
+   medição** (corpus = os 1037 `.prg` do core): **31 de 285 classes (≈11%)** declaram
+   `CONSTRUCTOR`, enquanto **408 de 1816 nomes de método (≈22%)** vivem em mais de uma
+   classe. **O gatilho é comum, o canal é raro** — em código como o do core a maioria dos
+   renames homônimos ainda recusa. *(Escrevi a frase, o Diego perguntou "vai funcionar ou
+   não?", e a pergunta cobrou a medição. §1.7.2.)*
+3. **Logo o E1 continua sendo a maior alavanca** — ele fecha os ≈89% sem construtor mais a
+   fábrica. A correção 1 não o rebaixa; a 2 o reafirma.
+
+**A PONTE CANDIDATA para alcançar código legado sem core novo é `annotate --apply` →
+`rename` — é a [P41](roadmap.md), e o buraco dela é ESTREITO e localizado.** O `annotate`
+falha (`W0025` + rollback) **só** quando a classe está no MESMO módulo e ABAIXO do uso;
+outro módulo passa, classe acima passa, e a ordem do `.hbp` não muda nada. A causa está na
+matriz da P41: ele emite o `DECLARE` no caso cross-module e NÃO no mesmo-módulo — mas o
+canal declarado é sequencial, então um uso acima da `CREATE CLASS` precisa igual. **Defeito
+de ferramenta num ponto localizado; nada que o usuário deva mudar no código dele, e
+`usages`/`rename` não são afetados** (medido nas duas ordens).
+
+Três armadilhas para quem pegar a P41: (a) o `annotate` **INSERE linhas**, então coordenada
+`file:line:col` de antes dele fica velha e o rename seguinte acerta um `_HB_MEMBER` com
+recusa ilegível; (b) **meça no `fixdata`, não numa fixture sua** — foi medindo na minha que
+eu publiquei a ponte como geral; (c) **cada linha da matriz exige diretório NOVO**: a
+primeira versão dela saiu errada porque copiei fontes de um diretório que o `--apply` já
+havia editado (§1.7.8, segunda vez no mesmo dia).
+
+**O caminho de sonda**: reconstruir o fixture leva 30 segundos e ele está inteiro na P14 —
+mas prefira as fixtures dos casos novos
+(`tests-go/suite/testdata/rename-method-homonym-with-declared-receiver/source/` e a irmã
+`refuse-...-receiver-unknown/`): são as duas metades, e as duas compilam limpo.
+
+**E há uma SEGUNDA frente aberta pela P39, barata e independente: a [P40](roadmap.md)**
+— o receptor é resolvido por **(linha, mensagem)**, então dois sends da mesma mensagem na
+mesma linha com receptores diferentes colapsam para `possible` no `usages` e para recusa no
+`rename`. Quebrar a mesma expressão em duas linhas devolve `confirmed`/`excluded`: **o fato
+está no dump, a chave de join é que é grossa.** A P40 tem a medição e a pergunta que a
+ordena — *o `tok` de um nó SEND é contratualmente o token da mensagem?* —, e essa se
+responde **lendo a gramática do core**, não dumpando: o schema avisa que `tok` é birthTok e
+nasce atrasado, e 11/11 sondas concordarem é evidência, não contrato.
 
 ---
+
+**ABERTO PELA P39, e as duas são baratas:** **[P40](roadmap.md)** (receptor por SÍTIO, não
+por linha) e **[P41](roadmap.md)** (a ponte `annotate` → `rename`). A P41 é a que muda o
+alcance da capacidade em código real; a P40 é a que tira uma recusa que só existe por causa
+de onde cai a quebra de linha.
 
 **TAMBÉM ABERTO:** **P33** (LSP, aprovada), **P34** (IntelliSense, exploratória),
 **P22**/**P25** (EM CURSO), **V fatia 2** (a análise incremental) e o volume da

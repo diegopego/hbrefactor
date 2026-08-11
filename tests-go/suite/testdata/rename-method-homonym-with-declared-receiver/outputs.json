@@ -1,0 +1,82 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:14:8",
+   "Show",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 3 edit(s); message and generated function renamed for MYCLASS1; 1 send proven to dispatch elsewhere left untouched",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "method",
+   "old": "Print",
+   "new": "Show",
+   "editCount": 3,
+   "proof": "symbols-renamed-in-class",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 10
+      },
+      "end": {
+       "line": 7,
+       "character": 15
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 13,
+       "character": 7
+      },
+      "end": {
+       "line": 13,
+       "character": 12
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 37,
+       "character": 6
+      },
+      "end": {
+       "line": 37,
+       "character": 11
+      }
+     }
+    }
+   ],
+   "derived": [
+    {
+     "from": "MYCLASS1_PRINT",
+     "to": "MYCLASS1_SHOW"
+    }
+   ],
+   "derivedStrings": [
+    {
+     "from": "Print",
+     "to": "Show",
+     "file": "app.prg"
+    }
+   ]
+  },
+  "edits": []
+ }
+]

@@ -1,0 +1,244 @@
+app.prg(6) >CREATE CLASS MyClass1<
+#xcommand >CLASS MyClass1<
+app.prg(6) >CLASS MyClass1<
+#xcommand >_HB_CLASS MyClass1 ; function __HB_CLS_OPT( MyClass1 ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "MyClass1", __HB_CLS_PAR( ), @__HB_CLS_OPT( MyClass1)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ MyClass1 ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(6) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(6) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(6) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(6) >__HB_CLS_OPT( MyClass1 )<
+#xtranslate >MyClass1<
+app.prg(6) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(6) >__HB_CLS_OPT( MyClass1)<
+#xtranslate >MyClass1<
+app.prg(7) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(7) >_CLASS_NAME_<
+#define >MyClass1<
+app.prg(7) >_CLASS_NAME_<
+#define >MyClass1<
+app.prg(7) >_CLASS_NAME_<
+#define >MyClass1<
+app.prg(7) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(7) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(7) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(7) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(7) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(7) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(7) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(7) >__HB_CLS_MTHNAME MyClass1 New()<
+#xtranslate >MyClass1_New()<
+app.prg(7) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(7) >MyClass1 _<
+(concatenate) >MyClass1_<
+app.prg(7) >MyClass1_ New<
+(concatenate) >MyClass1_New<
+app.prg(7) >__HB_CLS_ASID( MyClass1_New() )<
+#xtranslate >MyClass1_New<
+app.prg(7) >__HB_CLS_DECLARE_METHOD New MyClass1<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS MyClass1 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS MyClass1 ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS MyClass1 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS MyClass1<
+app.prg(8) >METHOD Print()<
+#xcommand >METHOD Print() _CLASS_MODE_<
+app.prg(8) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(8) >METHOD Print() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Print()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Print()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Print()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Print() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(8) >_CLASS_NAME_<
+#define >MyClass1<
+app.prg(8) >_CLASS_NAME_<
+#define >MyClass1<
+app.prg(8) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(8) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(8) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(8) >__HB_CLS_ASFUNC(Print())<
+#xtranslate >Print()<
+app.prg(8) >__HB_CLS_PARAMS(Print())<
+#xtranslate >__HB_CLS_ASID(Print())<
+app.prg(8) >__HB_CLS_ASID(Print())<
+#xtranslate >Print<
+app.prg(8) >__HB_CLS_ASSTRING(Print())<
+#xtranslate >"Print"<
+app.prg(8) >__HB_CLS_MTHNAME MyClass1 Print()<
+#xtranslate >MyClass1_Print()<
+app.prg(8) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(8) >MyClass1 _<
+(concatenate) >MyClass1_<
+app.prg(8) >MyClass1_ Print<
+(concatenate) >MyClass1_Print<
+app.prg(8) >__HB_CLS_ASID( MyClass1_Print() )<
+#xtranslate >MyClass1_Print<
+app.prg(8) >__HB_CLS_DECLARE_METHOD Print MyClass1<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Print CLASS MyClass1 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Print CLASS MyClass1 ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Print([ <xparams,... >] ) CLASS MyClass1 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Print([ <xparams>] ) CLASS MyClass1<
+app.prg(9) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(9) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(9) >_CLASS_NAME_<
+#define >MyClass1<
+app.prg(9) >END SEQUENCE<
+#command >end<
+app.prg(11) >METHOD New() CLASS MyClass1<
+#xcommand >METHOD FUNCTION New() CLASS MyClass1 _CLASS_MODE_<
+app.prg(11) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(11) >METHOD FUNCTION New() CLASS MyClass1 _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS MyClass1<
+app.prg(11) >DECLARED METHOD FUNCTION New( ) CLASS MyClass1<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME MyClass1 New( ) ; local Self AS CLASS MyClass1 := QSelf() AS CLASS MyClass1<
+app.prg(11) >__HB_CLS_MTHNAME MyClass1 New( )<
+#xtranslate >MyClass1_New( )<
+app.prg(11) >MyClass1 _<
+(concatenate) >MyClass1_<
+app.prg(11) >MyClass1_ New<
+(concatenate) >MyClass1_New<
+app.prg(14) >METHOD Print() CLASS MyClass1<
+#xcommand >METHOD FUNCTION Print() CLASS MyClass1 _CLASS_MODE_<
+app.prg(14) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(14) >METHOD FUNCTION Print() CLASS MyClass1 _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Print( ) CLASS MyClass1<
+app.prg(14) >DECLARED METHOD FUNCTION Print( ) CLASS MyClass1<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME MyClass1 Print( ) ; local Self AS CLASS MyClass1 := QSelf() AS CLASS MyClass1<
+app.prg(14) >__HB_CLS_MTHNAME MyClass1 Print( )<
+#xtranslate >MyClass1_Print( )<
+app.prg(14) >MyClass1 _<
+(concatenate) >MyClass1_<
+app.prg(14) >MyClass1_ Print<
+(concatenate) >MyClass1_Print<
+app.prg(18) >CREATE CLASS MyClass2<
+#xcommand >CLASS MyClass2<
+app.prg(18) >CLASS MyClass2<
+#xcommand >_HB_CLASS MyClass2 ; function __HB_CLS_OPT( MyClass2 ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "MyClass2", __HB_CLS_PAR( ), @__HB_CLS_OPT( MyClass2)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ MyClass2 ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(18) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(18) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(18) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(18) >__HB_CLS_OPT( MyClass2 )<
+#xtranslate >MyClass2<
+app.prg(18) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(18) >__HB_CLS_OPT( MyClass2)<
+#xtranslate >MyClass2<
+app.prg(19) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(19) >_CLASS_NAME_<
+#define >MyClass2<
+app.prg(19) >_CLASS_NAME_<
+#define >MyClass2<
+app.prg(19) >_CLASS_NAME_<
+#define >MyClass2<
+app.prg(19) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(19) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(19) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(19) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(19) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(19) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(19) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(19) >__HB_CLS_MTHNAME MyClass2 New()<
+#xtranslate >MyClass2_New()<
+app.prg(19) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(19) >MyClass2 _<
+(concatenate) >MyClass2_<
+app.prg(19) >MyClass2_ New<
+(concatenate) >MyClass2_New<
+app.prg(19) >__HB_CLS_ASID( MyClass2_New() )<
+#xtranslate >MyClass2_New<
+app.prg(19) >__HB_CLS_DECLARE_METHOD New MyClass2<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS MyClass2 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS MyClass2 ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS MyClass2 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS MyClass2<
+app.prg(20) >METHOD Print()<
+#xcommand >METHOD Print() _CLASS_MODE_<
+app.prg(20) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(20) >METHOD Print() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Print()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Print()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Print()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Print() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(20) >_CLASS_NAME_<
+#define >MyClass2<
+app.prg(20) >_CLASS_NAME_<
+#define >MyClass2<
+app.prg(20) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(20) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(20) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(20) >__HB_CLS_ASFUNC(Print())<
+#xtranslate >Print()<
+app.prg(20) >__HB_CLS_PARAMS(Print())<
+#xtranslate >__HB_CLS_ASID(Print())<
+app.prg(20) >__HB_CLS_ASID(Print())<
+#xtranslate >Print<
+app.prg(20) >__HB_CLS_ASSTRING(Print())<
+#xtranslate >"Print"<
+app.prg(20) >__HB_CLS_MTHNAME MyClass2 Print()<
+#xtranslate >MyClass2_Print()<
+app.prg(20) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(20) >MyClass2 _<
+(concatenate) >MyClass2_<
+app.prg(20) >MyClass2_ Print<
+(concatenate) >MyClass2_Print<
+app.prg(20) >__HB_CLS_ASID( MyClass2_Print() )<
+#xtranslate >MyClass2_Print<
+app.prg(20) >__HB_CLS_DECLARE_METHOD Print MyClass2<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Print CLASS MyClass2 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Print CLASS MyClass2 ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Print([ <xparams,... >] ) CLASS MyClass2 _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Print([ <xparams>] ) CLASS MyClass2<
+app.prg(21) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(21) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(21) >_CLASS_NAME_<
+#define >MyClass2<
+app.prg(21) >END SEQUENCE<
+#command >end<
+app.prg(23) >METHOD New() CLASS MyClass2<
+#xcommand >METHOD FUNCTION New() CLASS MyClass2 _CLASS_MODE_<
+app.prg(23) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(23) >METHOD FUNCTION New() CLASS MyClass2 _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS MyClass2<
+app.prg(23) >DECLARED METHOD FUNCTION New( ) CLASS MyClass2<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME MyClass2 New( ) ; local Self AS CLASS MyClass2 := QSelf() AS CLASS MyClass2<
+app.prg(23) >__HB_CLS_MTHNAME MyClass2 New( )<
+#xtranslate >MyClass2_New( )<
+app.prg(23) >MyClass2 _<
+(concatenate) >MyClass2_<
+app.prg(23) >MyClass2_ New<
+(concatenate) >MyClass2_New<
+app.prg(26) >METHOD Print() CLASS MyClass2<
+#xcommand >METHOD FUNCTION Print() CLASS MyClass2 _CLASS_MODE_<
+app.prg(26) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(26) >METHOD FUNCTION Print() CLASS MyClass2 _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Print( ) CLASS MyClass2<
+app.prg(26) >DECLARED METHOD FUNCTION Print( ) CLASS MyClass2<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME MyClass2 Print( ) ; local Self AS CLASS MyClass2 := QSelf() AS CLASS MyClass2<
+app.prg(26) >__HB_CLS_MTHNAME MyClass2 Print( )<
+#xtranslate >MyClass2_Print( )<
+app.prg(26) >MyClass2 _<
+(concatenate) >MyClass2_<
+app.prg(26) >MyClass2_ Print<
+(concatenate) >MyClass2_Print<

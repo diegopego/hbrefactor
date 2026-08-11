@@ -210,6 +210,22 @@
 // human's call.
 #define RSN_RULE_BINDS_MEMVAR "directive-also-binds-a-memvar"
 
+// P14: renaming a method a HOMONYM class also answers. Homonymy alone is no
+// longer a refusal - the tool asks, per site, the same question the query
+// answers, and moves only what a fact places in the class being renamed. What
+// is left are the two places where that question has no answer:
+//
+// SEND_RECEIVER: this send does not resolve to a receiver, so nobody knows
+// whether it reaches the method being renamed. `stop-and-report` and no flag:
+// consent is not what is missing, a fact is - and there IS a way to create it,
+// by declaring the receiver (`LOCAL o AS CLASS C`), which is the human's call
+// about their own program.
+// SITE_OWNER: a written site of the name that no fact attributes to a class.
+// Same shape, other channel: the site would have to be edited on the strength
+// of spelling alone, which is what this tool exists not to do
+#define RSN_SEND_RECEIVER "send-receiver-not-a-fact"
+#define RSN_SITE_OWNER    "site-owner-class-not-a-fact"
+
 // W.2: outro processo está refatorando ESTE projeto agora. É a única recusa que
 // não é sobre o pedido nem sobre o projeto - o pedido continua válido, só chegou
 // junto com outro. Por isso ela tem ação PRÓPRIA: nem `stop-and-report` (não há
@@ -893,8 +909,8 @@ STATIC FUNCTION Usages( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, aLift
    LOCAL nHits := 0, cModFile, aSrc, cUp, aLoc := {}, aDefSeen := {}, aRuleSeen := {}
    LOCAL cClass := "", cMethTok, cUpMeth, nAt, hDecl, hGraph, aVerd, hInter
-   LOCAL aSpans, hEnt, aArt, hFn, hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
-   LOCAL aDecl, aSite, cCur, nState, hOwnV
+   LOCAL hDone, cKey, hRule, cVocab, cOwn, cOwnerQ
+   LOCAL aDecl, aSite, hOwnV
    LOCAL cAtSpec := NIL, aAtParts, cAtFile, cAtPath, nAtLine, nAtCol0, hResAt
    LOCAL cKind          // A.1: o rótulo que a prosa E o JSON usam (uma fonte)
    // ast-23: { linha, colunas, tamanho } do sítio, resolvido por SitePos() -
@@ -1267,65 +1283,13 @@ STATIC FUNCTION Usages( aArgs )
       NEXT
 
       // sites de DECLARAÇÃO para a forma Classe:Método (B4f-2 fatia dos
-      // homônimos de declaração; generalizada na B4f-3). Duas fontes de
-      // FATO, ambas genéricas:
-      //   1. canal declared NO STREAM: `_HB_CLASS <nome>` muda a classe
-      //      corrente (semântica SEQUENCIAL do compilador - harbour.y,
-      //      não convenção) e `_HB_MEMBER <nome>` declara nela; o nome
-      //      vem POSICIONADO no site escrito. Cobre hbclass, DSL espelho
-      //      e DSL declarativa pura pelo MESMO canal da linguagem.
-      //   2. registro por STRING contido (por índice) na função GERADA -
-      //      posse por containment (PpMarkerOwners, site a site). Cobre
-      //      builds do hbclass sem declarações e DSLs que só registram.
+      // homônimos de declaração; generalizada na B4f-3). O fato e as duas
+      // fontes dele estão no MethodDeclSites - que o rename também consulta,
+      // pelo mesmo motivo: saber de QUEM é cada sítio.
       // Dedup por posição; veredito pela resolução da CONSULTADA
       hDone := { => }
       IF ! Empty( cClass )
-         aDecl  := {}
-         cCur   := NIL
-         nState := 0
-         FOR EACH hItem IN hAst[ "tokens" ]
-            IF nState == 3
-               // grupo `{ a, b, ... }` do _HB_MEMBER (a lista de membros
-               // do canal - forma do VAR no hbclass): todo identificador
-               // posicionado dentro do grupo é nome de membro declarado
-               IF hItem[ "type" ] == 55
-                  nState := 0
-               ELSEIF hItem[ "type" ] == 21 .AND. Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
-                  cCur != NIL .AND. hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL
-                  AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], cCur } )
-               ENDIF
-            ELSEIF hItem[ "type" ] == 21
-               DO CASE
-               CASE Upper( hItem[ "text" ] ) == "_HB_CLASS"
-                  nState := 1
-               CASE Upper( hItem[ "text" ] ) == "_HB_MEMBER"
-                  nState := 2
-               CASE nState == 1
-                  cCur   := Upper( hItem[ "text" ] )
-                  nState := 0
-               CASE nState == 2
-                  IF Upper( hItem[ "text" ] ) == cUpMeth .AND. cCur != NIL .AND. ;
-                     hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL
-                     AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], cCur } )
-                  ENDIF
-                  nState := 0
-               ENDCASE
-            ELSEIF nState == 2 .AND. hItem[ "type" ] == 54
-               nState := 3
-            ELSE
-               nState := 0
-            ENDIF
-         NEXT
-         aSpans := FuncStmtSpans( hAst )
-         hEnt   := PpMarkerSeeds( hAst, cUpMeth )
-         FOR EACH aArt IN PpMarkerArtifacts( hAst, hEnt[ "pairs" ], cUpMeth )
-            hItem := aArt[ 2 ]
-            IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL .AND. ;
-               ( hFn := FuncOfTokIdx( aSpans, aArt[ 1 ] ) ) != NIL .AND. ! hFn[ "fileDecl" ] .AND. ;
-               FuncDerived( hAst, hFn ) .AND. MethodImplOf( hAst, hFn, "", cUpMeth ) == NIL
-               AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], Upper( hFn[ "name" ] ) } )
-            ENDIF
-         NEXT
+         aDecl := MethodDeclSites( hAst, cUpMeth )
          FOR EACH aSite IN aDecl
             cKey := hb_ntos( aSite[ 1 ] ) + "|" + hb_ntos( aSite[ 2 ] )
             IF hb_HHasKey( hDone, cKey )
@@ -14438,31 +14402,112 @@ STATIC FUNCTION FuncByName( hAst, cName )
 // isso é o artefato, não uma dona). Clones não contam: um clone
 // posicionado é o próprio nome escrito.
 // Devolve { DONO_UPPER => { "via" =>, "impl" => hFunc|NIL } }
+// the owners ONE artifact attributes, and through which channel - the same
+// fact PpMarkerOwners aggregates for the module, exposed per artifact.
+// Aggregating loses what a partial rename needs: not WHICH owners exist in
+// the module, but whose each artifact is. Empty when no fact decides.
+// Each item: { OWNER_UPPER, channel, hImpl|NIL }
+STATIC FUNCTION ArtOwners( hAst, aArt, aSpans, cUp )
+
+   LOCAL aOut := {}, hTok := aArt[ 2 ], hFrom, hFunc, cOwn
+
+   IF hTok[ "type" ] == 21 .AND. ! Empty( aArt[ 4 ] ) .AND. ;
+      ( hFunc := FuncByName( hAst, hTok[ "text" ] ) ) != NIL
+      FOR EACH hFrom IN aArt[ 4 ]
+         cOwn := Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) )
+         IF ! Empty( cOwn )
+            AAdd( aOut, { cOwn, "paste", hFunc } )
+         ENDIF
+      NEXT
+   ELSEIF hTok[ "type" ] == 41
+      hFunc := FuncOfTokIdx( aSpans, aArt[ 1 ] )
+      IF hFunc != NIL .AND. ! hFunc[ "fileDecl" ] .AND. ;
+         FuncDerived( hAst, hFunc ) .AND. ;
+         MethodImplOf( hAst, hFunc, "", cUp ) == NIL
+         AAdd( aOut, { Upper( hFunc[ "name" ] ), "string", NIL } )
+      ENDIF
+   ENDIF
+
+   RETURN aOut
+
+// declaration sites of a method, each with its OWNER - the fact the `usages`
+// classifies and the rename needs to know whose a site is. Two sources, both
+// generic:
+//   1. the declared channel IN THE STREAM: `_HB_CLASS <name>` moves the
+//      current class (the compiler's SEQUENTIAL semantics - harbour.y, not a
+//      convention) and `_HB_MEMBER <name>` declares in it; the name arrives
+//      POSITIONED at the written site. hbclass, mirror DSL and purely
+//      declarative DSL all come through the SAME channel of the language.
+//   2. registration by STRING contained (by index) in the GENERATED function
+//      - ownership by containment, site by site. Covers hbclass builds with
+//      no declarations, and DSLs that only register.
+// Each item: { line, column 0-based, OWNER_UPPER }
+STATIC FUNCTION MethodDeclSites( hAst, cUpMeth )
+
+   LOCAL aDecl := {}, hItem, cCur := NIL, nState := 0
+   LOCAL aSpans, hEnt, aArt, hFn
+
+   FOR EACH hItem IN hAst[ "tokens" ]
+      IF nState == 3
+         // grupo `{ a, b, ... }` do _HB_MEMBER (a lista de membros
+         // do canal - forma do VAR no hbclass): todo identificador
+         // posicionado dentro do grupo é nome de membro declarado
+         IF hItem[ "type" ] == 55
+            nState := 0
+         ELSEIF hItem[ "type" ] == 21 .AND. Upper( hItem[ "text" ] ) == cUpMeth .AND. ;
+            cCur != NIL .AND. hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL
+            AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], cCur } )
+         ENDIF
+      ELSEIF hItem[ "type" ] == 21
+         DO CASE
+         CASE Upper( hItem[ "text" ] ) == "_HB_CLASS"
+            nState := 1
+         CASE Upper( hItem[ "text" ] ) == "_HB_MEMBER"
+            nState := 2
+         CASE nState == 1
+            cCur   := Upper( hItem[ "text" ] )
+            nState := 0
+         CASE nState == 2
+            IF Upper( hItem[ "text" ] ) == cUpMeth .AND. cCur != NIL .AND. ;
+               hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL
+               AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], cCur } )
+            ENDIF
+            nState := 0
+         ENDCASE
+      ELSEIF nState == 2 .AND. hItem[ "type" ] == 54
+         nState := 3
+      ELSE
+         nState := 0
+      ENDIF
+   NEXT
+   aSpans := FuncStmtSpans( hAst )
+   hEnt   := PpMarkerSeeds( hAst, cUpMeth )
+   FOR EACH aArt IN PpMarkerArtifacts( hAst, hEnt[ "pairs" ], cUpMeth )
+      hItem := aArt[ 2 ]
+      IF hItem[ "type" ] == 41 .AND. hItem[ "line" ] > 0 .AND. hItem[ "col" ] != NIL .AND. ;
+         ( hFn := FuncOfTokIdx( aSpans, aArt[ 1 ] ) ) != NIL .AND. ! hFn[ "fileDecl" ] .AND. ;
+         FuncDerived( hAst, hFn ) .AND. MethodImplOf( hAst, hFn, "", cUpMeth ) == NIL
+         AAdd( aDecl, { hItem[ "line" ], hItem[ "col" ], Upper( hFn[ "name" ] ) } )
+      ENDIF
+   NEXT
+
+   RETURN aDecl
+
 STATIC FUNCTION PpMarkerOwners( hAst, aArts, aSpans, cUp )
 
-   LOCAL hOwners := { => }, aArt, hTok, hFrom, hFunc, cOwn
+   LOCAL hOwners := { => }, aArt, aOne, cOwn
 
    FOR EACH aArt IN aArts
-      hTok := aArt[ 2 ]
-      IF hTok[ "type" ] == 21 .AND. ! Empty( aArt[ 4 ] ) .AND. ;
-         ( hFunc := FuncByName( hAst, hTok[ "text" ] ) ) != NIL
-         FOR EACH hFrom IN aArt[ 4 ]
-            cOwn := Upper( SubStr( hTok[ "text" ], hFrom[ "at" ] + 1, hFrom[ "len" ] ) )
-            IF ! Empty( cOwn )
-               hOwners[ cOwn ] := { "via" => "paste", "impl" => hFunc }
-            ENDIF
-         NEXT
-      ELSEIF hTok[ "type" ] == 41
-         hFunc := FuncOfTokIdx( aSpans, aArt[ 1 ] )
-         IF hFunc != NIL .AND. ! hFunc[ "fileDecl" ] .AND. ;
-            FuncDerived( hAst, hFunc ) .AND. ;
-            MethodImplOf( hAst, hFunc, "", cUp ) == NIL
-            cOwn := Upper( hFunc[ "name" ] )
+      FOR EACH aOne IN ArtOwners( hAst, aArt, aSpans, cUp )
+         cOwn := aOne[ 1 ]
+         IF aOne[ 2 ] == "paste"
+            hOwners[ cOwn ] := { "via" => "paste", "impl" => aOne[ 3 ] }
+         ELSE
             IF ! hb_HHasKey( hOwners, cOwn )
                hOwners[ cOwn ] := { "via" => "string", "impl" => NIL }
             ENDIF
          ENDIF
-      ENDIF
+      NEXT
    NEXT
 
    RETURN hOwners
@@ -14661,6 +14706,10 @@ STATIC FUNCTION RenameMethod( aArgs )
    LOCAL cKey, aKParts, nApp, nMarker, aAlts, cAltList   // P5: validação do restrict
    LOCAL hArtIdx                                         // P6: guarda de órfão por FATO
    LOCAL aWork, hRes, cKind, cProof, aPred := {}, aPredS := {}
+   // P14: renaming a method a HOMONYM class also answers
+   LOCAL lClassGiven, lPartial := .F., hDeclT := NIL, hGraphR := NIL
+   LOCAL hSiteOwn := { => }, hTally := { => }, hMsgRen := { => }, aVerd, aPos
+   LOCAL aLift, aSite, aOne, cCert, nSkipped := 0
 
    IF Len( aArgs ) < 4
       Usage()
@@ -14689,6 +14738,13 @@ STATIC FUNCTION RenameMethod( aArgs )
    cUpClass := Upper( cClass )
    cUpOld   := Upper( cMethod )
    cUpNew   := Upper( cNew )
+   // P14: whether the CLASS is a fact, and not the first owner picked below.
+   // The cursor names it when it sat on a declaration or an implementation;
+   // from a SEND site the position resolver still hands over a bare message
+   // (the receiver of the site is P14's step 2), and then the class here is
+   // just "the first owner found" - which decides nothing and must not
+   // decide who gets renamed
+   lClassGiven := ! Empty( cUpClass )
 
    IF ! OneWord( cNew )
       RETURN Refuse( "new name '" + cNew + "' is not a single word" )
@@ -14818,9 +14874,47 @@ STATIC FUNCTION RenameMethod( aArgs )
             cWhy += iif( Empty( cWhy ), "", "; " ) + aE[ 1 ] + " (" + aE[ 2 ] + ")"
          ENDIF
       NEXT
+      // P14: homonymy across classes is NOT, by itself, ambiguity. In the same
+      // project and the same run, `usages Class:Method` already answers
+      // `confirmed send (receiver declared AS CLASS ...)` for one site and
+      // `excluded send (dispatches to ...)` for the next - and the rename
+      // refused in bulk without ever asking. It asks now, site by site,
+      // through the same functions. What it still refuses is a site it cannot
+      // place: that is the real ambiguity, and it stays.
+      //
+      // The question is only worth asking when the CLASS is a fact. Coming
+      // from a send site the class here is "the first owner found" (see
+      // lClassGiven), so renaming part of the project by it would be a coin
+      // toss wearing a proof
       IF ! Empty( cWhy )
-         RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
-                        " - a send is dynamic dispatch, the rename is ambiguous; refusing" )
+         IF ! lClassGiven
+            RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
+                           " - a send is dynamic dispatch, the rename is ambiguous; refusing" )
+         ENDIF
+         lPartial := .T.
+         hDeclT   := DeclTables( hAsts )
+         IF hDeclT == NIL
+            RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
+                           " - a send is dynamic dispatch, the rename is ambiguous; refusing" )
+         ENDIF
+         hGraphR := ClassGraph( hAsts, hDeclT )
+         // whose each WRITTEN site is: implementation by the paste trail
+         // (PpMarkerLift), declaration by the declared channel of the stream
+         // (MethodDeclSites) - the two sources the query classifies
+         FOR EACH cPath IN hProj[ "files" ]
+            hSiteOwn[ cPath ] := { => }
+            FOR EACH hFunc IN hAsts[ cPath ][ "functions" ]
+               aLift := PpMarkerLift( hAsts[ cPath ], hFunc, cUpOld )
+               IF aLift != NIL .AND. ! Empty( aLift[ 2 ] )
+                  hSiteOwn[ cPath ][ hb_ntos( aLift[ 3 ] ) + "|" + hb_ntos( aLift[ 4 ] ) ] := ;
+                     Upper( aLift[ 2 ] )
+               ENDIF
+            NEXT
+            FOR EACH aSite IN MethodDeclSites( hAsts[ cPath ], cUpOld )
+               hSiteOwn[ cPath ][ hb_ntos( aSite[ 1 ] ) + "|" + hb_ntos( aSite[ 2 ] + 1 ) ] := ;
+                  aSite[ 3 ]
+            NEXT
+         NEXT
       ENDIF
       // membro de DADOS (VAR/DATA): a atribuição vira o send '_NOME' (o
       // setter). O getter (:NOME) e o setter (:_NOME) são o MESMO token
@@ -14852,17 +14946,44 @@ STATIC FUNCTION RenameMethod( aArgs )
    // COMPOSTOS (hMap) e as strings previstas (hPredStr) continuam estritos,
    // e a contagem de símbolos fecha o caso misto
    IF lMethod
-      hMap[ cUpOld ] := cUpNew
-      IF lData
-         hMap[ "_" + cUpOld ] := "_" + cUpNew   // DATA: o setter também é símbolo
+      // P14: under a partial rename the MESSAGE symbols are not a strict
+      // rename - the other owners keep answering them. They move to hMsgRen
+      // and are recomputed from the sends, in FactsPartialRenamed. The getter
+      // (:NAME) and the setter (:_NAME) are two messages, each alive in a
+      // module because of ITS OWN sends, so each is recomputed on its own
+      IF lPartial
+         hMsgRen[ cUpOld ] := cUpNew
+         IF lData
+            hMsgRen[ "_" + cUpOld ] := "_" + cUpNew
+         ENDIF
+      ELSE
+         hMap[ cUpOld ] := cUpNew
+         IF lData
+            hMap[ "_" + cUpOld ] := "_" + cUpNew   // DATA: o setter também é símbolo
+         ENDIF
       ENDIF
    ELSE
       hOpt[ cUpOld ] := cUpNew
    ENDIF
    FOR EACH cPath IN hProj[ "files" ]
-      aPS := {}
+      aPS    := {}
+      IF lPartial
+         aSpans := FuncStmtSpans( hAsts[ cPath ] )   // só o ArtOwners precisa
+      ENDIF
       FOR EACH aArt IN hFacts[ cPath ][ "arts" ]
          hTok  := aArt[ 2 ]
+         // P14: only the artifacts of OUR class change - `MYCLASS2_PRINT`
+         // stays as it is, and predicting it would make the verification
+         // demand an edit the rename must never make
+         IF lPartial
+            lOurs := .F.
+            FOR EACH aOne IN ArtOwners( hAsts[ cPath ], aArt, aSpans, cUpOld )
+               lOurs := lOurs .OR. aOne[ 1 ] == cUpClass
+            NEXT
+            IF ! lOurs
+               LOOP
+            ENDIF
+         ENDIF
          cPred := PredictText( hTok[ "text" ], aArt[ 3 ], cNew )
          IF hTok[ "type" ] == 21 .AND. !( Upper( hTok[ "text" ] ) == cUpOld )
             hMap[ Upper( hTok[ "text" ] ) ] := Upper( cPred )
@@ -14928,7 +15049,25 @@ STATIC FUNCTION RenameMethod( aArgs )
    FOR EACH cPath IN hProj[ "files" ]
       hAst := hAsts[ cPath ]
       aE := {}
+      hTally[ cPath ] := { => }
       FOR EACH aHit IN hFacts[ cPath ][ "sites" ]
+         // P14: under a partial rename a written site only moves when a fact
+         // says it belongs to the class being renamed. No fact = refusal:
+         // this is the ambiguity the bulk refusal was really about
+         IF lPartial
+            cOwn := hb_HGetDef( hSiteOwn[ cPath ], ;
+                                hb_ntos( aHit[ 1 ] ) + "|" + hb_ntos( aHit[ 2 ] ), "" )
+            IF Empty( cOwn )
+               RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
+                              ", and no fact says which class the site at " + ;
+                              hb_FNameNameExt( cPath ) + ":" + hb_ntos( aHit[ 1 ] ) + ":" + ;
+                              hb_ntos( aHit[ 2 ] ) + " belongs to - a send is dynamic " + ;
+                              "dispatch, the rename is ambiguous; refusing", RSN_SITE_OWNER )
+            ENDIF
+            IF !( cOwn == cUpClass )
+               LOOP
+            ENDIF
+         ENDIF
          AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
       NEXT
       IF lMethod
@@ -14939,6 +15078,41 @@ STATIC FUNCTION RenameMethod( aArgs )
                // a grafia crua na linha; editá-la cobre leitura e escrita
                IF Upper( hItem[ "sym" ] ) == cUpOld .OR. ;
                   ( lData .AND. Upper( hItem[ "sym" ] ) == "_" + cUpOld )
+                  IF lPartial
+                     // P14: the SAME verdict the query prints for this send.
+                     // hInter stays NIL, as in `usages` - the RE.3 gate: the
+                     // verdict consumes the declared channel only, never
+                     // interprocedural inference
+                     aVerd := SendVerdict( SendReceiverType( hFunc, hItem, hDeclT, NIL, hAst ), ;
+                                           cUpClass, hItem[ "block" ], cUpOld, hGraphR )
+                     IF aVerd[ 2 ]
+                        // excluded: proven to be someone else's
+                        MsgTally( hTally[ cPath ], Upper( hItem[ "sym" ] ), "other" )
+                        nSkipped++
+                        LOOP
+                     ENDIF
+                     cCert := FirstWord( aVerd[ 1 ] )
+                     IF !( cCert == "confirmed" .OR. cCert == "guaranteed" )
+                        RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
+                                       ", and the send at " + hb_FNameNameExt( cPath ) + ":" + ;
+                                       hb_ntos( hItem[ "line" ] ) + " does not resolve to a " + ;
+                                       "receiver (" + aVerd[ 1 ] + ") - the rename is " + ;
+                                       "ambiguous; refusing", RSN_SEND_RECEIVER )
+                     ENDIF
+                     // the position of THIS send (ast-21), never every
+                     // spelling on the line: with two receivers written on
+                     // one line, the line is not the site
+                     aPos := SitePos( hAst, hItem, Len( cMethod ) )
+                     IF Empty( aPos[ 2 ] )
+                        RETURN Refuse( "'" + cMethod + "' is also a member of: " + cWhy + ;
+                                       ", and the send at " + hb_FNameNameExt( cPath ) + ":" + ;
+                                       hb_ntos( hItem[ "line" ] ) + " has no position in this " + ;
+                                       "module - the rename is ambiguous; refusing", RSN_SITE_OWNER )
+                     ENDIF
+                     MsgTally( hTally[ cPath ], Upper( hItem[ "sym" ] ), "ours" )
+                     AddHit( aE, { "line" => aPos[ 1 ], "col" => aPos[ 2 ][ 1 ] - 1 } )
+                     LOOP
+                  ENDIF
                   FOR EACH aHit IN SendLineHits( hAst, hItem[ "line" ], cUpOld )
                      AddHit( aE, { "line" => aHit[ 1 ], "col" => aHit[ 2 ] - 1 } )
                   NEXT
@@ -14968,7 +15142,11 @@ STATIC FUNCTION RenameMethod( aArgs )
    NEXT
 
    cKind := iif( lData, "data", iif( lMethod, "method", "pp-marker" ) )
-   cProof := "symbols-renamed"
+   // P14: the strength of the proof is not the same, and the field says so.
+   // A whole-project rename maps the symbol table one to one; a partial one
+   // recomputes the message symbol from the sends that moved, and the other
+   // owners keep answering the old name
+   cProof := iif( lPartial, "symbols-renamed-in-class", "symbols-renamed" )
    aWork := WorkFromToken( hEdits, hb_BLen( cMethod ), cNew )
 
    Prose( iif( lData, "rename-data: " + cUpClass + ":", ;
@@ -15030,7 +15208,16 @@ STATIC FUNCTION RenameMethod( aArgs )
    // registro e nome da função gerada) - símbolos conferidos com o mapa
    // COMPUTADO; demais módulos: byte-idêntico com o símbolo renomeado
    FOR EACH cPath IN hProj[ "files" ]
-      IF ! Empty( hFacts[ cPath ][ "arts" ] )
+      IF lPartial
+         // P14: the old message symbol SURVIVES here, and the new one is
+         // ADDED - the index-wise walk of the two checks below has no meaning
+         // when the table gains an entry
+         IF ! FactsPartialRenamed( cTmp, cPath, hMap, hMsgRen, hTally[ cPath ], @cSpec )
+            RollbackAll( hOrig )
+            RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
+                           RSN_VERIFY_FAILED )
+         ENDIF
+      ELSEIF ! Empty( hFacts[ cPath ][ "arts" ] )
          IF ! FactsSymbolsRenamed( cTmp, cPath, hMap, hOpt, @cSpec )
             RollbackAll( hOrig )
             RETURN Refuse( "verification FAILED in " + hb_FNameName( cPath ) + ": " + cSpec + " - rollback", ;
@@ -15070,13 +15257,18 @@ STATIC FUNCTION RenameMethod( aArgs )
       NEXT
    NEXT
 
-   cWhy := iif( lData, ;
+   cWhy := iif( lPartial, ;
+      "verified: " + hb_ntos( nTotal ) + " edit(s); " + ;
+      iif( lData, "DATA member getter+setter", "message and generated function" ) + ;
+      " renamed for " + cUpClass + "; " + hb_ntos( nSkipped ) + " send" + ;
+      iif( nSkipped == 1, "", "s" ) + " proven to dispatch elsewhere left untouched", ;
+      iif( lData, ;
       "verified: " + hb_ntos( nTotal ) + " edit(s); DATA member getter+setter renamed, " + ;
       "registration re-derived, other modules byte-identical", ;
       iif( lMethod, ;
       "verified: " + hb_ntos( nTotal ) + " edit(s); message and generated function renamed, " + ;
       "other modules byte-identical", ;
-      "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" ) )
+      "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" ) ) )
    Prose( cWhy + hb_eol() )
 
    hRes := RenameResult( "applied", cKind, cMethod, cNew, aWork, cProof, NIL )
@@ -15124,3 +15316,113 @@ STATIC FUNCTION FactsSymbolsRenamed( cTmp, cPath, hMap, hOpt, cWhy )
    NEXT
 
    RETURN .T.
+
+// P14 - the verification of a rename that moved ONE class of a homonym pair.
+// The whole-project version above walks both tables INDEX BY INDEX, and that
+// only works while the rename is a bijection. Here it is not: the other
+// owners keep answering the old message, so the old symbol SURVIVES and the
+// new one is ADDED - the table gains an entry and every index after it slides.
+//
+// So the symbols are compared as a MULTISET keyed by name+scope+link, and the
+// MESSAGE symbols are not carried over from the map: they are RECOMPUTED from
+// what the edit did. The measured fact behind that: the bare message symbol
+// exists because of the SENDS - a module with none has none, because what
+// registers a method is a string, not a symbol. Hence, per module and per
+// message (hMsgRen = OLD -> NEW, hTally = how many sends of each moved):
+//    ours  > 0  =>  the new message symbol is there
+//    other > 0  =>  the old one is still there
+// The functions stay index-wise: a partial rename does not add or remove one
+STATIC FUNCTION FactsPartialRenamed( cTmp, cPath, hMap, hMsgRen, hTally, cWhy )
+
+   LOCAL hA := ProofFacts( cTmp, cPath, "before", @cWhy )
+   LOCAL hB := iif( hA == NIL, NIL, ProofFacts( cTmp, cPath, "after", @cWhy ) )
+   LOCAL hExp := { => }, hMsg := { => }, nI, cName, cAfterName, cKey, hSym
+
+   IF hA == NIL .OR. hB == NIL
+      RETURN .F.
+   ENDIF
+   IF Len( hA[ "funcs" ] ) != Len( hB[ "funcs" ] )
+      cWhy := "the function count changed"
+      RETURN .F.
+   ENDIF
+   FOR nI := 1 TO Len( hA[ "funcs" ] )
+      cName      := hA[ "funcs" ][ nI ][ "name" ]
+      cAfterName := hB[ "funcs" ][ nI ][ "name" ]
+      IF !( hb_HGetDef( hMap, cName, cName ) == cAfterName )
+         cWhy := "function " + cName + " -> " + cAfterName + " unexpected"
+         RETURN .F.
+      ENDIF
+   NEXT
+   // the names held OUT of the multiset - both sides of every message pair
+   FOR EACH cName IN hb_HKeys( hMsgRen )
+      hMsg[ cName ] := .T.
+      hMsg[ hMsgRen[ cName ] ] := .T.
+   NEXT
+   FOR EACH hSym IN hA[ "syms" ]
+      cName := hb_HGetDef( hMap, hSym[ "name" ], hSym[ "name" ] )
+      IF hb_HHasKey( hMsg, cName )
+         LOOP
+      ENDIF
+      cKey := cName + "|" + hb_ntos( hSym[ "scope" ] ) + "|" + hSym[ "link" ]
+      hExp[ cKey ] := hb_HGetDef( hExp, cKey, 0 ) + 1
+   NEXT
+   FOR EACH hSym IN hB[ "syms" ]
+      cName := hSym[ "name" ]
+      IF hb_HHasKey( hMsg, cName )
+         LOOP
+      ENDIF
+      cKey := cName + "|" + hb_ntos( hSym[ "scope" ] ) + "|" + hSym[ "link" ]
+      IF hb_HGetDef( hExp, cKey, 0 ) == 0
+         cWhy := "symbol " + cName + " unexpected after the rename"
+         RETURN .F.
+      ENDIF
+      hExp[ cKey ] -= 1
+   NEXT
+   FOR EACH cKey IN hb_HKeys( hExp )
+      IF hExp[ cKey ] != 0
+         cWhy := "symbol " + Left( cKey, At( "|", cKey ) - 1 ) + " disappeared"
+         RETURN .F.
+      ENDIF
+   NEXT
+   FOR EACH cName IN hb_HKeys( hMsgRen )
+      IF SymPresent( hB[ "syms" ], hMsgRen[ cName ] ) != ;
+         ( MsgCount( hTally, cName, "ours" ) > 0 )
+         cWhy := "message " + hMsgRen[ cName ] + " does not match the sends that moved"
+         RETURN .F.
+      ENDIF
+      IF SymPresent( hB[ "syms" ], cName ) != ( MsgCount( hTally, cName, "other" ) > 0 )
+         cWhy := "message " + cName + " does not match the sends left for the other owner(s)"
+         RETURN .F.
+      ENDIF
+   NEXT
+
+   RETURN .T.
+
+// P14 - the sends of ONE message that a partial rename moved ("ours") and
+// left ("other"). The getter (:NAME) and the setter (:_NAME) of a DATA member
+// are two messages, and each lives in a module because of its OWN sends -
+// counting them together would let a module that only ever reads say
+// something about the symbol only a write creates
+STATIC PROCEDURE MsgTally( hTally, cUpSym, cField )
+
+   IF ! hb_HHasKey( hTally, cUpSym )
+      hTally[ cUpSym ] := { "ours" => 0, "other" => 0 }
+   ENDIF
+   hTally[ cUpSym ][ cField ]++
+
+   RETURN
+
+STATIC FUNCTION MsgCount( hTally, cUpSym, cField )
+   RETURN iif( hb_HHasKey( hTally, cUpSym ), hTally[ cUpSym ][ cField ], 0 )
+
+STATIC FUNCTION SymPresent( aSyms, cUpName )
+
+   LOCAL hSym
+
+   FOR EACH hSym IN aSyms
+      IF hSym[ "name" ] == cUpName
+         RETURN .T.
+      ENDIF
+   NEXT
+
+   RETURN .F.

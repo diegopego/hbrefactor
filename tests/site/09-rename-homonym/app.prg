@@ -11,15 +11,23 @@ PROCEDURE Main()
    RETURN
 
 CREATE CLASS Pagamento
+   METHOD New() CONSTRUCTOR
    METHOD Enviar()
 ENDCLASS
+
+METHOD New() CLASS Pagamento
+   RETURN Self
 
 METHOD Enviar() CLASS Pagamento
    RETURN "pago"
 
 CREATE CLASS Registro
+   METHOD New() CONSTRUCTOR
    METHOD Enviar()
 ENDCLASS
+
+METHOD New() CLASS Registro
+   RETURN Self
 
 METHOD Enviar() CLASS Registro
    RETURN "gravado"
