@@ -5,34 +5,34 @@
   "argv": [
    "rename",
    "app.hbp",
-   "app.prg:7:12",
-   "nTotal",
+   "app.prg:9:10",
+   "Destino",
    "--json"
   ],
   "status": "ok",
   "exit": 0,
   "reason": null,
   "action": null,
-  "detail": "verified: 4 edit(s); symbol renamed, pcode byte-identical",
+  "detail": "verified: 3 edit(s); symbol tables renamed as expected, pcode byte-identical",
   "diagnostics": [],
   "result": {
    "verdict": "applied",
-   "kind": "memvar",
-   "old": "nLinhas",
-   "new": "nTotal",
-   "editCount": 4,
+   "kind": "function",
+   "old": "Alvo",
+   "new": "Destino",
+   "editCount": 3,
    "proof": "pcode-identical",
    "locations": [
     {
      "uri": "file://<CWD>/app.prg",
      "range": {
       "start": {
-       "line": 2,
-       "character": 7
+       "line": 0,
+       "character": 8
       },
       "end": {
-       "line": 2,
-       "character": 14
+       "line": 0,
+       "character": 12
       }
      }
     },
@@ -40,38 +40,25 @@
      "uri": "file://<CWD>/app.prg",
      "range": {
       "start": {
-       "line": 6,
-       "character": 11
-      },
-      "end": {
-       "line": 6,
-       "character": 18
-      }
-     }
-    },
-    {
-     "uri": "file://<CWD>/app.prg",
-     "range": {
-      "start": {
-       "line": 10,
+       "line": 4,
        "character": 20
       },
       "end": {
-       "line": 10,
-       "character": 27
+       "line": 4,
+       "character": 24
       }
      }
     },
     {
-     "uri": "file://<CWD>/cmdlog.ch",
+     "uri": "file://<CWD>/app.prg",
      "range": {
       "start": {
-       "line": 0,
-       "character": 28
+       "line": 8,
+       "character": 9
       },
       "end": {
-       "line": 0,
-       "character": 35
+       "line": 8,
+       "character": 13
       }
      }
     }

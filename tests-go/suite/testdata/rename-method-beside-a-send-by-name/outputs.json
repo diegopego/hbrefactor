@@ -50,17 +50,6 @@
      }
     }
    ],
-   "reach": {
-    "complete": false,
-    "runtime": [
-     {
-      "file": "app.prg",
-      "line": 21,
-      "kind": "message",
-      "sym": "__OBJSENDMSG"
-     }
-    ]
-   },
    "derived": [
     {
      "from": "CAIXA_MOSTRA",

@@ -1188,6 +1188,22 @@ heurística viva ao lado dele. Então:
    fronteira que ele não cobre. Isto responde, com fato, a assimetria que o backlog de
    27/07 registrou como decisão pendente (memvar recusa × função passa).
 
+   > **REVOGADO em 2026-08-11, pelo Diego, e a pergunta dele é a régua**: *"pra que falar
+   > que não alcançou algo que o rename não tem nem pista de que poderia ser algo
+   > relacionado ao rename que foi pedido?"* O campo `reach` foi entregue, viveu dois dias e
+   > **saiu**: ele listava sítios do PROJETO, sem fato ligando nenhum deles àquele rename, e
+   > por isso saía idêntico em toda invocação — um `Do( cNome )` num módulo qualquer
+   > aparecia em todo rename do projeto. Informação que sai sempre não informa.
+   >
+   > **A régua que ficou, e vale para todo campo futuro: sítio se LISTA onde um fato o liga
+   > à operação; onde não liga, não se lista.** A recusa do memvar nomeia os furos do
+   > alcance do criador — ali a lista É o produto, porque aquele código roda enquanto a
+   > variável vive. No rename de função não há esse vínculo, e não havia como haver.
+   >
+   > O que a informação era — onde o projeto resolve nome em run time — é propriedade do
+   > PROJETO, e o lugar dela é a auditoria da [P37](#p37), que se roda quando se quer.
+   > Nada disso chegou a usuário: entrou e saiu entre dois commits.
+
 **DUAS REGRAS DO DIEGO QUE GOVERNAM ESTA FASE** *(2026-07-27; resgatadas em 2026-08-09 do
 razão de sessão que as guardava, ao auditá-lo antes de apagá-lo — não existiam em nenhum
 outro lugar, e as duas são operativas AQUI)*
@@ -1383,7 +1399,210 @@ via `hb_MilliSeconds` — está preservado, agora sobre `--dry-run`). A **extens
 VSCode** perdeu o modal "Proceed (--force)?", que era o último ponto onde ela
 decidia fluxo casando prosa em inglês. `make test` 1005/0.
 
-### P36d — o `reach` do reorder-params tem escopo errado *(aberta 2026-08-10; **A FAZER**)*
+### P37 — AUDITORIA DE ADEQUAÇÃO: onde este projeto é refatorável, e onde não é *(ideia do Diego, 2026-08-09: "detecção de código inadequado a refatoração como um alerta, assim um programador poderia aderir às boas práticas se quisesse"; **A FAZER**)*
+
+**A forma, e ela já está quase pronta**: não é verbo novo (o portão D-P5 não se toca). É o
+`find-dynamic-calls` — que na P36b deixou de ler string e passou a responder por fato —
+ganhando **veredito POR ARQUIVO** e um resumo, em vez da lista corrida de achados. E é o que
+o Diego pediu: *"um flag para o programador rodar quando quiser, ao invés de disparar a cada
+vez que faça algum refactor"*.
+
+**Os fatos que ela usa já existem, todos**: `dyn` em `calls[]` (ast-25/26) e macro **escrito
+pelo programador** (token type 22, `prov: "s"`, com coluna — o mesmo critério do
+`HasUserMacro`, que já separa o `&` do usuário do que a expansão do `hbclass.ch` gera).
+Zero fato novo, zero mudança de core.
+
+**O que NÃO conta como inadequado, e a medição é o argumento**: `sends[]`. Envio de mensagem
+é despacho dinâmico por definição, está em **41% dos módulos do core**, e a ferramenta lida
+com ele desde a B4f (camadas confirmed/excluded/possible). Chamar isso de "inadequado" seria
+declarar OOP inadequada, o que é falso e destruiria a utilidade do relatório.
+
+**O NÚMERO que justifica a fase** *(censo de 2026-08-10: os 692 `.prg` de `src/` e `contrib/`
+do core que compilam isolados, cada um dumpado e contado)*:
+
+| | módulos | |
+|---|---|---|
+| **limpos** (sem `&` escrito e sem chamada `dyn`) | **647** | **93%** |
+| com `&` ESCRITO pelo programador | 9 | 1% |
+| com chamada que resolve nome em run time | 39 | 5% |
+| *(com `usesMacro` ligado, quase tudo vindo do `hbclass.ch`)* | *163* | *23%* |
+
+Os 7% se concentram onde se espera — `xhberr.prg`, `debugger.prg`, `tpersist.prg`,
+`dbedit.prg`, `ttable.prg`. É infraestrutura, não código de aplicação. **É este número que
+torna a fase útil**: um relatório que fala em 7% dos arquivos é lido; um que fala em 60% é
+desligado.
+
+**O que a auditoria NÃO faz, e este é o ponto duro da fase**: ela **não exclui arquivo da
+análise**. Excluir quebraria a solidez — o alcance de um rename precisa de TODOS os
+chamadores, e ignorar um módulo trocaria uma recusa verdadeira por uma mentira silenciosa,
+que é exatamente o defeito que a P36 acabou de matar. O veredito é informação para o
+humano; os verbos continuam vendo o projeto inteiro.
+
+**Escopo**
+- veredito por arquivo (`traceable` × `has run-time reach`), com os sítios de cada um e a
+  classe (`memvar`/`function`/`code`/`message`/macro);
+- resumo: quantos módulos de quantos, que é o número que o programador acompanha ao longo do
+  tempo;
+- envelope estruturado (é o contrato de máquina da fase A: a IDE e o agente leem daqui);
+- caso da suíte com um projeto de 3 módulos — dois limpos, um dinâmico — provando o veredito
+  dos três e o resumo.
+
+**A MARCAÇÃO DE "IGNORE" FICA FORA — e a decisão é do Diego, 2026-08-10, com o motivo
+dele:** *"nem você me convenceu e nem eu te convenci. deixe o código crescer e gerar fatos
+para depois conversarmos sobre isso."*
+
+Os dois lados ficam registrados para ninguém re-litigar do zero:
+
+- **a favor**: *"assim como diversos linters contêm diretivas de ignorar, e dado que um
+  programador pode escolher escrever código que só é entendido em runtime, eventualmente ele
+  vai querer marcar estes trechos como a serem ignorados pelo refactor — afinal já é sabido
+  que o refactor nunca vai alcançar lá e pode ser que só fique gerando ruído"* (Diego);
+- **contra, por ora**: o ruído ainda não existe. A auditoria é comando que se roda quando se
+  quer, e o censo diz 7% dos módulos. **Deixar o ruído acontecer primeiro é o que dá
+  embasamento** — decidir agora seria decidir sobre ruído suposto.
+
+**O que NUNCA vai existir, e agora está MEDIDO em vez de argumentado** *(pergunta do Diego,
+2026-08-11: "existe chamador que vai gerar ruído dando recusa porque é dinâmico?")*: marcação
+que faça a ferramenta *não analisar* um arquivo.
+
+Projeto de dois módulos, `app.prg` + uma `lib.prg` "sabidamente dinâmica" (`Do( cNome )` e
+`__mvGet( cVar )`):
+
+| o dinâmico está... | verbo | resultado |
+|---|---|---|
+| no projeto, FORA do alcance do criador | rename de memvar | **ok** |
+| no projeto, em qualquer lugar | rename de função | **ok** (declara no `reach`) |
+| idem | método, `reorder-params`, `inline-local` | **ok** |
+| DENTRO do alcance do criador | rename de memvar | **recusa**, nomeando `LIBLE (lib.prg:8) calls __MVGET` |
+
+**Quatro dos cinco verbos não recusam por chamador dinâmico** — depois da P36 eles declaram.
+O ruído que a marcação existiria para calar **não existe** neles.
+
+E o único caso que recusa é justamente aquele em que calar seria mentir: o código dinâmico
+**roda enquanto o `PRIVATE` está vivo** e lê memvar por nome. Marcar `lib.prg` como ignorada
+ali equivale a afirmar que aquele `__mvGet( cVar )` não nomeia esta variável — que é a
+afirmação que ninguém pode fazer, e a razão de a ferramenta existir. A saída legítima do
+programador não é uma marca: é **estreitar o escopo** (não chamar a biblioteca dinâmica
+enquanto o `PRIVATE` vive), que é a reorganização que esta auditoria existe para sugerir.
+
+*(Nuance que fecha o assunto: memvar é, nas palavras do Diego na P22, "um code smell", e
+"é aceitável que sejamos limitados também no tratamento dela". O único verbo que recusa por
+alcance dinâmico é exatamente aquele em que a limitação já era aceita.)*
+
+**E o propósito da auditoria, dito pelo Diego, é mais do que informar**: *"seria boa
+ferramenta para alertar ao desenvolvedor para organizar seu código de uma forma melhor, para
+que ele refatore o seu código movendo trechos dinâmicos para arquivos isolados do código
+refatorável."* Isso muda o que o relatório precisa dizer: não basta listar sítios — ele tem
+de deixar **óbvio qual módulo está a um passo de ficar limpo** (um único `&` num arquivo de
+2.000 linhas é convite a mover; quarenta sítios espalhados é outra conversa). O censo do core
+mostra que o alvo é realista: 93% já estão limpos, e os sujos são poucos e concentrados.
+
+**O INVENTÁRIO DE CONSTRUTOS — o que a ferramenta refatora sem dúvida** *(ordem do Diego,
+2026-08-10: "esta fase deve determinar qual tipo de código a hbrefactor pode refatorar sem
+dúvidas"; medido com uma fixture que exercita cada um e compila limpo sob `-w3 -es2`)*:
+
+| construto | o que o COMPILADOR entrega | situação |
+|---|---|---|
+| codeblock `{\| x \| ... }` | param como `local`+`block:true`; captura como **`detached`** | **coberto** |
+| `Eval( bBloco )`, `AEval` | `sends[] = EVAL`; o bloco é VALOR, não nome | coberto |
+| `#define` | valor expandido, token com `from` | coberto |
+| `#xcommand`/`#translate` (DSL) | `ppRules`/`ppApplications`, match/result, derivação | coberto (linha B4/P) |
+| `FIELD a, b IN alias` | `declarations[].scope = "field"` | coberto |
+| `PRIVATE`/`PUBLIC`/`MEMVAR` | declarations + occurrences + `__mvPrivate` gerado | coberto, com as regras de alcance |
+| `STATIC` file-wide × de função | `declarations` com `filewide` | coberto (P30) |
+| `hb_macroBlock`/`Type`/`Do`/`__mv*`/`__objSendMsg` | `calls[].dyn` (ast-25/26) | **declarado** |
+| macro `&cVar` | `usesMacro` + nó MACRO posicionado; **operando `null`** | **declarado**; recusa no alcance de memvar |
+| `#ifdef` (ramo desligado) | **nada** — o pp não deixa rastro em canal nenhum | **P17**, buraco conhecido, hoje DECLARADO no `scope` |
+| `REQUEST`/`EXTERNAL` | símbolo na tabela **com `scope: 0`** (sem `HB_FS_USED`) | **buraco NOVO — P38** |
+
+**O custo da auditoria é ~zero, e isso responde ao alerta do Diego** (*"historicamente muitos
+recursos foram gastos tentando determinar se um rename seria bem sucedido tentando usar
+heurística"*): cada linha da tabela já é fato que o dump entrega hoje. A auditoria **não
+tenta prever se um rename vai dar certo** — quem responde isso é a recompilação, e ela já
+responde. A auditoria só relata a presença dos construtos. No dia em que alguém propuser
+"analisar melhor para prever", é esta linha que diz não.
+
+**Critério de pronto (mecânico)**: caso com 3 módulos provando os dois vereditos e o resumo;
+o veredito saindo do envelope (não da prosa); `sends[]` **não** classificando módulo como
+inadequado (caso que trava isso, porque é o erro fácil); e a auditoria rodada sobre o corpus
+do core reproduzindo o censo acima — se divergir, ou o censo estava errado ou a auditoria
+está, e a diferença é o achado.
+
+### P38 — `REQUEST`/`EXTERNAL` nomeiam a função e o rename não os vê *(achado 2026-08-10 pela varredura de construtos da P37; **✅ ENTREGUE 2026-08-11, `ast-27`** — passo 2; o passo 1 caiu por não ter mais consumidor)*
+
+**Medido, com fixture que compila limpo:**
+
+```harbour
+REQUEST Alvo          // linha 3 - nomeia a função TEXTUALMENTE
+...
+FUNCTION Alvo()       // linha 33
+```
+
+`rename Alvo -> Destino` edita a chamada e a definição, **não** edita a linha 3, e então:
+
+```
+hbrefactor: verification FAILED in a: the number of symbols/functions changed - rollback
+```
+
+**A máquina funcionou**: o verificador pegou, desfez, e o fonte voltou byte a byte. O defeito
+não é de segurança — é que o usuário recebe *"o número de símbolos mudou"* onde a verdade é
+*"há um REQUEST na linha 3 nomeando esta função"*. Mensagem ilegível é o modo de falha que a
+fase A existe para matar. `EXTERNAL` se comporta igual.
+
+**O CONSERTO é o passo 2** (Diego, 2026-08-10: *"parece que só o passo já resolveria tudo"* —
+e resolve: com o sítio publicado, o rename edita a linha e o caso deixa de existir). O passo 1
+**não é caminho para ele** e não é pré-requisito: é outra coisa, que sobrevive depois dele, e
+por isso vem descrita primeiro só por ser mais barata.
+
+**PASSO 1 — a mensagem passa a dizer a verdade, sem core e sem adivinhar.** A ferramenta já
+compara as tabelas de símbolos antes e depois; o que ela não faz é CONTAR o que viu. Depois
+da edição o módulo ainda declara o nome VELHO — porque a linha do `REQUEST` o manteve vivo —
+e isso é fato direto da comparação. A recusa passa de *"o número de símbolos mudou"* para
+*"depois do rename o módulo ainda declara 'Alvo': algo o nomeia num sítio que a edição não
+alcançou"*. Cobre `REQUEST`, `EXTERNAL` e qualquer outro construto que mantenha o nome vivo,
+porque não pergunta QUEM nomeia — só constata que o nome sobreviveu.
+
+> **A rota barata que eu ia propor e MEDI antes**: um símbolo nomeado sem ser usado sai com
+> `scope: 0`+`link: extern`, e daria para acusar o `REQUEST` por aí. Só que, quando a função
+> também é definida no módulo, o mesmo símbolo sai `scope: 8705`+`link: func` —
+> indistinguível de uma função comum. A rota cobre metade dos casos e teria virado regra com
+> cara de completa.
+
+**PASSO 2 — o core publica o sítio, e aí o rename EDITA. É ESTE que resolve o caso.** O token do operando está no fluxo,
+mas nada o liga ao `REQUEST`; ligar por proximidade de linha seria adivinhação (§1.2 gatilho
+1). O padrão já existe e é o mesmo dos outros três canais de sítio: nome + linha + coluna.
+Com ele, o `rename-function` edita a linha do `REQUEST` como edita a definição, e a
+verificação passa. Vale para o `REQUEST` que mora em OUTRO módulo, que é o caso comum: o
+sítio é publicado por módulo, e o verbo já varre o projeto inteiro.
+
+**Então por que fazer o passo 1?** Não pelo `REQUEST` — depois do passo 2 ele não produz mais
+mensagem nenhuma. É porque *"o número de símbolos mudou"* é a mensagem que **qualquer**
+construto ainda desconhecido vai produzir, e ela não diz nada a quem lê. O verificador pegou o
+problema; quem falhou foi a descrição. Enquanto for barato (a comparação já acontece; falta
+NOMEAR o símbolo sobrevivente), vale.
+
+> **O QUE ENTROU (2026-08-11)**: só o passo 2, e o passo 1 **não foi feito** — sem o
+> `REQUEST` para produzi-la, a mensagem opaca ficou sem caso conhecido que a exercite, e
+> escrever melhoria de mensagem sem caso é escrever o que ninguém confere. Ela volta no dia
+> em que outro construto a produzir, e aí com o caso junto.
+>
+> **A forma da entrega**: `hb_compAstExternAdd` chamado das QUATRO ações da gramática
+> (`ExtList`/`DynList`, cada uma com a variante de lista), lendo `@N` da pilha de
+> localizações — o mecanismo que a P21 construiu. O `rename-function` consome `externs[]`
+> com `hb_HGetDef` e edita como edita a definição. Caso `rename-function-named-by-a-request`
+> nasceu vermelho com a mensagem opaca. `make test` 1005/0; `make pcode-identity` 889/889
+> **com o parser regenerado**, que era a dúvida real desta fatia.
+>
+> **Ritual do parser conferido** (§2): `harbour.y` + `harbour.yyc` mudaram e vão juntos; o
+> `harbour.yyh` **não** mudou, e está certo — nenhum token novo entrou, só ações.
+
+**Critério de pronto (mecânico)**: caso pinando o rename de função com `REQUEST` — nasce
+vermelho com a mensagem opaca de hoje — passando a recusar NOMEANDO o símbolo sobrevivente
+(passo 1); depois, o mesmo caso com o `REQUEST` reescrito e a verificação passando (passo 2);
+caso irmão para `EXTERNAL`; e um caso com `REQUEST` de função de OUTRO módulo, que é onde o
+`scope: 0` aparece.
+
+### P36d — o aviso de chamada dinâmica sai do reorder-params *(aberta 2026-08-10; **✅ FECHADA 2026-08-11 por decisão do Diego**)*
 
 **O defeito, achado por pergunta do Diego** (*"o reorder que é recusado é quando
 alguém tenta reorder em cima da chamada do()? ou da função invocada pelo do()?"*).
@@ -1395,18 +1614,19 @@ de `Soma`, com a qual não tem relação nenhuma.
 mais. **O que fica ABERTO** é o escopo do que ele declara: hoje ele lista toda
 chamada dinâmica do projeto, o que é ruído em projeto grande.
 
-**A pergunta que abre a fatia, e é de core (§1.1)**: quando o argumento do nome é
-**constante de compilação** (`Do( "Soma", 2, 3 )`), o compilador SABE o nome — ele
-está na árvore, e o `ast-25` já publica a chamada. Se o dump publicar também o nome
-resolvido quando ele é constante, o verbo passa a distinguir três situações em vez
-de uma: *nomeia esta função* (relata/recusa), *nomeia outra* (silêncio), *não dá para
-saber* (declara). **Sondar antes de projetar**: medir quantos `Do(...)`/`__mvGet(...)`
-do corpus têm argumento constante — se for a maioria, a fatia vale; se for resíduo,
-o escopo certo é outro.
+**FECHADA sem fatia de core, e a decisão é do Diego (2026-08-11)**: o aviso saiu por
+inteiro, e a razão dele é de produto, não de mecanismo — *"o `do` tem sua própria API e ela
+executa uma função, mas ela aceita strings. Então o programador que invoca uma função a
+partir de `do()` sabe que ela não vai ser alcançada em uma reorganização de parâmetros"*.
 
-**Critério de pronto (mecânico)**: tabela de sondas com a medição do corpus; e, se a
-fatia seguir, caso pinando que um `Do()` que nomeia outra função **não** aparece no
-`reach` do reorder daquela, e que um que nomeia a própria aparece.
+Não é descuido a ser lembrado a cada comando: é escolha de quem escreveu. O relato desse
+tipo de chamada é da **auditoria** (P37), que se roda quando se quer — *"como se usa um
+mecanismo de formatação de código para garantir boas práticas"* (Diego).
+
+A rota de core que esta fase ia sondar — publicar o nome resolvido quando o argumento é
+constante de compilação — **não foi aberta**, e fica registrada caso volte a fazer sentido:
+ela só serviria para distinguir *nomeia esta função* de *nomeia outra*, e a decisão acima
+diz que nem a primeira merece aviso no verbo.
 
 ### P33 — LSP como superfície de entrega *(aberto 2026-08-08; decisão do Diego: "concordo com: LSP como superfície de entrega"; **A FAZER**)*
 

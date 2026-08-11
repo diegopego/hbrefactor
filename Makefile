@@ -47,7 +47,7 @@ CORE_SCHEMA = $(shell sed -n 's/^\#define HB_AST_SCHEMA  *"\(ast-[0-9]*\)".*/\1/
 # por engano. `make build` continua compilando.
 .DEFAULT_GOAL := help
 
-.PHONY: build core core-check stock stock-check pcode-identity test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage setup-env deps help
+.PHONY: build core core-check stock stock-check pcode-identity test caso gotest govet oracle ppcorpus lexdiff clean hooks site-serve site-check site-examples tmp-usage tmp-prune tmp-prune-check setup-env deps help
 
 # RC: os shell rc onde o setup-env escreve. Default: os DOIS (bash + zsh) - o
 # bloco é idempotente, então escrever nos dois é inócuo. Override p/ um só:
@@ -226,6 +226,7 @@ test: build bin/tcheck bin/parrun
 	# como o portão da página ficou mudo justamente na fase que o quebrou
 	@$(MAKE) --no-print-directory lexdiff
 	@$(MAKE) --no-print-directory site-check
+	@$(MAKE) --no-print-directory tmp-prune-check
 	@$(MAKE) --no-print-directory gotest
 
 # RETRATO do core: grava os .ppo/.ppt de cada caso. É o UNICO esperado que se
@@ -338,6 +339,17 @@ site-serve:
 ## tmp-usage   AVISA se os temporários passaram do limite (nunca apaga; HBREFACTOR_TMP_WARN_MB=500)
 tmp-usage: tools/tmp-usage.sh
 	@tools/tmp-usage.sh
+
+## tmp-prune   REMOVES the disposable temps (never snap/ without --snap; ARGS='--all')
+tmp-prune: tools/tmp-prune.sh
+	@tools/tmp-prune.sh $(ARGS)
+
+# the gate for tmp-prune: it deletes for a living, so its guarantees (snap/ is
+# never dropped by default, a live run defers lock/ and ast/, dry-run removes
+# nothing) are asserted against a synthetic tree. Deterministic under `make
+# test` because "live" is scoped by each candidate's own TMPDIR.
+tmp-prune-check: tools/tmp-prune.sh
+	@tools/tmp-prune.sh --selftest
 
 ## deps        instala as dependências EXTERNAS (node, go, bison); --check só relata
 deps: tools/deps.sh

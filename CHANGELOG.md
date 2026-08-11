@@ -1,4 +1,4 @@
-<!-- changelog-baseline: hbrefactor@17fb3a0 -->
+<!-- changelog-baseline: hbrefactor@29b3665 -->
 <!-- Delta pointer. Everything AFTER this commit is NOT yet described here.
      To resume:  git log e3efe33..HEAD   (see § Maintaining this file, at the end). -->
 
@@ -19,6 +19,26 @@ The compiler that makes all of this possible has its own:
 **[harbour-core/NEWS.md](../harbour-core/harbour/NEWS.md)** (branch
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
+
+## 2026-08-11 — renaming a function that a `REQUEST` names
+
+```harbour
+REQUEST Alvo          // this line names the function too
+
+FUNCTION Alvo()
+```
+
+Renaming `Alvo` used to fail. Not silently - the tool recompiled, saw the module
+still declaring the old symbol, put everything back byte for byte, and told you
+`the number of symbols/functions changed`. Safe, and impossible to act on.
+
+It now edits that line like it edits the definition: three sites, pcode
+byte-identical. `EXTERNAL` and `DYNAMIC` too, and two names on one line
+(`REQUEST Alvo, Outra`) are two sites.
+
+The compiler had the fact all along - it knows which token spells that name - and
+had no channel to hand it over. That is the shape of most things this tool cannot
+do: not analysis it lacks, but a fact the compiler never got to say.
 
 ## 2026-08-10 — `--force` is gone
 
@@ -125,20 +145,12 @@ That rename now goes through with no warning at all, and the string is left
 exactly as it was. `--force` is for a risk that was proven, and spending it on
 a non-risk is how a flag stops being read.
 
-**Renaming a FUNCTION does not refuse on macro — it states the reach.** Macro
-evaluation is run time, and a refactoring tool does not control it; pretending
-otherwise would be worse than saying so. So the machine output of a rename now
-carries a `reach` field saying, explicitly, whether anything in the project
-resolves names at run time and where:
-
-```json
-"reach": { "complete": false,
-           "runtime": [ { "file": "app.prg", "line": 6, "kind": "code", "sym": null } ] }
-```
-
-`complete: true` is stated too, never implied by silence — the point is that
-you should not have to notice an *absent* field to learn that something was
-left out.
+**Renaming a FUNCTION does not refuse on macro.** Macro evaluation is run time,
+and a refactoring tool does not control it; pretending otherwise would be worse
+than saying so. You get what was proved — the edited sites and the comparison
+behind them — and where your project builds names at run time is answered by
+the audit, which you run when you want to know, instead of a line repeated on
+every rename.
 
 **Where it still bites you.** Renaming a **method** or reordering parameters
 still uses the old literal comparison, so the assembled-name case gets past

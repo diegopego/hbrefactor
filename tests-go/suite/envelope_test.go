@@ -51,30 +51,13 @@ type Escopo struct {
 	Unseen   []string `json:"unseen"`
 }
 
-// Alcance (P36) is the OTHER thing a rename may not have seen, and it is a
-// different unknown from Escopo's: not a region the compilation skipped, but a
-// name that only exists while the program RUNS - a macro evaluation, or a call
-// to a core function that resolves a symbol from a value (ast-25).
-//
-// It is a field and not a silence for the reason the spec gives uncertainty in
-// general: absence does not catch anyone's eye, so `complete` is stated in both
-// directions. It does not refuse - macros are outside the tool's control by
-// decision, and the honest product is saying where they are.
-type Alcance struct {
-	Complete bool           `json:"complete"`
-	Runtime  []SitioRuntime `json:"runtime"`
-}
-
-type SitioRuntime struct {
-	File string `json:"file"`
-	Line int    `json:"line"`
-	// what class of symbol the site may reach by name: "code" (a macro
-	// evaluation or a run-time compile - anything), "memvar", "function"
-	Kind string `json:"kind"`
-	// the core function that resolves the name, when the site is a call;
-	// null for a macro, which is the language itself doing it
-	Sym *string `json:"sym"`
-}
+// [REMOVIDO 2026-08-11, decisão do Diego] Aqui viveram `Alcance`/`SitioRuntime`,
+// o tipo do campo `reach` do result. O campo saiu do produto: ele listava
+// sítios do PROJETO que resolvem nome em run time, sem fato nenhum que os
+// ligasse ao rename pedido, e por isso saía igual em toda invocação. Essa
+// informação é da auditoria (roadmap P37), que se roda quando se quer.
+// O tipo sai junto de propósito: com ele fora, um `reach` que volte não
+// compila num caso, em vez de passar despercebido.
 
 // A forma do result é POR COMANDO — um rename não tem os campos de um usages,
 // e o rename de palavra de DSL tem os seus.
@@ -86,10 +69,6 @@ type Resultado struct {
 	EditCount int     `json:"editCount,omitempty"`
 	Proof     string  `json:"proof,omitempty"`
 	Locations []Local `json:"locations,omitempty"`
-
-	// nos verbos com alcance de projeto (o rename de local não tem: um
-	// homônimo em ramo pulado é outra variável, e macro não alcança LOCAL)
-	Reach *Alcance `json:"reach,omitempty"`
 
 	// só no rename de palavra de DSL
 	Scope                *Escopo `json:"scope,omitempty"`

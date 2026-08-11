@@ -12,23 +12,37 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 
 ---
 
-> **⇢ COMECE AQUI (atualizado em 2026-08-09): vá direto ao
-> [`roadmap.md`](roadmap.md).** Não existe mais arquivo de retomada — a frente da
-> POSIÇÃO DO SÍTIO fechou inteira, e o ledger daquela sessão morreu com ela (era
-> `retomada-sessao.md`; este bloco apontava para ele e ficou com link morto por
-> algumas horas — ninguém percebeu, porque **nada verifica referência entre docs**).
->
-> **O que aquela linhagem entregou** (registro por fase no roadmap): **P21** (`ast-21`),
-> **P24** (`ast-23`), **P25**, **P26**, **P27**, **P28**, **P30**; depois **P32**
-> (`ast-24` — as provas passaram a ler fato do compilador e o leitor de `.hrb` morreu),
-> **P29**, **P31** e a **P35**, fechada por política no dia em que abriu. O mecanismo da
-> posição está em [`posicao-do-sitio.md`](posicao-do-sitio.md).
->
-> **O que está ABERTO agora** — e é isto que uma sessão fria precisa saber:
-> **P33** (LSP como superfície de entrega, aprovada pelo Diego, A FAZER) e **P34**
-> (IntelliSense, exploratória); **P17** é a mais grave da fila antiga; **P22** e **P25**
-> seguem EM CURSO; e a `site/index.html` do hbrefactor, o deploy do Pages do core e o
-> push dos dois repositórios estão **adiados por ordem do Diego**.
+> **⇢ MINI-ROADMAP DA SESSÃO DE 2026-08-09/11** *(formato pedido pelo Diego: quando a
+> sessão fica longa, o handoff vira o mapa dela, e ele apaga o arquivo quando tudo estiver
+> pronto)*. O estado durável está no [`roadmap.md`](roadmap.md); aqui só o que está VIVO.
+
+**ENTREGUE E COMMITADO** — `hbrefactor@29b3665` + `harbour-core@5735f10f04`:
+**P36** (`ast-25`: o dump marca a chamada que resolve nome em run time; a heurística de
+string do memvar morre) e **P36b** (a família frágil inteira: `inline-local`,
+`reorder-params`, `rename-method`, `extract-function`, `find-dynamic-calls`; `ast-26` para a
+classe `message`).
+
+**NA ÁRVORE, VERDE, NÃO COMMITADO** — `make test` 1005/0, `pcode-identity` 889/889:
+- **P36c** — a flag `--force` **morreu**. Os cinco alimentadores viraram o que eram: dois
+  diagnostics, um alerta FALSO removido (sombra de local — medido: o programa imprime o
+  mesmo valor e o pcode sai idêntico), uma recusa por quebra provada
+  (`memvar-named-inside-a-macro-string`) e uma declaração. A extensão perdeu o modal.
+- **A remoção do campo `reach`** — ele viveu dois dias e saiu por decisão do Diego
+  (2026-08-11). A régua que ficou vale para todo campo futuro: **sítio se LISTA onde um fato
+  o liga à operação; onde não liga, não se lista.**
+- **P36d** — o mesmo aviso saiu do `reorder-params`, pela mesma razão mais a de produto:
+  quem chama por `Do()` sabe que não será alcançado por reorganização de parâmetros.
+
+**ESCRITO, NÃO IMPLEMENTADO — e é aqui que a próxima sessão começa:**
+- **P37, a auditoria de adequação** *(prioridade do Diego: é o recurso que ele quer, usado
+  "como se usa um mecanismo de formatação de código")*. Spec fechada, inclusive o inventário
+  medido de construtos e o censo do core (93% dos módulos limpos). A marcação de "ignore"
+  ficou **fora por decisão dele** — deixar o ruído aparecer primeiro.
+- **P38, `REQUEST`/`EXTERNAL`** — o rename não edita a linha do `REQUEST`, o verificador pega
+  e desfaz, e a mensagem é ilegível. **O commit no core está AUTORIZADO** (Diego,
+  2026-08-11); falta escrever o código: o passo 2 (o core publica o sítio) é o conserto.
+
+**PENDÊNCIAS DE PROCESSO:** o trabalho acima espera commit; o push nunca foi pedido.
 
 ## 0-28. A SESSÃO DE 2026-07-28 — a P21 entregou o MECANISMO, e a fila mudou de dono
 

@@ -1,4 +1,4 @@
-# Schema `ast-26` — o dump AST do compilador (spec)
+# Schema `ast-27` — o dump AST do compilador (spec)
 
 Contrato entre o harbour patchado (branch `feature/compiler-ast-dump`,
 arquivos `src/compiler/compast.c` + rastreamento de regras e de derivação
@@ -844,6 +844,30 @@ run time em todo programa que declara classe, todas falsas.
 > classe, então todo `ENDCLASS` do mundo passou a relatar uma porta na linha da
 > própria declaração. Foi a fixture do caso de rename de método que mostrou —
 > não a leitura do `.ch`. *(§1.7.3: o dump manda, não a dedução.)*
+
+## `externs[]` — os nomes que o módulo DECLARA sem chamar (ast-27, P38)
+
+```jsonc
+"externs": [
+  { "sym": "ALVO",   "line": 1, "col":  8, "kind": "request" },
+  { "sym": "OUTRA",  "line": 1, "col": 14, "kind": "request" },
+  { "sym": "TARDIA", "line": 3, "col":  8, "kind": "dynamic" } ]
+```
+
+`REQUEST`/`EXTERNAL` (`kind: "request"`) e `DYNAMIC` (`kind: "dynamic"`) escrevem o
+**nome de uma função** numa linha do fonte. Até o `ast-26` esse nome não existia em canal
+nenhum: renomear a função editava chamada e definição, a linha do `REQUEST` ficava para
+trás, e a recompilação reprovava com *"the number of symbols/functions changed"* —
+**segura** (o verificador desfazia) e ilegível.
+
+O `col` vem da **pilha de localizações do parser**, o mesmo mecanismo da P21: a ação da
+gramática é o único lugar que sabe qual token escreve aquele nome, e uma linha pode listar
+vários (`REQUEST Alvo, Outra` acima, colunas 8 e 14). Ler com `hb_HGetDef`: sem token
+escrito neste módulo, não há `col` — e aí o consumidor relata, nunca adivinha.
+
+**O que o canal NÃO é**: uma lista de dependências. Ele diz onde o nome está ESCRITO, para
+que quem edita o símbolo edite também essa linha. Quem quer saber o que o módulo importa
+continua lendo `symbols[]`.
 
 ## `symbols[]` + hashes de pcode por função (ast-24, P32 fatia 0)
 

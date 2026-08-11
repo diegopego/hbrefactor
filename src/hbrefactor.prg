@@ -771,7 +771,7 @@ STATIC FUNCTION ReadAst( cTmp, cModPath )
 // a versão do dump que ESTA ferramenta fala. Um só lugar; o caso 122 confere
 // contra o que o compilador do HB_BIN realmente emite.
 STATIC FUNCTION AstSchema()
-   RETURN "ast-26"
+   RETURN "ast-27"
 
 // o dump está lá e foi lido, mas fala outra versão: dizer ISSO. As recusas
 // genéricas dizem "dump missing/invalid" e mandam o usuário procurar um arquivo
@@ -3354,61 +3354,22 @@ STATIC FUNCTION ScopeField( hAsts, hProj, cUpName )
 
    RETURN { "complete" => Empty( aUnseen ), "unseen" => aUnseen }
 
-// P36 como CAMPO: reach = { complete, runtime[] } - a OUTRA coisa que o
-// veredito não cobre, e ela é um desconhecido diferente do `scope`. Ali é
-// região que a compilação pulou; aqui é nome que só existe com o programa
-// RODANDO: um macro sendo avaliado, ou uma chamada que o core declara como
-// resolvedora de nome (`dyn`, ast-25).
-//
-// NÃO recusa: macro é run time e está fora do controle da ferramenta por
-// decisão (Diego, 2026-07-27) - o produto honesto é dizer ONDE. Sem este
-// campo o envelope dizia `verified` e `scope.complete: true`, e quem lia
-// tinha todo o direito de entender "nada ficou de fora".
-//
-// A régua é a de sempre: nada aqui lê o texto de uma string para adivinhar
-// qual nome o sítio alcança. O sítio é fato do compilador; QUAL nome ele
-// resolve é justamente o que ninguém pode provar, e é por isso que o campo
-// existe em vez de um veredito.
-STATIC FUNCTION ReachField( hAsts, hProj )
-
-   LOCAL aOut := {}, cPath, hAst, hFunc, hItem, hSite
-
-   FOR EACH cPath IN hProj[ "files" ]
-      IF ! hb_HHasKey( hAsts, cPath )
-         LOOP
-      ENDIF
-      hAst := hAsts[ cPath ]
-      FOR EACH hFunc IN hAst[ "functions" ]
-         IF hFunc[ "fileDecl" ]
-            LOOP
-         ENDIF
-         IF hFunc[ "usesMacro" ]
-            FOR EACH hSite IN MacroSites( hAst, hFunc )
-               AAdd( aOut, { "file" => hb_FNameNameExt( cPath ), "line" => hSite[ "line" ], ;
-                             "kind" => "code", "sym" => NIL } )
-            NEXT
-         ENDIF
-         FOR EACH hItem IN hFunc[ "calls" ]
-            IF hb_HGetDef( hItem, "dyn", NIL ) != NIL
-               AAdd( aOut, { "file" => hb_FNameNameExt( cPath ), "line" => hItem[ "line" ], ;
-                             "kind" => hItem[ "dyn" ], "sym" => hItem[ "sym" ] } )
-            ENDIF
-         NEXT
-      NEXT
-   NEXT
-   ASort( aOut,,, {| x, y | iif( x[ "file" ] == y[ "file" ], ;
-                                x[ "line" ] < y[ "line" ], x[ "file" ] < y[ "file" ] ) } )
-
-   RETURN { "complete" => Empty( aOut ), "runtime" => aOut }
-
 // o result comum dos verbos de RENAME. cVerdict = "applied" | "preview";
 // cProof = a força da verificação quando aplicado (NIL/null sob --dry-run,
 // onde nada foi compilado); hScope = ScopeField(...) só nos verbos com
 // alcance condicional (o rename de local não tem: um homônimo em ramo pulado
-// é outra variável, não o mesmo símbolo); hReach = ReachField(...) só onde o
-// símbolo é alcançável POR NOME em run time - função e memvar. LOCAL e STATIC
-// não são: nem macro nem `__mvGet` chegam neles (medido na P22)
-STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope, hReach )
+// é outra variável, não o mesmo símbolo).
+//
+// P37 (decisão do Diego, 2026-08-11): aqui existiu por dois dias um campo
+// `reach`, listando os sítios do PROJETO que resolvem nome em run time. Ele
+// saiu porque a lista não tinha fato ligando aqueles sítios a ESTE rename -
+// um `Do( cNome )` em outro módulo aparecia igual em todo rename do projeto,
+// e informação que sai sempre não informa nada. O que ela dizia é propriedade
+// do PROJETO, e o lugar dela é a auditoria, que se roda quando se quer.
+// A régua que ficou: sítio se LISTA onde um fato o liga à operação (a recusa
+// do memvar nomeia os furos do alcance do criador, e ali a lista é o produto);
+// onde não liga, não se lista
+STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope )
 
    LOCAL hRes := { ;
       "verdict"   => cVerdict, ;
@@ -3421,9 +3382,6 @@ STATIC FUNCTION RenameResult( cVerdict, cKind, cOld, cNew, aWork, cProof, hScope
 
    IF hScope != NIL
       hRes[ "scope" ] := hScope
-   ENDIF
-   IF hReach != NIL
-      hRes[ "reach" ] := hReach
    ENDIF
 
    RETURN hRes
@@ -4737,7 +4695,7 @@ STATIC FUNCTION RenameFunction( aArgs )
    LOCAL cUpOld, cUpNew, cText, hOrig := { => }, nLine, nTotal := 0, aHit
    LOCAL aRuleSeen := {}, aRuleSites := {}, aSite
    LOCAL hRule, hTok, cSide, cKey, cChPath, cCwd, cSiteDesc
-   LOCAL aWork, hScope, hReachFld, cKind
+   LOCAL aWork, hScope, cKind
    LOCAL aDrag := {}, aDyn := {}, lRuleCoincidence := .F.
 
    IF Len( aArgs ) < 4
@@ -4983,6 +4941,17 @@ STATIC FUNCTION RenameFunction( aArgs )
             ENDIF
          NEXT
       NEXT
+      // P38 (ast-27): `REQUEST`/`EXTERNAL`/`DYNAMIC <nome>` escrevem o nome da
+      // função numa linha que nenhum outro canal alcançava. O rename passava
+      // por elas, o módulo continuava declarando o nome VELHO, e a verificação
+      // reprovava com "the number of symbols/functions changed" - segura e
+      // ilegível. O sítio agora vem do parser como qualquer outro (nome, linha
+      // e o token que o escreve), então ele se edita como a definição
+      FOR EACH hItem IN hb_HGetDef( hAst, "externs", {} )
+         IF Upper( hItem[ "sym" ] ) == cUpOld .AND. hb_HGetDef( hItem, "col", NIL ) != NIL
+            AAdd( aE, { hItem[ "line" ], hItem[ "col" ] + 1, hb_BLen( cOld ) } )
+         ENDIF
+      NEXT
       // P36c: aqui se avisava que uma LOCAL/STATIC homônima "sombrearia as
       // chamadas" naquele módulo, e o aviso era FALSO - medido em 2026-08-09:
       // com `LOCAL nItens` e a função renomeada para `nItens`, o programa
@@ -5052,7 +5021,6 @@ STATIC FUNCTION RenameFunction( aArgs )
    cKind := "function"
    aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
    hScope := ScopeField( hAsts, hProj, cUpOld )
-   hReachFld := ReachField( hAsts, hProj )
 
    IF Len( aDrag ) > 1
       cSiteDesc := ""                                // reuso: a lista do arraste
@@ -5078,7 +5046,7 @@ STATIC FUNCTION RenameFunction( aArgs )
       Prose( "dry run - nothing was written" + hb_eol() )
       RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
                  " edit(s) previewed", ;
-                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope, hReachFld ), , aWork )
+                 RenameResult( "preview", cKind, cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
@@ -5126,7 +5094,7 @@ STATIC FUNCTION RenameFunction( aArgs )
 
    RETURN Ok( "verified: " + hb_ntos( nTotal ) + " edit(s); symbol tables renamed " + ;
               "as expected, pcode byte-identical", ;
-              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", hScope, hReachFld ) )
+              RenameResult( "applied", cKind, cOld, cNew, aWork, "pcode-identical", hScope ) )
 
 STATIC PROCEDURE DedupHits( aE )
 
@@ -7205,7 +7173,7 @@ STATIC FUNCTION ReorderParams( aArgs )
    LOCAL cSpec, cFunc, cOrder, cOnlyFile := "", lDryRun := .F.
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hFunc, hItem, nI, nJ
    LOCAL cDefFile := "", hDef := NIL, aParams := {}, aNew, aPerm := {}
-   LOCAL hEdits := { => }, aE, aWarn := {}, cText, hOrig := { => }
+   LOCAL hEdits := { => }, aE, cText, hOrig := { => }
    LOCAL cUpFunc, aArgsSpans, aSigHits, nTotal := 0, cWhy
    LOCAL aIdent, lIsMethod, cUpMsg := "", nAt, aOwnerClasses := {}
    LOCAL hOwn, cOwn, aSpell, hF
@@ -7429,21 +7397,20 @@ STATIC FUNCTION ReorderParams( aArgs )
             NEXT
          NEXT
       ENDIF
-      // P36b: aqui se comparava o TEXTO de cada string com o nome da função e
-      // se pedia `--force` por causa disso. Medido no fixture que abriu a
-      // fatia: o aviso saía sobre um rótulo impresso que soletrava o nome da
-      // função, e ficava MUDO sobre a chamada da linha seguinte, que resolvia
-      // essa mesma função por nome em run time. O fato certo já está no dump
-      // (`dyn`), e é ele que alimenta o `reach` deste verbo agora
-      FOR EACH hFunc IN hAst[ "functions" ]
-         FOR EACH hItem IN hFunc[ "calls" ]
-            IF hb_HGetDef( hItem, "dyn", NIL ) != NIL
-               AAdd( aWarn, hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                     ": " + hItem[ "sym" ] + " " + DynPhrase( hItem[ "dyn" ] ) + ;
-                     " - the argument order it passes is not this tool's to see" )
-            ENDIF
-         NEXT
-      NEXT
+      // P36b matou aqui a comparação de TEXTO de string com o nome da função:
+      // ela avisava sobre um rótulo impresso e ficava muda sobre a chamada da
+      // linha seguinte, que resolvia a função por nome de verdade. O `dyn` que
+      // entrou no lugar saiu em 2026-08-11, por decisão do Diego, e a razão é
+      // a que aposentou o campo `reach`: nenhum fato liga um `Do( cNome )` de
+      // outro módulo A ESTA função, então o aviso saía igual em todo reorder
+      // do projeto.
+      //
+      // E a razão dele é de produto: "quem invoca uma função a partir de do()
+      // sabe que ela não vai ser alcançada em uma reorganização de
+      // parâmetros". O `Do` tem API própria e recebe string - é escolha do
+      // programador, não descuido a ser lembrado a cada comando. O lugar desse
+      // relato é a AUDITORIA (roadmap P37), que se roda quando se quer, como
+      // se roda um formatador de código
       IF ! Empty( aE )
          hEdits[ cPath ] := aE
          nTotal += Len( aE )
@@ -7452,19 +7419,6 @@ STATIC FUNCTION ReorderParams( aArgs )
    IF nTotal == 0
       RETURN Refuse( "no site found" )
    ENDIF
-
-   // P36c: este portão era a ferramenta parando por uma chamada dinâmica
-   // QUALQUER do projeto - inclusive uma que nomeia outra função (medido:
-   // `Do( cOutra )` com `cOutra := "Relatorio"` barrava o reorder de outra
-   // função). Como todo projeto real tem uma, o portão barrava sempre, que é
-   // a definição de portão inútil.
-   //
-   // Não há fato que ligue uma chamada por nome A ESTA função: o nome é valor
-   // de run time. Então o verbo faz o que os renames fazem - DECLARA os
-   // sítios no `reach` e segue -, e quem sabe o que aquele nome vale é você
-   FOR nI := 1 TO Len( aWarn )
-      Diag( "runtime-name-call", aWarn[ nI ], NIL )
-   NEXT
 
    aWork := WorkFromRange( hEdits )
 
@@ -9858,7 +9812,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
    LOCAL hProj, cTmp, cPath, hAst, hAsts := { => }, hRule, hFunc, hItem
    LOCAL cUpOld, cUpNew, hF, hFNew, hIdx, hReach, hInReach, aC, aU, aWarn := {}
    LOCAL hEdits := { => }, aE, hLines, nLine, cText, hOrig := { => }, nTotal := 0
-   LOCAL cWhy := "", aLive, aWork, hScope, hReachFld, hHole
+   LOCAL cWhy := "", aLive, aWork, hScope, hHole
    LOCAL hRuleBad                       // P28: recusa vinda da coleta do `.ch`
    LOCAL cAtMod := "", nAtLine := 0     // P29: the cursor, naming the chain
    LOCAL lP29 := .F., aReaches := {}, aSets := {}, nPick := 0
@@ -10277,7 +10231,6 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    aWork := WorkFromToken( hEdits, hb_BLen( cOld ), cNew )
    hScope := ScopeField( hAsts, hProj, cUpOld )
-   hReachFld := ReachField( hAsts, hProj )
 
    Prose( "rename-memvar: " + cOld + " -> " + cNew + " (creator " + aC[ 4 ] + " in " + ;
            aC[ 2 ] + ", scope closed and clean)" + hb_eol() )
@@ -10292,7 +10245,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
       Prose( "dry run - nothing was written" + hb_eol() )
       RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
                  " edit(s) previewed", ;
-                 RenameResult( "preview", "memvar", cOld, cNew, aWork, NIL, hScope, hReachFld ), , aWork )
+                 RenameResult( "preview", "memvar", cOld, cNew, aWork, NIL, hScope ), , aWork )
    ENDIF
 
    IF ! CompileHrbAll( hProj, cTmp, "before", .T. )
@@ -10345,7 +10298,7 @@ STATIC FUNCTION RenameMemvar( aArgs )
 
    RETURN Ok( "verified: " + hb_ntos( nTotal ) + ;
               " edit(s); symbol renamed, pcode byte-identical", ;
-              RenameResult( "applied", "memvar", cOld, cNew, aWork, "pcode-identical", hScope, hReachFld ) )
+              RenameResult( "applied", "memvar", cOld, cNew, aWork, "pcode-identical", hScope ) )
 
 STATIC FUNCTION MvFuncUsesOld( hFunc, cUpOld )
 
@@ -14989,8 +14942,7 @@ STATIC FUNCTION RenameMethod( aArgs )
    NEXT
    IF lDryRun
       Prose( "dry run - nothing was written" + hb_eol() )
-      hRes := RenameResult( "preview", cKind, cMethod, cNew, aWork, NIL, NIL, ;
-                            ReachField( hAsts, hProj ) )
+      hRes := RenameResult( "preview", cKind, cMethod, cNew, aWork, NIL, NIL )
       hRes[ "derived" ] := aPred
       hRes[ "derivedStrings" ] := aPredS
       RETURN Ok( "dry run - nothing was written; " + hb_ntos( Len( aWork ) ) + ;
@@ -15070,8 +15022,7 @@ STATIC FUNCTION RenameMethod( aArgs )
       "verified: " + hb_ntos( nTotal ) + " edit(s); derived artifacts renamed as predicted" ) )
    Prose( cWhy + hb_eol() )
 
-   hRes := RenameResult( "applied", cKind, cMethod, cNew, aWork, cProof, NIL, ;
-                         ReachField( hAsts, hProj ) )
+   hRes := RenameResult( "applied", cKind, cMethod, cNew, aWork, cProof, NIL )
    hRes[ "derived" ] := aPred
    hRes[ "derivedStrings" ] := aPredS
    RETURN Ok( cWhy, hRes )

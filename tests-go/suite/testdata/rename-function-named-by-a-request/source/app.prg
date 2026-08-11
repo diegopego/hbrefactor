@@ -1,0 +1,11 @@
+REQUEST Alvo
+
+PROCEDURE Main()
+
+   OutStd( hb_ntos( Alvo() ) )
+
+   RETURN
+
+FUNCTION Alvo()
+
+   RETURN 7

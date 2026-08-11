@@ -1,7 +1,7 @@
 <!--
   hbrefactor — LIVING MANUAL (source of truth for the public presentation)
 
-  baseline: hbrefactor@277d317 · harbour-core@d14fbbb53b (feature/compiler-ast-dump)
+  baseline: hbrefactor@29b3665 · harbour-core@5735f10f04 (feature/compiler-ast-dump)
     — this round the proofs changed hands: the compiler now states the module's
       identity in the dump (symbol table + two code fingerprints per function, one
       byte-exact and one immune to symbol renumbering, ast-24), and the tool's
@@ -668,7 +668,7 @@ in Harbour — and it is **your** thread to keep, not something the tool will ho
      time, so the first two ARE seen and named. Cases:
      refuse-rename-memvar-read-by-name-at-runtime (the __mvGet hole, with position),
      refuse-rename-memvar-reached-by-macro (the macro hole),
-     rename-function-declares-its-runtime-reach (reach as a positive field).
+     rename-function-with-a-macro-in-the-project (a macro does not veto a rename).
      Outputs captured live 2026-08-09 against those fixtures. -->
 
 Harbour lets a program build code while it runs and use it in the next instant. No
@@ -707,17 +707,12 @@ exactly what this tool exists to remove.
 *can* say which memvar a string re-expands — so you are told where, and the string is never
 edited.
 
-**And where it neither refuses nor can prove, it states the reach.** Renaming a *function*
+**And where it neither refuses nor can prove, it does not stop you.** Renaming a *function*
 does not stop for a macro — macro evaluation is run time, and no refactoring tool controls
-it — so the machine output says so out loud instead of implying completeness by silence:
-
-```json
-"reach": { "complete": false,
-           "runtime": [ { "file": "app.prg", "line": 6, "kind": "code", "sym": null } ] }
-```
-
-`complete: true` is stated in the same way when there is nothing to declare, because an
-*absent* field is not something you would notice.
+it. What you get is what was proved: the sites that were edited, and the comparison that
+backs them. Where in your project a name is built at run time is a property of the
+*project*, not of this rename, and it is the audit that answers it — a command you run when
+you want to know.
 
 **No output of this tool should be read as "your dynamic code is covered."** A `&` still
 builds code out of anything at all, and a function of your own written in C is outside
@@ -923,6 +918,7 @@ one fact at a time:
 | `ast-24` | the module's **identity**: the symbol table and two fingerprints per function — the exact bytes, and a form immune to symbol renumbering — so proofs read compiler facts instead of parsing `.hrb` |
 | `ast-25` | a call marked when it reaches a symbol by a name that only exists at run time (`__mvGet`, `Do`, `hb_macroBlock`…), and which class of symbol it reaches |
 | `ast-26` | the same for a **message** reached by name (`__objSendMsg`) — so renaming a method states that reach instead of guessing at strings |
+| `ast-27` | the site of a `REQUEST`/`EXTERNAL`/`DYNAMIC` line — the name written there is edited by the rename instead of being left behind |
 
 Along the way: a **20-year-old segfault fixed** (annotating a code-block parameter with
 `AS CLASS` used to crash the compiler — stock Harbour still does), and a false

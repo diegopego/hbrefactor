@@ -53,17 +53,6 @@
    "scope": {
     "complete": true,
     "unseen": []
-   },
-   "reach": {
-    "complete": false,
-    "runtime": [
-     {
-      "file": "app.prg",
-      "line": 6,
-      "kind": "code",
-      "sym": null
-     }
-    ]
    }
   },
   "edits": []

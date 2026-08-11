@@ -22,6 +22,10 @@ size_mb() {
 hb_mb=$( size_mb "$HBDIR" )
 work_mb=$( size_mb "$HBDIR/work" )
 snap_mb=$( size_mb "$HBDIR/snap" )
+# ast/ ENTRA na composição: sem ele a linha abaixo somava metade do total que
+# ela mesma imprimia (medido: work 991 + snap 1, num diretório de 1998 M), e o
+# comando de limpeza sugerido recuperava metade do que o leitor esperava.
+ast_mb=$( size_mb "$HBDIR/ast" )
 
 # scratchpad(s) do Claude Code deste projeto: é comportamento do HARNESS, não da
 # ferramenta - reportado em SEPARADO, só como medida (foi o que mais encheu).
@@ -33,7 +37,7 @@ for d in /tmp/claude-*/*hbrefactor*/; do
    scratch_mb=$(( scratch_mb + $( size_mb "$d" ) ))
 done
 
-echo "temporários do hbrefactor:  ${hb_mb} M   (work ${work_mb} M · snap ${snap_mb} M)   → $HBDIR"
+echo "temporários do hbrefactor:  ${hb_mb} M   (work ${work_mb} M · ast ${ast_mb} M · snap ${snap_mb} M)   → $HBDIR"
 if [ "${#scratch_paths[@]}" -gt 0 ]; then
    echo "scratchpad do Claude Code:  ${scratch_mb} M   (${#scratch_paths[@]} sessão(ões) — fora da ferramenta)"
 fi
@@ -46,12 +50,15 @@ if [ "$hb_mb" -ge "$WARN_MB" ]; then
    over=1
    echo "ACIMA DO LIMITE — temporários da ferramenta (${hb_mb} M). Rode você mesmo:"
    echo
-   echo "  # lixo puro, sempre seguro:"
-   echo "  rm -rf \"$HBDIR/work\""
+   echo "  # o descartável (work/ e lock/ inteiros, ast/ por idade); nunca mexe"
+   echo "  # em snap/, e pode rodar com a suíte no ar — ele adia o que não é seguro:"
+   echo "  make tmp-prune"
    echo
-   echo "  # tudo da ferramenta — inclui snap/, o buffer de \`verify --rollback\`;"
-   echo "  # só se NÃO houver refatoração pendente de verificar:"
-   echo "  rm -rf \"$HBDIR\""
+   echo "  # incluindo pastas de sonda e scratchpads de sessão antigos:"
+   echo "  make tmp-prune ARGS='--all'"
+   echo
+   echo "  # e para ver antes de apagar:"
+   echo "  make tmp-prune ARGS='--all --dry-run'"
    echo
 fi
 
