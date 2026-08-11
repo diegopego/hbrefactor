@@ -1548,6 +1548,35 @@ funcionando como projetada.
 novo. O que cada um provava sobrevive — o `dyn` reportado (22) e a supressão do `&` do
 `hbclass.ch` com o macro do usuário ainda pego (58). `make test` **1007/0**.
 
+#### O SEGUNDO EIXO DO MAPA (2026-08-11) — *"o ponto focal da auditoria é ter o mapa completo"* (Diego)
+
+O relatório ganhou as regiões que **este build não compilou**, por módulo:
+
+```
+condicional.prg: traceable
+  condicional.prg:6: 1 region(s) this build did not compile (MODO_LEGADO)
+4 module(s): 3 traceable, 1 with run-time reach; 1 with code this build did not compile
+```
+
+**Os dois eixos NÃO se misturam, e a distinção é a própria decisão da P17**: alcance de run
+time é propriedade do CÓDIGO e é para sempre; ramo não compilado é propriedade da
+CONFIGURAÇÃO, e outra build está a uma flag de distância. Por isso um `#ifdef` **não** torna
+o módulo `traceable: false` — ele entra no `unseen[]`, com o resumo contando à parte.
+
+**Por CONDIÇÃO, não por região, e a escala é o argumento**: medido no `tbrowse.prg`, o
+canal `ppSkipped` traz **22 regiões**; agrupadas por condição são **4** no módulo. O
+programador pensa em *"que flag esconde código de mim"*, não em faixas de linha soltas.
+
+**E o mesmo corte do `&`, pelo mesmo motivo**: só as regiões cujo `file` é o próprio módulo.
+Um `#ifdef` dentro do `hbclass.ch` são **11 num módulo de classe qualquer** (medido) — código
+de biblioteca sobre o qual ninguém age.
+
+**O caso novo achou um defeito no harness ao nascer**: o tipo do `unseen` do `scope` era
+`[]string` desde a P17 e nunca fora exercitado, porque nenhum caso tinha região pulada. O
+primeiro que teve reprovou na decodificação. *(E o portão de artefato pegou um `..ast.json`
+que eu mesmo deixei na fixture com um `-x.` malfeito — a terceira vez na sessão em que o
+compilador vaza arquivo, sempre por eu não mandar a saída para um tmp.)*
+
 ### P38 — `REQUEST`/`EXTERNAL` nomeiam a função e o rename não os vê *(achado 2026-08-10 pela varredura de construtos da P37; **✅ ENTREGUE 2026-08-11, `ast-27`** — passo 2; o passo 1 caiu por não ter mais consumidor)*
 
 **Medido, com fixture que compila limpo:**
@@ -2894,7 +2923,36 @@ apontando o **NOME** (não o `&`) e `prov: "s"`, e o `at` da derivação bate; o
 símbolo passa a editar `&cAlvo` → `&cNovo` e **verifica byte-idêntico**; a guarda
 `corpus_strfam` (que hoje assere a LACUNA) inverte de sinal; `lexdiff` 0; `make test` verde.
 
-### P17 — a COMPILAÇÃO CONDICIONAL esconde CÓDIGO, e a ferramenta diz "verified" sobre o que não olhou *(aberto 2026-07-13; **ampliado 2026-07-23**; **A RESOLVER — o mais grave em aberto**)*
+### P17 — a COMPILAÇÃO CONDICIONAL esconde CÓDIGO *(aberto 2026-07-13; ampliado 2026-07-23; **✅ FECHADA COMO LIMITE ESPECIFICADO em 2026-08-11, por decisão do Diego**)*
+
+> **A decisão, e ela reenquadra a fase inteira** *(Diego, 2026-08-11)*: *"o `.hbp`, `.hbc`,
+> `.hbm`, etc. já devem conter as flags de compilação também, portanto o refactor vai operar
+> em cima disso. O programador que opera com flags é exceção e ele deve saber das limitações
+> da ferramenta. (...) eu voto por apenas deixar especificado em teste que atualmente só
+> cobre o código como está descrito nos arquivos de projeto, pois é isto que o compilador
+> processa e o compilador é a fonte da AST."*
+>
+> Isso muda o veredito de "defeito mais grave em aberto" para **limite conhecido, declarado e
+> PINADO** — e a razão é a mesma que governa o resto do projeto: a fonte é o compilador, e o
+> que o compilador processa é o que o arquivo de projeto manda processar. Varrer todas as
+> combinações de flag seria a ferramenta inventando programas que ninguém pediu.
+>
+> **O que já existia e agora tem caso**: o `scope: { complete, unseen[] }` no envelope e os
+> dois avisos em prosa. Medido nos dois lados com o MESMO fonte e dois `.hbp`:
+>
+> | projeto | ramo editado | o que o `scope` declara |
+> |---|---|---|
+> | `sem.hbp` | o `#else` (linha 15) | `unseen: [{ file, line: 9, cond: "MODO_NOVO" }]` |
+> | `com.hbp` (`-DMODO_NOVO`) | o `#ifdef` (linha 9) | `unseen: [{ file, line: 15, cond: "MODO_NOVO" }]` |
+>
+> Caso `the-project-file-decides-which-branch-is-real`, dois comandos em `--dry-run` sobre o
+> mesmo fonte. **Ele achou um defeito no harness ao nascer**: o tipo do `unseen` era
+> `[]string` desde a P17 e nenhum caso tinha `unseen` não-vazio, então o erro nunca apareceu.
+> Tipo que só está certo porque nunca foi exercitado é teste que não testa.
+>
+> **O que fica ABERTO, e é outra fase se alguém quiser**: relatar as regiões puladas na
+> AUDITORIA (P37) — hoje o `scope` fala por comando, e o programador que quer o mapa do
+> projeto inteiro ainda não o tem num lugar só. Não bloqueia nada.
 
 **Achado da medição de USO** (direção do Diego: estudar o pp no fonte real do Harbour). O core
 declara diretiva **dentro do próprio `.prg`** em **152 dos 419 módulos** do corpus (36%), com

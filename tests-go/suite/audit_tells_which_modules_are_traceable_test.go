@@ -17,6 +17,12 @@ import "testing"
 //	             report worthless.
 //	dinamico.prg `__mvGet( cNome )` and `&cExpr` - the two real ones, and each
 //	             site is named with its line so you can go look.
+//	condicional.prg an `#ifdef` branch this build did not compile. It is
+//	             TRACEABLE: nothing in it is dynamic. What it is, is partial -
+//	             and that is a property of the configuration, not of the code,
+//	             so it rides its own axis (`unseen`) instead of poisoning the
+//	             verdict. Run-time reach is forever; another build is one flag
+//	             away.
 //
 // What the report is FOR (Diego, 2026-08-10): it is not a veto and it never
 // changes what a rename does. It exists so a programmer can see where the
@@ -30,8 +36,8 @@ func init() {
 		if env.Status != "ok" {
 			t.Fatalf("status = %q (%s), want ok", env.Status, env.Detail)
 		}
-		if env.Result.Total != 3 || env.Result.Traceable != 2 {
-			t.Errorf("summary = %d/%d, want 3 modules with 2 traceable",
+		if env.Result.Total != 4 || env.Result.Traceable != 3 {
+			t.Errorf("summary = %d/%d, want 4 modules with 3 traceable",
 				env.Result.Traceable, env.Result.Total)
 		}
 		for _, m := range env.Result.Modules {

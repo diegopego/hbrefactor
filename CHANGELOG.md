@@ -47,6 +47,22 @@ for a long time. Only two things take a module out: a call the compiler says
 resolves a name at run time, and a `&` you wrote — the `&` that `hbclass.ch`
 generates inside a `CREATE CLASS` is not yours and is not counted.
 
+**It also maps what this build did not compile.** An `#ifdef` branch that your
+project's flags leave out is not dynamic code - it is *another configuration* -
+so it does not take a module off the traceable list. It goes on its own line,
+grouped by the flag that hides it, because that is how you think about it:
+
+```
+tbrowse.prg: traceable
+  tbrowse.prg:147-2458: 4 region(s) this build did not compile (HB_BRW_STATICMOUSE)
+  tbrowse.prg:509-2209: 4 region(s) this build did not compile (HB_CLP_STRICT)
+```
+
+The tool covers the code your project files say to compile, because that is what
+the compiler processes and the compiler is where every fact here comes from. If
+you build several configurations from one source, this is the line that tells you
+which one you just refactored.
+
 **What to expect when you run it**, measured on Harbour's own source: of 692
 modules, **647 (93%) are traceable**, 9 contain a macro you wrote, and 39 call
 something that resolves a name. The dynamic code concentrates where you would

@@ -1,0 +1,190 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "sem.hbp",
+   "app.prg:15:10",
+   "Computa",
+   "--dry-run",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "dry run - nothing was written; 2 edit(s) previewed",
+  "diagnostics": [],
+  "result": {
+   "verdict": "preview",
+   "kind": "function",
+   "old": "Calcula",
+   "new": "Computa",
+   "editCount": 2,
+   "proof": null,
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 20
+      },
+      "end": {
+       "line": 2,
+       "character": 27
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 14,
+       "character": 9
+      },
+      "end": {
+       "line": 14,
+       "character": 16
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": false,
+    "unseen": [
+     {
+      "file": "app.prg",
+      "line": 9,
+      "cond": "MODO_NOVO"
+     }
+    ]
+   }
+  },
+  "edits": [
+   {
+    "uri": "file://<CWD>/app.prg",
+    "range": {
+     "start": {
+      "line": 2,
+      "character": 20
+     },
+     "end": {
+      "line": 2,
+      "character": 27
+     }
+    },
+    "newText": "Computa"
+   },
+   {
+    "uri": "file://<CWD>/app.prg",
+    "range": {
+     "start": {
+      "line": 14,
+      "character": 9
+     },
+     "end": {
+      "line": 14,
+      "character": 16
+     }
+    },
+    "newText": "Computa"
+   }
+  ]
+ },
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "com.hbp",
+   "app.prg:9:10",
+   "Computa",
+   "--dry-run",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "dry run - nothing was written; 2 edit(s) previewed",
+  "diagnostics": [],
+  "result": {
+   "verdict": "preview",
+   "kind": "function",
+   "old": "Calcula",
+   "new": "Computa",
+   "editCount": 2,
+   "proof": null,
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 2,
+       "character": 20
+      },
+      "end": {
+       "line": 2,
+       "character": 27
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 8,
+       "character": 9
+      },
+      "end": {
+       "line": 8,
+       "character": 16
+      }
+     }
+    }
+   ],
+   "scope": {
+    "complete": false,
+    "unseen": [
+     {
+      "file": "app.prg",
+      "line": 15,
+      "cond": "MODO_NOVO"
+     }
+    ]
+   }
+  },
+  "edits": [
+   {
+    "uri": "file://<CWD>/app.prg",
+    "range": {
+     "start": {
+      "line": 2,
+      "character": 20
+     },
+     "end": {
+      "line": 2,
+      "character": 27
+     }
+    },
+    "newText": "Computa"
+   },
+   {
+    "uri": "file://<CWD>/app.prg",
+    "range": {
+     "start": {
+      "line": 8,
+      "character": 9
+     },
+     "end": {
+      "line": 8,
+      "character": 16
+     }
+    },
+    "newText": "Computa"
+   }
+  ]
+ }
+]

@@ -6444,6 +6444,46 @@ STATIC FUNCTION SkippedNameHits( hAsts, hProj, cUpName )
 
    RETURN aOut
 
+// P37: o MAPA das regiões que ESTE build não compilou, por módulo. O canal é o
+// mesmo `ppSkipped` que o SkippedNameHits filtra por nome; aqui não há nome, e
+// o que interessa é a CONDIÇÃO - o programador pensa em "que flag esconde
+// código de mim", não em faixas de linha. Medido no core: `tbrowse.prg` tem 22
+// regiões e 12 condições; por região seria despejo, por condição é mapa.
+//
+// Isto NÃO entra no `traceable`: alcance de run time é propriedade do código e
+// é para sempre; ramo não compilado é propriedade da CONFIGURAÇÃO, e outra
+// build está a uma flag de distância (Diego, 2026-08-11 - a ferramenta cobre o
+// que o arquivo de projeto manda compilar, porque é isso que o compilador
+// processa, e o compilador é a fonte da AST)
+STATIC FUNCTION SkippedMap( hAst, cPath )
+
+   LOCAL hPor := { => }, aOut := {}, hReg, cKey, hIt
+
+   FOR EACH hReg IN hb_HGetDef( hAst, "ppSkipped", {} )
+      // só o que está no MÓDULO: um `#ifdef` dentro do `hbclass.ch` é código de
+      // biblioteca sobre o qual o programador não age, e são 11 num módulo de
+      // classe qualquer (medido). Mesma classe de ruído do `&` que a expansão
+      // gera - e o mesmo corte, que aqui é o próprio campo `file` da região
+      IF ! hb_FNameNameExt( hb_HGetDef( hReg, "file", "" ) ) == hb_FNameNameExt( cPath )
+         LOOP
+      ENDIF
+      cKey := hb_CStr( hb_HGetDef( hReg, "cond", NIL ) )
+      IF hb_HHasKey( hPor, cKey )
+         hIt := hPor[ cKey ]
+         hIt[ "from" ]    := Min( hIt[ "from" ], hReg[ "from" ] )
+         hIt[ "to" ]      := Max( hIt[ "to" ], hReg[ "to" ] )
+         hIt[ "regions" ] += 1
+      ELSE
+         hPor[ cKey ] := { "cond" => hb_HGetDef( hReg, "cond", NIL ), ;
+                           "from" => hReg[ "from" ], "to" => hReg[ "to" ], ;
+                           "regions" => 1 }
+         AAdd( aOut, hPor[ cKey ] )
+      ENDIF
+   NEXT
+   ASort( aOut,,, {| x, y | x[ "from" ] < y[ "from" ] } )
+
+   RETURN aOut
+
 // o veredito qualificado pelo alcance. Todo verbo que renomeia um nome chama
 // ESTE ponto - o experimento da P17 provou o rot na prática: ligado a um verbo
 // só, o caso da diretiva (outro verbo, outro "verified:") passava batido.
@@ -7101,7 +7141,7 @@ STATIC FUNCTION GenTargets( aOwners )
 STATIC FUNCTION FindDynamicCalls( aArgs )
 
    LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem, aSrc, hSite
-   LOCAL aMods := {}, aSites, nLimpos := 0, cDyn
+   LOCAL aMods := {}, aSites, nLimpos := 0, nCond := 0, cDyn
 
    IF Len( aArgs ) < 2
       Usage()
@@ -7140,7 +7180,11 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
       NEXT
       ASort( aSites,,, {| x, y | x[ "line" ] < y[ "line" ] } )
       AAdd( aMods, { "file" => hb_FNameNameExt( cPath ), ;
-                     "traceable" => Empty( aSites ), "sites" => aSites } )
+                     "traceable" => Empty( aSites ), "sites" => aSites, ;
+                     "unseen" => SkippedMap( hAst, cPath ) } )
+      IF ! Empty( ATail( aMods )[ "unseen" ] )
+         nCond++
+      ENDIF
       IF Empty( aSites )
          nLimpos++
          Prose( hb_FNameNameExt( cPath ) + ": traceable" + hb_eol() )
@@ -7154,10 +7198,18 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
                     SrcLine( aSrc, hSite[ "line" ] ) + hb_eol() )
          NEXT
       ENDIF
+      FOR EACH hSite IN ATail( aMods )[ "unseen" ]
+         Prose( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( hSite[ "from" ] ) + ;
+                 iif( hSite[ "to" ] > hSite[ "from" ], "-" + hb_ntos( hSite[ "to" ] ), "" ) + ;
+                 ": " + hb_ntos( hSite[ "regions" ] ) + " region(s) this build did not compile" + ;
+                 iif( hSite[ "cond" ] == NIL, "", " (" + hSite[ "cond" ] + ")" ) + hb_eol() )
+      NEXT
    NEXT
 
    cPath := hb_ntos( Len( aMods ) ) + " module(s): " + hb_ntos( nLimpos ) + ;
-            " traceable, " + hb_ntos( Len( aMods ) - nLimpos ) + " with run-time reach"
+            " traceable, " + hb_ntos( Len( aMods ) - nLimpos ) + " with run-time reach" + ;
+            iif( nCond == 0, "", "; " + hb_ntos( nCond ) + ;
+                 " with code this build did not compile" )
    Prose( cPath + hb_eol() )
 
    RETURN Ok( cPath, { "modules" => aMods, "total" => Len( aMods ), ;

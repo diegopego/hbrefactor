@@ -1,0 +1,8 @@
+
+
+FUNCTION Formata( cX )
+
+
+
+
+   RETURN cX

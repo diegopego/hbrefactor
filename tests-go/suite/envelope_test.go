@@ -48,7 +48,18 @@ type Diagnostico struct {
 // dizendo até onde a prova alcança, em vez de afirmar sobre a árvore inteira.
 type Escopo struct {
 	Complete bool     `json:"complete"`
-	Unseen   []string `json:"unseen"`
+	Unseen   []Regiao `json:"unseen"`
+}
+
+// Regiao é uma região que a compilação PULOU: o arquivo, a linha e a condição
+// que a define. Até 2026-08-11 este campo era `[]string` aqui e ninguém notou,
+// porque nenhum caso tinha `unseen` não-vazio - o primeiro que teve reprovou na
+// decodificação. Tipo que só está certo porque nunca foi exercitado é um teste
+// que não testa.
+type Regiao struct {
+	File string `json:"file"`
+	Line int    `json:"line"`
+	Cond string `json:"cond"`
 }
 
 // [REMOVIDO 2026-08-11, decisão do Diego] Aqui viveram `Alcance`/`SitioRuntime`,
@@ -96,6 +107,17 @@ type Modulo struct {
 	File      string       `json:"file"`
 	Traceable bool         `json:"traceable"`
 	Sites     []SitioDinam `json:"sites"`
+	// o SEGUNDO eixo do mapa: o que ESTE build não compilou. Não entra no
+	// `traceable` de propósito - alcance de run time é para sempre, outra
+	// configuração está a uma flag de distância
+	Unseen []RegiaoPulada `json:"unseen"`
+}
+
+type RegiaoPulada struct {
+	Cond    string `json:"cond"`
+	From    int    `json:"from"`
+	To      int    `json:"to"`
+	Regions int    `json:"regions"`
 }
 
 type SitioDinam struct {

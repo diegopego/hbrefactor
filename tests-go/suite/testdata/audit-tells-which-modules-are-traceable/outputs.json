@@ -11,14 +11,15 @@
   "exit": 0,
   "reason": null,
   "action": null,
-  "detail": "3 module(s): 2 traceable, 1 with run-time reach",
+  "detail": "4 module(s): 3 traceable, 1 with run-time reach; 1 with code this build did not compile",
   "diagnostics": [],
   "result": {
    "modules": [
     {
      "file": "classe.prg",
      "traceable": true,
-     "sites": []
+     "sites": [],
+     "unseen": []
     },
     {
      "file": "dinamico.prg",
@@ -34,16 +35,31 @@
        "kind": "code",
        "sym": null
       }
-     ]
+     ],
+     "unseen": []
     },
     {
      "file": "puro.prg",
      "traceable": true,
-     "sites": []
+     "sites": [],
+     "unseen": []
+    },
+    {
+     "file": "condicional.prg",
+     "traceable": true,
+     "sites": [],
+     "unseen": [
+      {
+       "cond": "MODO_LEGADO",
+       "from": 6,
+       "to": 6,
+       "regions": 1
+      }
+     ]
     }
    ],
-   "total": 3,
-   "traceable": 2
+   "total": 4,
+   "traceable": 3
   },
   "edits": []
  }

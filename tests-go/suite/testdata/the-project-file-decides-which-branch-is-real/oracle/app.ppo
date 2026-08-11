@@ -1,0 +1,17 @@
+PROCEDURE Main()
+
+   OutStd( hb_ntos( Calcula( 2 ) ) )
+
+   RETURN
+
+
+
+
+
+
+
+
+
+FUNCTION Calcula( nX )
+
+   RETURN nX * 2
