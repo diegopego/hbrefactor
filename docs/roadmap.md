@@ -558,7 +558,65 @@ Plano, usos candidatos e limites: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-
 > agente por excelência. A fase A não executa a P12; ela responde a pergunta que a P12 deixava
 > no ar (*"quem consome isto?"*).
 
-## P14 — TIPOS DECLARADOS COM ALCANCE, e o cursor que os consome *(situação levantada pelo Diego, 2026-07-13; **EXPLORATÓRIA — NADA PROVADO AINDA**)*
+## P14 — TIPOS DECLARADOS COM ALCANCE, e o cursor que os consome *(situação levantada pelo Diego, 2026-07-13; **EXPLORATÓRIA; MEDIDA de ponta a ponta em 2026-08-11 — é a PRÓXIMA FRENTE recomendada**)*
+
+> ### O ESTADO REAL, MEDIDO (2026-08-11) — o Diego pediu, em palavras dele, três coisas
+>
+> ```harbour
+> #include "hbclass.ch"
+> CREATE CLASS MyClass1 ; METHOD Print() ; ENDCLASS      // (uma linha por brevidade)
+> METHOD Print() CLASS MyClass1 ; OutStd( "um" ) ; RETURN Self
+> CREATE CLASS MyClass2 ; METHOD Print() ; ENDCLASS
+> METHOD Print() CLASS MyClass2 ; OutStd( "dois" ) ; RETURN Self
+>
+> PROCEDURE Main()
+>    LOCAL c1 := MyClass1():New()
+>    LOCAL c2 := MyClass2():New()
+>    c1:Print()
+>    c2:Print()
+>    RETURN
+> ```
+>
+> **(a) `LOCAL c1 := MyClass1():New()` — os dois envios saem iguais:**
+> `possible send (dynamic dispatch, receiver unknown)` nas duas linhas. E está
+> CERTO pela lei do projeto: tipar `c1` a partir do `New()` foi removido na RE.3
+> por ser inferência — o `New()` não declara o que devolve.
+>
+> **(b) com `LOCAL c1 AS CLASS MyClass1`, o `usages` qualificado RESOLVE:**
+> ```
+> app.prg:7:  method definition Print (class MyClass1)
+> app.prg:17: excluded method definition (implements MYCLASS2:PRINT)
+> app.prg:28: confirmed send (receiver declared AS CLASS MYCLASS1) in MAIN
+> app.prg:29: excluded send within the declared class graph (dispatches to MYCLASS2:PRINT)
+> ```
+> É exatamente o requisito 2 do Diego, funcionando.
+>
+> **(c) o CURSOR fica pela metade**: `usages --at` sobre `c1:Print()` classifica os
+> envios certo (confirmed/excluded) mas devolve `query: Print` **nua**, então lista
+> as DUAS definições. É o buraco que esta fase já descrevia.
+>
+> **(d) o RENAME recusa, MESMO com o tipo declarado**:
+> `'Print' is also a member of: MYCLASS2 - a send is dynamic dispatch, the rename is
+> ambiguous; refusing`.
+>
+> ### O ACHADO NOVO, e ele é o mais barato de consertar
+>
+> **O `usages` pergunta o receptor e o `rename` não.** Mesma execução, mesmo projeto,
+> mesmos fatos: um verbo diz `confirmed`/`excluded` com o motivo, o outro recusa em
+> bloco por homonímia. Não falta FATO — falta o rename consultar o que já existe.
+>
+> **A ordem que isto sugere** (e cada passo é entregável sozinho):
+> 1. **o rename consulta os mesmos fatos do `usages`** — recusa só quando os envios
+>    ficam mesmo ambíguos, e renomeia quando o alcance declarado fecha;
+> 2. **o cursor deixa de mandar consulta nua** (a Fase 2 desta fase);
+> 3. **E1** (`FUNCTION F() AS CLASS X` no core) — é o que faz a notação do Diego,
+>    `LOCAL c1 := MyClass1():New()`, funcionar SEM `AS CLASS`: a função de classe
+>    passa a declarar o que devolve, e o tipo vira fato por declaração. O roadmap já
+>    chamava o E1 de "a maior alavanca do sistema"; este exemplo é o caso dele.
+>
+> **Critério de aceitação, nas palavras do Diego**: a partir de `c1:Print()` ir à
+> definição de `METHOD Print() CLASS MyClass1`; `find all usages` achar `c1:Print()`
+> e **não** `c2:Print()`; e o rename tocar um e não o outro.
 
 Plano completo: **[plano-tipos-com-alcance.md](plano-tipos-com-alcance.md)** — **o arquivo é
 plano, não registro.**

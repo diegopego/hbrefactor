@@ -41,9 +41,43 @@ custou um erro:
 4. **O que o arquivo de projeto manda compilar é o que existe.** O compilador é a fonte da
    AST; varrer combinações de flag seria inventar programas que ninguém pediu.
 
-**ABERTO, para a próxima sessão escolher:** **P33** (LSP, aprovada), **P34** (IntelliSense,
-exploratória), **P22**/**P25** (EM CURSO), **V fatia 2** (a análise incremental) e o volume
-da **A.1 passo 2** — 123 units ainda no `run.sh` contra 58 casos no formato novo.
+---
+
+## ⇢ A PRÓXIMA SESSÃO COMEÇA AQUI: a P14, e ela já está medida
+
+O Diego pediu três coisas, nas palavras dele, e a sessão as mediu de ponta a ponta antes de
+acabar. **Leia a [P14 no roadmap](roadmap.md) — o bloco "O ESTADO REAL, MEDIDO" tem o
+fixture inteiro e as quatro saídas reais.** Aqui só o que faz agir:
+
+```harbour
+LOCAL c1 := MyClass1():New()
+LOCAL c2 := MyClass2():New()
+c1:Print()      // MyClass1 e MyClass2 ambas têm METHOD Print()
+c2:Print()
+```
+
+| o que ele espera | hoje |
+|---|---|
+| de `c1:Print()` ir à definição em `MyClass1` | **meio** — o envio é classificado certo, mas a consulta sai NUA e lista as duas definições |
+| `usages` achar `c1:Print()` e não `c2:Print()` | **funciona** com `LOCAL c1 AS CLASS MyClass1` (`confirmed`/`excluded`); sem a anotação, os dois saem `receiver unknown` |
+| `rename` tocar um e não o outro | **recusa**, mesmo com o tipo declarado |
+
+**O achado que ordena o trabalho: o `usages` pergunta o receptor e o `rename` NÃO.** Mesma
+execução, mesmos fatos — um diz `confirmed`/`excluded` com o motivo, o outro recusa em bloco
+por homonímia. **Não falta fato; falta o rename consultar o que já existe.** É o passo mais
+barato e o primeiro.
+
+Depois vêm o cursor (parar de mandar consulta nua) e o **E1** de core (`FUNCTION F() AS CLASS
+X`), que é o que faz a notação SEM `AS CLASS` funcionar — hoje ela não funciona por decisão,
+não por esquecimento: tipar pelo `New()` foi removido na RE.3 como inferência.
+
+**O caminho de sonda**: reconstruir o fixture leva 30 segundos e ele está inteiro na P14.
+
+---
+
+**TAMBÉM ABERTO:** **P33** (LSP, aprovada), **P34** (IntelliSense, exploratória),
+**P22**/**P25** (EM CURSO), **V fatia 2** (a análise incremental) e o volume da
+**A.1 passo 2** — 123 units ainda no `run.sh` contra 58 casos no formato novo.
 
 **PENDÊNCIA DE PROCESSO:** o push nunca foi pedido e não foi feito, nos dois repos. E há um
 `tools/tmp-prune.sh` não rastreado na árvore que **não é meu** — deixei fora de todos os
