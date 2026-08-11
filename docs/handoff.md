@@ -16,33 +16,38 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 > sessão fica longa, o handoff vira o mapa dela, e ele apaga o arquivo quando tudo estiver
 > pronto)*. O estado durável está no [`roadmap.md`](roadmap.md); aqui só o que está VIVO.
 
-**ENTREGUE E COMMITADO** — `hbrefactor@29b3665` + `harbour-core@5735f10f04`:
-**P36** (`ast-25`: o dump marca a chamada que resolve nome em run time; a heurística de
-string do memvar morre) e **P36b** (a família frágil inteira: `inline-local`,
-`reorder-params`, `rename-method`, `extract-function`, `find-dynamic-calls`; `ast-26` para a
-classe `message`).
+**TUDO ENTREGUE E COMMITADO.** `hbrefactor@abf0643` · `harbour-core@6c9b74ca63`,
+`make test` **1007/0**, `pcode-identity` **889/889**.
 
-**NA ÁRVORE, VERDE, NÃO COMMITADO** — `make test` 1005/0, `pcode-identity` 889/889:
-- **P36c** — a flag `--force` **morreu**. Os cinco alimentadores viraram o que eram: dois
-  diagnostics, um alerta FALSO removido (sombra de local — medido: o programa imprime o
-  mesmo valor e o pcode sai idêntico), uma recusa por quebra provada
-  (`memvar-named-inside-a-macro-string`) e uma declaração. A extensão perdeu o modal.
-- **A remoção do campo `reach`** — ele viveu dois dias e saiu por decisão do Diego
-  (2026-08-11). A régua que ficou vale para todo campo futuro: **sítio se LISTA onde um fato
-  o liga à operação; onde não liga, não se lista.**
-- **P36d** — o mesmo aviso saiu do `reorder-params`, pela mesma razão mais a de produto:
-  quem chama por `Do()` sabe que não será alcançado por reorganização de parâmetros.
+| fase | o que mudou |
+|---|---|
+| **P36** (`ast-25`) | o dump marca a chamada que resolve nome em run time; a heurística de string do memvar morre — ela deixava passar `__mvGet( "xC" + "fg" )` com selo de `verified` |
+| **P36b** (`ast-26`) | a família frágil inteira: `inline-local`, `reorder-params`, `rename-method`, `extract-function`, `find-dynamic-calls` |
+| **P36c** | a flag `--force` **morre**; cada alimentador vira o que é (dois diagnostics, um alerta falso removido, uma recusa por quebra provada, uma declaração) |
+| **P36d** | o aviso de chamada dinâmica sai do `reorder-params` |
+| **P37** | a **auditoria**: veredito por arquivo + o mapa das regiões que o build não compilou |
+| **P38** (`ast-27`) | `REQUEST`/`EXTERNAL` viram sítio editável — o rename deixa de falhar com mensagem ilegível |
+| **P17** | fechada como **limite especificado**, com caso que o pina |
 
-**ESCRITO, NÃO IMPLEMENTADO — e é aqui que a próxima sessão começa:**
-- **P37, a auditoria de adequação** *(prioridade do Diego: é o recurso que ele quer, usado
-  "como se usa um mecanismo de formatação de código")*. Spec fechada, inclusive o inventário
-  medido de construtos e o censo do core (93% dos módulos limpos). A marcação de "ignore"
-  ficou **fora por decisão dele** — deixar o ruído aparecer primeiro.
-- **P38, `REQUEST`/`EXTERNAL`** — o rename não edita a linha do `REQUEST`, o verificador pega
-  e desfaz, e a mensagem é ilegível. **O commit no core está AUTORIZADO** (Diego,
-  2026-08-11); falta escrever o código: o passo 2 (o core publica o sítio) é o conserto.
+**AS RÉGUAS QUE ESTA SESSÃO DEIXOU** — elas valem para o próximo trabalho, e cada uma
+custou um erro:
 
-**PENDÊNCIAS DE PROCESSO:** o trabalho acima espera commit; o push nunca foi pedido.
+1. **Sítio se LISTA onde um FATO o liga à operação; onde não liga, não se lista.** Foi o que
+   matou o campo `reach` dois dias depois de ele nascer, e o aviso do `reorder-params`.
+2. **Alerta só onde o core pode provar.** Trazer fragilidade para a ferramenta está fora de
+   escopo; explorar se o core passa a dar o fato está dentro.
+3. **A ferramenta recusa quando prova que a edição quebra algo; no resto aplica e declara.**
+   Não há terceiro estado para o usuário destravar — foi assim que o `--force` morreu.
+4. **O que o arquivo de projeto manda compilar é o que existe.** O compilador é a fonte da
+   AST; varrer combinações de flag seria inventar programas que ninguém pediu.
+
+**ABERTO, para a próxima sessão escolher:** **P33** (LSP, aprovada), **P34** (IntelliSense,
+exploratória), **P22**/**P25** (EM CURSO), **V fatia 2** (a análise incremental) e o volume
+da **A.1 passo 2** — 123 units ainda no `run.sh` contra 58 casos no formato novo.
+
+**PENDÊNCIA DE PROCESSO:** o push nunca foi pedido e não foi feito, nos dois repos. E há um
+`tools/tmp-prune.sh` não rastreado na árvore que **não é meu** — deixei fora de todos os
+commits.
 
 ## 0-28. A SESSÃO DE 2026-07-28 — a P21 entregou o MECANISMO, e a fila mudou de dono
 
