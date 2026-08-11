@@ -383,7 +383,11 @@ async function cmdFindDynamicCalls() {
   const c = await projCtx();
   if (!c) return;
   await saveAll();
-  report('find-dynamic-calls', await run(['find-dynamic-calls', c.spec], c.cwd));
+  // P37: o verbo virou AUDITORIA - veredito por arquivo ("este módulo é
+  // refatorável com prova?") e um contador no fim. Não é veto: nenhum outro
+  // comando o consulta, e o rename continua olhando o projeto inteiro. É o
+  // relatório que se roda quando se quer organizar o código
+  report('audit', await run(['find-dynamic-calls', c.spec], c.cwd));
 }
 
 // snapshot/verify (A.2): o ORÁCULO EXPOSTO. Vale para QUALQUER edição - a sua,

@@ -7074,18 +7074,34 @@ STATIC FUNCTION GenTargets( aOwners )
 
    RETURN aOut
 
-// a função tem macro '&' ESCRITO PELO USUÁRIO? Um macro real é token type 22
-// posicionado (prov 's', ex.: '&cVar.'); o '&' interno da expansão do
-// hbclass.ch (usesMacro na função da classe) não gera token posicionado, então
-// é falso positivo. É o MacroSites que responde - aqui só o sim/não
-STATIC FUNCTION HasUserMacro( hAst, hFunc )
-   RETURN ! Empty( MacroSites( hAst, hFunc ) )
+// ---------------------------------------------------------------------------
+// A AUDITORIA DE ADEQUAÇÃO (P37) - "quais módulos deste projeto eu consigo
+// refatorar com prova, e quais não?"
+//
+// Ideia do Diego (2026-08-09): *"detecção de código inadequado a refatoração
+// como um alerta, assim um programador poderia aderir às boas práticas se
+// quisesse"*, usado *"como se usa um mecanismo de formatação de código"*. Não é
+// veto: nenhum verbo consulta este veredito, e o alcance de um rename continua
+// olhando o projeto inteiro. É informação para quem escreve, e o propósito dela
+// é acionável - ver onde está o dinâmico e, querendo, movê-lo para módulos
+// próprios.
+//
+// O que conta como fora do alcance da prova, e só isto:
+//   - `dyn` numa chamada (ast-25/26): a RTL alcança símbolo por nome de runtime
+//   - um `&` que o PROGRAMADOR escreveu (token 22, prov 's'; o `&` que o
+//     hbclass.ch gera na expansão não é dele - é o MacroSites que separa)
+//
+// O que NÃO conta, e a medição é o argumento: `sends[]`. Mensagem é despacho
+// dinâmico por definição, está em 41% dos módulos do core, e a ferramenta lida
+// com ela desde a B4f. Chamar isso de inadequado declararia OOP inadequada e
+// tornaria o relatório inútil - e refatorar classes é um dos maiores objetivos
+// desta ferramenta (Diego).
+// ---------------------------------------------------------------------------
 
 STATIC FUNCTION FindDynamicCalls( aArgs )
 
-   LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem
-   LOCAL hDefined := { => }, nFound := 0, aSrc
-   LOCAL aFind := {}   // A.1: os achados são o fato; a prosa é uma linha p/ cada
+   LOCAL hProj, cTmp, cPath, hAst, hFunc, hItem, aSrc, hSite
+   LOCAL aMods := {}, aSites, nLimpos := 0, cDyn
 
    IF Len( aArgs ) < 2
       Usage()
@@ -7099,64 +7115,53 @@ STATIC FUNCTION FindDynamicCalls( aArgs )
    IF ! AstDumps( hProj, cTmp )
       RETURN Refuse( "the project does not compile" )
    ENDIF
+
    FOR EACH cPath IN hProj[ "files" ]
       hAst := ReadAst( cTmp, cPath )
       IF hAst == NIL
          RETURN Refuse( "dump missing for '" + cPath + "'" )
       ENDIF
-      FOR EACH hFunc IN hAst[ "functions" ]
-         IF ! hFunc[ "fileDecl" ]
-            hDefined[ Upper( hFunc[ "name" ] ) ] := hb_FNameNameExt( cPath )
-         ENDIF
-      NEXT
-   NEXT
-   FOR EACH cPath IN hProj[ "files" ]
-      hAst := ReadAst( cTmp, cPath )
-      aSrc := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
-      // P36b: o verbo era feito da heurística - "string cujo TEXTO é o nome de
-      // uma função do projeto, logo talvez uma chamada dinâmica". Medido num
-      // fixture com cinco acessos dinâmicos: ele relatava UM rótulo impresso
-      // (uma string de dado que soletrava o nome de uma função) e ficava mudo
-      // sobre os três acessos reais - por nome de função, por nome de memvar e
-      // por compilação em run time. Agora a pergunta que
-      // o nome do comando promete é respondida pelo fato: as chamadas que o
-      // core declara como resolvedoras de nome (`dyn`, ast-25) e as avaliações
-      // de macro. No mesmo fixture: quatro achados, nenhum falso
+      aSrc   := hb_ATokens( StrTran( hb_MemoRead( cPath ), Chr( 13 ), "" ), Chr( 10 ) )
+      aSites := {}
       FOR EACH hFunc IN hAst[ "functions" ]
          IF hFunc[ "fileDecl" ]
             LOOP
          ENDIF
          FOR EACH hItem IN hFunc[ "calls" ]
-            IF hb_HGetDef( hItem, "dyn", NIL ) != NIL
-               nFound++
-               AAdd( aFind, { "kind" => "call-resolves-name", ;
-                              "file" => hb_FNameNameExt( cPath ), "line" => hItem[ "line" ], ;
-                              "sym" => hItem[ "sym" ], "reaches" => hItem[ "dyn" ], ;
-                              "function" => hFunc[ "name" ], ;
-                              "text" => SrcText( aSrc, hItem[ "line" ] ) } )
-               Prose( hb_FNameNameExt( cPath ) + ":" + hb_ntos( hItem[ "line" ] ) + ;
-                  ": " + hItem[ "sym" ] + " " + DynPhrase( hItem[ "dyn" ] ) + ;
-                  SrcLine( aSrc, hItem[ "line" ] ) + hb_eol() )
+            cDyn := hb_HGetDef( hItem, "dyn", NIL )
+            IF cDyn != NIL
+               AAdd( aSites, { "line" => hItem[ "line" ], "kind" => cDyn, ;
+                               "sym" => hItem[ "sym" ] } )
             ENDIF
          NEXT
+         FOR EACH hSite IN MacroSites( hAst, hFunc )
+            AAdd( aSites, { "line" => hSite[ "line" ], "kind" => "code", "sym" => NIL } )
+         NEXT
       NEXT
-      FOR EACH hFunc IN hAst[ "functions" ]
-         // só macro REAL do usuário: usesMacro provindo da expansão do
-         // hbclass.ch (função da classe) não tem '&' posicionado - falso
-         // positivo suprimido (P3)
-         IF ! hFunc[ "fileDecl" ] .AND. hFunc[ "usesMacro" ] .AND. HasUserMacro( hAst, hFunc )
-            nFound++
-            AAdd( aFind, { "kind" => "function-uses-macro", ;
-                           "file" => hb_FNameNameExt( cPath ), "line" => hFunc[ "line" ], ;
-                           "function" => hFunc[ "name" ], "text" => NIL } )
-            Prose( hb_FNameNameExt( cPath ) + ":" + hb_ntos( hFunc[ "line" ] ) + ;
-               ": function " + hFunc[ "name" ] + " uses & macros (dynamic names possible)" + hb_eol() )
-         ENDIF
-      NEXT
+      ASort( aSites,,, {| x, y | x[ "line" ] < y[ "line" ] } )
+      AAdd( aMods, { "file" => hb_FNameNameExt( cPath ), ;
+                     "traceable" => Empty( aSites ), "sites" => aSites } )
+      IF Empty( aSites )
+         nLimpos++
+         Prose( hb_FNameNameExt( cPath ) + ": traceable" + hb_eol() )
+      ELSE
+         Prose( hb_FNameNameExt( cPath ) + ": " + hb_ntos( Len( aSites ) ) + ;
+                 " site(s) resolving names at run time" + hb_eol() )
+         FOR EACH hSite IN aSites
+            Prose( "  " + hb_FNameNameExt( cPath ) + ":" + hb_ntos( hSite[ "line" ] ) + ": " + ;
+                    iif( hSite[ "sym" ] == NIL, "macro evaluation", ;
+                         hSite[ "sym" ] + " " + DynPhrase( hSite[ "kind" ] ) ) + ;
+                    SrcLine( aSrc, hSite[ "line" ] ) + hb_eol() )
+         NEXT
+      ENDIF
    NEXT
-   Prose( hb_ntos( nFound ) + " finding(s)" + hb_eol() )
 
-   RETURN Ok( hb_ntos( nFound ) + " finding(s)", { "findings" => aFind } )
+   cPath := hb_ntos( Len( aMods ) ) + " module(s): " + hb_ntos( nLimpos ) + ;
+            " traceable, " + hb_ntos( Len( aMods ) - nLimpos ) + " with run-time reach"
+   Prose( cPath + hb_eol() )
+
+   RETURN Ok( cPath, { "modules" => aMods, "total" => Len( aMods ), ;
+                       "traceable" => nLimpos } )
 
 // ---------------------------------------------------------------------------
 // reorder-params - reordena parâmetros na assinatura e os ARGUMENTOS em

@@ -464,13 +464,21 @@ echo "case 22: find-dynamic-calls audits what the compiler PROVES is dynamic"
 # por nome, o memvar alcancado por nome - e o de macro, que ja' era fato.
 D=$(fresh case22)
 printf '\nFUNCTION Indireta( cVar )\n\n   RETURN Do( cVar, 1 )\n\nFUNCTION Dinamica( cVar )\n\n   RETURN &cVar\n' >> "$D/a.prg"
+# P37: o verbo virou AUDITORIA - veredito por ARQUIVO ("este modulo e'
+# rastreavel?") em vez de lista corrida de achados. O que ele afirma e' o
+# mesmo fato; o que mudou e' a forma, que agora responde a pergunta do
+# programador em vez de despejar sitios.
 ( cd "$D" && "$BIN" find-dynamic-calls fix01.hbp --json > out.log 2>&1 )
 RC=$?
 check "exit 0"                     $([ $RC -eq 0 ] && echo 0 || echo 1)
-"$TCHECK" envrow "$D/out.log" findings "kind=call-resolves-name;sym=DO;reaches=function;function=INDIRETA"
-check "call that resolves a function name reported" $?
-"$TCHECK" envrow "$D/out.log" findings "kind=function-uses-macro;function=DINAMICA"
-check "macro zone reported"        $?
+"$TCHECK" envhas "$D/out.log" detail "with run-time reach"
+check "the summary counts the modules"  $?
+grep -q '"kind": "function"' "$D/out.log" && grep -q '"sym": "DO"' "$D/out.log"
+check "the call that resolves a function name is a site" $?
+grep -q '"kind": "code"' "$D/out.log"
+check "the macro is a site too"    $?
+grep -q '"traceable": true' "$D/out.log"
+check "and the clean modules are stated as traceable" $?
 
 }
 
@@ -1361,15 +1369,15 @@ echo "case 58: B4e P3 - find-dynamic-calls filtra o ruído do & da expansão hbc
 # posicionado, prov 's') deve ser reportada.
 D=$(freshsig case58)
 ( cd "$D" && "$BIN" find-dynamic-calls fixsig.hbp > fd.log 2>&1 )
-grep -q "^0 finding" "$D/fd.log"
-check "clean class project reports 0 (hbclass & noise suppressed)" $?
-! grep -qi "WIDGET uses & macros" "$D/fd.log" && ! grep -qi "PANEL uses & macros" "$D/fd.log"
+grep -q "0 with run-time reach" "$D/fd.log"
+check "clean class project: every module traceable (hbclass & noise suppressed)" $?
+! grep -qi "WIDGET" "$D/fd.log" || ! grep -qi "run-time" "$D/fd.log"
 check "the class functions are not flagged" $?
 printf '\nFUNCTION Dyn( cMsg )\n   RETURN &cMsg.()\n' >> "$D/w2.prg"
 ( cd "$D" && "$BIN" find-dynamic-calls fixsig.hbp > fd2.log 2>&1 )
-grep -q "function DYN uses & macros" "$D/fd2.log"
+grep -q "macro evaluation" "$D/fd2.log"
 check "a real user macro is still flagged" $?
-grep -q "^1 finding" "$D/fd2.log"
+grep -q "1 with run-time reach" "$D/fd2.log"
 check "exactly the user macro, none of the class noise" $?
 
 }

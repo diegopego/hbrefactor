@@ -1659,7 +1659,7 @@ Eval( bPaga )
       <div class="cmd"><span class="nm">inline-local</span><p>Fold a variable back into its uses — purity judged by the compiler's own tree, not a guess.</p></div>
       <div class="cmd"><span class="nm">reorder-params</span><p>Change a function's or method's parameter order and fix every call site to match, behavior-preserving.</p></div>
       <div class="cmd"><span class="nm">call-graph</span><p>See who calls what — across modules and out to external functions; method sends shown as dynamic edges, honestly distinct from static calls.</p></div>
-      <div class="cmd"><span class="nm">find-dynamic-calls</span><p>List every place the compiler proves a name is resolved at run time — a call into the runtime that takes a name, or a macro — and nothing that merely looks like one.</p></div>
+      <div class="cmd"><span class="nm">find-dynamic-calls</span><p>Audit the project file by file: which modules can be refactored on proof, and which reach names that only exist while the program runs. Run it when you want to organize, the way you run a formatter.</p></div>
       <div class="cmd"><span class="nm">annotate</span><p>Materialize implied types (<span class="mono">DECLARE</span> / <span class="mono">AS CLASS</span>), verified, with automatic rollback.</p></div>
       <div class="cmd"><span class="nm">exec-registry</span><p>Snapshot classes that only exist at runtime, by running just the registration code in a sandbox.</p></div>
     </div>

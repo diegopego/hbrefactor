@@ -75,13 +75,33 @@ type Resultado struct {
 	ApplicationSites     int     `json:"applicationSites,omitempty"`
 	DirectiveOccurrences int     `json:"directiveOccurrences,omitempty"`
 
+	// só na auditoria (find-dynamic-calls): o veredito POR ARQUIVO. `total` e
+	// `traceable` são o número que o programador acompanha ao longo do tempo -
+	// é a forma de ele ver o próprio código melhorando.
+	Modules   []Modulo `json:"modules,omitempty"`
+	Total     int      `json:"total,omitempty"`
+	Traceable int      `json:"traceable,omitempty"`
+
 	// só no usages. `total` × `returned` + `truncated` existem porque a
 	// resposta pode ser cortada, e um consumidor que leia só `locations`
 	// concluiria "são estes" quando são "estes, dos N".
 	Query     string `json:"query,omitempty"`
-	Total     int    `json:"total,omitempty"`
 	Returned  int    `json:"returned,omitempty"`
 	Truncated bool   `json:"truncated,omitempty"`
+}
+
+// Modulo é o veredito de um arquivo: rastreável, ou com os sítios que o tiram
+// do alcance da prova. `sites` vazio é a afirmação positiva, não a ausência.
+type Modulo struct {
+	File      string       `json:"file"`
+	Traceable bool         `json:"traceable"`
+	Sites     []SitioDinam `json:"sites"`
+}
+
+type SitioDinam struct {
+	Line int     `json:"line"`
+	Kind string  `json:"kind"`
+	Sym  *string `json:"sym"`
 }
 
 type Edicao struct {

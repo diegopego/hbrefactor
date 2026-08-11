@@ -1399,7 +1399,7 @@ via `hb_MilliSeconds` — está preservado, agora sobre `--dry-run`). A **extens
 VSCode** perdeu o modal "Proceed (--force)?", que era o último ponto onde ela
 decidia fluxo casando prosa em inglês. `make test` 1005/0.
 
-### P37 — AUDITORIA DE ADEQUAÇÃO: onde este projeto é refatorável, e onde não é *(ideia do Diego, 2026-08-09: "detecção de código inadequado a refatoração como um alerta, assim um programador poderia aderir às boas práticas se quisesse"; **A FAZER**)*
+### P37 — AUDITORIA DE ADEQUAÇÃO: onde este projeto é refatorável, e onde não é *(ideia do Diego, 2026-08-09; **✅ ENTREGUE 2026-08-11**)*
 
 **A forma, e ela já está quase pronta**: não é verbo novo (o portão D-P5 não se toca). É o
 `find-dynamic-calls` — que na P36b deixou de ler string e passou a responder por fato —
@@ -1527,6 +1527,26 @@ o veredito saindo do envelope (não da prosa); `sends[]` **não** classificando 
 inadequado (caso que trava isso, porque é o erro fácil); e a auditoria rodada sobre o corpus
 do core reproduzindo o censo acima — se divergir, ou o censo estava errado ou a auditoria
 está, e a diferença é o achado.
+
+#### O QUE ENTROU (2026-08-11)
+
+`result` passa a ser `{ modules[], total, traceable }`, com `modules[] = { file, traceable,
+sites[] }` e cada sítio `{ line, kind, sym }` (`sym: null` no macro, que é a linguagem
+fazendo, não uma função). Zero fato novo: `dyn` (ast-25/26) e `MacroSites`.
+
+**O confronto com o censo foi FEITO, e bate** — quatro módulos reais do `contrib/gtwvg`,
+escolhidos do censo pelos dois lados: `3state`, `bitmap` e `checkbox` (censo `dyn=0`) saem
+`traceable`; `activex` (censo `dyn=1`) sai com o sítio nomeado — `hb_ExecFromArray( ::oOLE,
+__GetMessage(), ... )`. E os três limpos têm `usesMacro` ACESO pelo `&` do `hbclass.ch`, sem
+serem sinalizados: é o fato do caso 58 valendo em código real do core.
+
+**Um portão pegou um resíduo no caminho**: o `HasUserMacro` ficou órfão (a auditoria usa o
+`MacroSites` direto) e o build reprovou por W0034 — a regra de build limpo do Makefile
+funcionando como projetada.
+
+**Drift, e ele é o que a spec pedia**: casos 22 e 58 do `run.sh` reescritos para o formato
+novo. O que cada um provava sobrevive — o `dyn` reportado (22) e a supressão do `&` do
+`hbclass.ch` com o macro do usuário ainda pego (58). `make test` **1007/0**.
 
 ### P38 — `REQUEST`/`EXTERNAL` nomeiam a função e o rename não os vê *(achado 2026-08-10 pela varredura de construtos da P37; **✅ ENTREGUE 2026-08-11, `ast-27`** — passo 2; o passo 1 caiu por não ter mais consumidor)*
 

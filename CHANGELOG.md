@@ -20,6 +20,39 @@ The compiler that makes all of this possible has its own:
 `feature/compiler-ast-dump`). There it is called `NEWS` by GNU convention — Harbour
 already has a `ChangeLog.txt`, which is the *developer's* log; `NEWS` is the *user's*.
 
+## 2026-08-11 — the audit: which of your modules can be refactored on proof
+
+`find-dynamic-calls` now answers one question per file, and the answer is a
+verdict rather than a pile of sites:
+
+```
+$ hbrefactor find-dynamic-calls app.hbp
+classe.prg: traceable
+dinamico.prg: 2 site(s) resolving names at run time
+  dinamico.prg:5: __MVGET resolves a memvar name at run time  | RETURN __mvGet( cNome )
+  dinamico.prg:11: macro evaluation  | RETURN &cExpr
+puro.prg: traceable
+3 module(s): 2 traceable, 1 with run-time reach
+```
+
+**It is not a veto and it changes nothing.** No verb consults it; a rename still
+looks at your whole project. It exists so you can see where the dynamic code
+is and, if you want, move it into modules of its own — the way you run a
+formatter. The counter at the end is the number to watch: it is how you see your
+own code getting better.
+
+**A class with methods and sends is `traceable`.** Dynamic dispatch is what
+objects do, it is in 41% of Harbour's own modules, and this tool has handled it
+for a long time. Only two things take a module out: a call the compiler says
+resolves a name at run time, and a `&` you wrote — the `&` that `hbclass.ch`
+generates inside a `CREATE CLASS` is not yours and is not counted.
+
+**What to expect when you run it**, measured on Harbour's own source: of 692
+modules, **647 (93%) are traceable**, 9 contain a macro you wrote, and 39 call
+something that resolves a name. The dynamic code concentrates where you would
+guess — the error handler, the debugger, persistence, `dbedit`. Most application
+code is on the clean side of that line already.
+
 ## 2026-08-11 — renaming a function that a `REQUEST` names
 
 ```harbour

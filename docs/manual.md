@@ -796,7 +796,7 @@ Every classic refactoring, re-seated on the compiler's facts; each one verified
 | `inline-local` | Fold a variable back into its uses — purity judged by the compiler's own tree. |
 | `reorder-params` | Change a function's or method's parameter order and fix every call site to match. |
 | `call-graph` | See who calls what — across modules, out to external functions; method sends shown as dynamic edges, honestly distinct from static calls. |
-| `find-dynamic-calls` | List every place the compiler proves a name is resolved at run time — a call into the runtime that takes a name, or a macro — and nothing that merely looks like one. |
+| `find-dynamic-calls` | Audit the project file by file: which modules can be refactored on proof, and which reach names that only exist while the program runs. Run it when you want to organize, the way you run a formatter. |
 | `annotate` | Materialize implied types (`DECLARE` / `AS CLASS`), verified, with automatic rollback. |
 | `exec-registry` | Snapshot classes that only exist at runtime, by running just the registration code in a sandbox. |
 

@@ -1,0 +1,50 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "find-dynamic-calls",
+  "argv": [
+   "find-dynamic-calls",
+   "app.hbp",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "3 module(s): 2 traceable, 1 with run-time reach",
+  "diagnostics": [],
+  "result": {
+   "modules": [
+    {
+     "file": "classe.prg",
+     "traceable": true,
+     "sites": []
+    },
+    {
+     "file": "dinamico.prg",
+     "traceable": false,
+     "sites": [
+      {
+       "line": 5,
+       "kind": "memvar",
+       "sym": "__MVGET"
+      },
+      {
+       "line": 11,
+       "kind": "code",
+       "sym": null
+      }
+     ]
+    },
+    {
+     "file": "puro.prg",
+     "traceable": true,
+     "sites": []
+    }
+   ],
+   "total": 3,
+   "traceable": 2
+  },
+  "edits": []
+ }
+]

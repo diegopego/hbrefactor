@@ -1,0 +1,86 @@
+classe.prg(5) >CREATE CLASS Caixa<
+#xcommand >CLASS Caixa<
+classe.prg(5) >CLASS Caixa<
+#xcommand >_HB_CLASS Caixa ; function __HB_CLS_OPT( Caixa ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Caixa", __HB_CLS_PAR( ), @__HB_CLS_OPT( Caixa)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Caixa ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+classe.prg(5) >HB_CLS_PARAM_LIST<
+#define >...<
+classe.prg(5) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+classe.prg(5) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+classe.prg(5) >__HB_CLS_OPT( Caixa )<
+#xtranslate >Caixa<
+classe.prg(5) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+classe.prg(5) >__HB_CLS_OPT( Caixa)<
+#xtranslate >Caixa<
+classe.prg(6) >VAR nTot INIT 0<
+#xcommand >_HB_MEMBER { nTot } ; oClass:AddMultiData(, 0, __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"nTot"}, __HB_CLS_NOINI )<
+classe.prg(6) >HB_OO_CLSTP_READONLY<
+#define >16<
+classe.prg(6) >HB_OO_CLSTP_PERSIST<
+#define >256<
+classe.prg(6) >HB_OO_CLSTP_SYNC<
+#define >2048<
+classe.prg(6) >__HB_CLS_NOINI<
+#define >.F.<
+classe.prg(6) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+classe.prg(7) >METHOD Soma( nQtd )<
+#xcommand >METHOD Soma( nQtd ) _CLASS_MODE_<
+classe.prg(7) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+classe.prg(7) >METHOD Soma( nQtd ) _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Soma( nQtd )); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Soma( nQtd )) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Soma( nQtd )), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Soma( nQtd ) )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+classe.prg(7) >_CLASS_NAME_<
+#define >Caixa<
+classe.prg(7) >_CLASS_NAME_<
+#define >Caixa<
+classe.prg(7) >HB_OO_CLSTP_CTOR<
+#define >8<
+classe.prg(7) >HB_OO_CLSTP_PERSIST<
+#define >256<
+classe.prg(7) >HB_OO_CLSTP_SYNC<
+#define >2048<
+classe.prg(7) >__HB_CLS_ASFUNC(Soma( nQtd ))<
+#xtranslate >Soma( nQtd)<
+classe.prg(7) >__HB_CLS_PARAMS(Soma( nQtd ))<
+#xtranslate >__HB_CLS_ASID(Soma( nQtd ))<
+classe.prg(7) >__HB_CLS_ASID(Soma( nQtd ))<
+#xtranslate >Soma<
+classe.prg(7) >__HB_CLS_ASSTRING(Soma( nQtd ))<
+#xtranslate >"Soma"<
+classe.prg(7) >__HB_CLS_MTHNAME Caixa Soma( nQtd )<
+#xtranslate >Caixa_Soma( nQtd )<
+classe.prg(7) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+classe.prg(7) >Caixa _<
+(concatenate) >Caixa_<
+classe.prg(7) >Caixa_ Soma<
+(concatenate) >Caixa_Soma<
+classe.prg(7) >__HB_CLS_ASID( Caixa_Soma( nQtd ) )<
+#xtranslate >Caixa_Soma<
+classe.prg(7) >__HB_CLS_DECLARE_METHOD Soma Caixa<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Soma CLASS Caixa _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Soma CLASS Caixa ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Soma([ <xparams,... >] ) CLASS Caixa _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Soma([ <xparams>] ) CLASS Caixa<
+classe.prg(8) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+classe.prg(8) >HB_CLS_PARAM_LIST<
+#define >...<
+classe.prg(8) >_CLASS_NAME_<
+#define >Caixa<
+classe.prg(8) >END SEQUENCE<
+#command >end<
+classe.prg(10) >METHOD Soma( nQtd ) CLASS Caixa<
+#xcommand >METHOD FUNCTION Soma( nQtd ) CLASS Caixa _CLASS_MODE_<
+classe.prg(10) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+classe.prg(10) >METHOD FUNCTION Soma( nQtd ) CLASS Caixa _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Soma( nQtd ) CLASS Caixa<
+classe.prg(10) >DECLARED METHOD FUNCTION Soma( nQtd ) CLASS Caixa<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Caixa Soma( nQtd ) ; local Self AS CLASS Caixa := QSelf() AS CLASS Caixa<
+classe.prg(10) >__HB_CLS_MTHNAME Caixa Soma( nQtd )<
+#xtranslate >Caixa_Soma( nQtd )<
+classe.prg(10) >Caixa _<
+(concatenate) >Caixa_<
+classe.prg(10) >Caixa_ Soma<
+(concatenate) >Caixa_Soma<

@@ -20,7 +20,7 @@
       { "command": "hbrefactor.reorderParams", "title": "hbrefactor: Reorder parameters of function under cursor" },
       { "command": "hbrefactor.extractFunction", "title": "hbrefactor: Extract selection to new function" },
       { "command": "hbrefactor.callGraph", "title": "hbrefactor: Call graph (word under cursor or whole project)" },
-      { "command": "hbrefactor.findDynamicCalls", "title": "hbrefactor: Find dynamic calls (strings/macros audit)" },
+      { "command": "hbrefactor.findDynamicCalls", "title": "hbrefactor: Audit which modules are refactorable" },
       { "command": "hbrefactor.snapshot", "title": "hbrefactor: Snapshot (record the baseline before editing)" },
       { "command": "hbrefactor.verify", "title": "hbrefactor: Verify edit (did it preserve behaviour? works for ANY edit, including an AI's)" }
     ],
