@@ -1,0 +1,268 @@
+app.prg(7) >CREATE CLASS Lantern<
+#xcommand >CLASS Lantern<
+app.prg(7) >CLASS Lantern<
+#xcommand >_HB_CLASS Lantern ; function __HB_CLS_OPT( Lantern ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Lantern", __HB_CLS_PAR( ), @__HB_CLS_OPT( Lantern)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Lantern ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(7) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(7) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(7) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(7) >__HB_CLS_OPT( Lantern )<
+#xtranslate >Lantern<
+app.prg(7) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(7) >__HB_CLS_OPT( Lantern)<
+#xtranslate >Lantern<
+app.prg(8) >VAR cInscription INIT "north wall"<
+#xcommand >_HB_MEMBER { cInscription } ; oClass:AddMultiData(, "north wall", __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"cInscription"}, __HB_CLS_NOINI )<
+app.prg(8) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(8) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(8) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(8) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(8) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(9) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(9) >_CLASS_NAME_<
+#define >Lantern<
+app.prg(9) >_CLASS_NAME_<
+#define >Lantern<
+app.prg(9) >_CLASS_NAME_<
+#define >Lantern<
+app.prg(9) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(9) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(9) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(9) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(9) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(9) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(9) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(9) >__HB_CLS_MTHNAME Lantern New()<
+#xtranslate >Lantern_New()<
+app.prg(9) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(9) >Lantern _<
+(concatenate) >Lantern_<
+app.prg(9) >Lantern_ New<
+(concatenate) >Lantern_New<
+app.prg(9) >__HB_CLS_ASID( Lantern_New() )<
+#xtranslate >Lantern_New<
+app.prg(9) >__HB_CLS_DECLARE_METHOD New Lantern<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS Lantern _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS Lantern ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS Lantern _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS Lantern<
+app.prg(10) >METHOD Engrave()<
+#xcommand >METHOD Engrave() _CLASS_MODE_<
+app.prg(10) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(10) >METHOD Engrave() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Engrave()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Engrave()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Engrave()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Engrave() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(10) >_CLASS_NAME_<
+#define >Lantern<
+app.prg(10) >_CLASS_NAME_<
+#define >Lantern<
+app.prg(10) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(10) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(10) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(10) >__HB_CLS_ASFUNC(Engrave())<
+#xtranslate >Engrave()<
+app.prg(10) >__HB_CLS_PARAMS(Engrave())<
+#xtranslate >__HB_CLS_ASID(Engrave())<
+app.prg(10) >__HB_CLS_ASID(Engrave())<
+#xtranslate >Engrave<
+app.prg(10) >__HB_CLS_ASSTRING(Engrave())<
+#xtranslate >"Engrave"<
+app.prg(10) >__HB_CLS_MTHNAME Lantern Engrave()<
+#xtranslate >Lantern_Engrave()<
+app.prg(10) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(10) >Lantern _<
+(concatenate) >Lantern_<
+app.prg(10) >Lantern_ Engrave<
+(concatenate) >Lantern_Engrave<
+app.prg(10) >__HB_CLS_ASID( Lantern_Engrave() )<
+#xtranslate >Lantern_Engrave<
+app.prg(10) >__HB_CLS_DECLARE_METHOD Engrave Lantern<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Engrave CLASS Lantern _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Engrave CLASS Lantern ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Engrave([ <xparams,... >] ) CLASS Lantern _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Engrave([ <xparams>] ) CLASS Lantern<
+app.prg(11) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(11) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(11) >_CLASS_NAME_<
+#define >Lantern<
+app.prg(11) >END SEQUENCE<
+#command >end<
+app.prg(13) >METHOD New() CLASS Lantern<
+#xcommand >METHOD FUNCTION New() CLASS Lantern _CLASS_MODE_<
+app.prg(13) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(13) >METHOD FUNCTION New() CLASS Lantern _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS Lantern<
+app.prg(13) >DECLARED METHOD FUNCTION New( ) CLASS Lantern<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Lantern New( ) ; local Self AS CLASS Lantern := QSelf() AS CLASS Lantern<
+app.prg(13) >__HB_CLS_MTHNAME Lantern New( )<
+#xtranslate >Lantern_New( )<
+app.prg(13) >Lantern _<
+(concatenate) >Lantern_<
+app.prg(13) >Lantern_ New<
+(concatenate) >Lantern_New<
+app.prg(16) >METHOD Engrave() CLASS Lantern<
+#xcommand >METHOD FUNCTION Engrave() CLASS Lantern _CLASS_MODE_<
+app.prg(16) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(16) >METHOD FUNCTION Engrave() CLASS Lantern _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Engrave( ) CLASS Lantern<
+app.prg(16) >DECLARED METHOD FUNCTION Engrave( ) CLASS Lantern<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Lantern Engrave( ) ; local Self AS CLASS Lantern := QSelf() AS CLASS Lantern<
+app.prg(16) >__HB_CLS_MTHNAME Lantern Engrave( )<
+#xtranslate >Lantern_Engrave( )<
+app.prg(16) >Lantern _<
+(concatenate) >Lantern_<
+app.prg(16) >Lantern_ Engrave<
+(concatenate) >Lantern_Engrave<
+app.prg(20) >CREATE CLASS Compass<
+#xcommand >CLASS Compass<
+app.prg(20) >CLASS Compass<
+#xcommand >_HB_CLASS Compass ; function __HB_CLS_OPT( Compass ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Compass", __HB_CLS_PAR( ), @__HB_CLS_OPT( Compass)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Compass ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(20) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(20) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(20) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(20) >__HB_CLS_OPT( Compass )<
+#xtranslate >Compass<
+app.prg(20) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(20) >__HB_CLS_OPT( Compass)<
+#xtranslate >Compass<
+app.prg(21) >VAR cInscription INIT "true north"<
+#xcommand >_HB_MEMBER { cInscription } ; oClass:AddMultiData(, "true north", __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"cInscription"}, __HB_CLS_NOINI )<
+app.prg(21) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(21) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(21) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(21) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(21) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(22) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(22) >_CLASS_NAME_<
+#define >Compass<
+app.prg(22) >_CLASS_NAME_<
+#define >Compass<
+app.prg(22) >_CLASS_NAME_<
+#define >Compass<
+app.prg(22) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(22) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(22) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(22) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(22) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(22) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(22) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(22) >__HB_CLS_MTHNAME Compass New()<
+#xtranslate >Compass_New()<
+app.prg(22) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(22) >Compass _<
+(concatenate) >Compass_<
+app.prg(22) >Compass_ New<
+(concatenate) >Compass_New<
+app.prg(22) >__HB_CLS_ASID( Compass_New() )<
+#xtranslate >Compass_New<
+app.prg(22) >__HB_CLS_DECLARE_METHOD New Compass<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS Compass _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS Compass ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS Compass _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS Compass<
+app.prg(23) >METHOD Engrave()<
+#xcommand >METHOD Engrave() _CLASS_MODE_<
+app.prg(23) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(23) >METHOD Engrave() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Engrave()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Engrave()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Engrave()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Engrave() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(23) >_CLASS_NAME_<
+#define >Compass<
+app.prg(23) >_CLASS_NAME_<
+#define >Compass<
+app.prg(23) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(23) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(23) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(23) >__HB_CLS_ASFUNC(Engrave())<
+#xtranslate >Engrave()<
+app.prg(23) >__HB_CLS_PARAMS(Engrave())<
+#xtranslate >__HB_CLS_ASID(Engrave())<
+app.prg(23) >__HB_CLS_ASID(Engrave())<
+#xtranslate >Engrave<
+app.prg(23) >__HB_CLS_ASSTRING(Engrave())<
+#xtranslate >"Engrave"<
+app.prg(23) >__HB_CLS_MTHNAME Compass Engrave()<
+#xtranslate >Compass_Engrave()<
+app.prg(23) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(23) >Compass _<
+(concatenate) >Compass_<
+app.prg(23) >Compass_ Engrave<
+(concatenate) >Compass_Engrave<
+app.prg(23) >__HB_CLS_ASID( Compass_Engrave() )<
+#xtranslate >Compass_Engrave<
+app.prg(23) >__HB_CLS_DECLARE_METHOD Engrave Compass<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Engrave CLASS Compass _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Engrave CLASS Compass ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Engrave([ <xparams,... >] ) CLASS Compass _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Engrave([ <xparams>] ) CLASS Compass<
+app.prg(24) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(24) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(24) >_CLASS_NAME_<
+#define >Compass<
+app.prg(24) >END SEQUENCE<
+#command >end<
+app.prg(26) >METHOD New() CLASS Compass<
+#xcommand >METHOD FUNCTION New() CLASS Compass _CLASS_MODE_<
+app.prg(26) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(26) >METHOD FUNCTION New() CLASS Compass _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS Compass<
+app.prg(26) >DECLARED METHOD FUNCTION New( ) CLASS Compass<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Compass New( ) ; local Self AS CLASS Compass := QSelf() AS CLASS Compass<
+app.prg(26) >__HB_CLS_MTHNAME Compass New( )<
+#xtranslate >Compass_New( )<
+app.prg(26) >Compass _<
+(concatenate) >Compass_<
+app.prg(26) >Compass_ New<
+(concatenate) >Compass_New<
+app.prg(29) >METHOD Engrave() CLASS Compass<
+#xcommand >METHOD FUNCTION Engrave() CLASS Compass _CLASS_MODE_<
+app.prg(29) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(29) >METHOD FUNCTION Engrave() CLASS Compass _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Engrave( ) CLASS Compass<
+app.prg(29) >DECLARED METHOD FUNCTION Engrave( ) CLASS Compass<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Compass Engrave( ) ; local Self AS CLASS Compass := QSelf() AS CLASS Compass<
+app.prg(29) >__HB_CLS_MTHNAME Compass Engrave( )<
+#xtranslate >Compass_Engrave( )<
+app.prg(29) >Compass _<
+(concatenate) >Compass_<
+app.prg(29) >Compass_ Engrave<
+(concatenate) >Compass_Engrave<

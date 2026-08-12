@@ -1,0 +1,90 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:8:8",
+   "cEpigraph",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 4 edit(s); DATA member getter+setter renamed for LANTERN; 2 sends proven to dispatch elsewhere left untouched",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "data",
+   "old": "cInscription",
+   "new": "cEpigraph",
+   "editCount": 4,
+   "proof": "symbols-renamed-in-class",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 7,
+       "character": 7
+      },
+      "end": {
+       "line": 7,
+       "character": 19
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 16,
+       "character": 16
+      },
+      "end": {
+       "line": 16,
+       "character": 28
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 37,
+       "character": 12
+      },
+      "end": {
+       "line": 37,
+       "character": 24
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 40,
+       "character": 20
+      },
+      "end": {
+       "line": 40,
+       "character": 32
+      }
+     }
+    }
+   ],
+   "derived": [],
+   "derivedStrings": [
+    {
+     "from": "cInscription",
+     "to": "cEpigraph",
+     "file": "app.prg"
+    }
+   ]
+  },
+  "edits": []
+ }
+]

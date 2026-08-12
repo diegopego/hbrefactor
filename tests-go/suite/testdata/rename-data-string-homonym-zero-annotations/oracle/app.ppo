@@ -1,0 +1,41 @@
+#line 7 "app.prg"
+_HB_CLASS Lantern ; function Lantern ( ... ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := 1 ; ( ( nScope ) ) ; oClass := iif( .F.,, HBClass():new( "Lantern", iif( .F., { }, { @HBObject() } ), @Lantern() ) ) ;;
+   _HB_MEMBER { cInscription } ; oClass:AddMultiData(, "north wall", nScope + iif( .F., 16, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ), {"cInscription"}, .F. )
+   _HB_MEMBER New() AS CLASS Lantern; oClass:AddMethod( "New", @Lantern_New(), nScope + iif( .T., 8, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ) )
+   _HB_MEMBER Engrave(); oClass:AddMethod( "Engrave", @Lantern_Engrave(), nScope + iif( .F., 8, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ) )
+oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; end ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( ... ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS Lantern ;
+
+static FUNCTION Lantern_New( ) ; local Self AS CLASS Lantern := QSelf() AS CLASS Lantern
+   RETURN Self
+
+static FUNCTION Lantern_Engrave( ) ; local Self AS CLASS Lantern := QSelf() AS CLASS Lantern
+   OutStd( Self:cInscription )
+   RETURN Self
+
+_HB_CLASS Compass ; function Compass ( ... ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := 1 ; ( ( nScope ) ) ; oClass := iif( .F.,, HBClass():new( "Compass", iif( .F., { }, { @HBObject() } ), @Compass() ) ) ;;
+   _HB_MEMBER { cInscription } ; oClass:AddMultiData(, "true north", nScope + iif( .F., 16, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ), {"cInscription"}, .F. )
+   _HB_MEMBER New() AS CLASS Compass; oClass:AddMethod( "New", @Compass_New(), nScope + iif( .T., 8, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ) )
+   _HB_MEMBER Engrave(); oClass:AddMethod( "Engrave", @Compass_Engrave(), nScope + iif( .F., 8, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ) )
+oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; end ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( ... ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS Compass ;
+
+static FUNCTION Compass_New( ) ; local Self AS CLASS Compass := QSelf() AS CLASS Compass
+   RETURN Self
+
+static FUNCTION Compass_Engrave( ) ; local Self AS CLASS Compass := QSelf() AS CLASS Compass
+   OutStd( ::cInscription )
+   RETURN Self
+
+PROCEDURE Main()
+
+   LOCAL oLantern := Lantern():New()
+   LOCAL oCompass := Compass():New()
+
+   oLantern:cInscription := "east wall"
+   oCompass:cInscription := "magnetic north"
+
+   OutStd( oLantern:cInscription )
+
+   oLantern:Engrave()
+   oCompass:Engrave()
+
+   RETURN

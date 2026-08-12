@@ -16,10 +16,12 @@ Companheiro do [prompt-revisao-anti-heuristica.md](prompt-revisao-anti-heuristic
 > sessão fica longa, o handoff vira o mapa dela, e ele apaga o arquivo quando tudo estiver
 > pronto)*. O estado durável está no [`roadmap.md`](roadmap.md); aqui só o que está VIVO.
 
-**TUDO ENTREGUE E COMMITADO até `hbrefactor@c14acfa`** · `harbour-core@6c9b74ca63`,
-`make test` **1007/0**, `pcode-identity` **889/889**.
-**NÃO COMMITADO:** a **P39** (abaixo) — só `src/hbrefactor.prg`, dois casos Go novos,
-três exemplos da página, manual/roadmap/handoff. Zero linha de core.
+**TUDO ENTREGUE E COMMITADO** · `harbour-core@6c9b74ca63`, `make test` **1007/0** + Go,
+`pcode-identity` **889/889**. A P39 saiu em `hbrefactor@3859954`; a consolidação do modelo
+(CLAUDE.md + roadmap + handoff) em `hbrefactor@48a18d4`; os dois casos que pinam o modelo
+(`rename-data-string-homonym-zero-annotations`,
+`rename-method-homonym-through-declared-member`) vão no commit que carrega esta edição.
+Zero linha de core em tudo isso.
 
 | fase | o que mudou |
 |---|---|
@@ -122,8 +124,10 @@ de onde cai a quebra de linha.
 membro; procure "O MODELO CONSOLIDADO" no roadmap — inclui a lista de CASOS que o pinam,
 que é a forma durável pedida por ele) e abriu três fases: **P42** (grafia inline
 `VAR ... AS CLASS`, opcional, protótipo provado), **P43** (o `annotate` aprende membros) e
-**P44** (o core deriva o tipo do membro protegido — rota zero-texto, exploratória). Dois
-casos da lista **já podem nascer com a capacidade atual**, sem esperar fase nenhuma.
+**P44** (o core deriva o tipo do membro protegido — rota zero-texto, exploratória). Os dois
+casos da lista que **já podiam nascer NASCERAM no mesmo dia** (verdes de primeira, expected
+à mão): `rename-data-string-homonym-zero-annotations` e
+`rename-method-homonym-through-declared-member`, em `tests-go/suite/`.
 
 **TAMBÉM ABERTO:** **P33** (LSP, aprovada), **P34** (IntelliSense, exploratória),
 **P22**/**P25** (EM CURSO), **V fatia 2** (a análise incremental) e o volume da

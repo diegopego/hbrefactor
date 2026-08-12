@@ -1,0 +1,364 @@
+app.prg(7) >CREATE CLASS Trilho<
+#xcommand >CLASS Trilho<
+app.prg(7) >CLASS Trilho<
+#xcommand >_HB_CLASS Trilho ; function __HB_CLS_OPT( Trilho ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Trilho", __HB_CLS_PAR( ), @__HB_CLS_OPT( Trilho)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Trilho ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(7) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(7) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(7) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(7) >__HB_CLS_OPT( Trilho )<
+#xtranslate >Trilho<
+app.prg(7) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(7) >__HB_CLS_OPT( Trilho)<
+#xtranslate >Trilho<
+app.prg(8) >VAR cRotulo<
+#xcommand >_HB_MEMBER { cRotulo } ; oClass:AddMultiData(,, __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"cRotulo"}, __HB_CLS_NOINI )<
+app.prg(8) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(8) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(8) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(8) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(8) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(9) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(9) >_CLASS_NAME_<
+#define >Trilho<
+app.prg(9) >_CLASS_NAME_<
+#define >Trilho<
+app.prg(9) >_CLASS_NAME_<
+#define >Trilho<
+app.prg(9) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(9) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(9) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(9) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(9) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(9) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(9) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(9) >__HB_CLS_MTHNAME Trilho New()<
+#xtranslate >Trilho_New()<
+app.prg(9) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(9) >Trilho _<
+(concatenate) >Trilho_<
+app.prg(9) >Trilho_ New<
+(concatenate) >Trilho_New<
+app.prg(9) >__HB_CLS_ASID( Trilho_New() )<
+#xtranslate >Trilho_New<
+app.prg(9) >__HB_CLS_DECLARE_METHOD New Trilho<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS Trilho _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS Trilho ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS Trilho _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS Trilho<
+app.prg(10) >METHOD Mostra()<
+#xcommand >METHOD Mostra() _CLASS_MODE_<
+app.prg(10) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(10) >METHOD Mostra() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Mostra()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Mostra()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Mostra()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Mostra() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(10) >_CLASS_NAME_<
+#define >Trilho<
+app.prg(10) >_CLASS_NAME_<
+#define >Trilho<
+app.prg(10) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(10) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(10) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(10) >__HB_CLS_ASFUNC(Mostra())<
+#xtranslate >Mostra()<
+app.prg(10) >__HB_CLS_PARAMS(Mostra())<
+#xtranslate >__HB_CLS_ASID(Mostra())<
+app.prg(10) >__HB_CLS_ASID(Mostra())<
+#xtranslate >Mostra<
+app.prg(10) >__HB_CLS_ASSTRING(Mostra())<
+#xtranslate >"Mostra"<
+app.prg(10) >__HB_CLS_MTHNAME Trilho Mostra()<
+#xtranslate >Trilho_Mostra()<
+app.prg(10) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(10) >Trilho _<
+(concatenate) >Trilho_<
+app.prg(10) >Trilho_ Mostra<
+(concatenate) >Trilho_Mostra<
+app.prg(10) >__HB_CLS_ASID( Trilho_Mostra() )<
+#xtranslate >Trilho_Mostra<
+app.prg(10) >__HB_CLS_DECLARE_METHOD Mostra Trilho<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Mostra CLASS Trilho _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Mostra CLASS Trilho ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Mostra([ <xparams,... >] ) CLASS Trilho _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Mostra([ <xparams>] ) CLASS Trilho<
+app.prg(11) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(11) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(11) >_CLASS_NAME_<
+#define >Trilho<
+app.prg(11) >END SEQUENCE<
+#command >end<
+app.prg(13) >METHOD New() CLASS Trilho<
+#xcommand >METHOD FUNCTION New() CLASS Trilho _CLASS_MODE_<
+app.prg(13) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(13) >METHOD FUNCTION New() CLASS Trilho _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS Trilho<
+app.prg(13) >DECLARED METHOD FUNCTION New( ) CLASS Trilho<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Trilho New( ) ; local Self AS CLASS Trilho := QSelf() AS CLASS Trilho<
+app.prg(13) >__HB_CLS_MTHNAME Trilho New( )<
+#xtranslate >Trilho_New( )<
+app.prg(13) >Trilho _<
+(concatenate) >Trilho_<
+app.prg(13) >Trilho_ New<
+(concatenate) >Trilho_New<
+app.prg(17) >METHOD Mostra() CLASS Trilho<
+#xcommand >METHOD FUNCTION Mostra() CLASS Trilho _CLASS_MODE_<
+app.prg(17) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(17) >METHOD FUNCTION Mostra() CLASS Trilho _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Mostra( ) CLASS Trilho<
+app.prg(17) >DECLARED METHOD FUNCTION Mostra( ) CLASS Trilho<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Trilho Mostra( ) ; local Self AS CLASS Trilho := QSelf() AS CLASS Trilho<
+app.prg(17) >__HB_CLS_MTHNAME Trilho Mostra( )<
+#xtranslate >Trilho_Mostra( )<
+app.prg(17) >Trilho _<
+(concatenate) >Trilho_<
+app.prg(17) >Trilho_ Mostra<
+(concatenate) >Trilho_Mostra<
+app.prg(21) >CREATE CLASS Vagao<
+#xcommand >CLASS Vagao<
+app.prg(21) >CLASS Vagao<
+#xcommand >_HB_CLASS Vagao ; function __HB_CLS_OPT( Vagao ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Vagao", __HB_CLS_PAR( ), @__HB_CLS_OPT( Vagao)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Vagao ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(21) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(21) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(21) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(21) >__HB_CLS_OPT( Vagao )<
+#xtranslate >Vagao<
+app.prg(21) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(21) >__HB_CLS_OPT( Vagao)<
+#xtranslate >Vagao<
+app.prg(22) >VAR cRotulo<
+#xcommand >_HB_MEMBER { cRotulo } ; oClass:AddMultiData(,, __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"cRotulo"}, __HB_CLS_NOINI )<
+app.prg(22) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(22) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(22) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(22) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(22) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(23) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(23) >_CLASS_NAME_<
+#define >Vagao<
+app.prg(23) >_CLASS_NAME_<
+#define >Vagao<
+app.prg(23) >_CLASS_NAME_<
+#define >Vagao<
+app.prg(23) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(23) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(23) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(23) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(23) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(23) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(23) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(23) >__HB_CLS_MTHNAME Vagao New()<
+#xtranslate >Vagao_New()<
+app.prg(23) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(23) >Vagao _<
+(concatenate) >Vagao_<
+app.prg(23) >Vagao_ New<
+(concatenate) >Vagao_New<
+app.prg(23) >__HB_CLS_ASID( Vagao_New() )<
+#xtranslate >Vagao_New<
+app.prg(23) >__HB_CLS_DECLARE_METHOD New Vagao<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS Vagao _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS Vagao ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS Vagao _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS Vagao<
+app.prg(24) >METHOD Mostra()<
+#xcommand >METHOD Mostra() _CLASS_MODE_<
+app.prg(24) >_CLASS_MODE_<
+#define >_CLASS_DECLARATION_<
+app.prg(24) >METHOD Mostra() _CLASS_DECLARATION_<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(Mostra()); __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(Mostra()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(Mostra()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ Mostra() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(24) >_CLASS_NAME_<
+#define >Vagao<
+app.prg(24) >_CLASS_NAME_<
+#define >Vagao<
+app.prg(24) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(24) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(24) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(24) >__HB_CLS_ASFUNC(Mostra())<
+#xtranslate >Mostra()<
+app.prg(24) >__HB_CLS_PARAMS(Mostra())<
+#xtranslate >__HB_CLS_ASID(Mostra())<
+app.prg(24) >__HB_CLS_ASID(Mostra())<
+#xtranslate >Mostra<
+app.prg(24) >__HB_CLS_ASSTRING(Mostra())<
+#xtranslate >"Mostra"<
+app.prg(24) >__HB_CLS_MTHNAME Vagao Mostra()<
+#xtranslate >Vagao_Mostra()<
+app.prg(24) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(24) >Vagao _<
+(concatenate) >Vagao_<
+app.prg(24) >Vagao_ Mostra<
+(concatenate) >Vagao_Mostra<
+app.prg(24) >__HB_CLS_ASID( Vagao_Mostra() )<
+#xtranslate >Vagao_Mostra<
+app.prg(24) >__HB_CLS_DECLARE_METHOD Mostra Vagao<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> Mostra CLASS Vagao _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Mostra CLASS Vagao ; #xcommand METHOD <type: FUNCTION, PROCEDURE> Mostra([ <xparams,... >] ) CLASS Vagao _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> Mostra([ <xparams>] ) CLASS Vagao<
+app.prg(25) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(25) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(25) >_CLASS_NAME_<
+#define >Vagao<
+app.prg(25) >END SEQUENCE<
+#command >end<
+app.prg(27) >METHOD New() CLASS Vagao<
+#xcommand >METHOD FUNCTION New() CLASS Vagao _CLASS_MODE_<
+app.prg(27) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(27) >METHOD FUNCTION New() CLASS Vagao _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS Vagao<
+app.prg(27) >DECLARED METHOD FUNCTION New( ) CLASS Vagao<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Vagao New( ) ; local Self AS CLASS Vagao := QSelf() AS CLASS Vagao<
+app.prg(27) >__HB_CLS_MTHNAME Vagao New( )<
+#xtranslate >Vagao_New( )<
+app.prg(27) >Vagao _<
+(concatenate) >Vagao_<
+app.prg(27) >Vagao_ New<
+(concatenate) >Vagao_New<
+app.prg(31) >METHOD Mostra() CLASS Vagao<
+#xcommand >METHOD FUNCTION Mostra() CLASS Vagao _CLASS_MODE_<
+app.prg(31) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(31) >METHOD FUNCTION Mostra() CLASS Vagao _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION Mostra( ) CLASS Vagao<
+app.prg(31) >DECLARED METHOD FUNCTION Mostra( ) CLASS Vagao<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Vagao Mostra( ) ; local Self AS CLASS Vagao := QSelf() AS CLASS Vagao<
+app.prg(31) >__HB_CLS_MTHNAME Vagao Mostra( )<
+#xtranslate >Vagao_Mostra( )<
+app.prg(31) >Vagao _<
+(concatenate) >Vagao_<
+app.prg(31) >Vagao_ Mostra<
+(concatenate) >Vagao_Mostra<
+app.prg(35) >CREATE CLASS Composicao<
+#xcommand >CLASS Composicao<
+app.prg(35) >CLASS Composicao<
+#xcommand >_HB_CLASS Composicao ; function __HB_CLS_OPT( Composicao ) ( HB_CLS_PARAM_LIST ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := HB_OO_CLSTP_EXPORTED ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "Composicao", __HB_CLS_PAR( ), @__HB_CLS_OPT( Composicao)() ) ) ;; #undef _CLASS_NAME_ ; #define _CLASS_NAME_ Composicao ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_DECLARATION_<
+app.prg(35) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(35) >HB_OO_CLSTP_EXPORTED<
+#define >1<
+app.prg(35) >HB_SYMBOL_UNUSED( nScope )<
+#define >( ( nScope ) )<
+app.prg(35) >__HB_CLS_OPT( Composicao )<
+#xtranslate >Composicao<
+app.prg(35) >__HB_CLS_PAR( )<
+#xtranslate >iif( .F., { }, { @HBObject() } )<
+app.prg(35) >__HB_CLS_OPT( Composicao)<
+#xtranslate >Composicao<
+app.prg(36) >VAR oPrincipal<
+#xcommand >_HB_MEMBER { oPrincipal } ; oClass:AddMultiData(,, __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"oPrincipal"}, __HB_CLS_NOINI )<
+app.prg(36) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(36) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(36) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(36) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(36) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(37) >VAR oReserva<
+#xcommand >_HB_MEMBER { oReserva } ; oClass:AddMultiData(,, __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .F., HB_OO_CLSTP_READONLY, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ), {"oReserva"}, __HB_CLS_NOINI )<
+app.prg(37) >HB_OO_CLSTP_READONLY<
+#define >16<
+app.prg(37) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(37) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(37) >__HB_CLS_NOINI<
+#define >.F.<
+app.prg(37) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(38) >METHOD New() CONSTRUCTOR<
+#xcommand >_HB_MEMBER __HB_CLS_ASFUNC(New()) AS CLASS _CLASS_NAME_; __HB_CLS_DECLARE_METHOD __HB_CLS_PARAMS(New()) _CLASS_NAME_ ; oClass:AddMethod( __HB_CLS_ASSTRING(New()), @__HB_CLS_ASID( __HB_CLS_MTHNAME _CLASS_NAME_ New() )(), __HB_CLS_SCOPE( .F., .F., .F. ) + iif( .T., HB_OO_CLSTP_CTOR, 0 ) + iif( .F., HB_OO_CLSTP_PERSIST, 0 ) + iif( .F., HB_OO_CLSTP_SYNC, 0 ) )<
+app.prg(38) >_CLASS_NAME_<
+#define >Composicao<
+app.prg(38) >_CLASS_NAME_<
+#define >Composicao<
+app.prg(38) >_CLASS_NAME_<
+#define >Composicao<
+app.prg(38) >HB_OO_CLSTP_CTOR<
+#define >8<
+app.prg(38) >HB_OO_CLSTP_PERSIST<
+#define >256<
+app.prg(38) >HB_OO_CLSTP_SYNC<
+#define >2048<
+app.prg(38) >__HB_CLS_ASFUNC(New())<
+#xtranslate >New()<
+app.prg(38) >__HB_CLS_PARAMS(New())<
+#xtranslate >__HB_CLS_ASID(New())<
+app.prg(38) >__HB_CLS_ASID(New())<
+#xtranslate >New<
+app.prg(38) >__HB_CLS_ASSTRING(New())<
+#xtranslate >"New"<
+app.prg(38) >__HB_CLS_MTHNAME Composicao New()<
+#xtranslate >Composicao_New()<
+app.prg(38) >__HB_CLS_SCOPE( .F., .F., .F. )<
+#xtranslate >nScope<
+app.prg(38) >Composicao _<
+(concatenate) >Composicao_<
+app.prg(38) >Composicao_ New<
+(concatenate) >Composicao_New<
+app.prg(38) >__HB_CLS_ASID( Composicao_New() )<
+#xtranslate >Composicao_New<
+app.prg(38) >__HB_CLS_DECLARE_METHOD New Composicao<
+#xcommand >#xcommand METHOD <type: FUNCTION, PROCEDURE> New CLASS Composicao _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New CLASS Composicao ; #xcommand METHOD <type: FUNCTION, PROCEDURE> New([ <xparams,... >] ) CLASS Composicao _CLASS_IMPLEMENTATION_ => DECLARED METHOD <type> New([ <xparams>] ) CLASS Composicao<
+app.prg(39) >ENDCLASS<
+#xcommand >oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( HB_CLS_PARAM_LIST ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS _CLASS_NAME_ ; #undef _CLASS_MODE_ ; #define _CLASS_MODE_ _CLASS_IMPLEMENTATION_<
+app.prg(39) >HB_CLS_PARAM_LIST<
+#define >...<
+app.prg(39) >_CLASS_NAME_<
+#define >Composicao<
+app.prg(39) >END SEQUENCE<
+#command >end<
+app.prg(44) >METHOD New() CLASS Composicao<
+#xcommand >METHOD FUNCTION New() CLASS Composicao _CLASS_MODE_<
+app.prg(44) >_CLASS_MODE_<
+#define >_CLASS_IMPLEMENTATION_<
+app.prg(44) >METHOD FUNCTION New() CLASS Composicao _CLASS_IMPLEMENTATION_<
+#xcommand >DECLARED METHOD FUNCTION New( ) CLASS Composicao<
+app.prg(44) >DECLARED METHOD FUNCTION New( ) CLASS Composicao<
+#xcommand >static FUNCTION __HB_CLS_MTHNAME Composicao New( ) ; local Self AS CLASS Composicao := QSelf() AS CLASS Composicao<
+app.prg(44) >__HB_CLS_MTHNAME Composicao New( )<
+#xtranslate >Composicao_New( )<
+app.prg(44) >Composicao _<
+(concatenate) >Composicao_<
+app.prg(44) >Composicao_ New<
+(concatenate) >Composicao_New<

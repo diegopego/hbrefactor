@@ -1,0 +1,82 @@
+[
+ {
+  "schema": "cli-2",
+  "command": "rename",
+  "argv": [
+   "rename",
+   "app.hbp",
+   "app.prg:17:8",
+   "Exibe",
+   "--json"
+  ],
+  "status": "ok",
+  "exit": 0,
+  "reason": null,
+  "action": null,
+  "detail": "verified: 3 edit(s); message and generated function renamed for TRILHO; 1 send proven to dispatch elsewhere left untouched",
+  "diagnostics": [],
+  "result": {
+   "verdict": "applied",
+   "kind": "method",
+   "old": "Mostra",
+   "new": "Exibe",
+   "editCount": 3,
+   "proof": "symbols-renamed-in-class",
+   "locations": [
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 9,
+       "character": 10
+      },
+      "end": {
+       "line": 9,
+       "character": 16
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 16,
+       "character": 7
+      },
+      "end": {
+       "line": 16,
+       "character": 13
+      }
+     }
+    },
+    {
+     "uri": "file://<CWD>/app.prg",
+     "range": {
+      "start": {
+       "line": 52,
+       "character": 19
+      },
+      "end": {
+       "line": 52,
+       "character": 25
+      }
+     }
+    }
+   ],
+   "derived": [
+    {
+     "from": "TRILHO_MOSTRA",
+     "to": "TRILHO_EXIBE"
+    }
+   ],
+   "derivedStrings": [
+    {
+     "from": "Mostra",
+     "to": "Exibe",
+     "file": "app.prg"
+    }
+   ]
+  },
+  "edits": []
+ }
+]

@@ -1086,13 +1086,17 @@ invariante cobrado.
 especificação durável; todos com DUAS classes homônimas em método E VAR — CLAUDE.md §3 —
 e o comentário de cada caso carrega o parágrafo do modelo que ele pina)*:
 
-- **já podem nascer** (capacidade atual, medida):
+- **já podem nascer** (capacidade atual, medida) — **✅ NASCERAM em 2026-08-11**, ambos
+  verdes na primeira execução com expected/outputs à mão (`tests-go/suite/`):
   - `rename-data-string-homonym-zero-annotations` — VAR string homônima, receptores por
-    ctor/`Self`: renomeia só a classe pedida, projeto sem UMA anotação (pina "primitiva
-    nunca precisa" + "o AS CLASS nunca vai na VAR renomeada");
+    ctor/`Self`: renomeia só a classe pedida (4 edits), projeto sem UMA anotação (pina
+    "primitiva nunca precisa" + "o AS CLASS nunca vai na VAR renomeada"; guarda
+    `noAnnotationsAnywhere` reprova se alguém um dia "ajudar" o fixture anotando);
   - `rename-method-homonym-through-declared-member` — send via `oCli:oPrincipal:Mostra()`
-    com a linha da Forma B escrita: o rename atravessa o membro (pina a Forma B compilando
-    hoje e o tipo-do-caminho);
+    com a linha da Forma B escrita: o rename atravessa o membro (3 edits; pina a Forma B
+    compilando hoje e o tipo-do-caminho). Controles adversariais medidos na entrega: sem
+    as linhas `_HB_MEMBER` a MESMA operação recusa (a declaração é load-bearing); sem
+    parênteses, `E0030`; forma de grupo, `W0025 Class '(null)'`;
 - **nascem com a P42** (se a Forma A for aprovada): `member-type-inline-syntax-homonym`;
 - **nascem com a P43**: `annotate-writes-protected-member-type`,
   `annotate-drafts-exported-member-line`, `annotate-member-diverging-assignments-collapses`;
