@@ -628,6 +628,24 @@ Plano, usos candidatos e limites: **[pp-corpus/pp-as-search.md](pp-corpus/pp-as-
 > | nomes de método declarados | **1816** |
 > | …em MAIS de uma classe (o gatilho da recusa) | **408 (≈22%)** |
 >
+> **RESSALVA que o Diego levantou, e que a medição confirmou em parte** *(2026-08-11: "o
+> padrão para programadores harbour é a sintaxe do hbclass.ch; as outras formas são
+> normalmente usadas apenas no core")*. Se o core usasse formas exóticas, o 11% acima seria
+> um número sobre o core e não sobre código de aplicação. **Medido, separando por sintaxe:**
+>
+> | forma | classes | com `CONSTRUCTOR` |
+> |---|---|---|
+> | `CREATE CLASS` (hbclass.ch) | **304** | 32 (**11%**) |
+> | `CLASS … ENDCLASS` (forma curta, também hbclass.ch) | **5** | 0 |
+>
+> **O core JÁ É hbclass.ch** — 304 contra 5 — então o 11% não estava sendo puxado para baixo
+> por sintaxe de exceção: ele é o número **dentro** do estilo padrão. **O que continua NÃO
+> medido, e a ressalva do Diego permanece de pé nesta parte:** se o programador de aplicação
+> declara `METHOD New() CONSTRUCTOR` com mais frequência do que o core declara. Não temos
+> corpus de aplicação (o `work/` está vazio, e o §3 proíbe usar o código do Diego como régua
+> de valor), então **o 11% deve ser lido como "no core", nunca como "no mundo"** — e qualquer
+> decisão que dependa desse número precisa de um corpus de aplicação antes.
+>
 > **Logo: o gatilho é COMUM e o canal do construtor é RARO.** Em código como o do core, a
 > maioria dos renames de método homônimo continua recusando — não por falta de capacidade,
 > por falta de receptor declarado. **O E1 volta a valer o que valia**: classe sem
@@ -847,6 +865,280 @@ nada que o usuário deva mudar no código dele.**
 a fase; a medição derrubou) nem "consertar a ordem do projeto do usuário" (era assim que eu
 descrevi a causa ao Diego; a matriz derrubou). É: **fazer o `annotate` decidir a emissão do
 `DECLARE` pela VISIBILIDADE no ponto de uso, não pela pertinência ao módulo.**
+
+**O PONTO EXATO NO FONTE, e o fato que falta.** Quem decide é `AnnClsInMod( hAst, cUpCls )`
+(src): ela varre `declared.classes` do módulo e devolve *"o módulo declara esta classe"*.
+Cinco sítios do `annotate` consultam essa resposta para decidir se emitem o registro
+`_HB_CLASS`. **A pergunta está errada em UMA palavra** — o que importa não é *se* o módulo
+declara, é *se já declarou naquele ponto*, porque o canal é sequencial.
+
+E aqui a fase encontra a pergunta do §1.1, respondida por medição:
+
+```
+declared.classes[] = { "name": "CONTA", "methods": [...] }     # e nada mais
+```
+
+**A entrada NÃO tem posição.** Então a informação para transformar `AnnClsInMod` numa
+pergunta posicional **não está nesse canal** — e é por isso que a fase não é uma linha de
+código. Duas rotas, e a ordem do §1.1 manda explorar o core ANTES de escolher:
+
+- **(b) CORE — o caminho padrão (§1.4):** `declared.classes` publica a posição em que a
+  classe entra na tabela (a linha do `_HB_CLASS`/`CREATE CLASS` que a registrou). É do
+  tamanho do `ast-21`/`ast-23`, cabe no mesmo formato (chave OPCIONAL, lida com
+  `hb_HGetDef`), e serve a qualquer consumidor futuro que precise de visibilidade
+  declarada — não só ao `annotate`.
+- **(a) FERRAMENTA:** o `_HB_CLASS` do STREAM já vem posicionado, e a ferramenta já o
+  percorre em dois lugares (`MethodDeclSites` e o mapa de vocabulário) — o schema
+  documenta esse canal como *o* canal declarado. **Mas:** fazer `AnnClsInMod` comparar
+  posições é a ferramenta modelando a regra de visibilidade sequencial do compilador, que
+  é gatilho 4 do §1.2 com uma casca fina. Se for por aqui, é com selo e razão escrita.
+
+**Decidir só depois de sondar o core** — onde `W0025` é emitido e o que ele consulta.
+*(Não sondei: parei aqui de propósito, §5 "plano ≠ spec, não implemente no mesmo passo".)*
+
+#### MATRIZ DE COBERTURA — por onde o objeto CHEGA ao send *(medida 2026-08-11)*
+
+Fixture com **duas classes homônimas em tudo** (mesmo `VAR nSaldo`, mesmo `METHOD Mostra()`
+— régua do CLAUDE.md §3), cinco formas de o objeto chegar, e cada célula rodada de fonte
+pristino. É a referência para saber o que cada elo compra:
+
+| como o objeto chega ao send | sem ctor | com `CONSTRUCTOR` | + `annotate --apply` | declaração À MÃO que fecha (compilada) |
+|---|---|---|---|---|
+| `oA := Conta():New()` | `possible` | **`confirmed`** | `confirmed` | *(o ctor JÁ é esta declaração)* |
+| `oF := Fabrica()` | `possible` | `possible` | **`confirmed`** | `DECLARE Fabrica() AS CLASS Conta` |
+| `{\| o \| o:nSaldo }` | `possible` | `possible` | **`confirmed`** | `{\| o AS CLASS Conta \| … }` |
+| `oPar` dentro de `Usa( oPar )` | `possible` | `possible` | `possible` **(política)** | `Usa( oPar AS CLASS Conta )` |
+| `oW:oDona:nSaldo` (objeto em membro) | `possible` | `possible` | `possible` **(lacuna)** | `_HB_MEMBER oDona() AS CLASS Conta` |
+
+E o que só o fixture HOMÔNIMO revela — o outro dono produz o veredito de exclusão, que a
+matriz de classe única não conseguia emitir de jeito nenhum:
+
+```
+CONTA_MOSTRA     RETURN ::nSaldo   -> confirmed
+POUPANCA_MOSTRA  RETURN ::nSaldo   -> excluded (dispatches to POUPANCA:NSALDO)
+MAIN             oP:nSaldo         -> excluded (dispatches to POUPANCA:NSALDO)
+```
+
+**Três fatos que esta matriz fixou:**
+
+1. **`CONSTRUCTOR` e `annotate` produzem o MESMO fato pelo mesmo canal.** Sem o construtor,
+   o `annotate` escreve `_HB_MEMBER NEW() AS CLASS CONTA` — que é exatamente o que a
+   palavra `CONSTRUCTOR` faz o `hbclass.ch` gerar (`2 declaration(s)` contra `1`). Logo
+   **o construtor NÃO é pré-requisito do `annotate`**, e as colunas 3 e 4 são idênticas.
+2. **O E1 confirmado na prática:** `STATIC FUNCTION Fabrica() AS CLASS Conta` **não
+   compila** (`E0030 syntax error at 'AS'`). É por isso que a rota de hoje é o `DECLARE`
+   separado — que funciona, medido.
+3. **`-kt` sobe só a anotação da VARIÁVEL.** No mesmo projeto: `oPar` com `AS CLASS`
+   escrito vira `guaranteed`; `oF`, cujo tipo vem do `DECLARE` da função, fica em
+   `confirmed`. Imposição em runtime é sobre o que a variável guarda, não sobre a
+   assinatura declarada.
+
+> **LACUNA NOVA, do tamanho da P41 e do mesmo verbo** *(achada 2026-08-11)*: a linha do
+> membro fecha por declaração — `_HB_MEMBER oDona() AS CLASS Conta` compila e devolve
+> `confirmed` —, mas **o `annotate` não emite essa linha**. Não é limite do core nem
+> política: é o mesmo tipo de conserto da P41 (o `annotate` deixando de escrever uma
+> declaração que fecharia a cadeia). *(Errei a forma na primeira sonda — `_HB_MEMBER ODONA
+> AS CLASS CONTA`, sem parênteses, NÃO compila: o getter de um `VAR` é mensagem e leva
+> `()`. Cheguei a classificar como "lacuna desconhecida" antes de acertar a sintaxe.)*
+
+### P42 — `VAR <nome> AS CLASS <Classe>`: o tipo do membro DECLARADO na própria classe *(ABERTA; medida 2026-08-11, pista do Diego)*
+
+> *"a gente já chegou a alterar a hbclass.ch para poder fazer o core rastrear classes sem
+> exigir alterações no código. desde que a alteração não afete código pré-existente."*
+
+**A sintaxe do tipo de membro JÁ EXISTE no `hbclass.ch`** — `#xcommand VAR <!DataName1!>
+[, …] [ <tp: TYPE, AS> <type> ] …` (linha 480). Ela funciona para tipo de UMA palavra e
+**não** para classe. Medido, e a `.ppo` mostra exatamente onde para:
+
+| escrito | compila? | expansão |
+|---|---|---|
+| `VAR nId AS NUMERIC` | ✅ | `_HB_MEMBER { AS NUMERIC nId }` |
+| `VAR oPrincipal AS CLASS Conta` | ❌ `E0030 syntax error at 'OPRINCIPAL'` | **nenhuma** — a regra não casou |
+| `_HB_MEMBER { AS CLASS Conta oPrincipal }` (à mão) | compila, mas **`W0025 Class '(null)'`** | o grupo PERDE o nome da classe |
+| `_HB_MEMBER oPrincipal() AS CLASS Conta` (à mão) | ✅ | **`confirmed send (receiver class CONTA)`** |
+
+**FECHADA EM PROTÓTIPO no mesmo dia — e ficou menor do que o texto acima previa.** A regra
+de 3 linhas, no padrão `_HB_SUPER`/`_HB_INLINESELF` deste branch, evita a forma de grupo
+inteira; **zero linha de core**:
+
+```harbour
+#xcommand VAR <!name!> AS CLASS <!cls!> [<rest,...>] => ;
+   VAR <name> [<rest>] ;;
+   _HB_MEMBER <name>() AS CLASS <cls>
+```
+
+Medido no protótipo (header copiado, nunca o core editado): compila com `INIT` e
+`PROTECTED`; classes homônimas dão `confirmed` num dono e `excluded` no outro; **38/38
+módulos do core byte-idênticos** sem a sintaxe nova; `HB_CLS_NO_DECLARATIONS` continua
+desligando tudo. Inofensiva por construção: hoje `VAR x AS CLASS Y` é **E0030** — nenhum
+código existente pode estar usando; a superfície é estritamente aditiva. *(Duas formas de
+regra erradas antes da certa: bloco errado do header, e a cláusula multi-nome
+`[, <!DataNameN!>]` impedia o casamento.)*
+
+**E a fase é OPCIONAL** *(entendimento fechado com o Diego — ver "O MODELO CONSOLIDADO")*:
+ela cria a **Forma A** (tipo inline, visível na definição). A **Forma B** — a linha
+`_HB_MEMBER` fora do bloco — **já funciona hoje sem mudança nenhuma** e é o formato que o
+`annotate` já emite para métodos. A P43 funciona com qualquer uma; a decisão A × B (ou
+ambas) é do Diego.
+
+**Critério de pronto (mecânico)** — se a Forma A for aprovada: caso
+`member-type-inline-syntax-homonym` (duas classes homônimas em método E VAR; membro
+resolvido num dono, `excluded` no outro); `make pcode-identity` 889/889; corpus
+byte-idêntico; `HB_CLS_NO_DECLARATIONS` segue mudo.
+
+#### A PERGUNTA DO DIEGO, e o que a medição respondeu *(2026-08-11)*
+
+> *"se o annotate é capaz de anotar o necessário, significa que o core precisa realmente
+> destas anotações?"*
+
+Lido no fonte: `AnnOne` calcula o tipo **duas vezes** — `hFato` (`hInter` NIL, só canal
+declarado) e, **só se aquele falhar**, `hMach` (a máquina interprocedural, marcada no
+próprio código como *"sugeridora - RE.3"*). Daí os níveis: **n1/n2 nascem de FATO**, **n3
+nasce de inferência**. Então a pergunta se parte em duas, e as duas foram medidas no mesmo
+fixture (`LOCAL oC := Conta():New()`, classe com `METHOD New() CONSTRUCTOR`):
+
+| | antes do `annotate` | depois |
+|---|---|---|
+| projeto **sem** `-kt` | `confirmed send (receiver class CONTA via declared types)` | `confirmed send (receiver declared AS CLASS CONTA)` |
+| projeto **com** `-kt` | `confirmed send (receiver class CONTA via declared types)` | **`guaranteed send (receiver AS CLASS CONTA imposed by -kt checks)`** |
+
+**Resposta em duas partes:**
+
+1. **Onde o tipo já é FATO e o projeto NÃO usa `-kt`: a anotação não compra veredito
+   nenhum.** Mesma certeza (`confirmed`), só muda por qual canal ela chegou. O Diego está
+   certo: ali o core não precisa da anotação — ele já sabia, e a P14 já tinha provado isso
+   (construtor declarado ⇒ `confirmed` com zero anotação).
+2. **Onde o projeto usa `-kt`, ela sobe o veredito para `guaranteed`** — e isso não é
+   redundância, é troca de natureza: `confirmed` diz *"o canal declarado afirma"*;
+   `guaranteed` diz *"e se algum dia for mentira, o programa PARA no sítio nomeado"*.
+   Derivação vira invariante imposta. E onde o tipo **não** é fato (n3, fábrica, união de
+   retornos), a anotação é o único caminho: ela converte PALPITE em DECLARAÇÃO que um
+   humano assina e o compilador cobra — que é a linha inteira do RE.3.
+
+**O QUE ISTO ABRE, e é decisão do Diego** *(não implementado)*: hoje o `--apply` escreve a
+anotação **n1 também em projeto sem `-kt`** — edita o fonte do usuário por ganho de
+veredito ZERO. Isso tem exatamente a forma das coisas que este projeto já matou por
+política *(régua 1 da sessão de 08-09: "sítio se LISTA onde um FATO o liga à operação; onde
+não liga, não se lista" — foi ela que matou o campo `reach` e o aviso do `reorder-params`)*.
+As opções, sem recomendação embutida:
+- **(i)** `--apply` deixa de escrever n1 quando o projeto não tem `-kt`, e o relatório diz
+  por quê (*"seu projeto já sabe disto; ligue `-kt` para que ele COBRE"*);
+- **(ii)** continua escrevendo, com o argumento de que a anotação é documentação durável e
+  sobrevive a mudanças que quebrem o canal do construtor — mas isso é **afirmação sobre o
+  futuro do código**, não fato de compilação, e o projeto normalmente recusa esse tipo de
+  argumento;
+- **(iii)** o relatório separa "compra `guaranteed`" de "não compra nada hoje" e o usuário
+  escolhe.
+
+**Nada disto é urgente e nada disto vai para código sem o Diego decidir** — fica registrado
+porque a pergunta dele achou um comportamento que ninguém tinha medido.
+
+#### O MODELO CONSOLIDADO — dois fatos, e quem escreve o quê *(fechado com o Diego, 2026-08-11; os casos listados no fim são a forma DURÁVEL disto — o roadmap desaparece, teste fica)*
+
+**Os dois fatos que a conversa separou de vez** (era a confusão que fazia toda resposta
+parecer vaga):
+
+1. **PERTENCIMENTO** — *"oPrincipal é membro de Cliente"*. O `CREATE CLASS` já dá sozinho
+   (canal `_HB_CLASS`/`_HB_MEMBER`, `_CLASS_NAME_`), e é por isso que o `CONSTRUCTOR` é
+   grátis: o tipo que ele declara É a classe do bloco, cujo nome está ali. **Zero texto,
+   já entregue hoje.**
+2. **CONTEÚDO** — *"oPrincipal GUARDA uma Conta"*. `Conta` é uma TERCEIRA classe cujo nome
+   **não está escrito no bloco `CREATE CLASS`** — só nas atribuições, que são corpo de
+   método. Não há o que o PP/`ENDCLASS` emitir: regra não emite fato que não está no input
+   dela (o PP vê tokens; dar-lhe semântica = segundo parser, rejeitado nesta fase).
+
+**A escada de quem escreve o CONTEÚDO** — e o `AS CLASS` **nunca** vai na VAR primitiva nem
+na VAR sendo renomeada: quando existe, vai nas variáveis-OBJETO do caminho até ela:
+
+| a VAR guarda | quem escreve o tipo | texto novo no fonte |
+|---|---|---|
+| valor (string/número/data/array) | ninguém — conteúdo não participa de dispatch | **nenhum** |
+| objeto, nome do membro ÚNICO no projeto | ninguém — a unicidade guarda o rename (caso 110) | **nenhum** |
+| objeto construído na hora / alcançado por `Self` | `CONSTRUCTOR` — o hbclass já injeta | **nenhum** |
+| objeto em membro `PROTECTED`/`HIDDEN` | o core deriva (**P44**) ou o `annotate` escreve (**P43**) | nenhum / 1 linha da ferramenta |
+| objeto em membro exportado | o programador APROVA a linha que o relatório rascunha | 1 linha assinada |
+| parâmetro de função pública | o programador (`F( o AS CLASS X )`) — conjunto aberto | 1 anotação |
+
+**Medições que sustentam (todas de 2026-08-11):** escopo `PROTECTED`/`HIDDEN` é **IMPOSTO
+em runtime** (atribuição de fora estoura — logo dedução fechada é fato de LINGUAGEM, não
+convenção); rename de `VAR cNome` string homônima com receptores por ctor/`Self` funciona
+**hoje com zero anotação** (4 edits numa classe, 2 sends da outra excluded); rename de
+método através de cadeia de membro tipado funciona (`oCli:oPrincipal:Mostra()` renomeado,
+`::oReserva:Mostra()` homônimo textual intacto).
+
+**Onde o texto mora, quando existe — decisão pendente do Diego:**
+- **Forma A (inline)**: `VAR oPrincipal AS CLASS Conta` — o tipo visível na definição;
+  precisa da P42 (3 linhas de header, protótipo provado);
+- **Forma B (fora do bloco)**: `_HB_MEMBER oPrincipal() AS CLASS Conta` após o `ENDCLASS`
+  — **funciona HOJE sem mudança nenhuma**; é o formato que o `annotate` já emite para
+  métodos, e deixa toda `CREATE CLASS ... ENDCLASS` byte-idêntica à de hoje.
+
+**Fato derivado × fato declarado** (governa a relação P43×P44): o derivado **se move com o
+código** — uma atribuição nova noutro método colapsa o tipo para desconhecido à distância,
+sem uma linha de diff que avise; honesto, porém calado. O declarado é **âncora** — a edição
+colide contra a promessa (sob `-kt`, estoura no sítio nomeado), e mudar o invariante exige
+mudar UMA linha visível em revisão. **`-kt` só impõe declaração, nunca derivação** —
+imposição por inferência mudaria comportamento de programa sem assinatura. As rotas
+**compõem**: P44 dá alcance sem atrito; P43 materializa a âncora para quem quer o
+invariante cobrado.
+
+**OS CASOS QUE PINAM O MODELO** *(pedido do Diego: a clareza vai nos testes, que são a
+especificação durável; todos com DUAS classes homônimas em método E VAR — CLAUDE.md §3 —
+e o comentário de cada caso carrega o parágrafo do modelo que ele pina)*:
+
+- **já podem nascer** (capacidade atual, medida):
+  - `rename-data-string-homonym-zero-annotations` — VAR string homônima, receptores por
+    ctor/`Self`: renomeia só a classe pedida, projeto sem UMA anotação (pina "primitiva
+    nunca precisa" + "o AS CLASS nunca vai na VAR renomeada");
+  - `rename-method-homonym-through-declared-member` — send via `oCli:oPrincipal:Mostra()`
+    com a linha da Forma B escrita: o rename atravessa o membro (pina a Forma B compilando
+    hoje e o tipo-do-caminho);
+- **nascem com a P42** (se a Forma A for aprovada): `member-type-inline-syntax-homonym`;
+- **nascem com a P43**: `annotate-writes-protected-member-type`,
+  `annotate-drafts-exported-member-line`, `annotate-member-diverging-assignments-collapses`;
+- **nascem com a P44**: `core-derives-protected-member-verdict`,
+  `derived-member-fact-moves-with-code` (a v1→v2: atribuição nova colapsa o veredito —
+  pinado como comportamento **ESPERADO**, não regressão).
+
+### P43 — o `annotate` aprende MEMBROS *(ABERTA; spec do plano de 2026-08-11; depende da P41 para arquivo com `Main` no topo)*
+
+**Escopo** — passo novo `AnnMembers`, entre locais e retornos (pseudo-código apresentado ao
+Diego na sessão):
+- membro **exportado** → **NUNCA edita** (doutrina: conjunto de atribuições aberto); RELATA
+  com a linha rascunhada e a saída alternativa (*"...write: `VAR o AS CLASS X` — or make
+  it PROTECTED and re-run"*);
+- membro **`PROTECTED`/`HIDDEN`** → enumera as atribuições nos métodos da classe (fechado
+  por construção — escopo imposto, sonda de 2026-08-11), tipa cada RHS com o `AnnLinks`
+  existente; todas provam a mesma classe → **escreve** (Forma B; A se a P42 existir);
+  diverge ou não prova → colapsa, relata nível 3;
+- verificação: **a mesma dos locais** — `.hrb` byte-idêntico sem `-kt`, `-w3 -es2` limpo,
+  RODA sob `-kt`; falha → rollback byte a byte.
+
+Nada de máquina nova: `MethodImplOf`, o nó `ASSIGN`→`SEND` (fato 11) e `AnnLinks` já
+existem — o passo é o laço e a edição.
+
+**Critério de pronto (mecânico)**: os três casos da lista acima verdes (fonte byte a byte
+intacto no caso que só relata); `make test` verde; round-trip A→B→A byte-exato onde
+aplica.
+
+### P44 — o core DERIVA o tipo do membro protegido *(EXPLORATÓRIA — a rota zero-texto; SONDA antes de spec)*
+
+**A tese** (corolário da linha FATO/PALPITE desta fase, doutrina fechada pelo Diego em
+2026-08-11): para membro `PROTECTED`/`HIDDEN` o conjunto de atribuições fecha **por
+linguagem** (runtime impõe — medido), logo derivar o tipo é dedução FECHADA = fato que
+pode julgar. O compilador deriva sozinho, publica no dump (ast-NN), e o caso comum
+(`::oPrincipal := Conta():New()` no construtor) resolve **sem uma letra nova no fonte**.
+
+**Limites já decididos:** colapso-para-desconhecido obrigatório (RHS não provado ou
+divergente); **`-kt` nunca impõe fato derivado**; o fato derivado se move com o código —
+comportamento esperado e honesto (ver o trade-off no modelo consolidado, acima).
+
+**Sondas antes de qualquer spec**: onde o compilador vê as atribuições de membro e se o
+ponto de junção do dump alcança; custo zero no pcode (gated por `fAst`), conferido pela
+régua de sempre.
+
+**Critério de pronto (mecânico)** — quando sair da exploração: contagem de conflitos do
+bison INALTERADA; pcode byte-idêntico sem as flags; os dois casos da lista acima verdes.
 
 **Escopo**:
 - **caso** que encadeia os três comandos (recusa → `annotate --apply` → rename aplica),

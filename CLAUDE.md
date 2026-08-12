@@ -433,6 +433,18 @@ morta. *(Prima do §4: "anunciar" inclui a conversa em que se decide.)*
   como régua de valor de fase nem alvo de entrega. *(Nuance da **xhb**: braço xHarbour,
   não-mantido — vale como corpus de MEDIÇÃO, mas número vindo só dela não justifica
   capacidade sozinho.)*
+- **EXEMPLO/FIXTURE COM CLASSE NASCE COM HOMÔNIMOS — método E propriedade** *(Diego,
+  2026-08-11: "mantenha sempre os exemplos com classes com métodos e propriedades
+  homônimas — tratar isto é crucial")*. Duas classes que compartilham o nome do `METHOD`
+  **e** o nome do `VAR`/`DATA`, sempre; classe única é caso degenerado e só entra quando o
+  assunto do teste é outro. **O motivo é mecânico, não estético:** com um dono só a
+  ferramenta **não consegue emitir `excluded`** — o veredito existe justamente para dizer
+  "este send prova que vai para OUTRA classe". Fixture de classe única passa verde cega
+  para metade da máquina. *(Medido no dia: a mesma matriz de cobertura rodada com um dono
+  só não produziu um único `excluded`; com dois donos homônimos, `oP:nSaldo` e o `::nSaldo`
+  dentro do método do outro dono saíram `excluded` — dois canais que ninguém estava
+  exercitando.)* Vale para fixture de suíte, exemplo de página, sonda e o que eu escrever
+  numa resposta.
 - **ESTUDAR CLASSE: os dois pontos de partida** *(Diego, 2026-07-13)* — vale para qualquer
   frente que toque OOP (tipo de receiver, rename de DATA/método, dispatch, herança):
   - `$(sh tools/hbenv.sh --print HB_CORE)/include/hbclass.ch` — a **DSL inteira** (`CREATE CLASS`,

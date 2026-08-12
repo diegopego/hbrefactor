@@ -118,6 +118,13 @@ por linha) e **[P41](roadmap.md)** (a ponte `annotate` → `rename`). A P41 é a
 alcance da capacidade em código real; a P40 é a que tira uma recusa que só existe por causa
 de onde cai a quebra de linha.
 
+**E a conversa de 2026-08-11 com o Diego consolidou O MODELO** (quem escreve o tipo de
+membro; procure "O MODELO CONSOLIDADO" no roadmap — inclui a lista de CASOS que o pinam,
+que é a forma durável pedida por ele) e abriu três fases: **P42** (grafia inline
+`VAR ... AS CLASS`, opcional, protótipo provado), **P43** (o `annotate` aprende membros) e
+**P44** (o core deriva o tipo do membro protegido — rota zero-texto, exploratória). Dois
+casos da lista **já podem nascer com a capacidade atual**, sem esperar fase nenhuma.
+
 **TAMBÉM ABERTO:** **P33** (LSP, aprovada), **P34** (IntelliSense, exploratória),
 **P22**/**P25** (EM CURSO), **V fatia 2** (a análise incremental) e o volume da
 **A.1 passo 2** — 123 units ainda no `run.sh` contra 58 casos no formato novo.
